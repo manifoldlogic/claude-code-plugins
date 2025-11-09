@@ -1,8 +1,10 @@
 {
   "name": "projects",
-  "description": "Manage project and ticket workflows",
+  "version": "0.1.0",
+  "description": "Manage project and ticket workflows with systematic planning, execution, and verification. Provides slash commands for creating projects, generating tickets, and executing complete ticket workflows including implementation, testing, verification, and committing.",
   "author": {
     "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
     "url": "https://github.com/danielbushman/claude-code-plugins"
   },
   "repository": "https://github.com/danielbushman/claude-code-plugins",
@@ -11,6 +13,7 @@
     "tickets",
     "workflows",
     "management",
-    "automation"
+    "automation",
+    "planning"
   ]
 }

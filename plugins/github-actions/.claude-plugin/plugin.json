@@ -1,0 +1,19 @@
+{
+  "name": "github-actions",
+  "version": "0.1.0",
+  "description": "GitHub Actions workflow management with specialized agent and MCP integration. Provides tools for creating, optimizing, and troubleshooting CI/CD pipelines, including workflow YAML configuration, matrix builds, secrets management, and performance optimization.",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/danielbushman/claude-code-plugins"
+  },
+  "repository": "https://github.com/danielbushman/claude-code-plugins",
+  "keywords": [
+    "github-actions",
+    "ci-cd",
+    "workflows",
+    "automation",
+    "mcp",
+    "github"
+  ]
+}

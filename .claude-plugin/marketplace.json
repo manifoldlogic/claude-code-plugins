@@ -6,19 +6,19 @@
   },
   "plugins": [
     {
-      "name": "initiatives",
-      "source": "./plugins/initiatives",
-      "description": "Manage initiatives workflows"
+      "name": "maproom",
+      "source": "./plugins/maproom",
+      "description": "Semantic code search with indexing, scanning, and MCP integration"
     },
     {
       "name": "projects",
       "source": "./plugins/projects",
-      "description": "Manage projects workflows"
+      "description": "Project and ticket workflow management with systematic execution"
     },
     {
       "name": "github-actions",
       "source": "./plugins/github-actions",
-      "description": "Manage GitHub Actions and Workflows"
+      "description": "GitHub Actions workflow creation, optimization, and troubleshooting"
     }
   ]
 }
