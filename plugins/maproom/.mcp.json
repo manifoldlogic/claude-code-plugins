@@ -10,7 +10,7 @@
         "/app/dist/index.js"
       ],
       "env": {
-        "EMBEDDING_PROVIDER": "openai",
+        "MAPROOM_EMBEDDING_PROVIDER": "openai",
         "OPENAI_API_KEY": "${OPENAI_API_KEY}"
       }
     }

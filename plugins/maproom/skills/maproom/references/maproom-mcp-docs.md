@@ -196,6 +196,6 @@ mcp__maproom__explain({
 
 Default: `postgresql://maproom:maproom@maproom-postgres:5432/maproom`
 
-Override with `DATABASE_URL` environment variable.
+Override with `MAPROOM_DATABASE_URL` environment variable.
 
 Ensure PostgreSQL with pgvector extension is running before using maproom tools.

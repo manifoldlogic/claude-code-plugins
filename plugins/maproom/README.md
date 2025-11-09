@@ -147,7 +147,7 @@ Automated workflow assistance:
 ### "Relation does not exist" error
 - Run migrations: `cargo run --bin crewchief-maproom -- db`
 - Verify PostgreSQL is running
-- Check DATABASE_URL environment variable
+- Check MAPROOM_DATABASE_URL environment variable
 
 ### No search results
 - Check if repository is indexed: `mcp__maproom__status`
@@ -165,7 +165,7 @@ Automated workflow assistance:
 
 ```bash
 # Database connection
-DATABASE_URL=postgresql://maproom:maproom@maproom-postgres:5432/maproom
+MAPROOM_DATABASE_URL=postgresql://maproom:maproom@maproom-postgres:5432/maproom
 
 # Embedding provider (choose one)
 EMBEDDING_PROVIDER=ollama  # or 'openai' or 'google'

@@ -8,11 +8,11 @@
 #   bash scan.sh /path/to/repo      # Scan specific path
 #
 # Environment Variables:
-#   EMBEDDING_PROVIDER   - openai, google, or ollama (required)
+#   MAPROOM_EMBEDDING_PROVIDER   - openai, google, or ollama (required)
 #   OPENAI_API_KEY       - Required for openai provider
 #   GOOGLE_PROJECT_ID    - Required for google provider
 #   GOOGLE_APPLICATION_CREDENTIALS - Required for google provider
-#   DATABASE_URL         - PostgreSQL connection (default: postgresql://maproom:maproom@localhost:5432/maproom)
+#   MAPROOM_DATABASE_URL         - PostgreSQL connection (default: postgresql://maproom:maproom@localhost:5432/maproom)
 
 set -euo pipefail
 
@@ -39,21 +39,21 @@ error() {
 main() {
     info "Maproom Repository Scanner"
 
-    # Check for EMBEDDING_PROVIDER
-    if [[ -z "${EMBEDDING_PROVIDER:-}" ]]; then
-        error "EMBEDDING_PROVIDER not set"
-        error "Please set EMBEDDING_PROVIDER to one of: openai, google, ollama"
+    # Check for MAPROOM_EMBEDDING_PROVIDER
+    if [[ -z "${MAPROOM_EMBEDDING_PROVIDER:-}" ]]; then
+        error "MAPROOM_EMBEDDING_PROVIDER not set"
+        error "Please set MAPROOM_EMBEDDING_PROVIDER to one of: openai, google, ollama"
         error ""
         error "Examples:"
-        error "  EMBEDDING_PROVIDER=openai bash scan.sh"
-        error "  export EMBEDDING_PROVIDER=ollama && bash scan.sh"
+        error "  MAPROOM_EMBEDDING_PROVIDER=openai bash scan.sh"
+        error "  export MAPROOM_EMBEDDING_PROVIDER=ollama && bash scan.sh"
         exit 1
     fi
 
-    info "Using embedding provider: $EMBEDDING_PROVIDER"
+    info "Using embedding provider: $MAPROOM_EMBEDDING_PROVIDER"
 
     # Validate provider-specific requirements
-    case "$EMBEDDING_PROVIDER" in
+    case "$MAPROOM_EMBEDDING_PROVIDER" in
         openai)
             if [[ -z "${OPENAI_API_KEY:-}" ]]; then
                 error "OPENAI_API_KEY not set (required for OpenAI provider)"
@@ -74,7 +74,7 @@ main() {
             info "Using local Ollama provider (no API key required)"
             ;;
         *)
-            error "Unsupported provider: $EMBEDDING_PROVIDER"
+            error "Unsupported provider: $MAPROOM_EMBEDDING_PROVIDER"
             error "Supported providers: openai, google, ollama"
             exit 1
             ;;
@@ -88,15 +88,15 @@ main() {
 
     info "Scanning path: $scan_path"
 
-    # Set DATABASE_URL if not already set
-    export DATABASE_URL="${DATABASE_URL:-postgresql://maproom:maproom@localhost:5432/maproom}"
+    # Set MAPROOM_DATABASE_URL if not already set
+    export MAPROOM_DATABASE_URL="${MAPROOM_DATABASE_URL:-postgresql://maproom:maproom@localhost:5432/maproom}"
 
     # Check database connectivity (optional)
     if command -v psql &> /dev/null; then
-        if psql "$DATABASE_URL" -c "SELECT 1" &> /dev/null 2>&1; then
+        if psql "$MAPROOM_DATABASE_URL" -c "SELECT 1" &> /dev/null 2>&1; then
             info "Database connection verified"
         else
-            warn "Cannot connect to database at: $DATABASE_URL"
+            warn "Cannot connect to database at: $MAPROOM_DATABASE_URL"
             warn "Scan will continue, but ensure database is running for indexing to work"
         fi
     fi
