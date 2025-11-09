@@ -1,25 +1,16 @@
 {
-  "hooks": [
-    {
-      "event": "before-tool-use",
-      "filter": {
-        "tool": "mcp__maproom__search"
-      },
-      "action": {
-        "type": "reminder",
-        "message": "Before searching with maproom, ensure the repository is indexed. Run 'bash scripts/scan.sh' from the maproom skill if needed, or check status with mcp__maproom__status."
+  "description": "Maproom indexing workflow reminders",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__maproom__search",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Reminder: Ensure repository is indexed before searching. Check with mcp__maproom__status or run a scan if needed.'"
+          }
+        ]
       }
-    },
-    {
-      "event": "after-skill-use",
-      "filter": {
-        "skill": "maproom",
-        "script": "scan.sh"
-      },
-      "action": {
-        "type": "suggestion",
-        "message": "Scan complete! Consider running 'bash scripts/watch.sh' to keep the index automatically updated during development."
-      }
-    }
-  ]
+    ]
+  }
 }
