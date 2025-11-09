@@ -1,2 +1,2 @@
-# Crewcheif Plugins for Claude Code
+# Plugins for Claude Code
 
