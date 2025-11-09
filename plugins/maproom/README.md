@@ -168,7 +168,7 @@ Automated workflow assistance:
 MAPROOM_DATABASE_URL=postgresql://maproom:maproom@maproom-postgres:5432/maproom
 
 # Embedding provider (choose one)
-EMBEDDING_PROVIDER=ollama  # or 'openai' or 'google'
+MAPROOM_EMBEDDING_PROVIDER=ollama  # or 'openai' or 'google'
 
 # OpenAI (if using)
 OPENAI_API_KEY=sk-...
