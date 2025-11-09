@@ -1,0 +1,24 @@
+{
+  "name": "crewchief",
+  "owner": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com"
+  },
+  "plugins": [
+    {
+      "name": "initiatives",
+      "source": "./plugins/initiatives",
+      "description": "Manage initiatives workflows"
+    },
+    {
+      "name": "projects",
+      "source": "./plugins/projects",
+      "description": "Manage projects workflows"
+    },
+    {
+      "name": "github-actions",
+      "source": "./plugins/github-actions",
+      "description": "Manage GitHub Actions and Workflows"
+    }
+  ]
+}

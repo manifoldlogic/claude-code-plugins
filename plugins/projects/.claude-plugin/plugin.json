@@ -1,0 +1,16 @@
+{
+  "name": "projects",
+  "description": "Manage project and ticket workflows",
+  "author": {
+    "name": "Daniel Bushman",
+    "url": "https://github.com/danielbushman/claude-code-plugins"
+  },
+  "repository": "https://github.com/danielbushman/claude-code-plugins",
+  "keywords": [
+    "projects",
+    "tickets",
+    "workflows",
+    "management",
+    "automation"
+  ]
+}
