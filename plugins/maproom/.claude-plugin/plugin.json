@@ -1,0 +1,21 @@
+{
+  "name": "maproom",
+  "version": "0.1.0",
+  "description": "Semantic code search with PostgreSQL, pgvector, and tree-sitter. Provides skills for repository indexing (scan/watch) and MCP integration for intelligent code search.",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/danielbushman/claude-code-plugins"
+  },
+  "repository": "https://github.com/danielbushman/claude-code-plugins",
+  "keywords": [
+    "search",
+    "semantic",
+    "code-search",
+    "indexing",
+    "mcp",
+    "pgvector",
+    "tree-sitter",
+    "embeddings"
+  ]
+}
