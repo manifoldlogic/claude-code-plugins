@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 #
 # Maproom Scan Script
-# Indexes a repository for semantic search
+# Indexes a repository for semantic search using @crewchief/maproom-mcp
 #
 # Usage:
 #   bash scan.sh                    # Scan current directory
 #   bash scan.sh /path/to/repo      # Scan specific path
-#   bash scan.sh /path/to/repo main # Scan with specific worktree name
+#
+# Environment Variables:
+#   EMBEDDING_PROVIDER   - openai, google, or ollama (required)
+#   OPENAI_API_KEY       - Required for openai provider
+#   GOOGLE_PROJECT_ID    - Required for google provider
+#   GOOGLE_APPLICATION_CREDENTIALS - Required for google provider
+#   DATABASE_URL         - PostgreSQL connection (default: postgresql://maproom:maproom@localhost:5432/maproom)
 
 set -euo pipefail
 
@@ -29,104 +35,83 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Detect platform
-detect_platform() {
-    local os=$(uname -s | tr '[:upper:]' '[:lower:]')
-    local arch=$(uname -m)
-
-    case "$os" in
-        darwin)
-            case "$arch" in
-                arm64) echo "darwin-arm64" ;;
-                x86_64) echo "darwin-x64" ;;
-                *) error "Unsupported architecture: $arch"; exit 1 ;;
-            esac
-            ;;
-        linux)
-            case "$arch" in
-                x86_64) echo "linux-x64" ;;
-                aarch64|arm64) echo "linux-arm64" ;;
-                *) error "Unsupported architecture: $arch"; exit 1 ;;
-            esac
-            ;;
-        mingw*|msys*|cygwin*)
-            echo "win32-x64"
-            ;;
-        *)
-            error "Unsupported operating system: $os"
-            exit 1
-            ;;
-    esac
-}
-
-# Find workspace root (where .git directory is)
-find_workspace_root() {
-    local dir="$PWD"
-    while [[ "$dir" != "/" ]]; do
-        if [[ -d "$dir/.git" ]]; then
-            echo "$dir"
-            return 0
-        fi
-        dir=$(dirname "$dir")
-    done
-    error "Not in a git repository"
-    exit 1
-}
-
 # Main execution
 main() {
     info "Maproom Repository Scanner"
 
-    # Get workspace root
-    local workspace_root=$(find_workspace_root)
-    info "Workspace root: $workspace_root"
-
-    # Detect platform and find binary
-    local platform=$(detect_platform)
-    local binary_path="$workspace_root/packages/cli/bin/$platform/crewchief-maproom"
-
-    if [[ ! -x "$binary_path" ]]; then
-        error "Maproom binary not found at: $binary_path"
-        error "Please ensure the binary is built and available"
+    # Check for EMBEDDING_PROVIDER
+    if [[ -z "${EMBEDDING_PROVIDER:-}" ]]; then
+        error "EMBEDDING_PROVIDER not set"
+        error "Please set EMBEDDING_PROVIDER to one of: openai, google, ollama"
+        error ""
+        error "Examples:"
+        error "  EMBEDDING_PROVIDER=openai bash scan.sh"
+        error "  export EMBEDDING_PROVIDER=ollama && bash scan.sh"
         exit 1
     fi
 
-    info "Using binary: $binary_path"
+    info "Using embedding provider: $EMBEDDING_PROVIDER"
+
+    # Validate provider-specific requirements
+    case "$EMBEDDING_PROVIDER" in
+        openai)
+            if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+                error "OPENAI_API_KEY not set (required for OpenAI provider)"
+                exit 1
+            fi
+            ;;
+        google)
+            if [[ -z "${GOOGLE_PROJECT_ID:-}" ]]; then
+                error "GOOGLE_PROJECT_ID not set (required for Google provider)"
+                exit 1
+            fi
+            if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+                error "GOOGLE_APPLICATION_CREDENTIALS not set (required for Google provider)"
+                exit 1
+            fi
+            ;;
+        ollama)
+            info "Using local Ollama provider (no API key required)"
+            ;;
+        *)
+            error "Unsupported provider: $EMBEDDING_PROVIDER"
+            error "Supported providers: openai, google, ollama"
+            exit 1
+            ;;
+    esac
 
     # Parse arguments
-    local scan_path="${1:-$PWD}"
-    local worktree="${2:-}"
+    local scan_path="${1:-.}"
 
     # Convert scan_path to absolute path
     scan_path=$(cd "$scan_path" 2>/dev/null && pwd || echo "$scan_path")
 
     info "Scanning path: $scan_path"
-    [[ -n "$worktree" ]] && info "Worktree: $worktree"
 
-    # Check database connectivity
-    if ! command -v psql &> /dev/null; then
-        warn "psql not found, skipping database connectivity check"
-    else
-        local db_url="${DATABASE_URL:-postgresql://maproom:maproom@maproom-postgres:5432/maproom}"
-        if ! psql "$db_url" -c "SELECT 1" &> /dev/null; then
-            error "Cannot connect to database at: $db_url"
-            error "Please ensure PostgreSQL is running (docker compose up -d)"
-            exit 1
+    # Set DATABASE_URL if not already set
+    export DATABASE_URL="${DATABASE_URL:-postgresql://maproom:maproom@localhost:5432/maproom}"
+
+    # Check database connectivity (optional)
+    if command -v psql &> /dev/null; then
+        if psql "$DATABASE_URL" -c "SELECT 1" &> /dev/null 2>&1; then
+            info "Database connection verified"
+        else
+            warn "Cannot connect to database at: $DATABASE_URL"
+            warn "Scan will continue, but ensure database is running for indexing to work"
         fi
-        info "Database connection verified"
     fi
 
-    # Run scan
-    info "Starting scan..."
-    if [[ -n "$worktree" ]]; then
-        "$binary_path" scan --path "$scan_path" --worktree "$worktree"
-    else
-        "$binary_path" scan --path "$scan_path"
-    fi
+    # Run scan using npx
+    info "Starting scan with @crewchief/maproom-mcp..."
+    npx @crewchief/maproom-mcp scan "$scan_path"
 
     local exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
         info "Scan completed successfully"
+        info ""
+        info "Next steps:"
+        info "  - Use mcp__maproom__search to search your code"
+        info "  - Run 'bash watch.sh' to keep index updated automatically"
     else
         error "Scan failed with exit code: $exit_code"
         exit $exit_code
