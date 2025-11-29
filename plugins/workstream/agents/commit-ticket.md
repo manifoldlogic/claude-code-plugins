@@ -51,15 +51,19 @@ Create a Conventional Commit message following this exact structure:
 - `ci`: CI/CD configuration changes
 - `build`: Build system or tooling changes
 
-**Scope Selection**:
-1. Read `.crewchief/reference/git-commit-scopes.txt` to see existing scopes
-2. Analyze the changed files to determine the affected area
-3. PREFER existing scopes over creating new ones
-4. If creating a new scope:
-   - Keep it succinct and minimal (e.g., `api`, `ui`, `auth`, `db`, `config`)
-   - Add it to the appropriate category in `git-commit-scopes.txt`
-   - Use lowercase, no special characters
-5. Choose the scope that best represents the primary area of change
+**Scope Selection** (infer from file paths):
+1. Analyze the changed files from `git status` to determine the affected area
+2. Infer scope from directory structure:
+   - `packages/cli/` → `cli`
+   - `packages/daemon-client/` → `daemon-client`
+   - `crates/maproom/` → `maproom`
+   - `packages/vscode-maproom/` → `vscode-maproom`
+   - `.crewchief/` → `workstream` or specific subsystem
+   - `.github/` → `ci`
+   - Root config files → `config` or `build`
+3. Keep scopes succinct and lowercase (e.g., `api`, `ui`, `auth`, `db`)
+4. If changes span multiple areas, use the primary affected area
+5. For ambiguous cases, use broader scopes like `core` or the repo name
 
 **Ticket Number**:
 - Extract from the ticket document filename or content
@@ -85,19 +89,7 @@ Implemented JWT-based authentication with refresh tokens.
 Added middleware for protected routes and token validation.
 ```
 
-### Step 4: Scope Registry Maintenance
-
-When you create or use a scope:
-
-1. Open `.crewchief/reference/git-commit-scopes.txt`
-2. If the scope is new:
-   - Determine the appropriate category (Frontend, Backend, Infrastructure, etc.)
-   - Add the scope to that category in alphabetical order
-   - Include a brief description if the scope name isn't self-explanatory
-3. If the scope exists, verify you're using it consistently with past usage
-4. Save the updated scope registry
-
-### Step 5: Commit Execution
+### Step 4: Commit Execution
 
 **ONLY if verification passed:**
 
@@ -112,7 +104,7 @@ When you create or use a scope:
 **Self-Verification Checklist** (run mentally before committing):
 - [ ] Ticket verification checkbox is marked
 - [ ] Commit type is appropriate for the changes
-- [ ] Scope exists in registry or has been added
+- [ ] Scope is inferred correctly from file paths
 - [ ] Ticket number is correctly formatted
 - [ ] Description is under 50 chars and uses imperative mood
 - [ ] All relevant files are staged (including ticket)
@@ -196,9 +188,8 @@ No changes have been committed.
 
 1. **NEVER commit without verification** - This is non-negotiable
 2. **ALWAYS include the ticket file** - It tracks progress
-3. **ALWAYS update scope registry** - Maintain consistency
-4. **ALWAYS follow Conventional Commits** - No exceptions
-5. **NEVER modify code** - You only commit existing changes
+3. **ALWAYS follow Conventional Commits** - No exceptions
+4. **NEVER modify code** - You only commit existing changes
 
 ## Your Expertise
 
