@@ -11,9 +11,9 @@
       "description": "Semantic code search with indexing, scanning, and MCP integration"
     },
     {
-      "name": "projects",
-      "source": "./plugins/projects",
-      "description": "Project and ticket workflow management with systematic execution"
+      "name": "workstream",
+      "source": "./plugins/workstream",
+      "description": "Work lifecycle management for initiatives, projects, and tickets"
     },
     {
       "name": "github-actions",
