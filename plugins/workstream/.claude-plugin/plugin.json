@@ -1,0 +1,22 @@
+{
+  "name": "workstream",
+  "version": "0.3.0",
+  "description": "Work lifecycle management for initiatives, projects, and tickets. Uses scripts for mechanical tasks, Haiku agents for structured processing, and Sonnet agents for reasoning. Coordinates the full flow from discovery through completion.",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/danielbushman/claude-code-plugins"
+  },
+  "repository": "https://github.com/danielbushman/claude-code-plugins",
+  "keywords": [
+    "projects",
+    "initiatives",
+    "tickets",
+    "workflows",
+    "planning",
+    "verification",
+    "haiku",
+    "sonnet",
+    "delegation"
+  ]
+}
