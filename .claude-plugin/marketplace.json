@@ -14,6 +14,11 @@
       "name": "github-actions",
       "source": "./plugins/github-actions",
       "description": "GitHub Actions workflow creation, optimization, and troubleshooting"
+    },
+    {
+      "name": "claude-code-dev",
+      "source": "./plugins/claude-code-dev",
+      "description": "Development tools for Claude Code: skills, commands, hooks, and plugins"
     }
   ]
 }

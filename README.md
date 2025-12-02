@@ -21,6 +21,7 @@ Add the marketplace and install plugins:
 |--------|-------------|
 | **workstream** | Project and ticket workflow management with specialized agents |
 | **github-actions** | GitHub Actions workflow creation, optimization, and troubleshooting |
+| **claude-code-dev** | Development tools for Claude Code: skills, commands, hooks, and plugins |
 
 ## Workstream Plugin
 
@@ -54,6 +55,19 @@ GitHub Actions workflow creation, optimization, and troubleshooting.
 **Agent:** `@github-actions-specialist`
 
 **[Full Documentation →](plugins/github-actions/README.md)**
+
+## Claude Code Dev Plugin
+
+Development tools for Claude Code itself.
+
+**Features:**
+- Skill creation and packaging
+- Step-by-step guides for extending Claude capabilities
+- Scripts for initialization, validation, and distribution
+
+**Skill:** `skill-creator` - Guides creation of effective skills with bundled resources
+
+**[Full Documentation →](plugins/claude-code-dev/README.md)**
 
 ## Installation Options
 
@@ -97,9 +111,11 @@ claude-code-plugins/
 │   │   ├── commands/         # Slash commands
 │   │   ├── agents/           # Specialized agents
 │   │   └── skills/           # Agent skills with scripts
-│   └── github-actions/       # GitHub Actions management
-│       ├── agents/           # Specialized agents
-│       └── skills/           # gh CLI skill
+│   ├── github-actions/       # GitHub Actions management
+│   │   ├── agents/           # Specialized agents
+│   │   └── skills/           # gh CLI skill
+│   └── claude-code-dev/      # Claude Code development tools
+│       └── skills/           # skill-creator and more
 └── docs/                     # Additional documentation
 ```
 
