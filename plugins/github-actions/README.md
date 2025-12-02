@@ -1,6 +1,6 @@
 # GitHub Actions Plugin
 
-GitHub Actions workflow management with specialized agent and MCP integration.
+GitHub Actions workflow management with specialized agent and gh CLI skill.
 
 ## Overview
 
@@ -11,7 +11,7 @@ The GitHub Actions plugin provides comprehensive CI/CD pipeline management for G
 - **Troubleshooting** - Debug failed workflows and jobs
 - **Matrix Builds** - Configure multi-platform and multi-version testing
 - **Secrets Management** - Handle sensitive data securely
-- **MCP Integration** - Full GitHub API access via Model Context Protocol
+- **gh CLI Skill** - GitHub CLI commands for workflow management
 
 ## Installation
 
@@ -74,20 +74,43 @@ Expert agent for GitHub Actions workflows with capabilities:
 @github-actions-specialist Create a CI workflow for a TypeScript project that runs tests and builds on Node 18 and 20
 ```
 
-### MCP Server
+### gh CLI Skill
 
-Provides GitHub API access via Model Context Protocol.
+The `gh-cli` skill provides guidance for using the GitHub CLI to manage workflows.
 
-**Available Tools:**
-See `.mcp.json` for the complete MCP server configuration, which includes:
+**Authentication Check:**
 
-- Workflow management (list, run, cancel workflows)
-- Job inspection (logs, status, artifacts)
-- Repository operations (issues, PRs, commits)
-- Secrets and environment variables
-- Branch protection rules
+Before using any gh commands, always verify authentication:
 
-The MCP server is automatically configured when the plugin is installed.
+```bash
+gh auth status
+```
+
+If not authenticated, run `gh auth login` first.
+
+**Common Commands:**
+
+```bash
+# List workflows
+gh workflow list
+
+# List recent workflow runs
+gh run list
+
+# View run details and logs
+gh run view <run-id> --log-failed
+
+# Trigger a workflow
+gh workflow run <workflow-name>
+
+# Rerun failed jobs
+gh run rerun <run-id> --failed
+
+# View PR checks
+gh pr checks
+```
+
+See `skills/gh-cli/SKILL.md` for complete documentation.
 
 ## Quick Start
 
@@ -117,19 +140,24 @@ The MCP server is automatically configured when the plugin is installed.
 
 ### Troubleshoot a Failed Workflow
 
-1. **Check workflow status:**
-   ```
-   @github-actions-specialist Check the status of the latest workflow run for PR #123
-   ```
-
-2. **Get job logs:**
-   ```
-   @github-actions-specialist Show me the logs for the failed "test" job
+1. **Check gh CLI authentication:**
+   ```bash
+   gh auth status
    ```
 
-3. **Fix and rerun:**
+2. **List failed runs:**
+   ```bash
+   gh run list --status=failure
    ```
-   @github-actions-specialist Fix the workflow based on the error and rerun
+
+3. **View failed job logs:**
+   ```bash
+   gh run view <run-id> --log-failed
+   ```
+
+4. **Ask the specialist to fix:**
+   ```
+   @github-actions-specialist Fix the workflow based on this error: [paste error]
    ```
 
 ### Optimize Existing Workflows
@@ -237,6 +265,12 @@ env:
 
 ## Troubleshooting
 
+### gh CLI not authenticated
+```
+ERROR: GitHub CLI is not authenticated
+```
+**Solution:** Run `gh auth login` and follow the prompts.
+
 ### Workflow not triggering
 - Check workflow triggers in YAML
 - Verify branch/path filters
@@ -244,7 +278,7 @@ env:
 - Check repository permissions
 
 ### Job failing
-- Review job logs via MCP tools
+- Review job logs via `gh run view <id> --log-failed`
 - Check action versions
 - Verify secrets are configured
 - Test steps locally when possible
@@ -270,27 +304,19 @@ env:
 GH_TOKEN=<your-github-token>
 ```
 
-### MCP Configuration
-
-The plugin's `.mcp.json` automatically configures the GitHub MCP server with:
-- GitHub API endpoint
-- Authentication handling
-- Tool availability
-
 ## Version
 
 Current version: **0.1.0**
 
 ## Keywords
 
-`github-actions`, `ci-cd`, `workflows`, `automation`, `mcp`, `github`
+`github-actions`, `ci-cd`, `workflows`, `automation`, `gh-cli`, `github`
 
 ## Links
 
-- [Repository](https://github.com/danielbushman/claude-code-plugins)
+- [Repository](https://github.com/manifoldlogic/claude-code-plugins)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [GitHub CLI Documentation](https://cli.github.com/manual/)
-- [MCP GitHub Server](https://github.com/modelcontextprotocol/servers/tree/main/src/github)
 
 ## Examples
 

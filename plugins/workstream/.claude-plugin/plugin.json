@@ -5,9 +5,9 @@
   "author": {
     "name": "Daniel Bushman",
     "email": "dbushman@manifoldlogic.com",
-    "url": "https://github.com/danielbushman/claude-code-plugins"
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
   },
-  "repository": "https://github.com/danielbushman/claude-code-plugins",
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
   "keywords": [
     "projects",
     "initiatives",

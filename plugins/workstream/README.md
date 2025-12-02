@@ -296,5 +296,5 @@ implement (Sonnet) → test (Haiku) → verify (Sonnet) → commit (Haiku)
 
 ## Links
 
-- [Repository](https://github.com/danielbushman/claude-code-plugins)
+- [Repository](https://github.com/manifoldlogic/claude-code-plugins)
 - [CrewChief Directory](/.crewchief/README.md)
