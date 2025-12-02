@@ -6,11 +6,6 @@
   },
   "plugins": [
     {
-      "name": "maproom",
-      "source": "./plugins/maproom",
-      "description": "Semantic code search with indexing, scanning, and MCP integration"
-    },
-    {
       "name": "workstream",
       "source": "./plugins/workstream",
       "description": "Work lifecycle management for initiatives, projects, and tickets"

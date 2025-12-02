@@ -1,36 +1,22 @@
 # CrewChief Plugins
 
-A collection of Claude Code plugins for development workflows, code search, and CI/CD automation.
+A collection of Claude Code plugins for development workflows and CI/CD automation.
 
 ## Available Plugins
 
-### Maproom
-**Version:** 0.1.0
-
-Semantic code search with PostgreSQL, pgvector, and tree-sitter.
-
-**Features:**
-- Semantic code search (find code by concept)
-- Repository indexing with scan/watch scripts
-- MCP integration for search tools
-- Multi-language support (TypeScript, Rust, Python, Go, JavaScript, Markdown)
-- Multiple search modes (FTS, vector, hybrid)
-
-**[Read More →](maproom/README.md)**
-
-### Projects
+### Workstream
 **Version:** 0.1.0
 
 Systematic project and ticket workflow management.
 
 **Features:**
-- Project planning with analysis and architecture documents
+- Initiative and project planning with analysis and architecture documents
 - Automated ticket generation from plans
 - Complete workflow automation (implement → test → verify → commit)
 - Specialized agents for each workflow phase
 - Quality assurance built-in
 
-**[Read More →](projects/README.md)**
+**[Read More →](workstream/README.md)**
 
 ### GitHub Actions
 **Version:** 0.1.0
@@ -58,8 +44,7 @@ GitHub Actions workflow creation, optimization, and troubleshooting.
 
 Install all plugins:
 ```bash
-/plugin install maproom@crewchief
-/plugin install projects@crewchief
+/plugin install workstream@crewchief
 /plugin install github-actions@crewchief
 ```
 
@@ -94,15 +79,10 @@ plugin-name/
 
 ## Usage Patterns
 
-### Semantic Code Search (Maproom)
-1. Start PostgreSQL: `docker compose up -d`
-2. Scan repository: `bash scripts/scan.sh`
-3. Search code: `mcp__maproom__search({ repo: "crewchief", query: "error handling" })`
-
-### Project Management (Projects)
-1. Create project: `/create-project [description]`
-2. Generate tickets: `/create-project-tickets [PROJECT_SLUG]`
-3. Execute tickets: `/work-on-project [PROJECT_SLUG]`
+### Project Management (Workstream)
+1. Create project: `/workstream:project-create [description]`
+2. Generate tickets: `/workstream:project-tickets [PROJECT_SLUG]`
+3. Execute tickets: `/workstream:project-work [PROJECT_SLUG]`
 
 ### CI/CD Workflows (GitHub Actions)
 1. Ask specialist: `@github-actions-specialist Create a CI workflow...`
@@ -130,7 +110,7 @@ plugin-name/
 
 **Name:** crewchief
 **Owner:** Daniel Bushman (dbushman@manifoldlogic.com)
-**Repository:** https://github.com/danielbushman/claude-code-plugins
+**Repository:** https://github.com/manifoldlogic/claude-code-plugins
 
 ## Contributing
 
@@ -147,5 +127,5 @@ See individual plugin READMEs for licensing information.
 ## Links
 
 - [Plugin Documentation](../docs/plugins.md)
-- [Repository](https://github.com/danielbushman/claude-code-plugins)
+- [Repository](https://github.com/manifoldlogic/claude-code-plugins)
 - [Claude Code Documentation](https://code.claude.com/docs)
