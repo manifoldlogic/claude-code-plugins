@@ -94,34 +94,6 @@ gh run rerun <run-id> --failed
 gh run cancel <run-id>
 ```
 
-## CrewChief-Specific Workflows
-
-The crewchief repository has these workflow files in `.github/workflows/`:
-
-### CI Workflow (`ci.yml`)
-- Runs on push and pull requests
-- Builds TypeScript packages
-- Builds Rust crate
-- Runs tests
-
-### Release Workflows
-- Package publishing to npm and crates.io
-- Docker image building
-- VS Code extension publishing
-
-## Working with Pull Requests
-
-```bash
-# View checks for current PR
-gh pr checks
-
-# View checks for a specific PR
-gh pr checks <pr-number>
-
-# Wait for checks to complete
-gh pr checks --watch
-```
-
 ## Troubleshooting Failed Workflows
 
 1. **Check authentication first:**

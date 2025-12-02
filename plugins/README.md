@@ -5,7 +5,7 @@ A collection of Claude Code plugins for development workflows and CI/CD automati
 ## Available Plugins
 
 ### Workstream
-**Version:** 0.1.0
+**Version:** 0.3.0
 
 Systematic project and ticket workflow management.
 
@@ -28,27 +28,27 @@ GitHub Actions workflow creation, optimization, and troubleshooting.
 - Performance optimization
 - Debugging and troubleshooting
 - Matrix builds and caching
-- MCP integration with GitHub API
+- gh CLI integration for workflow management
 
 **[Read More →](github-actions/README.md)**
 
 ## Installation
 
-### Add Marketplace
+### Add Marketplace from GitHub
 
 ```bash
-/plugin marketplace add /workspace/.crewchief/claude-code-plugins
+/plugin marketplace add manifoldlogic/claude-code-plugins
 ```
 
 ### Install Plugins
 
-Install all plugins:
+Install plugins individually:
 ```bash
 /plugin install workstream@crewchief
 /plugin install github-actions@crewchief
 ```
 
-Or install individually via the plugin manager:
+Or use the plugin manager UI:
 ```bash
 /plugin
 ```
@@ -72,9 +72,8 @@ plugin-name/
 │       ├── scripts/
 │       ├── references/
 │       └── assets/
-├── hooks/                   # Event handlers (optional)
-│   └── hooks.json
-└── .mcp.json               # MCP server config (optional)
+└── hooks/                   # Event handlers (optional)
+    └── hooks.json
 ```
 
 ## Usage Patterns
@@ -104,7 +103,7 @@ plugin-name/
 2. Add `.claude-plugin/plugin.json` with metadata
 3. Add plugin to `.claude-plugin/marketplace.json`
 4. Create README.md with documentation
-5. Add components (commands, agents, skills, hooks, MCP)
+5. Add components (commands, agents, skills, hooks)
 
 ## Marketplace
 
@@ -126,6 +125,5 @@ See individual plugin READMEs for licensing information.
 
 ## Links
 
-- [Plugin Documentation](../docs/plugins.md)
 - [Repository](https://github.com/manifoldlogic/claude-code-plugins)
-- [Claude Code Documentation](https://code.claude.com/docs)
+- [Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code)
