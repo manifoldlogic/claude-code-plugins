@@ -1,0 +1,19 @@
+{
+  "name": "analysis",
+  "version": "0.1.0",
+  "description": "Deep analytical thinking and problem-solving tools. Provides multi-dimensional analysis capabilities for complex technical and strategic decisions.",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
+  },
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
+  "keywords": [
+    "analysis",
+    "problem-solving",
+    "decision-making",
+    "strategy",
+    "thinking",
+    "planning"
+  ]
+}
