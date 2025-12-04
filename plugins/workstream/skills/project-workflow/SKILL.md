@@ -71,10 +71,21 @@ bash scripts/ticket-status.sh SLUG
 bash scripts/validate-structure.sh SLUG
 ```
 
+### Recommend and Assign Custom Agents
+```bash
+# After project planning, analyze for custom agent opportunities
+/workstream:project-recommend-agents SLUG
+
+# Review recommendations, create agents you want
+
+# Assign created agents to phases and tickets
+/workstream:project-assign-agents SLUG
+```
+
 ### Execute Workflow
 ```
 For each ticket:
-1. Delegate to primary implementation agent
+1. Delegate to primary implementation agent (custom or general)
 2. Delegate to test-runner agent (Haiku)
 3. Delegate to verify-ticket agent (Sonnet)
 4. Delegate to commit-ticket agent (Haiku)
@@ -141,6 +152,8 @@ Use Sonnet agents for tasks that require:
 | `initiative-planner` | Research and plan initiatives |
 | `project-planner` | Create comprehensive planning docs |
 | `project-reviewer` | Critical review of projects |
+| `agent-recommender` | Analyze projects to recommend custom specialized agents |
+| `agent-assigner` | Assign created agents to phases and tickets |
 | `ticket-creator` | Generate tickets from plans |
 | `verify-ticket` | Verify acceptance criteria met |
 
@@ -256,11 +269,71 @@ Commands in the `commands/` directory provide user-friendly interfaces:
 | `/initiative-create` | scaffold-initiative.sh + initiative-planner |
 | `/project-create` | scaffold-project.sh + project-planner |
 | `/project-review` | project-reviewer agent |
+| `/project-recommend-agents` | agent-recommender agent |
+| `/project-assign-agents` | agent-assigner agent |
 | `/project-tickets` | ticket-creator agent |
 | `/project-work` | Sequential ticket execution |
 | `/ticket` | Single ticket workflow |
 | `/status` | ticket-status.sh + status-reporter |
 | `/archive` | structure-validator + archive logic |
+
+## Complete Project Workflow
+
+The full project lifecycle with optional agent customization:
+
+```
+1. Create Project
+   /workstream:project-create "Project description"
+   → scaffold-project.sh creates structure
+   → project-planner fills planning docs
+   → May recommend agent analysis
+
+2. Review Project (Optional but Recommended)
+   /workstream:project-review SLUG
+   → project-reviewer critiques plan
+   → Identifies risks and gaps
+
+3. Recommend Agents (Optional, for complex projects)
+   /workstream:project-recommend-agents SLUG
+   → agent-recommender analyzes project
+   → Creates agent-recommendations.md
+   → Suggests agents only if genuinely valuable
+
+4. Create Custom Agents (If recommended)
+   Review agent-recommendations.md
+   Create agents you want
+   (Use agent creation commands)
+
+5. Assign Agents (If custom agents created)
+   /workstream:project-assign-agents SLUG
+   → agent-assigner updates plan.md and tickets
+   → Creates agent-assignments.md
+
+6. Create Tickets
+   /workstream:project-tickets SLUG
+   → ticket-creator generates tickets from plan
+   → Custom agents already assigned (if Step 5 done)
+
+7. Execute Work
+   /workstream:project-work SLUG
+   → Processes tickets sequentially
+   → Uses custom or general agents as assigned
+
+8. Archive (When complete)
+   /workstream:archive SLUG
+   → Moves to archive/
+```
+
+**When to use agent customization (Steps 3-5):**
+- Complex specialized domains (migrations, caching, performance)
+- High-risk areas where expertise prevents costly mistakes
+- Repeated specialized patterns across phases
+- Deep domain knowledge would improve quality
+
+**When to skip agent customization:**
+- Straightforward general programming
+- Short projects with few phases
+- General Claude skills sufficient
 
 ## Workflow Diagrams
 

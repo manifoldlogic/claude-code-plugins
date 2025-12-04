@@ -204,4 +204,33 @@ After planning:
 1. All five planning docs completed
 2. README.md updated
 3. Report summary to orchestrator
-4. Recommend: Run `/review-project` before creating tickets
+4. Evaluate if custom agents would help (see below)
+5. Recommend: Run `/review-project` before creating tickets
+
+## Agent Recommendation Evaluation
+
+After completing planning, assess whether custom specialized agents would meaningfully improve project success:
+
+**Consider recommending agent analysis if:**
+- Project has complex specialized domains (e.g., database migrations, caching, performance)
+- High-risk areas where mistakes would be costly
+- Repeated specialized tasks across multiple phases
+- Deep domain expertise would prevent common errors
+
+**Skip agent analysis if:**
+- Project is straightforward general programming
+- No concentration of specialized complexity
+- Short project with few phases
+- General Claude skills are sufficient
+
+**If agents seem valuable**, include in your handoff report:
+```
+RECOMMENDATION: Consider running /workstream:project-recommend-agents {SLUG} to identify opportunities for specialized agents in:
+- {Area 1}: {Brief reason why agents might help}
+- {Area 2}: {Brief reason why agents might help}
+```
+
+**If agents don't seem necessary**, simply note:
+```
+NOTE: This project appears well-suited for general agents. Custom specialized agents likely not needed.
+```
