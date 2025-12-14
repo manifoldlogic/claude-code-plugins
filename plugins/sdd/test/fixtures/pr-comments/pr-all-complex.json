@@ -1,0 +1,56 @@
+{
+  "number": 567,
+  "title": "Redesign data processing pipeline",
+  "url": "https://github.com/example/repo/pull/567",
+  "comments": [
+    {
+      "author": {"login": "architect1"},
+      "body": "This pipeline architecture needs significant consideration. The current approach tightly couples data ingestion with transformation, which will make it difficult to scale horizontally. We should consider adopting a more modular architecture with clear boundaries between stages. This would allow us to independently scale different parts of the pipeline and make testing much easier.",
+      "createdAt": "2025-01-09T09:00:00Z"
+    },
+    {
+      "author": {"login": "engineer2"},
+      "body": "The error handling strategy here is concerning. We're catching all exceptions and continuing, which could lead to silent failures in production. Consider implementing:\n\n```typescript\nclass PipelineError extends Error {\n  constructor(\n    message: string,\n    public stage: PipelineStage,\n    public retryable: boolean\n  ) {\n    super(message);\n  }\n}\n```\n\nThis would give us better visibility into failures and allow for smart retry logic.",
+      "createdAt": "2025-01-09T09:30:00Z"
+    },
+    {
+      "author": {"login": "architect1"},
+      "body": "Should we implement a circuit breaker pattern here? If the downstream service is failing, we're going to hammer it with retries. A circuit breaker would help us fail fast and avoid cascading failures across the system. Libraries like `opossum` provide good implementations we could integrate.",
+      "createdAt": "2025-01-09T10:00:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "author": {"login": "engineer2"},
+      "state": "CHANGES_REQUESTED",
+      "submittedAt": "2025-01-09T11:00:00Z",
+      "body": "The performance characteristics of this approach need analysis. I ran some benchmarks and found:\n\n1. Memory usage grows linearly with batch size (no streaming)\n2. CPU utilization peaks at 95% during transformation phase\n3. Network I/O is blocking, preventing parallelization\n4. Database connection pool exhausts under load\n\nWe need to address these before production deployment. Consider:\n- Implementing streaming to reduce memory footprint\n- Using worker threads for CPU-intensive transformations\n- Switching to async I/O throughout\n- Implementing connection pooling with proper limits",
+      "comments": [
+        {
+          "path": "src/pipeline/processor.ts",
+          "line": 45,
+          "body": "This synchronous loop is blocking the event loop. We should refactor to use async iteration:\n\n```typescript\nfor await (const batch of dataStream) {\n  await processBatch(batch);\n}\n```\n\nThis would allow other operations to proceed while processing."
+        },
+        {
+          "path": "src/pipeline/transform.ts",
+          "line": 78,
+          "body": "The transformation logic here is O(n²) complexity. For large datasets this will be prohibitively slow. Consider using a Map for lookups:\n\n```typescript\nconst lookupMap = new Map(referenceData.map(item => [item.id, item]));\nconst transformed = data.map(row => ({\n  ...row,\n  enriched: lookupMap.get(row.refId)\n}));\n```\n\nThis reduces complexity to O(n) and should improve performance by 100x for typical datasets."
+        }
+      ]
+    },
+    {
+      "author": {"login": "architect1"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-09T12:00:00Z",
+      "body": "From an architectural perspective, we should discuss whether this belongs in the application layer at all. This kind of heavy data processing might be better suited for:\n\n- A separate microservice dedicated to data pipelines\n- A batch processing system like Apache Spark\n- A streaming platform like Kafka with KSQL\n\nMoving this logic out of the main application would improve separation of concerns and allow us to scale processing independently. It would also reduce the blast radius if processing failures occur. We should schedule a design review to evaluate these options before investing more in the current approach.",
+      "comments": []
+    },
+    {
+      "author": {"login": "security1"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-09T13:00:00Z",
+      "body": "Security review highlights several concerns:\n\n1. Input validation is insufficient - no schema validation on incoming data\n2. No rate limiting on the pipeline endpoints\n3. Sensitive data is logged in error messages\n4. No encryption for data at rest in the processing queue\n5. Missing audit trail for data transformations\n\nThese need to be addressed for compliance with our data governance policies. See the security requirements doc for detailed guidelines on each point.",
+      "comments": []
+    }
+  ]
+}

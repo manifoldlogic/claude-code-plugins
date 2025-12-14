@@ -1,0 +1,97 @@
+{
+  "number": 888,
+  "title": "Edge case testing for comment classification",
+  "url": "https://github.com/example/repo/pull/888",
+  "comments": [
+    {
+      "author": {"login": "unicode_tester"},
+      "body": "支持中文评论吗？这个功能很重要。🎉 Also testing emoji: 🚀 ✨ 💯",
+      "createdAt": "2025-01-12T09:00:00Z"
+    },
+    {
+      "author": {"login": "emoji_user"},
+      "body": "👍",
+      "createdAt": "2025-01-12T09:05:00Z"
+    },
+    {
+      "author": {"login": "markdown_tester"},
+      "body": "Testing **bold**, *italic*, and `inline code`. Also testing [links](https://example.com) and ![images](https://example.com/img.png).",
+      "createdAt": "2025-01-12T09:10:00Z"
+    },
+    {
+      "author": {"login": "code_block_tester"},
+      "body": "Here's a code suggestion with multiple languages:\n\n```javascript\nconst foo = 'bar';\nconsole.log(foo);\n```\n\n```python\nfoo = 'bar'\nprint(foo)\n```\n\nBoth should work the same way.",
+      "createdAt": "2025-01-12T09:15:00Z"
+    },
+    {
+      "author": {"login": "very_long_comment"},
+      "body": "This is an extremely long comment that goes on and on and on. It contains many sentences that don't really say much of substance, but the sheer length of it might affect classification. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. And then it keeps going with even more content to really test the word count threshold. We want to make sure that very long comments are properly classified based on their content and not just their length. This comment should probably be classified as COMPLEX due to its length, even though it doesn't contain any particularly complex technical content. The classification heuristics should handle this appropriately. Additional padding text to ensure we exceed any reasonable word count threshold: the quick brown fox jumps over the lazy dog, again and again, repeatedly, without stopping, continuously, perpetually, forever and ever. More words, more sentences, more content to analyze. Testing, testing, one two three. The end is near but not quite here yet. Just a bit more to go. Almost done. Nearly there. And finally, we conclude this extremely verbose comment.",
+      "createdAt": "2025-01-12T09:20:00Z"
+    },
+    {
+      "author": {"login": "empty_lines_tester"},
+      "body": "Comment with\n\n\nmultiple\n\n\nempty\n\n\nlines\n\n\nin between",
+      "createdAt": "2025-01-12T09:25:00Z"
+    },
+    {
+      "author": {"login": "special_chars"},
+      "body": "Testing special chars: <>&\"'`~!@#$%^&*()_+-=[]{}|;:,.<>?/\\",
+      "createdAt": "2025-01-12T09:30:00Z"
+    },
+    {
+      "author": {"login": "nested_quote"},
+      "body": "> Someone said:\n> > And then someone else quoted them:\n> > > With multiple levels of nesting\n\nWhat do you think?",
+      "createdAt": "2025-01-12T09:35:00Z"
+    },
+    {
+      "author": {"login": "table_user"},
+      "body": "Here's a markdown table:\n\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| A | B | C |\n| D | E | F |\n\nDoes this parse correctly?",
+      "createdAt": "2025-01-12T09:40:00Z"
+    },
+    {
+      "author": {"login": "task_list"},
+      "body": "TODO items:\n- [ ] First task\n- [x] Completed task\n- [ ] Another pending task\n- [ ] Yet another task\n\nShould this be COMPLEX due to multiple list items?",
+      "createdAt": "2025-01-12T09:45:00Z"
+    },
+    {
+      "author": {"login": "mixed_content"},
+      "body": "URGENT: This is a critical issue!\n\n**Problem:** The system crashes when...\n\n**Expected:** It should handle...\n\n**Actual:** Instead it...\n\n```bash\n# Steps to reproduce:\ncd /path\n./script.sh\n# Observe error\n```\n\n**Workaround:** Temporarily we can...\n\n**Long-term fix:** We need to redesign...",
+      "createdAt": "2025-01-12T09:50:00Z"
+    },
+    {
+      "author": {"login": "url_heavy"},
+      "body": "See https://docs.example.com/guide and https://stackoverflow.com/questions/12345 and https://github.com/owner/repo/issues/42 for context",
+      "createdAt": "2025-01-12T09:55:00Z"
+    },
+    {
+      "author": {"login": "mentions"},
+      "body": "@alice @bob @charlie can you review this? cc @team-leads",
+      "createdAt": "2025-01-12T10:00:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "author": {"login": "edge_reviewer"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-12T11:00:00Z",
+      "body": "",
+      "comments": [
+        {
+          "path": "src/file.ts",
+          "line": 1,
+          "body": "Comment on first line of file"
+        },
+        {
+          "path": "src/very/deeply/nested/directory/structure/file.ts",
+          "line": 999,
+          "body": "Comment on line 999 of deeply nested file"
+        },
+        {
+          "path": "src/file-with-unicode-名前.ts",
+          "line": 42,
+          "body": "File name contains unicode characters"
+        }
+      ]
+    }
+  ]
+}

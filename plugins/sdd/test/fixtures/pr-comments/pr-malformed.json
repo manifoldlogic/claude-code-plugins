@@ -1,0 +1,92 @@
+{
+  "number": 111,
+  "title": "Test malformed data handling",
+  "url": "https://github.com/example/repo/pull/111",
+  "comments": [
+    {
+      "author": {"login": "normal_user"},
+      "body": "This is a normal comment",
+      "createdAt": "2025-01-13T09:00:00Z"
+    },
+    {
+      "author": null,
+      "body": "Comment with null author",
+      "createdAt": "2025-01-13T09:05:00Z"
+    },
+    {
+      "author": {"login": "user_missing_body"},
+      "createdAt": "2025-01-13T09:10:00Z"
+    },
+    {
+      "author": {"login": "user_null_body"},
+      "body": null,
+      "createdAt": "2025-01-13T09:15:00Z"
+    },
+    {
+      "author": {"login": "user_empty_body"},
+      "body": "",
+      "createdAt": "2025-01-13T09:20:00Z"
+    },
+    {
+      "author": {},
+      "body": "Author object is empty",
+      "createdAt": "2025-01-13T09:25:00Z"
+    },
+    {
+      "login": "wrong_structure",
+      "body": "Missing author wrapper object",
+      "createdAt": "2025-01-13T09:30:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "author": {"login": "reviewer1"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-13T10:00:00Z",
+      "body": "Review with missing comments array"
+    },
+    {
+      "author": {"login": "reviewer2"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-13T10:15:00Z",
+      "body": "Review with null comments array",
+      "comments": null
+    },
+    {
+      "author": {"login": "reviewer3"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-13T10:30:00Z",
+      "body": "Review with malformed inline comment",
+      "comments": [
+        {
+          "path": "src/file.ts",
+          "body": "Missing line number"
+        },
+        {
+          "line": 42,
+          "body": "Missing path"
+        },
+        {
+          "path": "src/other.ts",
+          "line": "not-a-number",
+          "body": "Line is a string instead of number"
+        },
+        {
+          "path": null,
+          "line": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-13T10:45:00Z",
+      "body": "Missing author in review"
+    },
+    {
+      "author": {"login": "reviewer5"},
+      "submittedAt": "2025-01-13T11:00:00Z",
+      "body": "Missing state field"
+    }
+  ]
+}

@@ -19,6 +19,11 @@
       "name": "claude-code-dev",
       "source": "./plugins/claude-code-dev",
       "description": "Development tools for Claude Code: skills, commands, hooks, and plugins"
+    },
+    {
+      "name": "sdd",
+      "source": "./plugins/sdd",
+      "description": "Spec Driven Development - workflow management system for structured epic planning, ticket execution, and task-based implementation"
     }
   ]
 }

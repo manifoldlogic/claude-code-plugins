@@ -1,0 +1,69 @@
+{
+  "number": 456,
+  "title": "Add user authentication feature",
+  "url": "https://github.com/example/repo/pull/456",
+  "comments": [
+    {
+      "author": {"login": "alice"},
+      "body": "Typo in variable name on line 42: 'usre' should be 'user'",
+      "createdAt": "2025-01-10T09:00:00Z"
+    },
+    {
+      "author": {"login": "bob"},
+      "body": "Missing null check before accessing user.profile",
+      "createdAt": "2025-01-10T09:15:00Z"
+    },
+    {
+      "author": {"login": "charlie"},
+      "body": "Should we consider using a more robust authentication library like Passport.js instead of rolling our own JWT implementation? This would give us better security guarantees, community support, and reduce maintenance burden. We'd also get built-in support for multiple authentication strategies (OAuth, SAML, etc.) which might be useful for future enterprise features.",
+      "createdAt": "2025-01-10T09:30:00Z"
+    },
+    {
+      "author": {"login": "diana"},
+      "body": "The token expiration logic needs clarification. Currently it's set to 24 hours but there's no refresh token mechanism. Consider implementing:\n\n```typescript\ninterface TokenPair {\n  accessToken: string;  // Short-lived (15 min)\n  refreshToken: string; // Long-lived (7 days)\n}\n```\n\nThis would improve security while maintaining good UX.",
+      "createdAt": "2025-01-10T10:00:00Z"
+    },
+    {
+      "author": {"login": "eve"},
+      "body": "nit: inconsistent spacing in imports",
+      "createdAt": "2025-01-10T10:15:00Z"
+    },
+    {
+      "author": {"login": "frank"},
+      "body": "Can we add JSDoc comments to the exported functions?",
+      "createdAt": "2025-01-10T10:30:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "author": {"login": "alice"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-10T11:00:00Z",
+      "body": "Overall structure looks good. A few minor suggestions below.",
+      "comments": [
+        {
+          "path": "src/auth/jwt.ts",
+          "line": 15,
+          "body": "Consider extracting the JWT secret to environment variables"
+        },
+        {
+          "path": "src/auth/middleware.ts",
+          "line": 42,
+          "body": "Missing error handling for malformed tokens. Current implementation will crash if token is invalid.\n\n```typescript\ntry {\n  const decoded = jwt.verify(token, secret);\n  req.user = decoded;\n  next();\n} catch (error) {\n  res.status(401).json({ error: 'Invalid token' });\n}\n```"
+        },
+        {
+          "path": "src/auth/routes.ts",
+          "line": 28,
+          "body": "Should validate email format before processing"
+        }
+      ]
+    },
+    {
+      "author": {"login": "bob"},
+      "state": "CHANGES_REQUESTED",
+      "submittedAt": "2025-01-10T11:30:00Z",
+      "body": "Security concerns need to be addressed before merging. Specifically:\n\n1. Password hashing rounds should be increased (currently 10, recommend 12)\n2. Rate limiting is not implemented for login endpoint\n3. No protection against timing attacks on password comparison\n4. Session management needs CSRF protection\n\nThese are critical for production deployment.",
+      "comments": []
+    }
+  ]
+}

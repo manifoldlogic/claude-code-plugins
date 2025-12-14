@@ -1,0 +1,74 @@
+{
+  "number": 234,
+  "title": "Fix minor styling issues",
+  "url": "https://github.com/example/repo/pull/234",
+  "comments": [
+    {
+      "author": {"login": "reviewer1"},
+      "body": "Typo: 'recieve' should be 'receive'",
+      "createdAt": "2025-01-08T10:00:00Z"
+    },
+    {
+      "author": {"login": "reviewer2"},
+      "body": "Missing semicolon at end of line 45",
+      "createdAt": "2025-01-08T10:05:00Z"
+    },
+    {
+      "author": {"login": "reviewer1"},
+      "body": "Can we add a comment explaining this regex?",
+      "createdAt": "2025-01-08T10:10:00Z"
+    },
+    {
+      "author": {"login": "reviewer3"},
+      "body": "nit: inconsistent indentation in this block",
+      "createdAt": "2025-01-08T10:15:00Z"
+    },
+    {
+      "author": {"login": "reviewer2"},
+      "body": "Should use const instead of let here",
+      "createdAt": "2025-01-08T10:20:00Z"
+    },
+    {
+      "author": {"login": "reviewer1"},
+      "body": "Missing import for the Icon component",
+      "createdAt": "2025-01-08T10:25:00Z"
+    },
+    {
+      "author": {"login": "reviewer3"},
+      "body": "Unused variable 'temp' can be removed",
+      "createdAt": "2025-01-08T10:30:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "author": {"login": "reviewer2"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-08T11:00:00Z",
+      "body": "Just a few minor formatting issues, looks good overall!",
+      "comments": [
+        {
+          "path": "src/components/Button.tsx",
+          "line": 12,
+          "body": "Add whitespace after the comma"
+        },
+        {
+          "path": "src/components/Button.tsx",
+          "line": 28,
+          "body": "Rename 'btn' to 'button' for clarity"
+        },
+        {
+          "path": "src/styles/theme.css",
+          "line": 5,
+          "body": "Remove trailing whitespace"
+        }
+      ]
+    },
+    {
+      "author": {"login": "reviewer1"},
+      "state": "APPROVED",
+      "submittedAt": "2025-01-08T11:15:00Z",
+      "body": "LGTM with minor fixes",
+      "comments": []
+    }
+  ]
+}

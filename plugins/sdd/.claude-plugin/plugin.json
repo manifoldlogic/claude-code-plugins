@@ -1,0 +1,59 @@
+{
+  "name": "sdd",
+  "version": "0.1.0",
+  "description": "Spec Driven Development - workflow management system for structured epic planning, ticket execution, and task-based implementation",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@quickbase.com",
+    "url": "https://github.com/quickbase/claude-code-plugins"
+  },
+  "repository": "https://github.com/quickbase/claude-code-plugins",
+  "keywords": [
+    "workflow",
+    "spec-driven",
+    "sdlc",
+    "ticket-management",
+    "epics",
+    "tickets",
+    "tasks",
+    "planning",
+    "verification",
+    "delegation"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/setup-sdd-env.js"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/block-dangerous-git.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/warn-sdd-refs.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

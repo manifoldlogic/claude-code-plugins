@@ -1,0 +1,175 @@
+{
+  "number": 43887,
+  "title": "Validation Dataset from Real PR Comments",
+  "url": "https://github.com/QuickBase/huey/pull/43887",
+  "comments": [
+    {
+      "author": {"login": "stalwekarQB"},
+      "body": "Let's move this to the agGridVars file so that you can define it only once and import from there. See usage of shouldExpandAllGroups for example.",
+      "createdAt": "2025-01-01T10:00:00Z"
+    },
+    {
+      "author": {"login": "stalwekarQB"},
+      "body": "nit - missing event param definition?",
+      "createdAt": "2025-01-01T10:05:00Z"
+    },
+    {
+      "author": {"login": "stalwekarQB"},
+      "body": "Can we use the specific type here?",
+      "createdAt": "2025-01-01T10:10:00Z"
+    },
+    {
+      "author": {"login": "stalwekarQB"},
+      "body": "We need this one right?",
+      "createdAt": "2025-01-01T10:15:00Z"
+    },
+    {
+      "author": {"login": "dan-paddock"},
+      "body": "Do you know if we want to show this if it's an unsupported field type?",
+      "createdAt": "2025-01-01T10:20:00Z"
+    },
+    {
+      "author": {"login": "dan-paddock"},
+      "body": "Does this need any disabled/invalid state?",
+      "createdAt": "2025-01-01T10:25:00Z"
+    },
+    {
+      "author": {"login": "dan-paddock"},
+      "body": "I see the Field components allows a height and width to be passed, should it be passed here as well so it's not always 14px?",
+      "createdAt": "2025-01-01T10:30:00Z"
+    },
+    {
+      "author": {"login": "patelbhavya14"},
+      "body": "Yes, it should be passed here when it's not 14px",
+      "createdAt": "2025-01-01T10:35:00Z"
+    },
+    {
+      "author": {"login": "patelbhavya14"},
+      "body": "No, it is not needed as per figma design and the areas where we want to display this icon",
+      "createdAt": "2025-01-01T10:40:00Z"
+    },
+    {
+      "author": {"login": "arusev-qb"},
+      "body": "As an additional safety net, can we make this optional, e.g. `recordConflicts?.[conflictNamespace]`",
+      "createdAt": "2025-01-01T10:45:00Z"
+    },
+    {
+      "author": {"login": "arusev-qb"},
+      "body": "This applies to all the places where we access it in this way.",
+      "createdAt": "2025-01-01T10:50:00Z"
+    },
+    {
+      "author": {"login": "arusev-qb"},
+      "body": "this is a good candidate for optional chaining as well",
+      "createdAt": "2025-01-01T10:55:00Z"
+    },
+    {
+      "author": {"login": "kpetrov-qb"},
+      "body": "Should we support plural form?",
+      "createdAt": "2025-01-01T11:00:00Z"
+    },
+    {
+      "author": {"login": "kpetrov-qb"},
+      "body": "Can you remove the messages we don't use anymore",
+      "createdAt": "2025-01-01T11:05:00Z"
+    },
+    {
+      "author": {"login": "dan-paddock"},
+      "body": "Changes look great, few questions below",
+      "createdAt": "2025-01-01T11:10:00Z"
+    },
+    {
+      "author": {"login": "ggospodinova-qb"},
+      "body": "🤯",
+      "createdAt": "2025-01-01T11:15:00Z"
+    },
+    {
+      "author": {"login": "stalwekarQB"},
+      "body": "Testing locally",
+      "createdAt": "2025-01-01T11:20:00Z"
+    },
+    {
+      "author": {"login": "arusev-qb"},
+      "body": "Apart from adding code comments, please also include an example of prefix",
+      "createdAt": "2025-01-01T11:25:00Z"
+    }
+  ],
+  "reviews": [
+    {
+      "author": {"login": "copilot-pull-request-reviewer"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-01T09:00:00Z",
+      "body": "## Summary\n\nThis PR addresses an AG Grid race condition fix with the following key changes:\n\n- Modified grid initialization logic to prevent race conditions\n- Updated event handlers to properly sequence operations\n- Added defensive checks for undefined states\n- Improved error handling in grid callbacks\n\n## Files Changed\n\n- src/components/Grid.tsx: Core grid logic updates\n- src/utils/gridHelpers.ts: Helper function improvements\n- tests/grid.test.ts: Additional test coverage\n\nThe changes follow established patterns and include comprehensive test coverage. Some comments have been suppressed for brevity.",
+      "comments": [
+        {
+          "path": "src/components/Grid.tsx",
+          "line": 42,
+          "body": "The useEffect hook is missing `isGridInEditMode` in its dependency array. This could lead to stale closure issues.\n\n```typescript\nuseEffect(() => {\n  // existing code\n}, [isGridInEditMode, otherDeps]);\n```"
+        },
+        {
+          "path": "src/components/Grid.tsx",
+          "line": 67,
+          "body": "Consider adding a dependency array to this useEffect hook to avoid running on every render:\n\n```typescript\nuseEffect(() => {\n  if (gridApi) {\n    gridApi.refreshCells();\n  }\n}, [gridApi]);\n```"
+        },
+        {
+          "path": "src/utils/gridHelpers.ts",
+          "line": 15,
+          "body": "The variable name `temp` is not descriptive. Consider renaming to something more meaningful:\n\n```typescript\nconst processedRows = data.map(row => transformRow(row));\n```"
+        },
+        {
+          "path": "src/utils/gridHelpers.ts",
+          "line": 89,
+          "body": "The `pipelinesTableLayout` constant appears to be identical to `modernTableLayout`. Consider consolidating:\n\n```typescript\n// Remove pipelinesTableLayout and use modernTableLayout instead\nexport const tableLayouts = {\n  modern: modernTableLayout,\n  pipelines: modernTableLayout, // alias for backwards compatibility\n};\n```"
+        }
+      ]
+    },
+    {
+      "author": {"login": "kpetrov-qb"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-01T12:00:00Z",
+      "body": "This can definitely be decomposed into lower level functions. At least to have a function which creates a row for a pipeline, function for creating the `nameCell`. Further, I let to you to decide if you want to decompose further. Maybe remove some of the inline comments as they are just explaining what the code does",
+      "comments": []
+    },
+    {
+      "author": {"login": "kpetrov-qb"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-01T12:30:00Z",
+      "body": "I would question if we really need these as in the current connection central and in the App summary we are not using such logic... But in order to skip additional discussions, I would suggest at least to remove the channels here which just have a capitalized first letter as it would be capitalized with the current logic",
+      "comments": []
+    },
+    {
+      "author": {"login": "dsalimov-qb"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-01T13:00:00Z",
+      "body": "Great work! I tested the following edge cases:\n\n1. Array field icons display correctly in all grid modes\n2. Filters work properly with the new field indicators\n3. Import step handles field type changes gracefully\n4. Loop targets preserve field metadata through transformations\n\nAll scenarios passed successfully. The implementation is solid.",
+      "comments": []
+    },
+    {
+      "author": {"login": "dsalimov-qb"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-01T13:30:00Z",
+      "body": "Screenshot shows the array icon issue is fixed by removing the prop. Good catch!",
+      "comments": [
+        {
+          "path": "src/components/FieldIndicator.tsx",
+          "line": 28,
+          "body": "Removing this prop fixed the array icon rendering issue as shown in the screenshot above."
+        }
+      ]
+    },
+    {
+      "author": {"login": "aaydan-qb"},
+      "state": "COMMENTED",
+      "submittedAt": "2025-01-01T14:00:00Z",
+      "body": "The column width calculation needs adjustment. Currently it's using a fixed multiplier which doesn't account for different font sizes or cell padding variations.\n\nHere's a more robust approach:\n\n```typescript\nconst calculateColumnWidth = (content: string, options: WidthOptions) => {\n  const baseWidth = content.length * CHAR_WIDTH;\n  const padding = options.padding || DEFAULT_PADDING;\n  return Math.max(MIN_WIDTH, baseWidth + padding);\n};\n```\n\nThis ensures consistent rendering across different viewport sizes.",
+      "comments": []
+    },
+    {
+      "author": {"login": "kpetrov-qb"},
+      "state": "APPROVED",
+      "submittedAt": "2025-01-01T15:00:00Z",
+      "body": "Functionally this works great! A few code quality notes:\n\n- Consider decomposing the large render function\n- The links comment in the modal could be more specific\n- Should the action items be centered?\n\nSee screenshot for the centering question. Overall good work!",
+      "comments": []
+    }
+  ]
+}

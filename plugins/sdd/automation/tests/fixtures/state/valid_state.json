@@ -1,0 +1,23 @@
+{
+  "run_id": "20251214-140000-abc123",
+  "status": "running",
+  "input_type": "jql",
+  "input_value": "project = UIT AND status = Open",
+  "started_at": "2025-12-14T14:00:00-05:00",
+  "finished_at": null,
+  "tickets": [
+    {
+      "key": "UIT-1001",
+      "status": "pending",
+      "completed_stages": [],
+      "error": null
+    },
+    {
+      "key": "UIT-1002",
+      "status": "in_progress",
+      "completed_stages": ["plan"],
+      "error": null
+    }
+  ],
+  "current_ticket": "UIT-1002"
+}
