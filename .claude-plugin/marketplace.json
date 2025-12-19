@@ -24,6 +24,16 @@
       "name": "sdd",
       "source": "./plugins/sdd",
       "description": "Spec Driven Development - workflow management system for structured epic planning, ticket execution, and task-based implementation"
+    },
+    {
+      "name": "maproom",
+      "source": "./plugins/maproom",
+      "description": "Semantic code search using crewchief-maproom CLI"
+    },
+    {
+      "name": "worktree",
+      "source": "./plugins/worktree",
+      "description": "Git worktree management using crewchief CLI"
     }
   ]
 }

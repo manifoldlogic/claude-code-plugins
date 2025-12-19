@@ -32,6 +32,34 @@ GitHub Actions workflow creation, optimization, and troubleshooting.
 
 **[Read More →](github-actions/README.md)**
 
+### Maproom
+**Version:** 0.1.0
+
+Semantic code search using the crewchief-maproom CLI.
+
+**Features:**
+- Semantic code search by concept (not just text matching)
+- Full-text search (FTS) and vector similarity search
+- Query formulation guidance for effective searches
+- Architecture exploration and code navigation
+- Integration with crewchief-maproom CLI
+
+**[Read More →](maproom/README.md)**
+
+### Worktree
+**Version:** 0.1.0
+
+Git worktree management using the crewchief CLI.
+
+**Features:**
+- Create isolated worktrees for parallel development
+- Safe branch operations with automatic stashing
+- Merge and cleanup workflows
+- Switch between worktrees seamlessly
+- Integration with crewchief worktree commands
+
+**[Read More →](worktree/README.md)**
+
 ## Installation
 
 ### Add Marketplace from GitHub
@@ -46,6 +74,8 @@ Install plugins individually:
 ```bash
 /plugin install workstream@crewchief
 /plugin install github-actions@crewchief
+/plugin install maproom@crewchief
+/plugin install worktree@crewchief
 ```
 
 Or use the plugin manager UI:
