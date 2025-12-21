@@ -34,6 +34,11 @@
       "name": "worktree",
       "source": "./plugins/worktree",
       "description": "Git worktree management using crewchief CLI"
+    },
+    {
+      "name": "game-design",
+      "source": "./plugins/game-design",
+      "description": "Game design consultant agents synthesized from 14 legendary designers"
     }
   ]
 }
