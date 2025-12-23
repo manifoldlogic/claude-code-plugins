@@ -39,6 +39,11 @@
       "name": "game-design",
       "source": "./plugins/game-design",
       "description": "Game design consultant agents synthesized from 14 legendary designers"
+    },
+    {
+      "name": "vscode",
+      "source": "./plugins/vscode",
+      "description": "VS Code and Cursor workspace configuration management - create and modify .code-workspace files, manage folders, settings, extensions, and more"
     }
   ]
 }
