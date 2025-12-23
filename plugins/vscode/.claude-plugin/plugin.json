@@ -1,0 +1,10 @@
+{
+  "name": "vscode",
+  "version": "0.1.0",
+  "description": "VS Code and Cursor workspace configuration management - create and modify .code-workspace files, manage folders, settings, extensions, and more",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com"
+  },
+  "keywords": ["vscode", "cursor", "workspace", "code-workspace", "multi-root"]
+}
