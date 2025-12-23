@@ -28,6 +28,7 @@ def should_skip_file(file_path):
     - Larger than 100KB (performance safeguard)
     - Inside .sdd directory (planning documents)
     - Inside plugins directory (Claude Code plugins - any /plugins/ path segment)
+    - Inside .devcontainer directory (infrastructure configuration)
     - Documentation files (.md) - not production code
     - Config files (.json, .yaml, .yml) within plugins/ or .sdd/ directories
     - Shell scripts (.sh) within plugins/ directories
@@ -57,6 +58,10 @@ def should_skip_file(file_path):
     # Skip if in plugins directory (Claude Code plugins)
     # Check for /plugins/ anywhere in path to handle temp directories in tests
     if '/plugins/' in normalized or normalized.startswith('plugins/'):
+        return True
+
+    # Skip .devcontainer directory (infrastructure configuration)
+    if '/.devcontainer/' in normalized or normalized.startswith('.devcontainer/'):
         return True
 
     # Skip config/script files within .sdd directories (already handled above)
