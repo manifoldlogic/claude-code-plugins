@@ -308,6 +308,22 @@ else
 fi
 
 echo ""
+echo "--- .devcontainer Exclusion Tests ---"
+echo ""
+
+# Test 22: .devcontainer file with .sdd reference (should NOT warn)
+run_test "Devcontainer file with .sdd reference" \
+    'const path = ".sdd/tickets/";' \
+    "$TEST_DIR/.devcontainer/config.sh" \
+    "no"
+
+# Test 23: .devcontainer file with SDD_ROOT_DIR (should NOT warn)
+run_test "Devcontainer file with SDD_ROOT_DIR" \
+    'export SDD_ROOT_DIR="/workspace/.sdd"' \
+    "$TEST_DIR/.devcontainer/.zshrc" \
+    "no"
+
+echo ""
 echo "============================================"
 echo "Cleanup"
 echo "============================================"
