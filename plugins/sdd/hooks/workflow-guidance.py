@@ -47,7 +47,13 @@ TICKET_DIR_PATTERN = re.compile(r'\b[A-Z]+_[\w-]+\b')  # e.g., STOPHOOK_automati
 TASK_ID_PATTERN = re.compile(r'\b[A-Z]+\.\d{4}\b')
 
 # Command categories for workflow state detection
-PLANNING_COMMANDS = {'/sdd:plan-ticket', '/sdd:review', '/sdd:create-tasks', '/sdd:import-jira-ticket'}
+# Planning commands - ordered by workflow progression
+TICKET_INIT_COMMANDS = {'/sdd:plan-ticket', '/sdd:import-jira-ticket'}
+REVIEW_COMMANDS = {'/sdd:review'}
+UPDATE_COMMANDS = {'/sdd:update'}
+TASK_CREATION_COMMANDS = {'/sdd:create-tasks'}
+PLANNING_COMMANDS = TICKET_INIT_COMMANDS | REVIEW_COMMANDS | UPDATE_COMMANDS | TASK_CREATION_COMMANDS
+
 IMPLEMENTATION_COMMANDS = {'/sdd:do-task', '/sdd:do-all-tasks'}
 VERIFICATION_COMMANDS = {'/sdd:code-review', '/sdd:pr'}
 
@@ -186,15 +192,23 @@ def detect_sdd_context(entries: list[dict]) -> dict:
     Returns:
         Dictionary with:
             - workflow: "none" | "planning" | "implementation" | "verification"
+            - planning_phase: "init" | "needs_review" | "reviewed" | "tasks_created" | None
             - indicators: List of detected indicator strings
             - task_id: Most recent task ID found, or None
             - ticket_id: Most recent ticket ID found, or None
+            - has_review: Whether /sdd:review was run
+            - has_update: Whether /sdd:update was run
+            - has_create_tasks: Whether /sdd:create-tasks was run
     """
     result = {
         'workflow': 'none',
+        'planning_phase': None,
         'indicators': [],
         'task_id': None,
         'ticket_id': None,
+        'has_review': False,
+        'has_update': False,
+        'has_create_tasks': False,
     }
 
     if not entries:
@@ -243,6 +257,12 @@ def detect_sdd_context(entries: list[dict]) -> dict:
     if ticket_ids_found:
         result['ticket_id'] = ticket_ids_found[-1]
 
+    # Track which planning commands have been run
+    command_set = set(sdd_commands_found)
+    result['has_review'] = bool(command_set.intersection(REVIEW_COMMANDS))
+    result['has_update'] = bool(command_set.intersection(UPDATE_COMMANDS))
+    result['has_create_tasks'] = bool(command_set.intersection(TASK_CREATION_COMMANDS))
+
     # Check if we have enough indicators to proceed
     if len(result['indicators']) < MIN_INDICATORS:
         return result
@@ -251,7 +271,53 @@ def detect_sdd_context(entries: list[dict]) -> dict:
     workflow = determine_workflow_state(sdd_commands_found, task_ids_found, ticket_ids_found)
     result['workflow'] = workflow
 
+    # Determine planning phase for more nuanced guidance
+    if workflow == 'planning':
+        result['planning_phase'] = determine_planning_phase(
+            command_set,
+            result['has_review'],
+            result['has_update'],
+            result['has_create_tasks']
+        )
+
     return result
+
+
+def determine_planning_phase(
+    commands: set[str],
+    has_review: bool,
+    has_update: bool,
+    has_create_tasks: bool
+) -> str:
+    """
+    Determine the current phase within the planning workflow.
+
+    Planning workflow progression:
+        init -> needs_review -> reviewed -> tasks_created
+
+    Args:
+        commands: Set of SDD commands found.
+        has_review: Whether /sdd:review was run.
+        has_update: Whether /sdd:update was run.
+        has_create_tasks: Whether /sdd:create-tasks was run.
+
+    Returns:
+        Planning phase: "init" | "needs_review" | "reviewed" | "tasks_created"
+    """
+    # If tasks have been created, we're in the final planning phase
+    if has_create_tasks:
+        return 'tasks_created'
+
+    # If reviewed (and optionally updated), ready for task creation
+    if has_review:
+        return 'reviewed'
+
+    # If ticket was initialized, needs review
+    if commands.intersection(TICKET_INIT_COMMANDS):
+        return 'needs_review'
+
+    # Default to init phase
+    return 'init'
 
 
 def determine_workflow_state(
@@ -302,6 +368,9 @@ def generate_guidance(context: dict) -> Optional[str]:
     """
     Generate guidance message based on workflow context.
 
+    Enforces review-first workflow:
+        plan-ticket → review → update (if needed) → create-tasks → do-all-tasks
+
     Args:
         context: Dictionary from detect_sdd_context().
 
@@ -315,18 +384,10 @@ def generate_guidance(context: dict) -> Optional[str]:
 
     task_id = context.get('task_id')
     ticket_id = context.get('ticket_id')
+    planning_phase = context.get('planning_phase')
 
     if workflow == 'planning':
-        if ticket_id:
-            return (
-                f"You're in a planning workflow for {ticket_id}. "
-                "Consider running /sdd:review to validate the plan, "
-                "or /sdd:create-tasks to generate implementation tasks."
-            )
-        return (
-            "You're in a planning workflow. Consider running /sdd:review "
-            "to validate the plan, or /sdd:create-tasks to generate tasks."
-        )
+        return _generate_planning_guidance(ticket_id, planning_phase)
 
     if workflow == 'implementation':
         if task_id:
@@ -348,6 +409,55 @@ def generate_guidance(context: dict) -> Optional[str]:
         )
 
     return None
+
+
+def _generate_planning_guidance(ticket_id: Optional[str], planning_phase: Optional[str]) -> str:
+    """
+    Generate guidance for planning workflow, enforcing review cycles.
+
+    Workflow progression:
+        needs_review → reviewed → tasks_created → ready for implementation
+
+    Args:
+        ticket_id: The ticket ID if found.
+        planning_phase: Current planning phase.
+
+    Returns:
+        Guidance message string.
+    """
+    ticket_str = f" for {ticket_id}" if ticket_id else ""
+    ticket_arg = f" {ticket_id}" if ticket_id else ""
+
+    if planning_phase == 'needs_review':
+        # Just created ticket - must review before creating tasks
+        return (
+            f"In planning workflow{ticket_str}: ticket created. "
+            f"Run /sdd:review{ticket_arg} to validate the plan before creating tasks. "
+            "Review identifies issues early and improves implementation quality."
+        )
+
+    if planning_phase == 'reviewed':
+        # Reviewed - suggest update if needed, otherwise create tasks
+        return (
+            f"In planning workflow{ticket_str}: review complete. "
+            f"If the review found issues, run /sdd:update{ticket_arg} to address them. "
+            f"If the review passed, run /sdd:create-tasks{ticket_arg} to generate implementation tasks."
+        )
+
+    if planning_phase == 'tasks_created':
+        # Tasks created - now ready for implementation
+        return (
+            f"In planning workflow{ticket_str}: tasks created. "
+            f"Run /sdd:do-all-tasks{ticket_arg} to execute all tasks systematically, "
+            f"or /sdd:do-task TASK_ID to work on a specific task."
+        )
+
+    # Default: init phase or unknown - guide toward review
+    return (
+        f"In planning workflow{ticket_str}. "
+        f"Run /sdd:review{ticket_arg} to validate the plan and identify any issues. "
+        "Review cycles improve confidence before task creation."
+    )
 
 
 # ============================================================================
