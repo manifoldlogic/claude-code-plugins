@@ -1,5 +1,0 @@
-{
-  "_comment": "Invalid JSON - missing closing brace for negative testing",
-  "sdd_root": "/app/.sdd",
-  "retry": {
-    "max_attempts": 3
