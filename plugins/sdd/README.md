@@ -74,7 +74,7 @@ Add to your `.bashrc` or `.zshrc` to disable permanently.
 
 ### Reporting Issues
 
-Found a bug or have suggestions? [File an issue](https://github.com/quickbase/claude-code-plugins/issues) with:
+Found a bug or have suggestions? [File an issue](https://github.com/manifoldlogic/claude-code-plugins/issues) with:
 
 - Steps to reproduce
 - Expected vs actual behavior
@@ -305,15 +305,23 @@ plugins/sdd/
 ├── commands/
 │   ├── archive.md
 │   ├── assign-agents.md
-│   ├── decompose.md
-│   ├── execute.md
-│   ├── implement.md
-│   ├── epic.md
-│   ├── ticket-init.md
+│   ├── code-review.md
+│   ├── create-tasks.md
+│   ├── do-all-tasks.md
+│   ├── do-task.md
+│   ├── epics-status.md
+│   ├── extend.md
+│   ├── import-jira-ticket.md
+│   ├── plan-ticket.md
+│   ├── pr-comments.md
+│   ├── pr.md
 │   ├── recommend-agents.md
 │   ├── review.md
 │   ├── setup.md
+│   ├── start-epic.md
+│   ├── status.md
 │   ├── tasks-status.md
+│   ├── tickets-status.md
 │   └── update.md
 ├── hooks/
 │   ├── block-dangerous-git.py
@@ -452,4 +460,4 @@ The plugin enforces enterprise-grade testing:
 
 ## Links
 
-- [Repository](https://github.com/quickbase/claude-code-plugins)
+- [Repository](https://github.com/manifoldlogic/claude-code-plugins)
