@@ -1,0 +1,23 @@
+{
+  "env": {
+    "SDD_ROOT_DIR": "/workspace/repos/claude-code-plugins/.SDD"
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ssh -i ~/.ssh/id_ed25519 danielbushman@host.docker.internal 'afplay /Users/danielbushman/git/manifoldlogic/home/.claude/audio/scale-e6-14577.mp3'"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "claude-code-dev@crewchief": true
+  }
+}

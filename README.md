@@ -11,7 +11,7 @@ Add the marketplace and install plugins:
 /plugin marketplace add manifoldlogic/claude-code-plugins
 
 # Install plugins
-/plugin install workstream@crewchief
+/plugin install sdd@crewchief
 /plugin install github-actions@crewchief
 ```
 
@@ -19,28 +19,31 @@ Add the marketplace and install plugins:
 
 | Plugin | Description |
 |--------|-------------|
-| **workstream** | Project and ticket workflow management with specialized agents |
+| **sdd** | Spec-Driven Development - epic planning, ticket execution, and task-based implementation |
 | **github-actions** | GitHub Actions workflow creation, optimization, and troubleshooting |
 | **claude-code-dev** | Development tools for Claude Code: skills, commands, hooks, and plugins |
+| **maproom** | Semantic code search using crewchief-maproom CLI |
+| **worktree** | Git worktree management using crewchief CLI |
+| **vscode** | VS Code workspace configuration management |
+| **game-design** | Game design consultant agents synthesized from legendary designers |
 
-## Workstream Plugin
+## SDD Plugin
 
-Systematic project and ticket workflow management.
+Spec-Driven Development - enterprise workflow management for structured development.
 
 **Features:**
-- Initiative and project planning with analysis and architecture documents
-- Automated ticket generation from plans
-- Complete workflow automation (implement → test → verify → commit)
+- Epic planning for research and discovery work
+- Ticket-based deliverables with analysis and architecture documents
+- Task-level implementation with verification
 - Specialized agents for each workflow phase (Haiku for mechanical tasks, Sonnet for reasoning)
 
 **Commands:**
-- `/workstream:project-create [description]` - Create a new project
-- `/workstream:project-tickets [SLUG]` - Generate tickets from project plan
-- `/workstream:project-work [SLUG]` - Execute all tickets for a project
-- `/workstream:ticket [TICKET_ID]` - Complete a single ticket
-- `/workstream:status [SLUG]` - Check project/ticket status
+- `/sdd:plan-ticket [description]` - Create a new ticket with planning documents
+- `/sdd:create-tasks [SLUG]` - Generate tasks from ticket plan
+- `/sdd:do-task [TASK_ID]` - Complete a single task with verification
+- `/sdd:status` - Check epic/ticket/task status
 
-**[Full Documentation →](plugins/workstream/README.md)**
+**[Full Documentation →](plugins/sdd/README.md)**
 
 ## GitHub Actions Plugin
 
@@ -107,7 +110,7 @@ claude-code-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json      # Marketplace configuration
 ├── plugins/
-│   ├── workstream/           # Project workflow management
+│   ├── sdd/                  # Spec-Driven Development workflow
 │   │   ├── commands/         # Slash commands
 │   │   ├── agents/           # Specialized agents
 │   │   └── skills/           # Agent skills with scripts

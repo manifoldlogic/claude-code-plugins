@@ -6,11 +6,6 @@
   },
   "plugins": [
     {
-      "name": "workstream",
-      "source": "./plugins/workstream",
-      "description": "Work lifecycle management for initiatives, projects, and tickets"
-    },
-    {
       "name": "github-actions",
       "source": "./plugins/github-actions",
       "description": "GitHub Actions workflow creation, optimization, and troubleshooting"

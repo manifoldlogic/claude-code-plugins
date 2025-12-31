@@ -1,4 +1,4 @@
-# Spec-Driven Development with Workstream
+# Spec-Driven Development with SDD
 
 ## Process Overview
 

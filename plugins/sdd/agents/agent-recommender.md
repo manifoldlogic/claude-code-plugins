@@ -83,7 +83,7 @@ For each candidate, ask:
 Before recommending a new agent, check if one already exists:
 
 1. Search the codebase for agent definitions
-2. Check the workstream plugin's agents directory
+2. Check the SDD plugin's agents directory
 3. Look for similar agent patterns in the ticket
 
 **Don't recommend duplicates.**

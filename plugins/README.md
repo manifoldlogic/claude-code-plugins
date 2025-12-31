@@ -4,19 +4,19 @@ A collection of Claude Code plugins for development workflows and CI/CD automati
 
 ## Available Plugins
 
-### Workstream
+### SDD (Spec-Driven Development)
 **Version:** 0.3.0
 
-Systematic project and ticket workflow management.
+Enterprise workflow management for epics, tickets, and tasks.
 
 **Features:**
-- Initiative and project planning with analysis and architecture documents
-- Automated ticket generation from plans
-- Complete workflow automation (implement → test → verify → commit)
+- Epic planning for research and discovery work
+- Ticket-based deliverables with analysis and architecture documents
+- Task-level implementation with verification
 - Specialized agents for each workflow phase
 - Quality assurance built-in
 
-**[Read More →](workstream/README.md)**
+**[Read More →](sdd/README.md)**
 
 ### GitHub Actions
 **Version:** 0.1.0
@@ -60,6 +60,31 @@ Git worktree management using the crewchief CLI.
 
 **[Read More →](worktree/README.md)**
 
+### VS Code
+**Version:** 0.1.0
+
+VS Code and Cursor workspace configuration management.
+
+**Features:**
+- Create and modify .code-workspace files
+- Manage folders, settings, and extensions
+- Launch configuration management
+- Task definition support
+
+**[Read More →](vscode/README.md)**
+
+### Game Design
+**Version:** 0.1.0
+
+Game design consultant agents synthesized from legendary designers.
+
+**Features:**
+- 9 specialized agent personas for game design consulting
+- Design roles distilled from 14 legendary designers
+- Core mechanics, narrative, audio, and visual design guidance
+
+**[Read More →](game-design/README.md)**
+
 ## Installation
 
 ### Add Marketplace from GitHub
@@ -72,7 +97,7 @@ Git worktree management using the crewchief CLI.
 
 Install plugins individually:
 ```bash
-/plugin install workstream@crewchief
+/plugin install sdd@crewchief
 /plugin install github-actions@crewchief
 /plugin install maproom@crewchief
 /plugin install worktree@crewchief
@@ -108,10 +133,10 @@ plugin-name/
 
 ## Usage Patterns
 
-### Project Management (Workstream)
-1. Create project: `/workstream:project-create [description]`
-2. Generate tickets: `/workstream:project-tickets [PROJECT_SLUG]`
-3. Execute tickets: `/workstream:project-work [PROJECT_SLUG]`
+### Project Management (SDD)
+1. Create ticket: `/sdd:plan-ticket [description]`
+2. Generate tasks: `/sdd:create-tasks [TICKET_SLUG]`
+3. Execute tasks: `/sdd:do-task [TASK_ID]`
 
 ### CI/CD Workflows (GitHub Actions)
 1. Ask specialist: `@github-actions-specialist Create a CI workflow...`
