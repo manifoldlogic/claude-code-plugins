@@ -4,7 +4,9 @@
   "description": "VS Code and Cursor workspace configuration management - create and modify .code-workspace files, manage folders, settings, extensions, and more",
   "author": {
     "name": "Daniel Bushman",
-    "email": "dbushman@manifoldlogic.com"
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
   },
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
   "keywords": ["vscode", "cursor", "workspace", "code-workspace", "multi-root"]
 }

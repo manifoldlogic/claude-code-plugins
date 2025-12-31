@@ -4,10 +4,10 @@
   "description": "Spec Driven Development - workflow management system for structured epic planning, ticket execution, and task-based implementation",
   "author": {
     "name": "Daniel Bushman",
-    "email": "dbushman@quickbase.com",
-    "url": "https://github.com/quickbase/claude-code-plugins"
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
   },
-  "repository": "https://github.com/quickbase/claude-code-plugins",
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
   "keywords": [
     "workflow",
     "spec-driven",

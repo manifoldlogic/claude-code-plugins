@@ -4,7 +4,7 @@
   "description": "Game design consultant agents synthesized from 14 legendary game designers. These agents provide specialized guidance across core mechanics, audio, narrative, psychology, systems design, and visual identity.",
   "author": {
     "name": "Daniel Bushman",
-    "email": "dbushman@quickbase.com",
+    "email": "dbushman@manifoldlogic.com",
     "url": "https://github.com/manifoldlogic/claude-code-plugins"
   },
   "repository": "https://github.com/manifoldlogic/claude-code-plugins",
