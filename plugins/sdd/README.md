@@ -256,7 +256,8 @@ plugins/sdd/
 │   └── update.md
 ├── hooks/
 │   ├── block-dangerous-git.py
-│   └── setup-sdd-env.sh
+│   ├── setup-sdd-env.js
+│   └── warn-sdd-refs.py
 ├── skills/
 │   └── project-workflow/
 │       ├── SKILL.md
