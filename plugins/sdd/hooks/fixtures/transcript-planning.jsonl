@@ -1,0 +1,6 @@
+{"display": "/sdd:plan-ticket Implement user authentication", "timestamp": 1700000001000, "sessionId": "test-123"}
+{"display": "Creating ticket AUTH_user-authentication", "timestamp": 1700000002000, "sessionId": "test-123"}
+{"display": "I'll help you plan this ticket. Let me analyze the requirements.", "timestamp": 1700000003000, "sessionId": "test-123"}
+{"display": "Working on ticket AUTH-123 planning documents", "timestamp": 1700000004000, "sessionId": "test-123"}
+{"display": "/sdd:review AUTH", "timestamp": 1700000005000, "sessionId": "test-123"}
+{"display": "The plan looks comprehensive. Ready for task creation.", "timestamp": 1700000006000, "sessionId": "test-123"}

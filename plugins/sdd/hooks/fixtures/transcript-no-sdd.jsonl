@@ -1,0 +1,5 @@
+{"display": "Hello, how can I help you?", "timestamp": 1700000001000, "sessionId": "test-123"}
+{"display": "I want to build a web app", "timestamp": 1700000002000, "sessionId": "test-123"}
+{"display": "What framework should I use?", "timestamp": 1700000003000, "sessionId": "test-123"}
+{"display": "I recommend using React or Vue for the frontend", "timestamp": 1700000004000, "sessionId": "test-123"}
+{"display": "Thanks for the suggestion!", "timestamp": 1700000005000, "sessionId": "test-123"}

@@ -1,0 +1,5 @@
+{"display": "/sdd:do-task AUTH.1001", "timestamp": 1700000001000, "sessionId": "test-123"}
+{"display": "Starting implementation of AUTH.1001", "timestamp": 1700000002000, "sessionId": "test-123"}
+{"display": "Working on AUTH.1001 implementation", "timestamp": 1700000003000, "sessionId": "test-123"}
+{"display": "Created authentication middleware in src/auth/middleware.ts", "timestamp": 1700000004000, "sessionId": "test-123"}
+{"display": "Task AUTH.1001 in progress - implementing login handler", "timestamp": 1700000005000, "sessionId": "test-123"}

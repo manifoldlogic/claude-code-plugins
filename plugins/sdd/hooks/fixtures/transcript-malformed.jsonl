@@ -1,0 +1,5 @@
+{"display": "Valid first line", "timestamp": 1700000001000, "sessionId": "test-123"}
+this is not valid json
+{"display": "Another valid line", "timestamp": 1700000002000, "sessionId": "test-123"}
+{malformed: "missing quotes on key"}
+{"display": "Third valid line", "timestamp": 1700000003000, "sessionId": "test-123"}
