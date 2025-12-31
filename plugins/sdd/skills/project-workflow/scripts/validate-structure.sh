@@ -116,8 +116,8 @@ validate_ticket() {
     echo "  }"
 }
 
-# Validate ticket structure
-validate_ticket() {
+# Validate task file structure
+validate_task() {
     local file="$1"
     local filename=$(basename "$file")
     local issues=()
@@ -125,7 +125,7 @@ validate_ticket() {
 
     # Check filename format (supports PROJ.1001 and UIT-9819.1001 formats)
     if [[ ! "$filename" =~ ^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*\.[0-9]+_.*\.md$ ]]; then
-        issues+=("Invalid ticket filename format")
+        issues+=("Invalid task filename format")
     fi
 
     # Check required sections
@@ -208,7 +208,7 @@ validate_ticket_tasks() {
                 else
                     echo ","
                 fi
-                validate_ticket "$file"
+                validate_task "$file"
             fi
         done
     fi
