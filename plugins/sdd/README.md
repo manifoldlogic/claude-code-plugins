@@ -18,6 +18,67 @@ Epic (research/discovery)
 - **Haiku agents for structured processing** - Status reports, test execution, commits
 - **Sonnet agents for reasoning** - Planning, review, verification
 - **Strict delegation** - Orchestrator coordinates, never does work itself
+- **Workflow guidance** - Stop hook provides contextual next-step suggestions
+
+## Workflow Guidance (Stop Hook)
+
+### Overview
+
+The SDD plugin includes a Stop hook that provides workflow guidance when Claude finishes responding. It analyzes your recent conversation to detect SDD workflow context and suggests next steps to keep you on track.
+
+### How It Works
+
+When Claude finishes responding, the hook:
+
+1. **Reads recent transcript** - Analyzes the last 50 messages
+2. **Detects SDD indicators** - Looks for `/sdd:` commands, ticket IDs, task IDs
+3. **Determines workflow state** - Planning, implementation, or verification
+4. **Provides contextual guidance** - Suggests logical next steps
+
+### When Guidance Appears
+
+Guidance appears when:
+
+- You're mid-planning (e.g., after `/sdd:plan-ticket`)
+- You're implementing a task (e.g., after `/sdd:do-task`)
+- You're in verification phase
+- Claude detects incomplete workflow steps
+
+If no SDD context is detected, the hook exits silently.
+
+### Understanding Guidance Messages
+
+| Workflow State | Example Guidance |
+|----------------|------------------|
+| **Planning** | "Consider running `/sdd:review` or `/sdd:create-tasks`" |
+| **Implementation** | "Consider running tests and committing your changes" |
+| **Verification** | "Consider checking test results and creating a PR" |
+
+### Disabling the Hook
+
+To temporarily disable workflow guidance:
+
+```bash
+export SDD_DISABLE_STOP_HOOK=1
+```
+
+Add to your `.bashrc` or `.zshrc` to disable permanently.
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| **False positives** | Hook detected SDD context incorrectly - disable hook or ignore guidance |
+| **Performance issues** | Check transcript size - hook is optimized for < 1 second execution |
+| **Unwanted guidance** | Set `SDD_DISABLE_STOP_HOOK=1` environment variable |
+
+### Reporting Issues
+
+Found a bug or have suggestions? [File an issue](https://github.com/quickbase/claude-code-plugins/issues) with:
+
+- Steps to reproduce
+- Expected vs actual behavior
+- Relevant transcript context (if possible)
 
 ## Installation
 
@@ -257,7 +318,8 @@ plugins/sdd/
 ├── hooks/
 │   ├── block-dangerous-git.py
 │   ├── setup-sdd-env.js
-│   └── warn-sdd-refs.py
+│   ├── warn-sdd-refs.py
+│   └── workflow-guidance.py
 ├── skills/
 │   └── project-workflow/
 │       ├── SKILL.md
