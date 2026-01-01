@@ -1,0 +1,6 @@
+{"display": "/sdd:plan-ticket Implement feature AUTOGATE_test-feature", "timestamp": 1700000001000, "sessionId": "test-123"}
+{"display": "Creating ticket AUTOGATE_test-feature", "timestamp": 1700000002000, "sessionId": "test-123"}
+{"display": "/sdd:review AUTOGATE_test-feature", "timestamp": 1700000003000, "sessionId": "test-123"}
+{"display": "Review complete for AUTOGATE_test-feature", "timestamp": 1700000004000, "sessionId": "test-123"}
+{"display": "/sdd:create-tasks AUTOGATE_test-feature", "timestamp": 1700000005000, "sessionId": "test-123"}
+{"display": "Tasks created for AUTOGATE_test-feature", "timestamp": 1700000006000, "sessionId": "test-123"}
