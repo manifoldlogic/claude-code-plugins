@@ -8,11 +8,12 @@ SDD workflows and suggests appropriate next steps.
 
 Exit Codes:
     0: Allow stop (default, fail-safe)
-    2: Block stop (with JSON output containing guidance)
+    2: Block stop (with JSON output containing gate block message or guidance)
 
-MVP Behavior:
-    Always exits 0 (allow stop), with guidance printed to stdout.
-    Blocking behavior (exit 2) is reserved for future phases.
+Gate Enforcement:
+    Before workflow guidance, checks for .autogate.json files in SDD_ROOT_DIR.
+    If a gate blocks, exits 2 with gate message.
+    Gate errors fail-safe to allow workflow guidance to proceed.
 
 Input: JSON from stdin with fields:
     - session_id: Current session ID
@@ -31,6 +32,14 @@ import re
 import sys
 from pathlib import Path
 from typing import Optional
+
+# ============================================================================
+# Gate Configuration Types
+# ============================================================================
+
+# Default gate configuration (fail-safe: allow work to proceed)
+DEFAULT_GATE_CONFIG = {'ready': True, 'stop_at_phase': None}
+
 
 # ============================================================================
 # Detection Patterns
@@ -173,6 +182,202 @@ def read_transcript_tail(path: str, num_lines: int = TRANSCRIPT_LINES) -> list[d
 
     except Exception:
         return []
+
+
+# ============================================================================
+# Gate Configuration Scanning and Evaluation
+# ============================================================================
+
+def scan_autogate_configs(sdd_root: str) -> dict:
+    """
+    Scan SDD_ROOT_DIR for .autogate.json files in tickets/ and epics/.
+
+    Only scans the immediate subdirectories (one level deep) to find
+    .autogate.json files for each ticket or epic.
+
+    Args:
+        sdd_root: Path to the SDD root directory (e.g., /workspace/.SDD).
+
+    Returns:
+        Dictionary mapping ticket/epic directory names to gate configs.
+        Returns empty dict on any error.
+    """
+    gates = {}
+
+    if not sdd_root or not os.path.isdir(sdd_root):
+        return gates
+
+    for subdir in ['tickets', 'epics']:
+        dir_path = os.path.join(sdd_root, subdir)
+        if not os.path.isdir(dir_path):
+            continue
+
+        try:
+            for item_dir in os.listdir(dir_path):
+                item_path = os.path.join(dir_path, item_dir)
+                if not os.path.isdir(item_path):
+                    continue
+
+                config_path = os.path.join(item_path, '.autogate.json')
+                if os.path.isfile(config_path):
+                    try:
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        config = parse_autogate_config(content)
+                        gates[item_dir] = config
+                    except Exception:
+                        # Invalid config treated as no config (ready)
+                        pass
+        except Exception:
+            # Directory listing error - skip this subdirectory
+            continue
+
+    return gates
+
+
+def parse_autogate_config(content: str) -> dict:
+    """
+    Parse and validate .autogate.json content.
+
+    Schema: {"ready": boolean, "stop_at_phase": int|null}
+
+    Args:
+        content: Raw JSON string from .autogate.json file.
+
+    Returns:
+        Dictionary with 'ready' (bool) and 'stop_at_phase' (int or None).
+        Defaults: ready=True, stop_at_phase=None.
+        Invalid JSON or values return defaults (fail-safe).
+    """
+    try:
+        data = json.loads(content)
+
+        # Extract and validate 'ready' field
+        ready = data.get('ready', True)
+        if not isinstance(ready, bool):
+            ready = True
+
+        # Extract and validate 'stop_at_phase' field
+        stop_at_phase = data.get('stop_at_phase', None)
+        if stop_at_phase is not None and not isinstance(stop_at_phase, int):
+            stop_at_phase = None
+
+        return {'ready': ready, 'stop_at_phase': stop_at_phase}
+
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        # Invalid JSON treated as ready (fail-safe)
+        return DEFAULT_GATE_CONFIG.copy()
+
+
+def get_active_ticket_from_context(context: dict) -> Optional[str]:
+    """
+    Extract the active ticket directory name from SDD context.
+
+    Uses the ticket_id from context, which is matched from TICKET_DIR_PATTERN
+    (e.g., AUTOGATE_autonomous-work-gates) or TICKET_ID_PATTERN (e.g., AUTH-123).
+
+    Args:
+        context: Dictionary from detect_sdd_context().
+
+    Returns:
+        Ticket directory name if found, None otherwise.
+    """
+    return context.get('ticket_id')
+
+
+def get_current_phase_number(context: dict) -> Optional[int]:
+    """
+    Map the planning_phase string to a numeric phase for gate comparison.
+
+    Phase numbering:
+        1 = 'init' or 'needs_review' (ticket created, needs review)
+        2 = 'reviewed' (review complete)
+        3 = 'tasks_created' (tasks generated)
+        4 = implementation/verification (beyond planning)
+
+    Args:
+        context: Dictionary from detect_sdd_context().
+
+    Returns:
+        Phase number (1-4) or None if not in a workflow.
+    """
+    workflow = context.get('workflow', 'none')
+    planning_phase = context.get('planning_phase')
+
+    if workflow == 'none':
+        return None
+
+    if workflow == 'planning':
+        phase_map = {
+            'init': 1,
+            'needs_review': 1,
+            'reviewed': 2,
+            'tasks_created': 3,
+        }
+        return phase_map.get(planning_phase, 1)
+
+    if workflow == 'implementation':
+        return 4
+
+    if workflow == 'verification':
+        return 4
+
+    return None
+
+
+def evaluate_gates(gates: dict, context: dict) -> dict:
+    """
+    Evaluate gates against the active work context.
+
+    Checks:
+        1. If active ticket has a gate with ready=false, block
+        2. If active ticket has a gate with stop_at_phase=N and phase N is complete, block
+
+    Args:
+        gates: Dictionary from scan_autogate_configs().
+        context: Dictionary from detect_sdd_context().
+
+    Returns:
+        Dictionary with:
+            - blocked: bool (True if work should be blocked)
+            - message: str (message explaining the block, empty if not blocked)
+    """
+    result = {'blocked': False, 'message': ''}
+
+    active_ticket = get_active_ticket_from_context(context)
+    if not active_ticket:
+        return result
+
+    # Check if active ticket has a gate configuration
+    gate = gates.get(active_ticket)
+    if not gate:
+        return result
+
+    # Check ready flag - if false, block all work on this ticket
+    if not gate.get('ready', True):
+        return {
+            'blocked': True,
+            'message': (
+                f"AUTOGATE: Ticket {active_ticket} is gated (ready: false). "
+                "Set ready: true in .autogate.json to continue autonomous work."
+            )
+        }
+
+    # Check phase gate - if stop_at_phase is set and that phase is complete, block
+    stop_at_phase = gate.get('stop_at_phase')
+    if stop_at_phase is not None:
+        current_phase = get_current_phase_number(context)
+        if current_phase is not None and current_phase > stop_at_phase:
+            return {
+                'blocked': True,
+                'message': (
+                    f"AUTOGATE: Phase {stop_at_phase} complete for {active_ticket}. "
+                    f"Currently at phase {current_phase}. "
+                    "Review progress before proceeding to next phase, or update stop_at_phase in .autogate.json."
+                )
+            }
+
+    return result
 
 
 # ============================================================================
@@ -492,11 +697,11 @@ def main() -> None:
     Entry point for the Stop hook.
 
     Parses input, checks for active SDD context in the transcript,
-    and provides appropriate workflow guidance.
+    evaluates work gates, and provides appropriate workflow guidance.
 
     Exit Codes:
         0: Allow stop (default behavior, fail-safe)
-        2: Block stop (reserved for future use)
+        2: Block stop (gate blocks work or guidance requires attention)
     """
     try:
         # Check environment variable to disable hook
@@ -527,6 +732,26 @@ def main() -> None:
 
         # Detect SDD context
         context = detect_sdd_context(entries)
+
+        # ====================================================================
+        # Gate Enforcement (AUTOGATE)
+        # Check work gates before providing workflow guidance.
+        # Gate blocks result in exit 2 (early exit).
+        # All gate errors fail-safe to continue with workflow guidance.
+        # ====================================================================
+        if not os.environ.get('AUTOGATE_BYPASS'):
+            try:
+                sdd_root = os.environ.get('SDD_ROOT_DIR', '')
+                if sdd_root:
+                    gates = scan_autogate_configs(sdd_root)
+                    if gates:
+                        gate_result = evaluate_gates(gates, context)
+                        if gate_result.get('blocked', False):
+                            output_and_exit('block', gate_result.get('message', ''), 2)
+            except Exception:
+                # Gate errors should not prevent workflow guidance
+                # Fail-safe: continue to guidance below
+                pass
 
         # Generate guidance based on context
         guidance = generate_guidance(context)
