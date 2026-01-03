@@ -120,9 +120,10 @@ Top Actions Before Proceeding:
 
 Full review: {ticket_path}/planning/ticket-review.md
 
-Next:
-{If Ready/Caution}: /sdd:create-tasks {TICKET_ID}
-{If Needs Work}: /sdd:update {TICKET_ID}
+---
+RECOMMENDED NEXT STEP:
+If Ready/Proceed: /sdd:create-tasks {TICKET_ID}
+If Needs Work: /sdd:update {TICKET_ID} - address findings first
 ```
 
 **If tasks exist:**
@@ -170,9 +171,10 @@ Top Actions:
 
 Full review: {ticket_path}/planning/ticket-review.md
 
-Next:
-{If Ready}: /sdd:do-all-tasks {TICKET_ID}
-{If Needs Work}: /sdd:update {TICKET_ID}
+---
+RECOMMENDED NEXT STEP:
+If Ready: /sdd:do-all-tasks {TICKET_ID}
+If Needs Work: /sdd:update {TICKET_ID} - address findings first
 ```
 
 ## When to Re-run Review
