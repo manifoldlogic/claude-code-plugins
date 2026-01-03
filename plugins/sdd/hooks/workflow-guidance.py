@@ -381,6 +381,304 @@ def evaluate_gates(gates: dict, context: dict) -> dict:
 
 
 # ============================================================================
+# Task File Inspection
+# ============================================================================
+
+# Regex patterns for checkbox parsing in task files
+# Match: - [ ] **Task completed** or - [x] **Task completed** (with optional bold)
+TASK_COMPLETED_PATTERN = re.compile(
+    r'^[\s]*-\s*\[([xX\s])\]\s*\*{0,2}Task completed\*{0,2}',
+    re.MULTILINE
+)
+
+# Match: - [ ] **Tests pass** or - [x] **Tests pass** (with optional bold)
+TESTS_PASS_PATTERN = re.compile(
+    r'^[\s]*-\s*\[([xX\s])\]\s*\*{0,2}Tests pass\*{0,2}',
+    re.MULTILINE
+)
+
+# Match: - [ ] **Verified** or - [x] **Verified** (with optional bold)
+VERIFIED_PATTERN = re.compile(
+    r'^[\s]*-\s*\[([xX\s])\]\s*\*{0,2}Verified\*{0,2}',
+    re.MULTILINE
+)
+
+# Pattern to detect code blocks (to skip checkbox parsing inside them)
+CODE_BLOCK_PATTERN = re.compile(r'```[\s\S]*?```', re.MULTILINE)
+
+# Pattern to extract task ID from filename (without word boundaries for start-of-string matching)
+TASK_ID_FILENAME_PATTERN = re.compile(r'^([A-Z]+\.\d{4})')
+
+
+def find_ticket_tasks_directory(sdd_root: str, ticket_id: str) -> Optional[str]:
+    """
+    Find the tasks directory for a given ticket.
+
+    Handles both directory-style ticket IDs (AUTH_test-ticket) and
+    Jira-style IDs (AUTH-123) by looking for matching directories.
+
+    Args:
+        sdd_root: Path to the SDD root directory.
+        ticket_id: Ticket identifier (either AUTH-123 or AUTH_test-ticket format).
+
+    Returns:
+        Path to the tasks directory if found, None otherwise.
+    """
+    if not sdd_root or not ticket_id:
+        return None
+
+    tickets_dir = os.path.join(sdd_root, 'tickets')
+    if not os.path.isdir(tickets_dir):
+        return None
+
+    try:
+        # If ticket_id contains underscore, it's already in directory format
+        if '_' in ticket_id:
+            tasks_path = os.path.join(tickets_dir, ticket_id, 'tasks')
+            if os.path.isdir(tasks_path):
+                return tasks_path
+            return None
+
+        # Otherwise, look for directories starting with ticket_id
+        # E.g., AUTH-123 might be in AUTH-123_feature-name/
+        for item in os.listdir(tickets_dir):
+            if item.startswith(ticket_id) or item.startswith(ticket_id.replace('-', '_')):
+                tasks_path = os.path.join(tickets_dir, item, 'tasks')
+                if os.path.isdir(tasks_path):
+                    return tasks_path
+
+        return None
+
+    except Exception:
+        return None
+
+
+def remove_code_blocks(content: str) -> str:
+    """
+    Remove code blocks from markdown content to avoid parsing checkboxes in examples.
+
+    Args:
+        content: Markdown content that may contain code blocks.
+
+    Returns:
+        Content with code blocks replaced by empty strings.
+    """
+    return CODE_BLOCK_PATTERN.sub('', content)
+
+
+def parse_task_file_status(content: str) -> dict:
+    """
+    Parse the Status section checkboxes from a task file.
+
+    Extracts the state of three checkboxes:
+    - Task completed: Whether the main task work is done
+    - Tests pass: Whether tests have been run and passed
+    - Verified: Whether the task has been verified
+
+    Args:
+        content: Full content of a task file.
+
+    Returns:
+        Dictionary with:
+            - task_completed: bool (True if checkbox is checked)
+            - tests_pass: bool (True if checkbox is checked)
+            - verified: bool (True if checkbox is checked)
+            - is_in_progress: bool (True if task_completed is unchecked)
+    """
+    result = {
+        'task_completed': False,
+        'tests_pass': False,
+        'verified': False,
+        'is_in_progress': False,
+    }
+
+    # Remove code blocks to avoid parsing example checkboxes
+    clean_content = remove_code_blocks(content)
+
+    # Parse Task completed checkbox
+    match = TASK_COMPLETED_PATTERN.search(clean_content)
+    if match:
+        result['task_completed'] = match.group(1).lower() == 'x'
+
+    # Parse Tests pass checkbox
+    match = TESTS_PASS_PATTERN.search(clean_content)
+    if match:
+        result['tests_pass'] = match.group(1).lower() == 'x'
+
+    # Parse Verified checkbox
+    match = VERIFIED_PATTERN.search(clean_content)
+    if match:
+        result['verified'] = match.group(1).lower() == 'x'
+
+    # Task is in progress if Task completed is unchecked
+    # We detect this by: pattern was found AND it was unchecked
+    if TASK_COMPLETED_PATTERN.search(clean_content):
+        result['is_in_progress'] = not result['task_completed']
+
+    return result
+
+
+def extract_task_id_from_filename(filename: str) -> Optional[str]:
+    """
+    Extract task ID from a task filename.
+
+    Expected format: TICKETID.NNNN_task-description.md
+    E.g., STOPHOOK.1001_task-file-inspection.md -> STOPHOOK.1001
+
+    Args:
+        filename: Name of the task file.
+
+    Returns:
+        Task ID if found, None otherwise.
+    """
+    if not filename.endswith('.md'):
+        return None
+
+    # Match TICKETID.NNNN pattern at start of filename
+    # Use TASK_ID_FILENAME_PATTERN which doesn't have word boundaries
+    match = TASK_ID_FILENAME_PATTERN.match(filename)
+    if match:
+        return match.group(1)
+    return None
+
+
+def check_task_status(sdd_root: str, ticket_id: str) -> dict:
+    """
+    Check the completion status of tasks for a given ticket.
+
+    Reads task files from the ticket's tasks/ directory and parses
+    their Status section checkboxes to determine which tasks are
+    in progress (have unchecked "Task completed" checkbox).
+
+    **Multi-session limitation**: This check only detects tasks that
+    were started but not completed. It cannot distinguish between
+    tasks that were started in the current session vs. a previous
+    session. Phase 2 will add session-scoped state to address this.
+
+    Args:
+        sdd_root: Path to the SDD root directory.
+        ticket_id: Ticket identifier to check tasks for.
+
+    Returns:
+        Dictionary with:
+            - has_in_progress: bool (True if any task is in progress)
+            - in_progress_tasks: list of task IDs that are in progress
+            - completed_tasks: list of task IDs that are completed
+            - verified_tasks: list of task IDs that are verified
+            - task_statuses: dict mapping task_id to status dict
+            - error: str or None (error message if any)
+
+    Note: All errors fail-safe (return has_in_progress=False).
+    """
+    result = {
+        'has_in_progress': False,
+        'in_progress_tasks': [],
+        'completed_tasks': [],
+        'verified_tasks': [],
+        'task_statuses': {},
+        'error': None,
+    }
+
+    try:
+        # Find the tasks directory
+        tasks_dir = find_ticket_tasks_directory(sdd_root, ticket_id)
+        if not tasks_dir:
+            # No tasks directory = no tasks = allow stop
+            return result
+
+        # Get list of task files
+        try:
+            task_files = [f for f in os.listdir(tasks_dir) if f.endswith('.md')]
+        except Exception:
+            # Can't list directory = fail-safe, allow stop
+            return result
+
+        if not task_files:
+            # No task files = no tasks = allow stop
+            return result
+
+        # Parse each task file
+        for task_file in task_files:
+            task_id = extract_task_id_from_filename(task_file)
+            if not task_id:
+                continue
+
+            task_path = os.path.join(tasks_dir, task_file)
+
+            try:
+                with open(task_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception:
+                # Can't read file = skip it, continue with others
+                continue
+
+            try:
+                status = parse_task_file_status(content)
+                result['task_statuses'][task_id] = status
+
+                if status['verified']:
+                    result['verified_tasks'].append(task_id)
+                elif status['task_completed']:
+                    result['completed_tasks'].append(task_id)
+                elif status['is_in_progress']:
+                    result['in_progress_tasks'].append(task_id)
+                    result['has_in_progress'] = True
+
+            except Exception:
+                # Parse error = skip this task, continue with others
+                continue
+
+        return result
+
+    except Exception as e:
+        # Any unexpected error = fail-safe, allow stop
+        result['error'] = str(e)
+        return result
+
+
+def generate_task_in_progress_message(context: dict, task_status: dict) -> str:
+    """
+    Generate a blocking message when tasks are in progress.
+
+    Args:
+        context: SDD context dictionary from detect_sdd_context().
+        task_status: Dictionary from check_task_status().
+
+    Returns:
+        Human-readable message explaining what task is in progress.
+    """
+    ticket_id = context.get('ticket_id', 'unknown')
+    in_progress = task_status.get('in_progress_tasks', [])
+
+    if len(in_progress) == 1:
+        task_id = in_progress[0]
+        return (
+            f"TASK IN PROGRESS: {task_id} has not been completed.\n\n"
+            f"The task file shows 'Task completed' checkbox is unchecked.\n\n"
+            f"Please complete the task by:\n"
+            f"1. Finishing the implementation work\n"
+            f"2. Running tests if applicable\n"
+            f"3. Checking the 'Task completed' checkbox in the task file\n\n"
+            f"If you need to abandon this task, check the 'Task completed' checkbox "
+            f"and add a note explaining why.\n\n"
+            f"Note: This detection has a known limitation in multi-session environments. "
+            f"If this task was started in a different session, you can disable this check "
+            f"by setting SDD_DISABLE_STOP_HOOK=1."
+        )
+
+    # Multiple tasks in progress
+    task_list = ', '.join(in_progress)
+    return (
+        f"TASKS IN PROGRESS: {len(in_progress)} tasks are not completed: {task_list}\n\n"
+        f"Each task file shows 'Task completed' checkbox is unchecked.\n\n"
+        f"Please complete these tasks before switching context.\n\n"
+        f"Note: This detection has a known limitation in multi-session environments. "
+        f"If these tasks were started in different sessions, you can disable this check "
+        f"by setting SDD_DISABLE_STOP_HOOK=1."
+    )
+
+
+# ============================================================================
 # SDD Context Detection
 # ============================================================================
 
@@ -739,9 +1037,10 @@ def main() -> None:
         # Gate blocks result in exit 2 (early exit).
         # All gate errors fail-safe to continue with workflow guidance.
         # ====================================================================
+        sdd_root = os.environ.get('SDD_ROOT_DIR', '')
+
         if not os.environ.get('AUTOGATE_BYPASS'):
             try:
-                sdd_root = os.environ.get('SDD_ROOT_DIR', '')
                 if sdd_root:
                     gates = scan_autogate_configs(sdd_root)
                     if gates:
@@ -752,6 +1051,27 @@ def main() -> None:
                 # Gate errors should not prevent workflow guidance
                 # Fail-safe: continue to guidance below
                 pass
+
+        # ====================================================================
+        # Task File Inspection
+        # Check if any tasks are in progress (unchecked "Task completed").
+        # Blocks with exit 2 if work is detected.
+        # All errors fail-safe to allow stop (exit 0).
+        #
+        # Multi-session limitation: This check cannot distinguish between
+        # tasks started in the current session vs. previous sessions.
+        # Users can bypass with SDD_DISABLE_STOP_HOOK=1 if needed.
+        # ====================================================================
+        try:
+            if sdd_root and context.get('ticket_id'):
+                task_status = check_task_status(sdd_root, context['ticket_id'])
+                if task_status.get('has_in_progress', False):
+                    message = generate_task_in_progress_message(context, task_status)
+                    output_and_exit('block', message, 2)
+        except Exception:
+            # Task inspection errors should not prevent workflow guidance
+            # Fail-safe: continue to guidance below
+            pass
 
         # Generate guidance based on context
         guidance = generate_guidance(context)
