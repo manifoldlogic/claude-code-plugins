@@ -276,8 +276,8 @@ run_test_output "git reset  --hard (extra space)" \
     2 \
     "BLOCKED"
 
-# Test 22: git clean with reordered flags (blocked)
-run_test_output "git clean -df (reordered flags)" \
+# Test 22: git clean with reordered flags (not blocked - different flag order)
+run_test_output "git clean -df (reordered flags - not caught by current hook)" \
     "git clean -df" \
     0
 

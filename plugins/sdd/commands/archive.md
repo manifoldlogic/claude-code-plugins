@@ -426,7 +426,7 @@ for deliv_path in $deliverable_files; do
             echo ""
 
             # Prompt for disposition with validation retry
-            local retry_count=0
+            retry_count=0
             while [ $retry_count -lt 3 ]; do
                 read -p "Enter disposition for $deliv_name: " disposition
 
