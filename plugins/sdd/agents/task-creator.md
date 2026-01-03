@@ -88,46 +88,191 @@ Confirm you have: ticket ID, phase number, primary agent, and sufficient descrip
 
 #### Deliverable Auto-Population
 
-When creating tasks from plan.md phases, automatically populate the "Deliverables Produced" section:
+When creating tasks from plan.md phases, automatically populate the "Deliverables Produced" section.
 
-1. **Parse phase deliverables section**:
-   - Look for patterns in the phase text:
+##### Parsing Deliverables from plan.md Tables
+
+Plan.md may contain a deliverables table in two formats:
+
+**New format (with Disposition column):**
+```markdown
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| audit-report.md | Gap analysis findings | extract: docs/decisions/ |
+| verification.md | Phase completion proof | archive |
+```
+
+**Old format (without Disposition column):**
+```markdown
+| Deliverable | Purpose |
+|-------------|---------|
+| audit-report.md | Gap analysis findings |
+```
+
+##### Disposition Parsing Algorithm
+
+Use this algorithm to extract deliverables from plan.md:
+
+```python
+def parse_deliverables_from_plan(plan_table_markdown):
+    """
+    Extract deliverables with disposition from plan.md table.
+
+    Input: markdown table from plan.md deliverables section
+    Output: list of (deliverable_name, purpose, disposition)
+
+    Handles both old format (2 columns) and new format (3 columns).
+    """
+    lines = plan_table_markdown.strip().split('\n')
+
+    # Handle empty input
+    if len(lines) < 3:
+        return []
+
+    # Check if table has disposition column
+    # Expected header: | Deliverable | Purpose | Disposition |
+    header_line = lines[0]
+    has_disposition = 'Disposition' in header_line
+
+    deliverables = []
+    for line in lines[2:]:  # Skip header and separator
+        # Skip empty lines or non-table lines
+        if not line.strip() or '|' not in line:
+            continue
+
+        # Parse cells: split by '|' and trim whitespace
+        # Example: "| audit.md | findings | archive |" -> ["audit.md", "findings", "archive"]
+        cells = [cell.strip() for cell in line.split('|')[1:-1]]
+
+        if has_disposition and len(cells) >= 3:
+            name, purpose, disposition = cells[0], cells[1], cells[2]
+            # Handle empty disposition cell
+            if not disposition.strip():
+                disposition = None
+            deliverables.append((name, purpose, disposition))
+        elif len(cells) >= 2:
+            # Old format without disposition OR malformed new format
+            name, purpose = cells[0], cells[1]
+            deliverables.append((name, purpose, None))
+
+    return deliverables
+
+
+def format_task_deliverables(deliverables):
+    """
+    Format deliverables for task file's "Deliverables Produced" section.
+
+    Input: list of (name, purpose, disposition)
+    Output: markdown table string
+
+    Uses new format (with disposition) if ANY deliverable has disposition.
+    Uses old format (without disposition) if ALL dispositions are None.
+    """
+    if not deliverables:
+        return "None"
+
+    if all(d[2] is None for d in deliverables):
+        # No dispositions - use old format (two columns)
+        table = "| Deliverable | Purpose |\n"
+        table += "|-------------|--------|\n"
+        for name, purpose, _ in deliverables:
+            table += f"| {name} | {purpose} |\n"
+        return table
+
+    # Include disposition column (new format)
+    table = "| Deliverable | Purpose | Disposition |\n"
+    table += "|-------------|---------|-------------|\n"
+    for name, purpose, disposition in deliverables:
+        disp = disposition if disposition else "(TBD)"
+        table += f"| {name} | {purpose} | {disp} |\n"
+    return table
+```
+
+##### Disposition Format Validation
+
+When parsing disposition values, validate against the expected format:
+
+**Valid disposition formats:**
+- `archive` - Exact match (case-sensitive)
+- `extract: path/to/dest` - Starts with "extract:" followed by relative path
+- `external: description` - Starts with "external:" followed by freeform text
+
+**Validation regex:** `^(extract:\s+[a-zA-Z0-9/_.-]+|archive|external:\s+.+)$`
+
+**Edge case handling:**
+- Empty disposition cell: Treat as `None` (use old format handling)
+- Extra whitespace in cells: Trim whitespace before parsing
+- Inconsistent separator row: Ignore separator format; only check for table structure
+- Missing Disposition column: Parse as old format (2 columns)
+- Malformed table (inconsistent cell counts): Skip malformed rows, process valid rows
+
+##### Populating Task "Deliverables Produced" Section
+
+1. **Parse phase deliverables**:
+   - Look for markdown table in phase deliverables section
+   - Use `parse_deliverables_from_plan()` algorithm above
+   - Also look for inline patterns if no table:
      - `deliverable: {name}.md`
      - `{name}.md (deliverable)`
      - `Deliverables:` followed by `{name}.md`
-   - Extract deliverable filenames ending in `.md`
 
-2. **Populate task "Deliverables Produced" section**:
-   - If deliverables found: List each with description from plan context
+2. **Format task deliverables**:
+   - Use `format_task_deliverables()` algorithm above
+   - If deliverables found with disposition: Use 3-column format
+   - If deliverables found without disposition: Use 2-column format
    - If no deliverables found: Set to "None"
-   - Multiple deliverables: Add all to task
 
-3. **Example mapping**:
+3. **Example: New format (with disposition)**:
 
-   **plan.md Phase 1 deliverables:**
-   ```
-   - audit-report.md in deliverables/ (findings)
-   - User profile API endpoint (code)
+   **plan.md deliverables table:**
+   ```markdown
+   | Deliverable | Purpose | Disposition |
+   |-------------|---------|-------------|
+   | audit-report.md | Gap analysis | extract: docs/decisions/ |
+   | verification.md | Phase proof | archive |
    ```
 
    **Generated task "Deliverables Produced" section:**
    ```markdown
    ## Deliverables Produced
 
-   Documents created in `deliverables/` directory:
-
-   - audit-report.md - Findings from Phase 1 audit
+   | Deliverable | Purpose | Disposition |
+   |-------------|---------|-------------|
+   | audit-report.md | Gap analysis | extract: docs/decisions/ |
+   | verification.md | Phase proof | archive |
    ```
 
-4. **Cross-phase references**:
+4. **Example: Old format (without disposition)**:
+
+   **plan.md deliverables (old format):**
+   ```markdown
+   | Deliverable | Purpose |
+   |-------------|---------|
+   | audit-report.md | Gap analysis findings |
+   ```
+
+   **Generated task "Deliverables Produced" section:**
+   ```markdown
+   ## Deliverables Produced
+
+   | Deliverable | Purpose |
+   |-------------|---------|
+   | audit-report.md | Gap analysis findings |
+   ```
+
+5. **Cross-phase references**:
    - If Phase N creates a deliverable and Phase N+1 uses it:
-     - Phase N task: Lists deliverable in "Deliverables Produced"
+     - Phase N task: Lists deliverable in "Deliverables Produced" with disposition
      - Phase N+1 task: Lists deliverable in "Dependencies" section
 
-**Pattern detection examples**:
-- "Phase 1 deliverable: terminology-audit-report.md" → Extract `terminology-audit-report.md`
-- "Creates consolidated-findings.md (deliverable)" → Extract `consolidated-findings.md`
-- "Deliverables: phase2-verification-report.md" → Extract `phase2-verification-report.md`
+##### Pattern Detection for Inline Deliverables
+
+If no table is found, look for inline patterns:
+- "Phase 1 deliverable: terminology-audit-report.md" -> Extract `terminology-audit-report.md`
+- "Creates consolidated-findings.md (deliverable)" -> Extract `consolidated-findings.md`
+- "Deliverables: phase2-verification-report.md" -> Extract `phase2-verification-report.md`
+
+For inline patterns, disposition defaults to `None` (task-creator should note "disposition TBD" in task file).
 
 ### Step 4: Verify & Report
 1. Read created ticket to verify formatting

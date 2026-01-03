@@ -277,7 +277,82 @@ After completing planning, assess whether deliverables would improve ticket exec
 - Avoid version numbers: `findings-report.md`, not `report-v2-final.md`
 - Pattern: `{content-description}.md` or `{phase}-{content-description}.md`
 
-**If recommending deliverables:**
-In plan.md, explicitly list deliverable documents in phase deliverables:
-- "audit-report.md in deliverables/ (findings)"
-- "User profile API endpoint (code)"
+### Disposition Types
+
+Every deliverable should have a **disposition** that describes what happens to it after the ticket is complete. There are three disposition types:
+
+**1. Extract (`extract: path/to/dest`)**
+
+Use for documentation with **permanent value** that should live in the codebase after the ticket is archived.
+
+Decision criteria:
+- Will this document be referenced by future development work?
+- Does it capture design decisions that inform the codebase architecture?
+- Is it valuable knowledge that should outlive the ticket?
+
+Examples:
+| Deliverable | Disposition | Reasoning |
+|-------------|-------------|-----------|
+| `adr-caching-strategy.md` | `extract: docs/decisions/` | Architecture Decision Record - permanent reference for caching decisions |
+| `gap-analysis-report.md` | `extract: docs/analysis/` | Gap analysis findings inform future feature planning |
+| `migration-guide.md` | `extract: docs/guides/` | Guide will be needed by teams doing future migrations |
+
+**2. Archive (`archive`)**
+
+Use for **temporary proof-of-work** that's only needed during ticket execution. These files will be archived with the ticket.
+
+Decision criteria:
+- Is this a verification artifact for quality gates?
+- Is this working documentation only relevant during development?
+- Would keeping this clutter the permanent codebase?
+
+Examples:
+| Deliverable | Disposition | Reasoning |
+|-------------|-------------|-----------|
+| `phase2-verification-report.md` | `archive` | Proof of quality gate passage - only needed during ticket lifecycle |
+| `working-notes.md` | `archive` | Developer notes and scratch work - ephemeral |
+| `testing-summary.md` | `archive` | Test execution summary - captured in CI/logs permanently |
+
+**3. External (`external: description`)**
+
+Use for content that **belongs outside the repository** - wiki pages, shared drives, external documentation systems.
+
+Decision criteria:
+- Does this content belong in a different system (wiki, shared drive, other repo)?
+- Is this documentation for non-developers who access a different system?
+- Does organizational policy require this content be placed elsewhere?
+
+Examples:
+| Deliverable | Disposition | Reasoning |
+|-------------|-------------|-----------|
+| `user-guide.md` | `external: Wiki: Product/UserGuide` | User documentation lives on the wiki |
+| `runbook.md` | `external: Confluence: Ops/Runbooks` | Operations runbooks are in Confluence |
+| `design-deck.md` | `external: Google Drive: Design/ProjectX` | Design assets shared via Google Drive |
+
+### Disposition Syntax
+
+The disposition column in plan.md uses this syntax:
+
+```
+extract: path/to/dest   - Extract to permanent location (relative path from repo root)
+archive                 - Archive with ticket (ephemeral)
+external: description   - Placed externally (freeform description of location)
+```
+
+**Format validation regex:** `^(extract:\s+[a-zA-Z0-9/_.-]+|archive|external:\s+.+)$`
+
+### If recommending deliverables
+
+In plan.md, include a deliverables table with disposition column:
+
+```markdown
+**Deliverables:**
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| audit-report.md | Gap analysis findings | extract: docs/decisions/ |
+| verification-report.md | Phase completion proof | archive |
+| design-notes.md | Context documentation | external: Wiki: Project/Design |
+```
+
+**Backwards Compatibility Note:** If you're updating an existing plan.md that doesn't have a Disposition column, you may add one. Tables without a Disposition column are still valid (task-creator handles both formats).

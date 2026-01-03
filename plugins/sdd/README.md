@@ -72,6 +72,102 @@ Add to your `.bashrc` or `.zshrc` to disable permanently.
 | **Performance issues** | Check transcript size - hook is optimized for < 1 second execution |
 | **Unwanted guidance** | Set `SDD_DISABLE_STOP_HOOK=1` environment variable |
 
+### Work Gates
+
+Work gates enhance the workflow guidance Stop hook with control over autonomous work progression. Gates work TOGETHER with workflow guidance - they can pause work for review while preserving all existing guidance features (planning phase tracking, review enforcement, contextual suggestions).
+
+**When to use gates:**
+- Pause autonomous work on specific tickets until you're ready
+- Stop after completing specific phases for manual review
+- Control work prioritization alongside workflow guidance
+
+#### Configuration
+
+Gates are configured using `.autogate.json` files placed in work item directories:
+
+- `tickets/{TICKET_ID}_{name}/.autogate.json` - Gate for a specific ticket
+- `epics/{DATE}_{name}/.autogate.json` - Gate for a specific epic
+
+#### Schema
+
+```json
+{
+  "ready": boolean,
+  "stop_at_phase": integer | null
+}
+```
+
+**Fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `ready` | boolean | `true` | Whether autonomous work can proceed on this item |
+| `stop_at_phase` | integer or null | `null` | Stop after completing this phase number (e.g., 1, 2, 3) |
+
+#### Examples
+
+**Completely gate a ticket (no autonomous work):**
+```json
+{"ready": false}
+```
+
+**Allow work but stop after Phase 1 for review:**
+```json
+{"ready": true, "stop_at_phase": 1}
+```
+
+**Fully ready (same as no file):**
+```json
+{"ready": true}
+```
+
+#### Integration with Workflow Guidance
+
+Gates work alongside workflow guidance in the same Stop hook:
+
+1. **Gate blocks (ready=false):** Hook exits early with gate message, workflow guidance not shown
+2. **Gate allows (ready=true):** Work proceeds, workflow guidance provided as normal
+3. **No gate configured:** Workflow guidance works exactly as before gates were added
+
+**When gate triggers:**
+- Hook exits with code 2 (block stop) BEFORE showing workflow guidance
+- Claude receives clear message about why work is gated
+- Message provides guidance on how to proceed
+
+**When gate allows or no gate:**
+- Hook continues to workflow guidance logic
+- Planning phase suggestions appear normally
+- Review enforcement works as expected
+- Contextual next-step guidance provided
+
+**Fail-safe behavior (errors allow work to continue):**
+- Invalid JSON in `.autogate.json` - Treated as "ready", workflow guidance continues
+- Missing transcript - Treated as no active work, workflow guidance continues
+- Any gate exception - Workflow guidance proceeds normally (fail-safe)
+
+#### Override
+
+Bypass all gate checks temporarily:
+
+```bash
+export AUTOGATE_BYPASS=true
+```
+
+When set, all gates are ignored and work can proceed normally.
+
+#### Work Gates Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| **Gate not blocking when expected** | Verify `.autogate.json` is in correct location (ticket/epic root directory) |
+| **Invalid JSON** | Check JSON syntax is valid - use `python3 -m json.tool < .autogate.json` |
+| **Gate for wrong ticket** | Confirm active work matches ticket with gate |
+| **Hook blocking unexpectedly** | Check for `.autogate.json` in current work item directory |
+| **Need to override temporarily** | Use `AUTOGATE_BYPASS=true` environment variable |
+
+**Behavior when nothing is ready:**
+If all tickets have gates blocking work (`ready: false`), the hook exits cleanly with success (exit code 0), allowing Claude to complete without error.
+
 ### Reporting Issues
 
 Found a bug or have suggestions? [File an issue](https://github.com/manifoldlogic/claude-code-plugins/issues) with:
