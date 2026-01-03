@@ -2317,6 +2317,765 @@ assert 'AUTH-123_feature-name' in result, f'Should find correct directory: {resu
 echo ""
 
 # ============================================================================
+# SECTION 22: Session State File Detection - Unit Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 22: Session State File Detection - Unit Tests${NC}"
+echo "------------------------------------------------------"
+
+# Test 22.1: is_state_file_stale returns False for non-existent file
+run_python_unit_test "is_state_file_stale handles non-existent file" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+result = module.is_state_file_stale('/nonexistent/path/file.json')
+assert result == False, f'Expected False for non-existent file, got {result}'
+"
+
+# Test 22.2: is_state_file_stale returns False for fresh file
+run_python_unit_test "is_state_file_stale returns False for fresh file" "
+import sys
+import os
+import tempfile
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Create a fresh temp file
+with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    f.write('{\"test\": true}')
+    temp_path = f.name
+
+try:
+    result = module.is_state_file_stale(temp_path)
+    assert result == False, f'Expected False for fresh file, got {result}'
+finally:
+    os.unlink(temp_path)
+"
+
+# Test 22.3: is_state_file_stale returns True for old file
+run_python_unit_test "is_state_file_stale returns True for old file" "
+import sys
+import os
+import time
+import tempfile
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Create a temp file and set its mtime to 25 hours ago
+with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    f.write('{\"test\": true}')
+    temp_path = f.name
+
+try:
+    old_time = time.time() - (25 * 3600)  # 25 hours ago
+    os.utime(temp_path, (old_time, old_time))
+    result = module.is_state_file_stale(temp_path)
+    assert result == True, f'Expected True for stale file, got {result}'
+finally:
+    os.unlink(temp_path)
+"
+
+# Test 22.4: validate_state_file_schema with valid schema
+run_python_unit_test "validate_state_file_schema accepts valid schema" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+data = {
+    'session_id': 'test-session-123',
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+result = module.validate_state_file_schema(data, 'test-session-123')
+assert result == True, f'Expected True for valid schema, got {result}'
+"
+
+# Test 22.5: validate_state_file_schema rejects mismatched session_id
+run_python_unit_test "validate_state_file_schema rejects session_id mismatch" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+data = {
+    'session_id': 'different-session',
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+result = module.validate_state_file_schema(data, 'test-session-123')
+assert result == False, f'Expected False for session_id mismatch, got {result}'
+"
+
+# Test 22.6: validate_state_file_schema rejects missing required fields
+run_python_unit_test "validate_state_file_schema rejects missing fields" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Missing task_id and phase
+data = {
+    'session_id': 'test-session-123',
+    'ticket_id': 'AUTH_test',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+result = module.validate_state_file_schema(data, 'test-session-123')
+assert result == False, f'Expected False for missing fields, got {result}'
+"
+
+# Test 22.7: validate_state_file_schema rejects non-dict input
+run_python_unit_test "validate_state_file_schema rejects non-dict input" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+result = module.validate_state_file_schema('not a dict', 'test-session-123')
+assert result == False, f'Expected False for non-dict input, got {result}'
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 23: Session State File Detection - detect_active_work Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 23: detect_active_work Function Tests${NC}"
+echo "-----------------------------------------------"
+
+# Test 23.1: detect_active_work returns None for missing state file
+run_python_unit_test "detect_active_work returns None for missing state file" "
+import sys
+import tempfile
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    result = module.detect_active_work(tmpdir, 'nonexistent-session')
+    assert result is None, f'Expected None for missing state file, got {result}'
+"
+
+# Test 23.2: detect_active_work returns valid work info
+run_python_unit_test "detect_active_work returns work info for valid state" "
+import sys
+import tempfile
+import os
+import json
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+session_id = 'test-session-valid'
+state_data = {
+    'session_id': session_id,
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+    'command': '/sdd:do-task AUTH.1001',
+}
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+    state_file = os.path.join(state_dir, f'{session_id}.json')
+    with open(state_file, 'w') as f:
+        json.dump(state_data, f)
+
+    result = module.detect_active_work(tmpdir, session_id)
+    assert result is not None, 'Expected work info, got None'
+    assert result['session_id'] == session_id, f'session_id mismatch'
+    assert result['ticket_id'] == 'AUTH_test', f'ticket_id mismatch'
+    assert result['task_id'] == 'AUTH.1001', f'task_id mismatch'
+    assert result['phase'] == 'implementation', f'phase mismatch'
+    assert result['command'] == '/sdd:do-task AUTH.1001', f'command mismatch'
+"
+
+# Test 23.3: detect_active_work returns None for session_id mismatch
+run_python_unit_test "detect_active_work returns None for session_id mismatch" "
+import sys
+import tempfile
+import os
+import json
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+file_session_id = 'file-session-id'
+request_session_id = 'request-session-id'
+state_data = {
+    'session_id': file_session_id,  # Different from request
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+    # Use request_session_id for filename but different session_id in content
+    state_file = os.path.join(state_dir, f'{request_session_id}.json')
+    with open(state_file, 'w') as f:
+        json.dump(state_data, f)
+
+    result = module.detect_active_work(tmpdir, request_session_id)
+    assert result is None, f'Expected None for session_id mismatch, got {result}'
+"
+
+# Test 23.4: detect_active_work returns None for invalid JSON
+run_python_unit_test "detect_active_work returns None for invalid JSON" "
+import sys
+import tempfile
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+session_id = 'test-invalid-json'
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+    state_file = os.path.join(state_dir, f'{session_id}.json')
+    with open(state_file, 'w') as f:
+        f.write('{this is not valid json}')
+
+    result = module.detect_active_work(tmpdir, session_id)
+    assert result is None, f'Expected None for invalid JSON, got {result}'
+"
+
+# Test 23.5: detect_active_work deletes stale file and returns None
+run_python_unit_test "detect_active_work auto-cleans stale files" "
+import sys
+import tempfile
+import os
+import time
+import json
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+session_id = 'test-stale-session'
+state_data = {
+    'session_id': session_id,
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+    state_file = os.path.join(state_dir, f'{session_id}.json')
+    with open(state_file, 'w') as f:
+        json.dump(state_data, f)
+
+    # Set file mtime to 25 hours ago (stale)
+    old_time = time.time() - (25 * 3600)
+    os.utime(state_file, (old_time, old_time))
+
+    result = module.detect_active_work(tmpdir, session_id)
+    assert result is None, f'Expected None for stale file, got {result}'
+    assert not os.path.exists(state_file), 'Stale file should have been deleted'
+"
+
+# Test 23.6: detect_active_work handles empty sdd_root
+run_python_unit_test "detect_active_work handles empty sdd_root" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+result = module.detect_active_work('', 'test-session')
+assert result is None, f'Expected None for empty sdd_root, got {result}'
+
+result = module.detect_active_work(None, 'test-session')
+assert result is None, f'Expected None for None sdd_root, got {result}'
+"
+
+# Test 23.7: detect_active_work handles empty session_id
+run_python_unit_test "detect_active_work handles empty session_id" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+result = module.detect_active_work('/some/path', '')
+assert result is None, f'Expected None for empty session_id, got {result}'
+
+result = module.detect_active_work('/some/path', None)
+assert result is None, f'Expected None for None session_id, got {result}'
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 24: Session State - generate_work_guidance Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 24: generate_work_guidance Function Tests${NC}"
+echo "--------------------------------------------------"
+
+# Test 24.1: generate_work_guidance produces informative message
+run_python_unit_test "generate_work_guidance produces informative message" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+active_work = {
+    'session_id': 'test-session',
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+    'command': '/sdd:do-task AUTH.1001',
+}
+task_status = {
+    'has_in_progress': True,
+    'in_progress_tasks': ['AUTH.1001'],
+}
+
+message = module.generate_work_guidance(active_work, task_status)
+assert 'AUTH.1001' in message, 'Message should contain task ID'
+assert 'AUTH_test' in message, 'Message should contain ticket ID'
+assert 'implementation' in message, 'Message should contain phase'
+assert '/sdd:do-task' in message, 'Message should contain command'
+assert 'ACTIVE WORK' in message, 'Message should have ACTIVE WORK header'
+"
+
+# Test 24.2: generate_work_guidance handles missing command
+run_python_unit_test "generate_work_guidance handles missing command" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+active_work = {
+    'session_id': 'test-session',
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+    # No command field
+}
+task_status = {
+    'has_in_progress': True,
+    'in_progress_tasks': ['AUTH.1001'],
+}
+
+message = module.generate_work_guidance(active_work, task_status)
+assert 'AUTH.1001' in message, 'Message should contain task ID'
+# Should not crash even without command
+"
+
+# Test 24.3: generate_work_guidance mentions other in-progress tasks
+run_python_unit_test "generate_work_guidance mentions other in-progress tasks" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+active_work = {
+    'session_id': 'test-session',
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+task_status = {
+    'has_in_progress': True,
+    'in_progress_tasks': ['AUTH.1001', 'AUTH.1002', 'AUTH.1003'],
+}
+
+message = module.generate_work_guidance(active_work, task_status)
+assert 'AUTH.1002' in message or '2 other task' in message, 'Message should mention other in-progress tasks'
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 25: Multi-Session Isolation Integration Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 25: Multi-Session Isolation Integration Tests${NC}"
+echo "------------------------------------------------------"
+
+# Test 25.1: Session A work doesn't block Session B
+# This is the critical multi-session isolation test
+
+# Setup: Create state file for Session A, but run hook with Session B
+run_python_unit_test "Session A state file doesn't block Session B" "
+import sys
+import tempfile
+import os
+import json
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+session_a = 'session-a-1234'
+session_b = 'session-b-5678'
+
+# Session A's work state
+state_data = {
+    'session_id': session_a,
+    'ticket_id': 'AUTH_test',
+    'task_id': 'AUTH.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+}
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+
+    # Create state file for Session A
+    state_file_a = os.path.join(state_dir, f'{session_a}.json')
+    with open(state_file_a, 'w') as f:
+        json.dump(state_data, f)
+
+    # Session B should not see Session A's work
+    result = module.detect_active_work(tmpdir, session_b)
+    assert result is None, f'Session B should not see Session A work, got {result}'
+"
+
+# Test 25.2: Each session only sees its own work
+run_python_unit_test "Each session sees only its own work" "
+import sys
+import tempfile
+import os
+import json
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+session_a = 'session-a-1234'
+session_b = 'session-b-5678'
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+
+    # Create state file for Session A
+    state_a = {
+        'session_id': session_a,
+        'ticket_id': 'AUTH_test',
+        'task_id': 'AUTH.1001',
+        'phase': 'implementation',
+        'started_at': '2026-01-03T10:00:00Z',
+    }
+    with open(os.path.join(state_dir, f'{session_a}.json'), 'w') as f:
+        json.dump(state_a, f)
+
+    # Create state file for Session B
+    state_b = {
+        'session_id': session_b,
+        'ticket_id': 'FEAT_other',
+        'task_id': 'FEAT.2001',
+        'phase': 'implementation',
+        'started_at': '2026-01-03T11:00:00Z',
+    }
+    with open(os.path.join(state_dir, f'{session_b}.json'), 'w') as f:
+        json.dump(state_b, f)
+
+    # Session A sees only its work
+    result_a = module.detect_active_work(tmpdir, session_a)
+    assert result_a is not None, 'Session A should see its work'
+    assert result_a['task_id'] == 'AUTH.1001', f'Session A should see AUTH.1001, got {result_a}'
+
+    # Session B sees only its work
+    result_b = module.detect_active_work(tmpdir, session_b)
+    assert result_b is not None, 'Session B should see its work'
+    assert result_b['task_id'] == 'FEAT.2001', f'Session B should see FEAT.2001, got {result_b}'
+"
+
+# Test 25.3: No session state falls back to task file inspection
+# Setup ticket with in-progress task
+mkdir -p "$TEST_SDD_ROOT/tickets/FALLBACK_test/tasks"
+cat > "$TEST_SDD_ROOT/tickets/FALLBACK_test/tasks/FALLBACK.1001_test.md" << 'EOF'
+# Task: [FALLBACK.1001]: Test Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Task for fallback testing.
+EOF
+
+cat > "$TEMP_DIR/transcript-fallback.jsonl" << EOF
+{"display": "/sdd:do-task FALLBACK_test FALLBACK.1001", "timestamp": 1700000001000, "sessionId": "test-session"}
+{"display": "Working on FALLBACK_test", "timestamp": 1700000002000, "sessionId": "test-session"}
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "new-session-no-state",
+  "transcript_path": "$TEMP_DIR/transcript-fallback.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+# Without session state file, should fall back to task file inspection and block
+run_test_with_env "Fallback to task file inspection when no session state" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "TASK IN PROGRESS"
+
+echo ""
+
+# ============================================================================
+# SECTION 26: Session State Performance Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 26: Session State Performance Tests${NC}"
+echo "---------------------------------------------"
+
+# Test 26.1: State file read performance (< 10ms target)
+run_python_unit_test "State file read performance < 10ms" "
+import sys
+import tempfile
+import os
+import json
+import time
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+session_id = 'perf-test-session'
+state_data = {
+    'session_id': session_id,
+    'ticket_id': 'PERF_test',
+    'task_id': 'PERF.1001',
+    'phase': 'implementation',
+    'started_at': '2026-01-03T10:00:00Z',
+    'command': '/sdd:do-task PERF.1001',
+}
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+    state_file = os.path.join(state_dir, f'{session_id}.json')
+    with open(state_file, 'w') as f:
+        json.dump(state_data, f)
+
+    # Warm up filesystem cache
+    module.detect_active_work(tmpdir, session_id)
+
+    # Measure performance over 100 iterations
+    iterations = 100
+    start = time.time()
+    for _ in range(iterations):
+        module.detect_active_work(tmpdir, session_id)
+    elapsed = time.time() - start
+
+    avg_ms = (elapsed / iterations) * 1000
+    assert avg_ms < 10, f'Average read time {avg_ms:.2f}ms exceeds 10ms target'
+"
+
+# Test 26.2: Missing state file check is fast
+run_python_unit_test "Missing state file check is fast" "
+import sys
+import tempfile
+import os
+import time
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    # Create state directory but no state file
+    state_dir = os.path.join(tmpdir, '.sdd-session-states')
+    os.makedirs(state_dir)
+
+    # Measure performance over 100 iterations
+    iterations = 100
+    start = time.time()
+    for i in range(iterations):
+        module.detect_active_work(tmpdir, f'nonexistent-session-{i}')
+    elapsed = time.time() - start
+
+    avg_ms = (elapsed / iterations) * 1000
+    assert avg_ms < 5, f'Average check time {avg_ms:.2f}ms for missing file should be < 5ms'
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 27: Session State - Integration with main() Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 27: Session State Integration Tests${NC}"
+echo "--------------------------------------------"
+
+# Test 27.1: Hook blocks when session state indicates work in progress
+
+# Setup: Create session state and matching task file
+SESSION_TEST_ID="integration-test-session"
+mkdir -p "$TEST_SDD_ROOT/.sdd-session-states"
+mkdir -p "$TEST_SDD_ROOT/tickets/INTEG_test/tasks"
+
+# Create session state file
+cat > "$TEST_SDD_ROOT/.sdd-session-states/$SESSION_TEST_ID.json" << EOF
+{
+  "session_id": "$SESSION_TEST_ID",
+  "ticket_id": "INTEG_test",
+  "task_id": "INTEG.1001",
+  "phase": "implementation",
+  "started_at": "2026-01-03T10:00:00Z",
+  "command": "/sdd:do-task INTEG.1001"
+}
+EOF
+
+# Create matching task file (in progress)
+cat > "$TEST_SDD_ROOT/tickets/INTEG_test/tasks/INTEG.1001_test.md" << 'EOF'
+# Task: [INTEG.1001]: Integration Test Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Task for integration testing.
+EOF
+
+cat > "$TEMP_DIR/transcript-integ.jsonl" << EOF
+{"display": "/sdd:do-task INTEG_test INTEG.1001", "timestamp": 1700000001000, "sessionId": "test"}
+{"display": "Working on INTEG_test", "timestamp": 1700000002000, "sessionId": "test"}
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$SESSION_TEST_ID",
+  "transcript_path": "$TEMP_DIR/transcript-integ.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+run_test_with_env "Hook blocks with session state and in-progress task" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "ACTIVE WORK"
+
+# Test 27.2: Different session ID doesn't trigger session state block
+DIFFERENT_SESSION_ID="different-session-id"
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$DIFFERENT_SESSION_ID",
+  "transcript_path": "$TEMP_DIR/transcript-integ.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+# Different session should fall back to task file inspection (will still block due to in-progress task)
+run_test_with_env "Different session uses fallback (task file)" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "TASK IN PROGRESS"
+
+# Cleanup integration test files
+rm -rf "$TEST_SDD_ROOT/.sdd-session-states"
+rm -rf "$TEST_SDD_ROOT/tickets/INTEG_test"
+rm -rf "$TEST_SDD_ROOT/tickets/FALLBACK_test"
+
+echo ""
+
+# ============================================================================
 # Summary
 # ============================================================================
 

@@ -1,0 +1,8 @@
+{
+  "session_id": "session-b-9876-5432-efgh",
+  "ticket_id": "FEAT_new-feature",
+  "task_id": "FEAT.2001",
+  "phase": "implementation",
+  "started_at": "2026-01-03T11:00:00Z",
+  "command": "/sdd:do-task FEAT.2001"
+}
