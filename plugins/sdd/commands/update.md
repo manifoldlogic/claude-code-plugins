@@ -144,10 +144,11 @@ Documents Updated: {count}
 2. {Second major improvement}
 3. {Third significant change}
 
-📋 NEXT STEP: /sdd:review {TICKET_ID}
-   (Re-run review to verify all issues resolved)
-
 Full update log: {ticket_path}/planning/review-updates.md
+
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify update quality before proceeding.
 ```
 
 **If tasks exist:**
@@ -184,12 +185,11 @@ Tasks Updated: {count}/{total}
 ⚠️ REMAINING CONCERNS (if any):
 • {Concern that couldn't be fully resolved}
 
-📋 NEXT STEP: /sdd:review {TICKET_ID}
-   (Re-run review to verify all issues resolved)
-
-   If review passes: /sdd:do-all-tasks {TICKET_ID}
-
 Full update log: {ticket_path}/planning/review-updates.md
+
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify update quality before proceeding.
 ```
 
 ## Example Usage
