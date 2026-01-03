@@ -57,9 +57,10 @@
 
 ## Deliverables Produced
 
-Documents created in `deliverables/` directory:
-
-- None (or list deliverables like: "terminology-audit-report.md - Comprehensive audit of all terminology issues")
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| {file.md} | {purpose} | {extract: path/ | archive | external: Location} |
 
 ## Verification Notes
 [Any special considerations for verification]

@@ -251,8 +251,12 @@ This document outlines the execution plan for the ticket.
 **Objective:** [What this phase achieves]
 
 **Deliverables:**
-- [Deliverable 1]
-- [Deliverable 2]
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| audit-report.md | Gap analysis findings | extract: docs/decisions/ |
+| verification-report.md | Phase completion proof | archive |
+| design-notes.md | Context documentation | external: Wiki: Project/Design |
 
 **Agent Assignments:**
 - [agent-name]: [responsibility]
@@ -262,8 +266,10 @@ This document outlines the execution plan for the ticket.
 **Objective:** [What this phase achieves]
 
 **Deliverables:**
-- [Deliverable 1]
-- [Deliverable 2]
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| {file.md} | {purpose} | {extract: path/ | archive | external: Location} |
 
 **Agent Assignments:**
 - [agent-name]: [responsibility]
