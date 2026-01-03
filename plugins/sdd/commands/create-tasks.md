@@ -206,12 +206,11 @@ Total: {total_count} tasks
 
 Task Index: {ticket_path}/tasks/{TICKET_ID}_TASK_INDEX.md
 
-Next Steps:
-1. Review tasks quality: /sdd:review {TICKET_ID}
-   (Recommended to verify task quality before execution)
-2. After review passes, execute tasks:
-   - Run all: /sdd:do-all-tasks {TICKET_ID}
-   - Or run first: /sdd:do-task {TICKET_ID.1001}
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify task quality before execution.
+
+After review passes: /sdd:do-all-tasks {TICKET_ID}
 ```
 
 ## Error Recovery
