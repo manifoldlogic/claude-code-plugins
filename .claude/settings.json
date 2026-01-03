@@ -1,6 +1,6 @@
 {
   "env": {
-    "SDD_ROOT_DIR": "/workspace/repos/claude-code-plugins/.SDD"
+    "SDD_ROOT_DIR": "/workspace/repos/claude-code-plugins/_SDD"
   },
   "permissions": {
     "defaultMode": "bypassPermissions"
