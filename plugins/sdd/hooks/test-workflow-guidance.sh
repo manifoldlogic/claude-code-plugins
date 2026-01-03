@@ -3076,6 +3076,275 @@ rm -rf "$TEST_SDD_ROOT/tickets/FALLBACK_test"
 echo ""
 
 # ============================================================================
+# SECTION 28: Multi-Session End-to-End Tests (STOPHOOK.3001)
+# ============================================================================
+
+echo -e "${BLUE}SECTION 28: Multi-Session End-to-End Tests${NC}"
+echo "--------------------------------------------"
+
+# Test scenario: Simulate multi-session workflow where sessions don't interfere
+# This validates that session state files properly isolate work detection.
+
+# Setup: Create two sessions with different state files
+SESSION_A="session-A-$(date +%s)"
+SESSION_B="session-B-$(date +%s)"
+
+mkdir -p "$TEST_SDD_ROOT/.sdd-session-states"
+mkdir -p "$TEST_SDD_ROOT/tickets/MULTI_test/tasks"
+
+# Create task file (in progress)
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1001_first.md" << 'EOF'
+# Task: [MULTI.1001]: First Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+First task for multi-session testing.
+EOF
+
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1002_second.md" << 'EOF'
+# Task: [MULTI.1002]: Second Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Second task for multi-session testing.
+EOF
+
+# Test 28.1: Session A starts work on MULTI.1001
+cat > "$TEST_SDD_ROOT/.sdd-session-states/$SESSION_A.json" << EOF
+{
+  "session_id": "$SESSION_A",
+  "ticket_id": "MULTI_test",
+  "task_id": "MULTI.1001",
+  "phase": "implementation",
+  "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "command": "/sdd:do-task MULTI.1001"
+}
+EOF
+
+cat > "$TEMP_DIR/transcript-multi.jsonl" << EOF
+{"display": "/sdd:do-task MULTI_test MULTI.1001", "timestamp": 1700000001000, "sessionId": "test"}
+{"display": "Working on MULTI_test", "timestamp": 1700000002000, "sessionId": "test"}
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$SESSION_A",
+  "transcript_path": "$TEMP_DIR/transcript-multi.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+run_test_with_env "Session A blocked on MULTI.1001" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "ACTIVE WORK.*MULTI.1001"
+
+# Test 28.2: Session B starts work on MULTI.1002 (different session, different task)
+cat > "$TEST_SDD_ROOT/.sdd-session-states/$SESSION_B.json" << EOF
+{
+  "session_id": "$SESSION_B",
+  "ticket_id": "MULTI_test",
+  "task_id": "MULTI.1002",
+  "phase": "implementation",
+  "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "command": "/sdd:do-task MULTI.1002"
+}
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$SESSION_B",
+  "transcript_path": "$TEMP_DIR/transcript-multi.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+run_test_with_env "Session B blocked on MULTI.1002 (independent)" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "ACTIVE WORK.*MULTI.1002"
+
+# Test 28.3: Session A completes verification - state file cleared
+# Simulate verify-task clearing the state file
+rm -f "$TEST_SDD_ROOT/.sdd-session-states/$SESSION_A.json"
+
+# Mark Session A's task as completed in task file
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1001_first.md" << 'EOF'
+# Task: [MULTI.1001]: First Task
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [x] **Verified** - by the verify-task agent
+
+## Summary
+First task for multi-session testing.
+EOF
+
+# Also mark MULTI.1002 as completed for this test (so Session A isn't blocked by fallback)
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1002_second.md" << 'EOF'
+# Task: [MULTI.1002]: Second Task
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [x] **Verified** - by the verify-task agent
+
+## Summary
+Second task for multi-session testing.
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$SESSION_A",
+  "transcript_path": "$TEMP_DIR/transcript-multi.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+# Session A should now be allowed (state file cleared, all tasks verified)
+run_test_with_env "Session A allowed after verification (state cleared, all tasks done)" 0 "SDD_ROOT_DIR" "$TEST_SDD_ROOT"
+
+# Test 28.4: Session B still blocked (its state file still exists)
+# Even though MULTI.1002 is now complete in the task file, Session B's state file
+# indicates it's still working on it, so the hook checks the state file first
+# But wait - the task is now verified, so there's no "in progress" task to report.
+# The session state file detection only blocks if the task file also shows in-progress.
+# Let's reset MULTI.1002 to be in-progress for this test:
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1002_second.md" << 'EOF'
+# Task: [MULTI.1002]: Second Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Second task for multi-session testing.
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$SESSION_B",
+  "transcript_path": "$TEMP_DIR/transcript-multi.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+run_test_with_env "Session B still blocked (Session A's completion doesn't affect B)" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "ACTIVE WORK.*MULTI.1002"
+
+# Test 28.5: Stale state file cleanup (> 24 hours old)
+# First, mark all tasks as complete so fallback doesn't block
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1001_first.md" << 'EOF'
+# Task: [MULTI.1001]: First Task
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [x] **Verified** - by the verify-task agent
+
+## Summary
+First task for multi-session testing.
+EOF
+
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1002_second.md" << 'EOF'
+# Task: [MULTI.1002]: Second Task
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [x] **Verified** - by the verify-task agent
+
+## Summary
+Second task for multi-session testing.
+EOF
+
+# Clear any other session state files
+rm -rf "$TEST_SDD_ROOT/.sdd-session-states"
+
+# Create a stale state file
+STALE_SESSION="stale-session-cleanup"
+mkdir -p "$TEST_SDD_ROOT/.sdd-session-states"
+cat > "$TEST_SDD_ROOT/.sdd-session-states/$STALE_SESSION.json" << EOF
+{
+  "session_id": "$STALE_SESSION",
+  "ticket_id": "MULTI_test",
+  "task_id": "MULTI.1003",
+  "phase": "implementation",
+  "started_at": "2020-01-01T00:00:00Z",
+  "command": "/sdd:do-task MULTI.1003"
+}
+EOF
+
+# Make the file old (touch with old timestamp)
+touch -d "2020-01-01 00:00:00" "$TEST_SDD_ROOT/.sdd-session-states/$STALE_SESSION.json" 2>/dev/null || \
+  touch -t 202001010000 "$TEST_SDD_ROOT/.sdd-session-states/$STALE_SESSION.json" 2>/dev/null || true
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$STALE_SESSION",
+  "transcript_path": "$TEMP_DIR/transcript-multi.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+# Stale state file should be auto-deleted, session allowed (all tasks complete, no active work)
+run_test_with_env "Stale session state auto-cleaned (> 24 hours)" 0 "SDD_ROOT_DIR" "$TEST_SDD_ROOT"
+
+# Verify the stale file was deleted
+if [ -f "$TEST_SDD_ROOT/.sdd-session-states/$STALE_SESSION.json" ]; then
+  echo -e "${RED}FAIL${NC}: Stale state file should have been deleted"
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  echo "Test: Stale file deletion verified ... ${GREEN}PASS${NC}"
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+
+# Test 28.6: Backwards compatibility - hook works without state files
+# Clear all state files
+rm -rf "$TEST_SDD_ROOT/.sdd-session-states"
+
+# Ensure task is still in progress (reset to unchecked)
+cat > "$TEST_SDD_ROOT/tickets/MULTI_test/tasks/MULTI.1002_second.md" << 'EOF'
+# Task: [MULTI.1002]: Second Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Second task for multi-session testing.
+EOF
+
+NEW_SESSION="new-session-no-state"
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$NEW_SESSION",
+  "transcript_path": "$TEMP_DIR/transcript-multi.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+# Should fall back to task file inspection and detect in-progress task
+run_test_with_env "Backwards compatible - uses task file fallback" 2 "SDD_ROOT_DIR" "$TEST_SDD_ROOT" "TASK IN PROGRESS.*MULTI.1002"
+
+# Cleanup multi-session test files
+rm -rf "$TEST_SDD_ROOT/.sdd-session-states"
+rm -rf "$TEST_SDD_ROOT/tickets/MULTI_test"
+
+echo ""
+
+# ============================================================================
 # Summary
 # ============================================================================
 

@@ -200,8 +200,21 @@ If task has "Deliverables Produced" section with entries:
    - Agent: `verify-task`
    - Decision: `PASS`
    - Notes: Brief summary of verification (e.g., "All 5 acceptance criteria met, tests passing")
-3. Report success with evidence for each acceptance criterion
-4. Inform user to proceed with commit-task agent
+3. **Clear session state file (enables multi-session work detection):**
+   ```bash
+   # Clear session state after verification - work is complete
+   SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+   SESSION_ID="${CLAUDE_SESSION_ID:-}"
+   if [ -n "$SESSION_ID" ]; then
+     STATE_FILE="$SDD_ROOT/.sdd-session-states/$SESSION_ID.json"
+     if [ -f "$STATE_FILE" ]; then
+       rm -f "$STATE_FILE"
+       echo "Session state cleared: $STATE_FILE"
+     fi
+   fi
+   ```
+4. Report success with evidence for each acceptance criterion
+5. Inform user to proceed with commit-task agent
 
 **FAILURE (Any requirement unmet):**
 1. Add an audit entry to the "## Verification Audit" table with:
