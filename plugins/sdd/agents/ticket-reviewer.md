@@ -119,6 +119,125 @@ You are a senior technical architect asking:
 - Can agents work independently?
 - Are verification criteria explicit?
 
+### 7. Agent Assignment Validation
+
+**Check for:**
+- Mismatch between Technical Requirements and Agents section
+- Task() calls referencing agents not listed in Agents section
+- Specialized work assigned to generic agents (task-executor, general-purpose)
+
+**Questions:**
+- Does each task's Agents section match its requirements?
+- Are specialized agents listed when Technical Requirements specify them?
+- Will /sdd:do-task invoke the correct agent for the work described?
+
+**Detection Patterns:**
+
+Scan Technical Requirements for specialized agent references using these patterns:
+
+1. **Pattern 1**: `Task(subagent_type="{agent-name}")`
+   - Example: `Task(subagent_type="game-design:game-core-mechanics-architect")`
+
+2. **Pattern 2**: "use {agent-name} agent"
+   - Example: "Use caching-specialist agent for cache layer implementation"
+
+3. **Pattern 3**: "invoke {agent-name}"
+   - Example: "Invoke game-design:game-core-mechanics-architect for mechanics analysis"
+
+**Validation Logic:**
+
+```python
+def validate_agent_assignment(technical_requirements, agents_section):
+    """
+    Validate that specialized agents in Technical Requirements match Agents section.
+
+    Returns: (is_valid, detected_agent, primary_agent, issue_type)
+    """
+    import re
+
+    # Pattern detection for specialized agent references
+    patterns = [
+        r'Task\(subagent_type="([^"]+)"\)',           # Pattern 1
+        r'[Uu]se\s+([a-zA-Z0-9:_-]+)\s+agent',        # Pattern 2
+        r'[Ii]nvoke\s+([a-zA-Z0-9:_-]+)',             # Pattern 3
+    ]
+
+    detected_agent = None
+    for pattern in patterns:
+        match = re.search(pattern, technical_requirements)
+        if match:
+            detected_agent = match.group(1)
+            break
+
+    # Extract primary agent from Agents section (first entry in brackets)
+    # Format: "- [primary-agent]" or "- [primary-agent:subtype]"
+    primary_match = re.search(r'-\s+\[([^\]]+)\]', agents_section)
+    primary_agent = primary_match.group(1) if primary_match else None
+
+    # Case 1: Specialized agent detected but not listed as primary
+    if detected_agent and primary_agent and detected_agent != primary_agent:
+        return (False, detected_agent, primary_agent, "critical_mismatch")
+
+    # Case 2: Specialized agent detected but no primary agent found
+    if detected_agent and not primary_agent:
+        return (False, detected_agent, None, "missing_primary")
+
+    # Case 3: Specialized work implied but generic agent assigned
+    generic_agents = ["task-executor", "general-purpose"]
+    if primary_agent in generic_agents:
+        # Check for domain-specific keywords suggesting specialized work needed
+        specialized_keywords = [
+            "architecture", "security", "performance", "caching",
+            "database", "authentication", "game-design", "ui-ux"
+        ]
+        for keyword in specialized_keywords:
+            if keyword.lower() in technical_requirements.lower():
+                return (False, None, primary_agent, "high_risk_generic")
+
+    return (True, detected_agent, primary_agent, None)
+```
+
+**Issue Classification:**
+
+| Issue Type | Severity | Description |
+|------------|----------|-------------|
+| critical_mismatch | Critical Issue | Technical Requirements reference agent 'X' but Agents section lists 'Y' |
+| missing_primary | Critical Issue | Technical Requirements reference specialized agent but Agents section has no primary |
+| high_risk_generic | High-Risk Issue | Specialized domain work assigned to generic agent |
+
+**Output Format:**
+
+When agent mismatch is detected, include in ticket-review.md:
+
+```markdown
+#### Critical Issue: Agent Assignment Mismatch in Task {TASK_ID}
+
+**Problem**: Technical Requirements reference agent '{detected-agent}' but Agents section lists '{primary-agent}' as primary.
+
+**Impact**: /sdd:do-task will invoke '{primary-agent}' instead of '{detected-agent}', causing delegation failure or incorrect implementation.
+
+**Required Action**: Update task file to align Technical Requirements and Agents section, or re-run /sdd:create-tasks with correct agent specification.
+```
+
+For high-risk generic assignments:
+
+```markdown
+#### High-Risk Issue: Generic Agent for Specialized Work in Task {TASK_ID}
+
+**Problem**: Task involves specialized domain work ({domain}) but is assigned to generic agent '{primary-agent}'.
+
+**Impact**: Generic agent may lack domain expertise, leading to suboptimal implementation.
+
+**Required Action**: Consider assigning a specialized agent for this task, or confirm generic agent is appropriate.
+```
+
+**Non-Modification Rule:**
+
+- **DO NOT** auto-correct task files
+- **DO NOT** modify Agents sections or Technical Requirements
+- **ONLY** report findings in ticket-review.md
+- User must manually fix task files or run /sdd:create-tasks again
+
 ---
 
 ## Ticket Review (When Tickets Exist)
@@ -156,6 +275,12 @@ For EACH ticket, evaluate:
    - Are coverage expectations defined?
    - Is verification approach clear?
    - Are negative test scenarios identified?
+
+6. **Agent Assignment Correctness**
+   - Does the primary agent in Agents section match Technical Requirements?
+   - If Technical Requirements specify a specialized agent, is that agent listed as primary?
+   - Are generic agents (task-executor, general-purpose) used only for non-specialized work?
+   - Would /sdd:do-task invoke the correct agent for this task's requirements?
 
 #### Cross-Ticket Analysis
 
