@@ -2,8 +2,8 @@
 
 Complete reference for all SDD plugin commands.
 
-**Version**: 1.0.0
-**Last Updated**: 2025-12-11
+**Version**: 1.1.0
+**Last Updated**: 2026-01-04
 
 ---
 
@@ -136,7 +136,9 @@ Created structure:
     ├── analysis/
     └── tickets/
 
-Next: Research and analyze, then decompose into tickets
+---
+RECOMMENDED NEXT STEP: /sdd:plan-ticket {TICKET_ID} {name}
+Research and analyze findings, then create tickets from epic discoveries
 ```
 
 **Related Commands**:
@@ -192,7 +194,9 @@ Created structure:
     │   └── analysis.md
     └── tasks/
 
-Next: Complete planning documents, then run /sdd:review AUTH
+---
+RECOMMENDED NEXT STEP: /sdd:review AUTH
+Complete planning documents (plan.md, architecture.md), then run review
 ```
 
 **Common Errors**:
@@ -264,7 +268,10 @@ Fetched:
 Ticket scaffolded: UIT-3670_implement-user-profile-caching
 
 Planning documents pre-populated from Jira content.
-Next: Review and enhance planning, then /sdd:review UIT-3670
+
+---
+RECOMMENDED NEXT STEP: /sdd:review UIT-3670
+Review and enhance auto-populated planning, then run ticket review
 ```
 
 **Common Errors**:
@@ -330,7 +337,9 @@ Risk Assessment:
 
 Decision: PASS - Ready for decomposition
 
-Next: /sdd:create-tasks AUTH
+---
+RECOMMENDED NEXT STEP: /sdd:create-tasks AUTH
+Ticket planning is complete and approved for task decomposition
 ```
 
 **Expected Output (FAIL)**:
@@ -401,7 +410,9 @@ Issues Addressed:
 ✓ Added integration points section
 ✓ Clarified API design
 
-Next: Re-run /sdd:review AUTH to verify fixes
+---
+RECOMMENDED NEXT STEP: /sdd:review AUTH
+Re-run review to verify all issues have been addressed
 ```
 
 **Related Commands**:
@@ -459,7 +470,10 @@ Tasks created:
 ✓ AUTH.2002_add-session-management.md
 
 4 tasks created in 2 phases
-Next: /sdd:do-all-tasks AUTH
+
+---
+RECOMMENDED NEXT STEP: /sdd:do-all-tasks AUTH
+Execute all tasks systematically through the full workflow
 ```
 
 **Common Errors**:
@@ -616,7 +630,10 @@ Running commit-task...
 ✓ Committed: feat(auth): AUTH.1001 setup oauth provider
 
 TASK COMPLETE: AUTH.1001
-Next: AUTH.1002 (or continue with /sdd:do-all-tasks)
+
+---
+RECOMMENDED NEXT STEP: /sdd:do-task AUTH.1002
+Continue with next task in sequence (or use /sdd:do-all-tasks AUTH)
 ```
 
 **Common Errors**:
@@ -685,7 +702,10 @@ Recommended Agents:
    - Tasks: All tasks (advisory)
 
 Recommendation saved to: planning/agent-recommendations.md
-Next: Create agents and run /sdd:assign-agents AUTH
+
+---
+RECOMMENDED NEXT STEP: /sdd:assign-agents AUTH
+Create recommended agents, then assign them to ticket tasks
 ```
 
 **Related Commands**:
@@ -818,10 +838,9 @@ PR: https://github.com/org/repo/pull/123
 Title: [AUTH] Implement user authentication OAuth
 Ticket: AUTH
 
-Next Steps:
-  1. Review PR and address any feedback
-  2. Merge PR when approved
-  3. Archive ticket: /sdd:archive AUTH
+---
+RECOMMENDED NEXT STEP: /sdd:archive AUTH
+After PR is merged, archive the completed ticket
 ```
 
 **Common Errors**:
@@ -1013,5 +1032,5 @@ Metrics logged to: logs/metrics.log
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Applies to**: SDD Plugin v1.0.0+
