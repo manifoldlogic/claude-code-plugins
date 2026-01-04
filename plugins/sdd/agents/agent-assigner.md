@@ -285,7 +285,9 @@ Updates Made:
 Files Modified:
 - {list of files edited}
 
-Next Step: Review assignments and begin work with /sdd:do-all-tasks {TICKET_ID}
+---
+RECOMMENDED NEXT STEP: /sdd:do-all-tasks {TICKET_ID}
+Begin work now that agents are assigned.
 ```
 
 ## Anti-Patterns to Avoid
