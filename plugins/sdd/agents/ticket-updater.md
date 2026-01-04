@@ -370,7 +370,7 @@ After completing updates:
 **IMPORTANT - Next Step Positioning:**
 The recommended next step MUST be the final content in your output. Use this standardized format:
 
-```
+```markdown
 [Summary of changes]
 [List of updated files]
 

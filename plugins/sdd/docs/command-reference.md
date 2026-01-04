@@ -1032,5 +1032,5 @@ Metrics logged to: logs/metrics.log
 
 ---
 
-**Document Version**: 1.1
+**Document Version**: 1.1.0
 **Applies to**: SDD Plugin v1.0.0+
