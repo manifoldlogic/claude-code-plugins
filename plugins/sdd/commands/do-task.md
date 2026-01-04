@@ -79,7 +79,7 @@ Parse the task file's "## Agents" section to identify the primary agent:
    - If result is empty after normalization, treat as missing agent
 
 **Example parsing:**
-```
+```text
 ## Agents
 - [game-design:game-core-mechanics-architect]    → "game-design:game-core-mechanics-architect"
 - [general-purpose]                               → "general-purpose"
@@ -113,7 +113,7 @@ Compare the extracted agent name against this **Standard Agent List**:
 - **If Agents section is missing or empty** → Log warning, use `general-purpose` (fallback for backward compatibility)
 
 **Warning message for missing/empty agent:**
-```
+```text
 ⚠ Warning: No primary agent found in task's Agents section.
   Falling back to general-purpose for implementation.
   To use a specialized agent, add an Agents section with the primary agent listed first.
@@ -256,7 +256,7 @@ Based on the agent classification determined in Step 1.5, use ONE of the followi
 
 Invoke the specialized agent directly using the Task tool:
 
-```
+```text
 Task tool with subagent_type: "{primary-agent-name}"
 
 Assignment:
@@ -281,7 +281,7 @@ Implement task {TASK_ID}
 ```
 
 **Example - Specialized Agent Invocation:**
-```
+```text
 # Task has: Agents: [game-design:game-core-mechanics-architect]
 # Classification: NOT in Standard Agent List → Specialized agent
 
@@ -314,7 +314,7 @@ Implement task SPIRIT.1003
 
 Use general-purpose delegation:
 
-```
+```text
 Task tool with subagent_type: "general-purpose"
 
 Assignment:
@@ -339,7 +339,7 @@ Implement task {TASK_ID}
 ```
 
 **Example - General Agent Invocation:**
-```
+```text
 # Task has: Agents: [general-purpose] OR Agents: [task-executor] OR missing Agents section
 # Classification: IN Standard Agent List or missing → Use general-purpose
 
@@ -372,7 +372,7 @@ Implement task SETUP.1001
 
 **If Task tool fails with "agent not found" or similar error:**
 
-```
+```text
 ❌ Agent Invocation Error: Could not find agent "{agent-name}"
 
 Possible causes:

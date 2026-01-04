@@ -155,6 +155,12 @@ def validate_agent_assignment(technical_requirements, agents_section):
     """
     import re
 
+    # Input validation - handle None or non-string inputs
+    if not technical_requirements or not isinstance(technical_requirements, str):
+        technical_requirements = ""
+    if not agents_section or not isinstance(agents_section, str):
+        agents_section = ""
+
     # Pattern detection for specialized agent references
     patterns = [
         r'Task\(subagent_type="([^"]+)"\)',           # Pattern 1
@@ -174,8 +180,12 @@ def validate_agent_assignment(technical_requirements, agents_section):
     primary_match = re.search(r'-\s+\[([^\]]+)\]', agents_section)
     primary_agent = primary_match.group(1) if primary_match else None
 
-    # Case 1: Specialized agent detected but not listed as primary
-    if detected_agent and primary_agent and detected_agent != primary_agent:
+    # Normalize agent names for case-insensitive comparison
+    detected_lower = detected_agent.lower() if detected_agent else None
+    primary_lower = primary_agent.lower() if primary_agent else None
+
+    # Case 1: Specialized agent detected but not listed as primary (case-insensitive)
+    if detected_agent and primary_agent and detected_lower != primary_lower:
         return (False, detected_agent, primary_agent, "critical_mismatch")
 
     # Case 2: Specialized agent detected but no primary agent found
@@ -184,7 +194,7 @@ def validate_agent_assignment(technical_requirements, agents_section):
 
     # Case 3: Specialized work implied but generic agent assigned
     generic_agents = ["task-executor", "general-purpose"]
-    if primary_agent in generic_agents:
+    if primary_lower in generic_agents:
         # Check for domain-specific keywords suggesting specialized work needed
         specialized_keywords = [
             "architecture", "security", "performance", "caching",

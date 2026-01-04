@@ -388,7 +388,7 @@ def validate_agent_consistency(technical_requirements, agents_section):
 1. **HALT task creation** - Do NOT create the task file
 
 2. **Report the mismatch clearly**:
-   ```
+   ```text
    ⚠️ AGENT MISMATCH DETECTED
 
    Technical Requirements reference: '{detected-agent}'
@@ -398,7 +398,7 @@ def validate_agent_consistency(technical_requirements, agents_section):
    ```
 
 3. **Show examples**:
-   ```
+   ```text
    CORRECT format (both aligned):
    - Technical Requirements: "Use {detected-agent} agent..."
    - Agents section: "- [{detected-agent}]"
@@ -409,7 +409,7 @@ def validate_agent_consistency(technical_requirements, agents_section):
    ```
 
 4. **Request clarification**:
-   ```
+   ```text
    Which agent should be assigned to this task?
    1. {detected-agent} (mentioned in Technical Requirements)
    2. {primary-agent} (currently in Agents section)
@@ -423,7 +423,7 @@ def validate_agent_consistency(technical_requirements, agents_section):
 ### Step 4: Verify & Report
 1. Read created ticket to verify formatting
 2. Report to user:
-   ```
+   ```text
    ✅ TICKET CREATED
 
    Ticket ID: {TICKET_ID}.{NUMBER}
