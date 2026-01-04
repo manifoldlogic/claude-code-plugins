@@ -9,9 +9,10 @@ The Worktree plugin provides Git worktree management capabilities powered by the
 - **Parallel Development**: Work on multiple features or bug fixes simultaneously without branch switching
 - **Isolated Environments**: Each worktree is a separate directory with its own checkout, preventing conflicts
 - **Safe Merge**: Merge worktrees back to main with built-in safety checks and automatic cleanup
-- **Automatic Cleanup**: Remove worktrees and their branches cleanly when work is complete
+- **Smart Cleanup**: Remove worktrees with SDD ticket status awareness to prevent accidental cleanup of incomplete work
 - **Branch Management**: Create, list, and manage git worktrees with simple commands
 - **Status Tracking**: View all active worktrees and their current state
+- **VS Code Integration**: Automatic workspace file updates when spawning or cleaning up worktrees
 
 ## Prerequisites
 
@@ -69,11 +70,17 @@ Merge the authentication worktree back to main
 ```
 Safely merges the completed feature back to the main branch with automatic cleanup of the worktree.
 
-### Cleaning Up
+### Cleaning Up with Ticket Awareness
 ```
 Remove the experimental-refactor worktree
 ```
-Cleanly removes the worktree and optionally deletes the associated branch.
+Cleanly removes the worktree and optionally deletes the associated branch. If an SDD ticket is associated with the worktree and has incomplete tasks, you'll be prompted to confirm before cleanup to prevent accidental data loss.
+
+### Safe Cleanup with Dry-Run
+```
+Show me what would happen if I cleaned up the feature-auth worktree
+```
+Preview cleanup operations without making changes using dry-run mode.
 
 ## Troubleshooting
 
@@ -125,3 +132,37 @@ Cleanly removes the worktree and optionally deletes the associated branch.
 - Check branch status: `git branch -vv` in the worktree directory
 - Set upstream if needed: `git branch -u origin/<branch>`
 - Ensure you've pushed the branch to remote if collaboration is needed
+
+## Skills Reference
+
+This plugin provides the following skills with detailed documentation:
+
+| Skill | Description | Documentation |
+|-------|-------------|---------------|
+| worktree-spawn | Create new worktrees with iTerm and VS Code workspace integration | [SKILL.md](skills/worktree-spawn/SKILL.md) |
+| worktree-management | Core git worktree operations (create, use, merge, clean) | [SKILL.md](skills/worktree-management/SKILL.md) |
+| worktree-cleanup | Remove worktrees with SDD ticket status awareness | [SKILL.md](skills/worktree-cleanup/SKILL.md) |
+
+## Directory Structure
+
+```text
+plugins/worktree/
+├── .claude-plugin/
+│   └── plugin.json
+├── skills/
+│   ├── worktree-spawn/
+│   │   └── SKILL.md
+│   ├── worktree-management/
+│   │   └── SKILL.md
+│   └── worktree-cleanup/
+│       └── SKILL.md
+└── README.md
+```
+
+## Related Scripts
+
+The worktree plugin integrates with helper scripts in the devcontainer environment:
+
+- **spawn-worktree.sh** - Orchestrates worktree creation with iTerm tab and workspace integration
+- **cleanup-worktree.sh** - Orchestrates worktree cleanup with ticket status checking
+- **workspace-folder.sh** - Manages VS Code workspace file folder entries
