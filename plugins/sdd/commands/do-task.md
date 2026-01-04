@@ -62,6 +62,63 @@ Read the task to understand:
 - Technical requirements
 - Dependencies
 
+### Step 1.5: Extract and Classify Primary Agent
+
+**CRITICAL: The orchestrator must invoke specialized agents directly. Sub-agents cannot spawn other agents - this is an architectural constraint of the Task tool.**
+
+#### Agent Extraction
+
+Parse the task file's "## Agents" section to identify the primary agent:
+
+1. **Find the Agents section** in the task file
+2. **Extract the first bullet point** content (this is the primary agent responsible for implementation)
+3. **Normalize the agent name**:
+   - Remove markdown formatting: `[]`, `-`, `*`, etc.
+   - Trim leading/trailing whitespace
+   - If result contains newlines, take only first line
+   - If result is empty after normalization, treat as missing agent
+
+**Example parsing:**
+```
+## Agents
+- [game-design:game-core-mechanics-architect]    → "game-design:game-core-mechanics-architect"
+- [general-purpose]                               → "general-purpose"
+- task-executor                                   → "task-executor"
+```
+
+#### Agent Classification
+
+Compare the extracted agent name against this **Standard Agent List**:
+
+| Standard Agents (14 total) |
+|---------------------------|
+| verify-task |
+| commit-task |
+| unit-test-runner |
+| status-reporter |
+| structure-validator |
+| task-creator |
+| ticket-reviewer |
+| ticket-planner |
+| agent-assigner |
+| agent-recommender |
+| epic-planner |
+| code-reviewer |
+| task-executor |
+| general-purpose |
+
+**Classification Decision:**
+- **If agent IS in the Standard Agent List** → Use `general-purpose` for implementation (standard workflow)
+- **If agent is NOT in the Standard Agent List** → Use specialized agent directly via Task tool
+- **If Agents section is missing or empty** → Log warning, use `general-purpose` (fallback for backward compatibility)
+
+**Warning message for missing/empty agent:**
+```
+⚠ Warning: No primary agent found in task's Agents section.
+  Falling back to general-purpose for implementation.
+  To use a specialized agent, add an Agents section with the primary agent listed first.
+```
+
 ### Step 2: Check Dependencies (BLOCKING)
 
 **CRITICAL: Dependencies MUST be satisfied before proceeding. If any dependency is incomplete, task execution CANNOT continue.**
@@ -187,11 +244,75 @@ Action Required:
 
 ### Step 3: Implementation
 
-**Choose delegation strategy based on task requirements:**
+**Delegate to the appropriate agent based on the classification from Step 1.5.**
 
-**Option A: Task tool with general-purpose subagent (Primary option):**
+#### Conditional Invocation Logic
 
-Use this for standard implementation work when no specialized domain expertise is required:
+Based on the agent classification determined in Step 1.5, use ONE of the following delegation patterns:
+
+---
+
+**IF PRIMARY AGENT IS A SPECIALIZED AGENT** (not in Standard Agent List):
+
+Invoke the specialized agent directly using the Task tool:
+
+```
+Task tool with subagent_type: "{primary-agent-name}"
+
+Assignment:
+## Task
+Implement task {TASK_ID}
+
+## Context
+- Task file: {task_path}
+- Read the task file for full requirements and acceptance criteria
+- You are the specialized agent assigned to this task
+- Apply your domain expertise to the implementation
+
+## Expected Output
+- All acceptance criteria implemented
+- "Task completed" checkbox can be checked
+- Summary of implementation with specialist insights
+
+## Acceptance Criteria
+- All task acceptance criteria met
+- Domain-specific quality standards applied
+- Technical requirements satisfied
+```
+
+**Example - Specialized Agent Invocation:**
+```
+# Task has: Agents: [game-design:game-core-mechanics-architect]
+# Classification: NOT in Standard Agent List → Specialized agent
+
+Task tool with subagent_type: "game-design:game-core-mechanics-architect"
+
+Assignment:
+## Task
+Implement task SPIRIT.1003
+
+## Context
+- Task file: /workspace/_SDD/tickets/SPIRIT_spirit-system/tasks/SPIRIT.1003_implement-spirit-evolution.md
+- Read the task file for full requirements and acceptance criteria
+- You are the specialized agent assigned to this task
+- Apply your domain expertise to the implementation
+
+## Expected Output
+- All acceptance criteria implemented
+- "Task completed" checkbox can be checked
+- Summary of implementation with specialist insights
+
+## Acceptance Criteria
+- All task acceptance criteria met
+- Domain-specific quality standards applied
+- Technical requirements satisfied
+```
+
+---
+
+**IF PRIMARY AGENT IS A STANDARD/GENERAL AGENT** (in Standard Agent List or missing):
+
+Use general-purpose delegation:
 
 ```
 Task tool with subagent_type: "general-purpose"
@@ -217,38 +338,58 @@ Implement task {TASK_ID}
 - No breaking changes introduced
 ```
 
-**Option B: Specialized agent (if assigned in task's "Agents" section):**
+**Example - General Agent Invocation:**
+```
+# Task has: Agents: [general-purpose] OR Agents: [task-executor] OR missing Agents section
+# Classification: IN Standard Agent List or missing → Use general-purpose
 
-Use this when a custom specialized agent has been created and assigned to this task:
+Task tool with subagent_type: "general-purpose"
+
+Assignment:
+## Task
+Implement task SETUP.1001
+
+## Context
+- Task file: /workspace/_SDD/tickets/SETUP_project-setup/tasks/SETUP.1001_initialize-config.md
+- Read the task file for full requirements and acceptance criteria
+- Follow technical requirements specified in task
+
+## Expected Output
+- All acceptance criteria implemented
+- "Task completed" checkbox can be checked
+- Summary of implementation done
+
+## Acceptance Criteria
+- All task acceptance criteria met
+- Code follows project patterns and conventions
+- Technical requirements satisfied
+- No breaking changes introduced
+```
+
+---
+
+#### Error Handling for Agent Invocation
+
+**If Task tool fails with "agent not found" or similar error:**
 
 ```
-Assignment: Implement task {TASK_ID}
+❌ Agent Invocation Error: Could not find agent "{agent-name}"
 
-Context:
-- Task: {task_path}
-- Requirements: {from task}
+Possible causes:
+1. Agent not installed or registered in the system
+2. Agent name misspelled in task's Agents section
+3. Agent definition file missing from plugins/sdd/agents/
 
-Instructions:
-1. Read and understand the task fully
-2. Implement all acceptance criteria
-3. Follow technical requirements
-4. Check the "Task completed" checkbox when done
-5. Note any issues or blockers
-
-Return: Summary of implementation done
+Suggested actions:
+1. Verify agent exists: Check if agents/{agent-name}.md exists
+2. Check agent name spelling in task file
+3. If specialized agent is missing, either:
+   a. Create the agent definition using /sdd:recommend-agents
+   b. Update task's Agents section to use general-purpose
+4. Re-run /sdd:do-task {TASK_ID} after fixing
 ```
 
-**Decision criteria:**
-- **Use Task tool (Option A)** when:
-  - General coding skills are sufficient
-  - No specialized domain expertise needed
-  - Task is straightforward implementation
-  - Context conservation is important (keeps orchestrator clean)
-
-- **Use specialized agent (Option B)** when:
-  - Custom agent explicitly assigned in task's "Agents" section
-  - Domain-specific expertise prevents costly mistakes
-  - Specialized knowledge improves quality significantly
+---
 
 **Context conservation:** The Task tool spawns a fresh subagent context for implementation, preserving the orchestrator's context for coordinating the full workflow (implement → test → verify → commit). See [delegation-patterns.md](../skills/project-workflow/references/delegation-patterns.md) Pattern 6.
 
