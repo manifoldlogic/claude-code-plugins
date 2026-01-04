@@ -96,10 +96,9 @@ Files Updated:
 New Document:
 - {TICKET_PATH}/planning/agent-assignments.md
 
-Next Steps:
-- Review agent assignments in plan.md and tasks
-- Begin work with /sdd:do-all-tasks {TICKET_ID}
-- Individual tasks can be worked with /sdd:do-task {TASK_ID}
+---
+RECOMMENDED NEXT STEP: /sdd:do-all-tasks {TICKET_ID}
+Begin work now that agents are assigned.
 ```
 
 ## Key Constraints
