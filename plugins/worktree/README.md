@@ -145,7 +145,7 @@ This plugin provides the following skills with detailed documentation:
 
 ## Directory Structure
 
-```
+```text
 plugins/worktree/
 ├── .claude-plugin/
 │   └── plugin.json

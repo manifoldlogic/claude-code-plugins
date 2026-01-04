@@ -6,7 +6,7 @@ description: Orchestration script for cleaning up git worktrees in devcontainer 
 # Worktree Cleanup Skill
 
 **Last Updated:** 2026-01-04
-**Script Source:** `/workspace/.devcontainer/scripts/cleanup-worktree.sh`
+**Script Source:** `.devcontainer/scripts/cleanup-worktree.sh`
 
 ## Overview
 
