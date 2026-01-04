@@ -207,7 +207,16 @@ When complete, update README.md with:
 - Summary of the ticket
 - Links to all planning docs
 - List of relevant agents
-- Recommended next step: `/sdd:review {TICKET_ID}`
+
+**IMPORTANT**: The recommended next step MUST be the final content in your output. Use this exact format:
+
+```
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Run review before creating tasks to validate planning quality.
+```
+
+This ensures consistent parsing and display of guidance to users.
 
 ## Handoff
 
@@ -216,7 +225,7 @@ After planning:
 2. README.md updated
 3. Report summary to orchestrator
 4. Evaluate if custom agents would help (see below)
-5. Recommend: Run `/sdd:review` before creating tasks
+5. Output recommended next step (see Output Format above)
 
 ## Agent Recommendation Evaluation
 
