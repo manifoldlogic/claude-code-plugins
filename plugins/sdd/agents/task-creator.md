@@ -274,10 +274,156 @@ If no table is found, look for inline patterns:
 
 For inline patterns, disposition defaults to `None` (task-creator should note "disposition TBD" in task file).
 
+### Step 3.5: Agent Assignment Validation
+
+**CRITICAL**: Before finalizing the task file, validate that specialized agent references in Technical Requirements are consistent with the Agents section.
+
+#### Pattern Detection
+
+Scan the Technical Requirements section for specialized agent references using these patterns:
+
+1. **Pattern 1**: `Task(subagent_type="{agent-name}")`
+   - Example: `Task(subagent_type="game-design:game-core-mechanics-architect")`
+
+2. **Pattern 2**: "use {agent-name} agent"
+   - Example: "Use game-design:game-core-mechanics-architect agent for mechanics analysis"
+
+3. **Pattern 3**: "invoke {agent-name}"
+   - Example: "Invoke caching-specialist for cache layer implementation"
+
+#### Consistency Check Logic
+
+```python
+def validate_agent_consistency(technical_requirements, agents_section):
+    """
+    Validate that specialized agents in Technical Requirements match Agents section.
+
+    Returns: (is_valid, detected_agent, primary_agent)
+    """
+    # Pattern detection for specialized agent references
+    patterns = [
+        r'Task\(subagent_type="([^"]+)"\)',           # Pattern 1
+        r'[Uu]se\s+([a-zA-Z0-9:_-]+)\s+agent',        # Pattern 2
+        r'[Ii]nvoke\s+([a-zA-Z0-9:_-]+)',             # Pattern 3
+    ]
+
+    detected_agent = None
+    for pattern in patterns:
+        match = re.search(pattern, technical_requirements)
+        if match:
+            detected_agent = match.group(1)
+            break
+
+    # If no specialized agent detected, standard agents are acceptable
+    if detected_agent is None:
+        return (True, None, None)
+
+    # Extract primary agent from Agents section (first entry in brackets)
+    # Format: "- [primary-agent]" or "- [primary-agent:subtype]"
+    primary_match = re.search(r'-\s+\[([^\]]+)\]', agents_section)
+    if not primary_match:
+        return (False, detected_agent, None)
+
+    primary_agent = primary_match.group(1)
+
+    # Check consistency
+    if detected_agent == primary_agent:
+        return (True, detected_agent, primary_agent)
+    else:
+        return (False, detected_agent, primary_agent)
+```
+
+#### Validation Rules
+
+1. **If specialized agent detected in Technical Requirements**:
+   - Extract the agent name from the matched pattern
+   - Check the Agents section's **primary entry** (first agent listed in brackets)
+   - Verify they match exactly
+
+2. **If no specialized agent mentioned in Technical Requirements**:
+   - Standard agents (task-executor, general-purpose) are acceptable
+   - Validation passes automatically
+
+3. **Primary Agent Definition**:
+   - The primary agent is the **first agent listed** in the Agents section
+   - It appears in square brackets: `- [primary-agent-name]`
+   - Supporting agents (verify-task, commit-task) follow without brackets
+
+#### CORRECT Example (Aligned)
+
+```markdown
+## Technical Requirements
+- Use game-design:game-core-mechanics-architect for mechanics analysis
+- Analyze existing battle system patterns
+- Document findings in architecture.md
+
+## Agents
+- [game-design:game-core-mechanics-architect]
+- verify-task
+- commit-task
+```
+
+**Why this is CORRECT**: Technical Requirements mention "game-design:game-core-mechanics-architect" and the Agents section lists the same agent as primary (first entry in brackets).
+
+#### INCORRECT Example (Mismatch - REJECT)
+
+```markdown
+## Technical Requirements
+- Use game-design:game-core-mechanics-architect for mechanics analysis
+- Analyze existing battle system patterns
+- Document findings in architecture.md
+
+## Agents
+- [task-executor]
+- verify-task
+- commit-task
+```
+
+**Why this is INCORRECT**: Technical Requirements specify "game-design:game-core-mechanics-architect" but Agents section lists "task-executor" as primary. This will cause silent failures when the orchestrator invokes task-executor instead of the specialized agent.
+
+#### Error Recovery
+
+**If mismatch detected, you MUST:**
+
+1. **HALT task creation** - Do NOT create the task file
+
+2. **Report the mismatch clearly**:
+   ```text
+   ⚠️ AGENT MISMATCH DETECTED
+
+   Technical Requirements reference: '{detected-agent}'
+   Agents section lists primary: '{primary-agent}'
+
+   This inconsistency will cause the wrong agent to be invoked.
+   ```
+
+3. **Show examples**:
+   ```text
+   CORRECT format (both aligned):
+   - Technical Requirements: "Use {detected-agent} agent..."
+   - Agents section: "- [{detected-agent}]"
+
+   INCORRECT format (current state):
+   - Technical Requirements: "Use {detected-agent} agent..."
+   - Agents section: "- [{primary-agent}]"
+   ```
+
+4. **Request clarification**:
+   ```text
+   Which agent should be assigned to this task?
+   1. {detected-agent} (mentioned in Technical Requirements)
+   2. {primary-agent} (currently in Agents section)
+   3. Different agent: [please specify]
+   ```
+
+#### Prohibition
+
+**NEVER create a task with task-executor or general-purpose as primary agent if Technical Requirements explicitly specify a specialized agent.** This is the most common source of agent mismatch errors.
+
 ### Step 4: Verify & Report
 1. Read created ticket to verify formatting
 2. Report to user:
-   ```
+   ```text
    ✅ TICKET CREATED
 
    Ticket ID: {TICKET_ID}.{NUMBER}
@@ -333,6 +479,7 @@ Before reporting completion:
 - [ ] Filename follows naming convention
 - [ ] All template sections filled
 - [ ] Primary agent specified
+- [ ] Agent assignment consistent (Technical Requirements match Agents section)
 - [ ] Acceptance criteria are measurable
 - [ ] Test scenarios defined (happy path, error cases, edge conditions)
 - [ ] Deliverables Produced section populated (from plan.md or "None")

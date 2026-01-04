@@ -17,6 +17,15 @@
 - verify-task
 - commit-task
 
+**Agent Selection Guide:**
+- If task requires specialized expertise, list the specialized agent as primary (first in list)
+- Specialized agents are invoked directly by the orchestrator (/sdd:do-task)
+- Do NOT list task-executor or general-purpose if Technical Requirements specify a specialized agent
+- Standard agents (unit-test-runner, verify-task, commit-task) handle workflow steps, not implementation
+- The primary agent (first listed) determines who implements the task
+
+**Warning:** Sub-agents cannot spawn other agents. The primary agent listed here will be invoked directly by /sdd:do-task. Ensure the correct agent is assigned to avoid silent delegation failures.
+
 ## Summary
 [Brief description of what needs to be done - 1-2 sentences]
 
