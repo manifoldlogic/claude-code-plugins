@@ -292,7 +292,11 @@ For inline patterns, disposition defaults to `None` (task-creator should note "d
    Planning References:
    - [Doc 1 if provided]
 
-   Next Step: Assign to {agent-name} agent to begin implementation.
+   ---
+   RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+   Verify task quality before execution.
+
+   After review passes: /sdd:do-all-tasks {TICKET_ID}
    ```
 
 ## Critical Guidelines

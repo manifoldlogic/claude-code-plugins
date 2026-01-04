@@ -377,7 +377,6 @@ Create `planning/ticket-review.md`:
 ## Conclusion
 **Recommendation:** {Proceed | Revise | Rework | Reconsider}
 **Success Probability:** {X}%
-**Next Step:** {/sdd:create-tasks | /sdd:update | /sdd:do-all-tasks}
 ```
 
 ## Rating Criteria
@@ -409,7 +408,12 @@ Create `planning/ticket-review.md`:
 After review:
 1. Create `ticket-review.md` in planning/
 2. Provide summary to orchestrator
-3. Recommend next step:
-   - If Ready: `/sdd:create-tasks` (pre-ticket) or `/sdd:do-all-tasks` (post-ticket)
-   - If Needs Work: `/sdd:update`
-   - If Not Ready: Major revision needed
+
+[Review document path: {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/planning/ticket-review.md]
+
+---
+RECOMMENDED NEXT STEP:
+If Ready (pre-task): /sdd:create-tasks {TICKET_ID}
+If Ready (post-task): /sdd:do-all-tasks {TICKET_ID}
+If Needs Work: /sdd:update {TICKET_ID} - address findings first
+If Not Ready: Major revision needed before proceeding

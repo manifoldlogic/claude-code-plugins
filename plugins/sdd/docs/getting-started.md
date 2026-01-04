@@ -57,7 +57,9 @@ Created structure:
     │   └── ...
     └── tasks/
 
-Next: Complete planning documents, then run /sdd:review DEMO
+---
+RECOMMENDED NEXT STEP: /sdd:review DEMO
+Complete planning documents, then run review to verify quality
 ```
 
 ### Step 2: Complete Planning Documents

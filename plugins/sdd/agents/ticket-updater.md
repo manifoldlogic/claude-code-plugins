@@ -202,7 +202,7 @@ For each ticket marked as needing revision in the review:
 
 ## Document Update Patterns
 
-### Transformation: Vague → Specific
+### Transformation: Vague -> Specific
 
 ```markdown
 BEFORE: "Handle errors appropriately"
@@ -212,21 +212,21 @@ BEFORE: "Good performance"
 AFTER: "Response time <200ms for 95th percentile"
 ```
 
-### Transformation: Complex → Simple
+### Transformation: Complex -> Simple
 
 ```markdown
 BEFORE: "Implement comprehensive caching layer"
 AFTER: "Add in-memory cache for search results (5min TTL, 1000 item max)"
 ```
 
-### Transformation: Implicit → Explicit
+### Transformation: Implicit -> Explicit
 
 ```markdown
 BEFORE: (assumption that X is available)
 AFTER: "Prerequisite: X service must be running. If unavailable, skip this feature."
 ```
 
-### Ticket Transformation: Vague Criteria → Specific
+### Ticket Transformation: Vague Criteria -> Specific
 
 ```markdown
 BEFORE:
@@ -288,11 +288,11 @@ Create `planning/review-updates.md`:
 ## Gaps Filled
 
 ### Requirements Gaps
-- ✅ {Gap} → Added to {document}
-- ✅ {Gap} → Clarified in {document}
+- {Gap} -> Added to {document}
+- {Gap} -> Clarified in {document}
 
 ### Technical Gaps
-- ✅ {Decision needed} → Decided: {decision}
+- {Decision needed} -> Decided: {decision}
 
 ## Ticket Updates (if applicable)
 
@@ -333,9 +333,9 @@ Create `planning/review-updates.md`:
 **Re-review Recommended:** Yes
 **Expected Result:** All issues should now be resolved
 
-## Next Steps
-1. Run `/sdd:review {TICKET_ID}` to verify
-2. If passes, proceed to `/sdd:create-tasks {TICKET_ID}`
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify update quality before proceeding.
 ```
 
 ## Quality Standards
@@ -366,6 +366,19 @@ After completing updates:
    - Count of tickets updated (if applicable)
    - Key improvements made
    - Any remaining concerns
-3. **Recommend next step:**
-   - Always: Re-run `/sdd:review` to verify
-   - If review passes: `/sdd:create-tasks` or `/sdd:do-all-tasks`
+
+**IMPORTANT - Next Step Positioning:**
+The recommended next step MUST be the final content in your output. Use this standardized format:
+
+```markdown
+[Summary of changes]
+[List of updated files]
+
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify update quality before proceeding.
+```
+
+- Horizontal rule (`---`) separates content from recommendation
+- File paths and summaries appear BEFORE the next step
+- Next step block is always the final output

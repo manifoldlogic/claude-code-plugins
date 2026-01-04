@@ -99,23 +99,9 @@ Ticket: {TICKET_ID}_{name}
 
 Document: {TICKET_PATH}/planning/agent-recommendations.md
 
-Next Steps:
-1. Review the recommendations in agent-recommendations.md
-2. For each agent you want to create:
-   - Open the /agents UI in Claude Code (from the main menu)
-   - Select "Create new agent"
-   - Choose "Generate with Claude (recommended)"
-   - Paste the complete agent description from agent-recommendations.md
-   - Claude Code's optimized agent creator will generate the agent configuration
-   - Save the agent
-3. After creating agents:
-   - Run /sdd:assign-agents {TICKET_ID} to update planning documents
-   - This updates plan.md and creates agent-assignments.md
-   - Tasks will inherit agent assignments when created via /sdd:create-tasks
-4. If not creating custom agents:
-   - Skip directly to /sdd:create-tasks {TICKET_ID}
-   - Default agents (ticket-planner, task-creator, etc.) are always available
-   - Custom agents are optional enhancements for specialized work
+---
+RECOMMENDED NEXT STEP: Create custom agents from agent-recommendations.md
+Review recommendations, then use /agents UI to create each agent, or run /sdd:assign-agents {TICKET_ID} after creation.
 ```
 
 ## Key Constraints

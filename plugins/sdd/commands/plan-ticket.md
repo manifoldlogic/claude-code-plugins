@@ -144,7 +144,9 @@ Planning Summary:
 - Solution: {one-line from architecture}
 - Phases: {count} phases planned
 
-Next Step: Run /sdd:review {TICKET_ID} before creating tasks
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify planning quality before proceeding.
 ```
 
 ## Example Usage

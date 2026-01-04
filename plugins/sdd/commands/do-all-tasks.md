@@ -211,29 +211,11 @@ Follow-up Tasks Created:
 Git Status:
 {run git status to confirm no uncommitted changes}
 
-{Detect ticket pattern:}
-```bash
-# Detect if ticket follows Jira pattern
-if [[ "$TICKET_ID" =~ ^[A-Z][A-Z0-9]*-[0-9]+$ ]]; then
-  IS_JIRA_TICKET="true"
-else
-  IS_JIRA_TICKET="false"
-fi
-```
-
-Next Steps:
-{If all verified and IS_JIRA_TICKET is true}:
-  1. Create Pull Request (Draft): /sdd:pr {TICKET_ID} --draft
-     (Creates draft PR for automated workflow - convert to regular PR after review)
-     (Requires gh CLI installed and authenticated)
-  2. Or archive directly: /sdd:archive {TICKET_ID}
-
-{If all verified and IS_JIRA_TICKET is false}:
-  1. Create Pull Request: /sdd:pr {TICKET_ID}
-     (Requires gh CLI installed and authenticated)
-  2. Or archive directly: /sdd:archive {TICKET_ID}
-
-{If failures}: Address failed tasks and re-run
+---
+RECOMMENDED NEXT STEP:
+If all tasks verified: /sdd:pr {TICKET_ID}
+If tasks have failures: /sdd:do-task {TICKET_ID}.{failed_task_id}
+If review needed: /sdd:review {TICKET_ID}
 ```
 
 ### Step 7: Clear Session State on Completion

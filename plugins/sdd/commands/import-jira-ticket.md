@@ -206,7 +206,9 @@ Jira Integration:
 - Ticket imported from: {JIRA_KEY}
 - Task IDs will be: {TICKET_ID}.1001, {TICKET_ID}.2001, etc.
 
-Next Step: Run /sdd:review {TICKET_ID} before creating tasks
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify imported planning quality before proceeding.
 ```
 
 ## Key Constraints

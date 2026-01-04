@@ -134,11 +134,9 @@ Create `{{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/planning/agent-recommendations.m
 **{Area}**: {Brief explanation why an agent ISN'T needed here}
 **{Area}**: {Brief explanation why an agent ISN'T needed here}
 
-## Next Steps
-
-1. Review recommendations and decide which agents to create
-2. Create agents using the descriptions provided
-3. Run `/sdd:assign-agents {TICKET_ID}` to update planning docs and tickets
+---
+RECOMMENDED NEXT STEP: Create custom agents from recommendations above
+Review recommendations, then use /agents UI to create each agent, or run /sdd:assign-agents {TICKET_ID} after creation.
 ```
 
 ## Quality Standards
@@ -214,7 +212,9 @@ When complete:
 
    Document created: {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/planning/agent-recommendations.md
 
-   Next Step: Review recommendations, create agents, then run /sdd:assign-agents {TICKET_ID}
+   ---
+   RECOMMENDED NEXT STEP: Create custom agents from agent-recommendations.md
+   Review recommendations, then use /agents UI to create each agent, or run /sdd:assign-agents {TICKET_ID} after creation.
    ```
 
 ## Anti-Patterns to Avoid

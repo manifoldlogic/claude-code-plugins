@@ -274,7 +274,9 @@ Status: ✓ Task completed, ✓ Tests pass, ✓ Verified (now checked)
 Audit Log Updated:
 | 2025-01-15 | verify-task | PASS | All 3 acceptance criteria met, tests passing |
 
-Next Step: Use commit-task agent to commit these changes.
+---
+RECOMMENDED NEXT STEP: /sdd:commit-task {TASK_ID}
+Commit these verified changes.
 ```
 
 **Failed Verification:**

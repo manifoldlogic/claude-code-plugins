@@ -337,7 +337,9 @@ Changes:
 
 Commit: {type}({scope}): {TASK_ID} {message}
 
-Next: {Next task in sequence or ticket complete}
+---
+RECOMMENDED NEXT STEP: {Next task in sequence or ticket complete}
+Continue with next task in sequence.
 ```
 
 ## Failure Handling
