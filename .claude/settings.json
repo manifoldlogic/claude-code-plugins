@@ -3,7 +3,10 @@
     "SDD_ROOT_DIR": "/workspace/repos/claude-code-plugins/_SDD"
   },
   "permissions": {
-    "defaultMode": "bypassPermissions"
+    "defaultMode": "bypassPermissions",
+    "additionalDirectories": [
+      "/workspace/repos/claude-code-plugins/_SDD/"
+    ]
   },
   "hooks": {
     "Notification": [

@@ -218,6 +218,26 @@ If tasks have failures: /sdd:do-task {TICKET_ID}.{failed_task_id}
 If review needed: /sdd:review {TICKET_ID}
 ```
 
+### Step 7: Clear Session State on Completion
+
+**When all tasks are verified and complete, clear the session state file:**
+
+```bash
+# Clear session state - ticket work is complete
+SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+SESSION_ID="${SDD_SESSION_ID:-${CLAUDE_SESSION_ID:-unknown}}"
+STATE_FILE="$SDD_ROOT/.sdd-session-states/$SESSION_ID.json"
+
+if [ -f "$STATE_FILE" ]; then
+  rm -f "$STATE_FILE"
+  echo "Session state cleared: $STATE_FILE"
+fi
+```
+
+**Note:** This cleanup is also performed by the verify-task and commit-task agents for individual tasks, but this provides a final cleanup at ticket completion level.
+
+---
+
 ## Key Constraints
 
 - Use /sdd:do-task for each task (do NOT implement directly)

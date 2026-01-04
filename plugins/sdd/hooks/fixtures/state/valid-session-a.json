@@ -1,0 +1,8 @@
+{
+  "session_id": "session-a-1234-5678-abcd",
+  "ticket_id": "AUTH_user-login",
+  "task_id": "AUTH.1001",
+  "phase": "implementation",
+  "started_at": "2026-01-03T10:30:00Z",
+  "command": "/sdd:do-task AUTH.1001"
+}
