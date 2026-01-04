@@ -192,6 +192,10 @@ DRY_RUN=false
 # Global array to collect warnings
 WARNINGS=()
 
+# Ticket detection variables (populated during execution)
+TICKET_PATH=""
+TICKET_STATUS=""
+
 ##############################################################################
 # Help Function
 ##############################################################################
@@ -368,12 +372,34 @@ get_worktree_path() {
         repo_path="/workspace/repos/$repo"
     fi
 
-    echo "$repo_path/../$name" | xargs realpath -m 2>/dev/null || echo "/workspace/repos/$repo/$name"
+    local target_path="$repo_path/../$name"
+    # Try GNU realpath -m first, then fall back for macOS compatibility
+    if command -v realpath &>/dev/null && realpath -m . &>/dev/null 2>&1; then
+        realpath -m "$target_path" 2>/dev/null
+    else
+        # Fallback for systems without realpath -m (e.g., macOS)
+        (cd "$(dirname "$target_path")" 2>/dev/null && echo "$(pwd)/$(basename "$target_path")") || echo "/workspace/repos/$repo/$name"
+    fi
 }
 
 ##############################################################################
 # Git Fetch
 ##############################################################################
+
+# Portable timeout function for macOS compatibility
+run_with_timeout() {
+    local timeout_seconds="$1"
+    shift
+    if command -v timeout &>/dev/null; then
+        timeout "${timeout_seconds}s" "$@"
+    elif command -v gtimeout &>/dev/null; then
+        # GNU timeout from Homebrew coreutils on macOS
+        gtimeout "${timeout_seconds}s" "$@"
+    else
+        # Fallback: run without timeout
+        "$@"
+    fi
+}
 
 # Fetch from origin main with timeout
 git_fetch_origin() {
@@ -386,8 +412,8 @@ git_fetch_origin() {
 
     info "Fetching latest from origin main (30s timeout)..."
 
-    # Use timeout command with 30 seconds
-    if timeout 30s git -C "$repo_path" fetch origin main 2>/dev/null; then
+    # Use portable timeout wrapper
+    if run_with_timeout 30 git -C "$repo_path" fetch origin main 2>/dev/null; then
         success "Git fetch complete"
         return 0
     else
@@ -473,6 +499,239 @@ remove_worktree() {
 }
 
 ##############################################################################
+# Ticket Detection Functions
+##############################################################################
+
+# Find SDD ticket for a worktree name
+# Arguments: worktree_name
+# Returns: ticket directory path on stdout, or empty string if no match
+# Exit codes: 0 = match found, 1 = no match, 3 = multiple matches at same priority
+find_ticket_for_worktree() {
+    local worktree_name="$1"
+
+    # Check if SDD_ROOT_DIR is set
+    if [[ -z "${SDD_ROOT_DIR+x}" ]]; then
+        # Variable is completely unset
+        info "SDD_ROOT_DIR not set - skipping ticket detection"
+        echo ""
+        return 0
+    fi
+
+    # Check if SDD_ROOT_DIR is empty
+    if [[ -z "$SDD_ROOT_DIR" ]]; then
+        info "SDD_ROOT_DIR is empty - skipping ticket detection"
+        echo ""
+        return 0
+    fi
+
+    # Check if SDD_ROOT_DIR directory exists
+    if [[ ! -d "$SDD_ROOT_DIR" ]]; then
+        info "SDD_ROOT_DIR directory does not exist: $SDD_ROOT_DIR - skipping ticket detection"
+        echo ""
+        return 0
+    fi
+
+    # Convert worktree name to lowercase for case-insensitive matching
+    local worktree_lower
+    worktree_lower=$(echo "$worktree_name" | tr '[:upper:]' '[:lower:]')
+
+    local active_tickets_dir="${SDD_ROOT_DIR}/tickets"
+    local archived_tickets_dir="${SDD_ROOT_DIR}/archive/tickets"
+
+    local matches=()
+    local ticket_name
+    local ticket_lower
+
+    # Priority 1: Exact match in active tickets
+    if [[ -d "$active_tickets_dir" ]]; then
+        for ticket_dir in "$active_tickets_dir"/*/; do
+            [[ -d "$ticket_dir" ]] || continue
+            ticket_name=$(basename "$ticket_dir")
+            ticket_lower=$(echo "$ticket_name" | tr '[:upper:]' '[:lower:]')
+
+            # Exact match: ticket name equals worktree name
+            if [[ "$ticket_lower" == "$worktree_lower" ]]; then
+                matches+=("$ticket_dir")
+            fi
+        done
+
+        if [[ ${#matches[@]} -eq 1 ]]; then
+            echo "${matches[0]%/}"
+            return 0
+        elif [[ ${#matches[@]} -gt 1 ]]; then
+            error "Multiple exact matches found for '$worktree_name':"
+            for match in "${matches[@]}"; do
+                error "  - $match"
+            done
+            return 3
+        fi
+    fi
+
+    # Priority 2: Prefix match in active tickets
+    matches=()
+    if [[ -d "$active_tickets_dir" ]]; then
+        for ticket_dir in "$active_tickets_dir"/*/; do
+            [[ -d "$ticket_dir" ]] || continue
+            ticket_name=$(basename "$ticket_dir")
+            ticket_lower=$(echo "$ticket_name" | tr '[:upper:]' '[:lower:]')
+
+            # Prefix match: ticket name starts with worktree name followed by underscore
+            if [[ "$ticket_lower" == "${worktree_lower}_"* ]]; then
+                matches+=("$ticket_dir")
+            fi
+        done
+
+        if [[ ${#matches[@]} -ge 1 ]]; then
+            # Return first match for prefix (not an error if multiple)
+            echo "${matches[0]%/}"
+            return 0
+        fi
+    fi
+
+    # Priority 3: Exact match in archived tickets
+    matches=()
+    if [[ -d "$archived_tickets_dir" ]]; then
+        for ticket_dir in "$archived_tickets_dir"/*/; do
+            [[ -d "$ticket_dir" ]] || continue
+            ticket_name=$(basename "$ticket_dir")
+            ticket_lower=$(echo "$ticket_name" | tr '[:upper:]' '[:lower:]')
+
+            # Exact match in archive
+            if [[ "$ticket_lower" == "$worktree_lower" ]]; then
+                matches+=("$ticket_dir")
+            fi
+        done
+
+        if [[ ${#matches[@]} -eq 1 ]]; then
+            echo "${matches[0]%/}"
+            return 0
+        elif [[ ${#matches[@]} -gt 1 ]]; then
+            error "Multiple exact matches found in archive for '$worktree_name':"
+            for match in "${matches[@]}"; do
+                error "  - $match"
+            done
+            return 3
+        fi
+    fi
+
+    # Priority 4: Prefix match in archived tickets
+    matches=()
+    if [[ -d "$archived_tickets_dir" ]]; then
+        for ticket_dir in "$archived_tickets_dir"/*/; do
+            [[ -d "$ticket_dir" ]] || continue
+            ticket_name=$(basename "$ticket_dir")
+            ticket_lower=$(echo "$ticket_name" | tr '[:upper:]' '[:lower:]')
+
+            # Prefix match in archive
+            if [[ "$ticket_lower" == "${worktree_lower}_"* ]]; then
+                matches+=("$ticket_dir")
+            fi
+        done
+
+        if [[ ${#matches[@]} -ge 1 ]]; then
+            # Return first match for prefix
+            echo "${matches[0]%/}"
+            return 0
+        fi
+    fi
+
+    # No match found
+    echo ""
+    return 1
+}
+
+# Get ticket status by parsing task files
+# Arguments: ticket_directory_path
+# Returns: "complete", "partial", or "not_started" on stdout
+get_ticket_status() {
+    local ticket_path="$1"
+    local tasks_dir="${ticket_path}/tasks"
+
+    # If no tasks directory, treat as not started
+    if [[ ! -d "$tasks_dir" ]]; then
+        echo "not_started"
+        return 0
+    fi
+
+    local total_tasks=0
+    local verified_tasks=0
+
+    # Parse each task file
+    for task_file in "$tasks_dir"/*.md; do
+        [[ -f "$task_file" ]] || continue
+        ((total_tasks++))
+
+        # Check for verified checkbox: - [x] **Verified**
+        if grep -q '\- \[x\] \*\*Verified\*\*' "$task_file" 2>/dev/null; then
+            ((verified_tasks++))
+        fi
+    done
+
+    # Determine status
+    if [[ $total_tasks -eq 0 ]]; then
+        echo "not_started"
+    elif [[ $verified_tasks -eq $total_tasks ]]; then
+        echo "complete"
+    elif [[ $verified_tasks -gt 0 ]]; then
+        echo "partial"
+    else
+        echo "not_started"
+    fi
+}
+
+# Confirm cleanup with ticket status awareness
+# Arguments: ticket_path, status, skip_confirmation_flag
+# Exit codes: 0 = proceed, 5 = user cancelled
+confirm_ticket_cleanup() {
+    local ticket_path="$1"
+    local status="$2"
+    local skip_confirmation="$3"
+
+    # If ticket is complete or no ticket found, proceed without prompting
+    if [[ -z "$ticket_path" ]] || [[ "$status" == "complete" ]]; then
+        return 0
+    fi
+
+    # Ticket is incomplete - display warning
+    echo "" >&2
+    echo "=========================================="  >&2
+    echo "  WARNING: Incomplete Ticket Detected"  >&2
+    echo "=========================================="  >&2
+    echo "" >&2
+    echo "  Ticket: $ticket_path" >&2
+    echo "  Status: $status" >&2
+
+    if [[ "$status" == "partial" ]]; then
+        echo "  (Some tasks are not yet verified)" >&2
+    elif [[ "$status" == "not_started" ]]; then
+        echo "  (No tasks have been verified yet)" >&2
+    fi
+    echo "" >&2
+
+    # If --yes flag is set, proceed without prompting
+    if [[ "$skip_confirmation" == true ]]; then
+        info "Proceeding with cleanup (--yes flag)"
+        return 0
+    fi
+
+    # Prompt user for confirmation
+    read -r -p "Continue with cleanup? (y/n) " response
+    case "$response" in
+        [yY][eE][sS]|[yY])
+            return 0
+            ;;
+        [nN][oO]|[nN])
+            info "Cleanup cancelled by user"
+            exit 5
+            ;;
+        *)
+            info "Cleanup cancelled by user (invalid response)"
+            exit 5
+            ;;
+    esac
+}
+
+##############################################################################
 # Confirmation Prompt
 ##############################################################################
 
@@ -480,6 +739,8 @@ confirm_cleanup() {
     local name="$1"
     local repo="$2"
     local keep_branch="$3"
+    local ticket_path="${4:-}"
+    local ticket_status="${5:-}"
 
     echo "" >&2
     echo "=========================================="  >&2
@@ -492,6 +753,13 @@ confirm_cleanup() {
         echo "  Branch: will be KEPT" >&2
     else
         echo "  Branch: will be DELETED" >&2
+    fi
+
+    # Display ticket info if available
+    if [[ -n "$ticket_path" ]]; then
+        echo "" >&2
+        echo "  Ticket: $(basename "$ticket_path")" >&2
+        echo "  Ticket Status: $ticket_status" >&2
     fi
     echo "" >&2
 
@@ -650,7 +918,11 @@ if [[ "$DRY_RUN" == true ]]; then
     echo ""
 
     dry_run_msg "2. Git fetch origin main (30s timeout):"
-    echo "     timeout 30s git -C /workspace/repos/$REPO fetch origin main"
+    dry_run_repo_path="/workspace/repos/$REPO/$REPO"
+    if [[ ! -d "$dry_run_repo_path" ]]; then
+        dry_run_repo_path="/workspace/repos/$REPO"
+    fi
+    echo "     timeout 30s git -C $dry_run_repo_path fetch origin main"
     echo ""
 
     if [[ "$SKIP_WORKSPACE" != true ]] && [[ -n "$resolved_workspace" ]]; then
@@ -710,9 +982,32 @@ success "Worktree found: $WORKTREE_PATH"
 # Resolve workspace file
 RESOLVED_WORKSPACE=$(resolve_workspace_file)
 
+# Detect associated SDD ticket (before git fetch)
+info "Checking for associated SDD ticket..."
+set +e  # Temporarily disable exit on error for ticket detection
+TICKET_PATH=$(find_ticket_for_worktree "$WORKTREE_NAME")
+find_ticket_exit_code=$?
+set -e  # Re-enable exit on error
+
+if [[ $find_ticket_exit_code -eq 3 ]]; then
+    error "Ambiguous ticket match - please resolve manually"
+    exit 3
+fi
+
+# Get ticket status if ticket found
+if [[ -n "$TICKET_PATH" ]]; then
+    TICKET_STATUS=$(get_ticket_status "$TICKET_PATH")
+    success "Ticket found: $(basename "$TICKET_PATH") (status: $TICKET_STATUS)"
+
+    # Check for incomplete ticket and prompt for confirmation
+    confirm_ticket_cleanup "$TICKET_PATH" "$TICKET_STATUS" "$SKIP_CONFIRMATION"
+else
+    info "No associated ticket found"
+fi
+
 # Confirm with user unless --yes flag
 if [[ "$SKIP_CONFIRMATION" != true ]]; then
-    confirm_cleanup "$WORKTREE_NAME" "$REPO" "$KEEP_BRANCH"
+    confirm_cleanup "$WORKTREE_NAME" "$REPO" "$KEEP_BRANCH" "$TICKET_PATH" "$TICKET_STATUS"
 fi
 
 # Git fetch origin main
@@ -749,6 +1044,11 @@ elif [[ " ${WARNINGS[*]} " =~ "Workspace update failed" ]]; then
     warn "Workspace: Failed (see warnings above)"
 else
     success "Workspace: Updated"
+fi
+
+# Display ticket info
+if [[ -n "$TICKET_PATH" ]]; then
+    info "Ticket: $(basename "$TICKET_PATH") ($TICKET_STATUS)"
 fi
 
 # Display warnings if any
