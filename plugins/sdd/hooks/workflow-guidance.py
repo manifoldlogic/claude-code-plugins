@@ -654,7 +654,7 @@ def generate_task_in_progress_message(context: dict, task_status: dict) -> str:
     if len(in_progress) == 1:
         task_id = in_progress[0]
         return (
-            f"TASK IN PROGRESS: {task_id} has not been completed.\n\n"
+            f"TASK IN PROGRESS: {task_id} (ticket: {ticket_id}) has not been completed.\n\n"
             f"The task file shows 'Task completed' checkbox is unchecked.\n\n"
             f"Please complete the task by:\n"
             f"1. Finishing the implementation work\n"
@@ -670,7 +670,7 @@ def generate_task_in_progress_message(context: dict, task_status: dict) -> str:
     # Multiple tasks in progress
     task_list = ', '.join(in_progress)
     return (
-        f"TASKS IN PROGRESS: {len(in_progress)} tasks are not completed: {task_list}\n\n"
+        f"TASKS IN PROGRESS: {len(in_progress)} tasks in ticket {ticket_id} are not completed: {task_list}\n\n"
         f"Each task file shows 'Task completed' checkbox is unchecked.\n\n"
         f"Please complete these tasks before switching context.\n\n"
         f"Note: This detection has a known limitation in multi-session environments. "
