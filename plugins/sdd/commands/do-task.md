@@ -14,6 +14,42 @@ Task pattern: `${SDD_ROOT_DIR}/tickets/**/tasks/$ARGUMENTS_*.md`
 
 **IMPORTANT: You are an orchestrator. You coordinate the implementation, testing, verification, and commit phases by delegating to appropriate agents.**
 
+### Step 0: Write Session State File
+
+**IMPORTANT: Before starting any task work, write a session state file to track active work.**
+
+This enables multi-session reliable work detection. The Stop hook uses this file to block only THIS session when work is in progress.
+
+```bash
+# Get session_id from environment or use a generated fallback
+SESSION_ID="${CLAUDE_SESSION_ID:-$(uuidgen 2>/dev/null || echo session-$$-$(date +%s))}"
+SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+TASK_ID="${ARGUMENTS}"
+TICKET_ID=$(echo "$TASK_ID" | cut -d. -f1)
+
+# Create session states directory if needed
+mkdir -p "$SDD_ROOT/.sdd-session-states"
+
+# Write session state file atomically (write to temp, rename)
+TEMP_FILE=$(mktemp "$SDD_ROOT/.sdd-session-states/.tmp.XXXXXX")
+cat > "$TEMP_FILE" << EOF
+{
+  "session_id": "$SESSION_ID",
+  "ticket_id": "$TICKET_ID",
+  "task_id": "$TASK_ID",
+  "phase": "implementation",
+  "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "command": "/sdd:do-task $TASK_ID"
+}
+EOF
+mv "$TEMP_FILE" "$SDD_ROOT/.sdd-session-states/$SESSION_ID.json"
+echo "Session state written: $SDD_ROOT/.sdd-session-states/$SESSION_ID.json"
+```
+
+**Error Handling:** If session state write fails, continue with task execution (graceful degradation). The Stop hook will fall back to task file inspection.
+
+---
+
 ### Step 1: Locate Task
 
 ```bash

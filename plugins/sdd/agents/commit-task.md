@@ -191,7 +191,26 @@ git status
 - Files committed
 - Any remaining uncommitted changes (if any) with explanation
 
-### Step 8: Log Completion (Optional)
+### Step 8: Clear Session State File
+
+**After successful commit, ensure session state is cleared (defensive check):**
+
+```bash
+# Clear session state after commit - work is complete
+SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
+if [ -n "$SESSION_ID" ]; then
+  STATE_FILE="$SDD_ROOT/.sdd-session-states/$SESSION_ID.json"
+  if [ -f "$STATE_FILE" ]; then
+    rm -f "$STATE_FILE"
+    echo "Session state cleared: $STATE_FILE"
+  fi
+fi
+```
+
+**Note:** This is a defensive cleanup. The verify-task agent should have already cleared the session state, but this ensures cleanup even if verification was bypassed or incomplete.
+
+### Step 9: Log Completion (Optional)
 
 After successful commit, log the event for audit trail:
 
