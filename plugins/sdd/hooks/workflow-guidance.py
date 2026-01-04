@@ -31,8 +31,25 @@ import os
 import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# ============================================================================
+# Logging
+# ============================================================================
+
+LOG_FILE = Path("/tmp/sdd-stop-hook.log")
+
+
+def log(message: str) -> None:
+    """Append message to log file with timestamp."""
+    try:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{timestamp}] {message}\n")
+    except Exception:
+        pass  # Fail silently
 
 # ============================================================================
 # Gate Configuration Types
@@ -1214,8 +1231,11 @@ def main() -> None:
         2: Block stop (gate blocks work or guidance requires attention)
     """
     try:
+        log("--- Stop hook triggered ---")
+
         # Check environment variable to disable hook
         if os.environ.get('SDD_DISABLE_STOP_HOOK'):
+            log("ALLOW: disabled via SDD_DISABLE_STOP_HOOK")
             sys.exit(0)
 
         # Parse input from stdin
@@ -1223,25 +1243,30 @@ def main() -> None:
             input_data = parse_input()
         except (json.JSONDecodeError, Exception):
             # Invalid input - fail-safe, allow stop
+            log("ALLOW: invalid input (parse error)")
             sys.exit(0)
 
         # CRITICAL: Check stop_hook_active FIRST to prevent infinite loops
         # This must be the first check after parsing input
         if input_data.get('stop_hook_active', False):
+            log("ALLOW: stop_hook_active=true (continuation)")
             sys.exit(0)
 
         # Get transcript path
         transcript_path = input_data.get('transcript_path')
         if not transcript_path:
+            log("ALLOW: no transcript_path")
             sys.exit(0)
 
         # Read recent transcript entries
         entries = read_transcript_tail(transcript_path)
         if not entries:
+            log("ALLOW: no transcript entries")
             sys.exit(0)
 
         # Detect SDD context
         context = detect_sdd_context(entries)
+        log(f"Context: workflow={context.get('workflow')}, ticket={context.get('ticket_id')}")
 
         # ====================================================================
         # Gate Enforcement (AUTOGATE)
@@ -1258,6 +1283,7 @@ def main() -> None:
                     if gates:
                         gate_result = evaluate_gates(gates, context)
                         if gate_result.get('blocked', False):
+                            log(f"BLOCK: gate - {gate_result.get('message', '')[:50]}")
                             output_and_exit('block', gate_result.get('message', ''), 2)
             except Exception:
                 # Gate errors should not prevent workflow guidance
@@ -1320,12 +1346,15 @@ def main() -> None:
         # MVP: Always allow stop with optional guidance
         # Future phases may block on clear workflow violations
         if guidance:
+            log(f"ALLOW: with guidance - {guidance[:50]}...")
             output_and_exit('allow', guidance, 0)
         else:
+            log("ALLOW: no SDD workflow detected")
             sys.exit(0)
 
-    except Exception:
+    except Exception as e:
         # Any error: fail-safe, allow stop
+        log(f"ALLOW: error - {e}")
         sys.exit(0)
 
 

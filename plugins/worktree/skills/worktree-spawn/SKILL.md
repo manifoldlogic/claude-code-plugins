@@ -118,7 +118,7 @@ spawn-worktree.sh <worktree-name> --repo <repository> [OPTIONS]
 - `-b, --branch BRANCH` - Base branch to branch from (default: "main")
 - `-p, --profile PROFILE` - iTerm2 profile name (default: from ITERM_PROFILE or "Default")
 - `-w, --workspace FILE` - VS Code workspace file path (default: from WORKSPACE_FILE or auto-detect)
-- `-n, --name DISPLAY_NAME` - Display name for workspace folder (default: same as worktree-name)
+- `-n, --name DISPLAY_NAME` - Display name for workspace folder (default: "<repo> (<worktree>)")
 - `--skip-tab` - Skip opening iTerm2 tab (only create worktree)
 - `--skip-workspace` - Skip adding to VS Code workspace (only create worktree and tab)
 - `--dry-run` - Show what would be done without making changes
@@ -231,7 +231,7 @@ Would execute with resolved parameters:
   Base branch: main (default)
   iTerm profile: Default (default)
   Workspace file: /workspace/.vscode/workspace.code-workspace
-  Display name: feature-test (default)
+  Display name: myproject (feature-test) (default)
 
 Commands that would run:
 
@@ -244,7 +244,7 @@ Commands that would run:
      ~/.devcontainer/scripts/open-devcontainer.sh -d /workspace/repos/myproject/feature-test -p "Default"
 
   3. Update workspace:
-     ~/.devcontainer/scripts/workspace-folder.sh add repos/myproject/feature-test --name "feature-test"
+     ~/.devcontainer/scripts/workspace-folder.sh add repos/myproject/feature-test --name "myproject (feature-test)"
 ```
 
 **Use case:** Verify configuration and preview all actions before executing. Helpful for understanding what the script will do, debugging issues, or confirming environment variable resolution and default values.
