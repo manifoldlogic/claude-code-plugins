@@ -199,6 +199,9 @@ After installation, restart Claude Code to activate the plugin.
 | `/sdd:create-tasks [TICKET_ID]` | Generate tasks from plan |
 | `/sdd:do-all-tasks [TICKET_ID]` | Execute all tasks systematically |
 | `/sdd:do-task [TASK_ID]` | Complete single task workflow |
+| `/sdd:pr [TICKET_ID]` | Create GitHub PR for completed ticket |
+| `/sdd:pr-comments [PR_NUMBER]` | Fetch and classify PR review comments |
+| `/sdd:fix-pr-feedback [PR_NUMBER]` | Critically evaluate and fix valid PR feedback |
 | `/sdd:recommend-agents [TICKET_ID]` | Recommend specialized agents for ticket |
 | `/sdd:assign-agents [TICKET_ID]` | Assign agents to phases and tasks |
 | `/sdd:update [TICKET_ID]` | Update ticket based on review findings |
@@ -259,6 +262,72 @@ Located in `skills/project-workflow/scripts/`:
 | `ticket-summary.sh` | Generate ticket summary |
 | `collect-metrics.sh` | Collect and log workflow metrics |
 | `master-status-board.sh` | Multi-repo status aggregation with recommended actions for autonomous loops |
+| `sdd-loop.sh` | Autonomous loop controller for batch task execution |
+
+## Loop Controller
+
+The SDD Loop Controller ("Ralph Wiggum Loop") provides autonomous task execution across multiple repositories. It continuously polls for work, executes tasks via Claude Code, and respects safety limits and phase boundaries.
+
+### Quick Start
+
+```bash
+# Basic usage - run against default workspace
+./sdd-loop.sh /workspace/repos/
+
+# Preview what would happen without executing
+./sdd-loop.sh --dry-run /workspace/repos/
+
+# Limit iterations for testing
+./sdd-loop.sh --max-iterations 10 /workspace/repos/
+```
+
+### Key Features
+
+- **Safety limits** - Configurable max iterations and consecutive error limits
+- **Phase boundaries** - Stop at specific phases for manual review via `.autogate.json`
+- **Dry-run mode** - Preview actions without executing Claude Code
+- **Cross-repo support** - Processes tasks across multiple repositories
+- **Signal handling** - Graceful shutdown on Ctrl+C or SIGTERM
+
+### Configuration
+
+```bash
+# Via command-line options
+./sdd-loop.sh --max-iterations 50 --max-errors 3 --timeout 3600 /workspace/repos/
+
+# Via environment variables
+export SDD_LOOP_MAX_ITERATIONS=100
+export SDD_LOOP_TIMEOUT=7200
+./sdd-loop.sh /workspace/repos/
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success - all work completed |
+| 1 | Error - task failure or limit reached |
+| 2 | Usage error - invalid arguments |
+| 130 | Interrupted by SIGINT (Ctrl+C) |
+| 143 | Terminated by SIGTERM |
+
+### Phase Boundary Control
+
+Stop the loop after completing specific phases:
+
+```bash
+# Set phase boundary in ticket directory
+cd /path/to/_SDD/tickets/TICKET_name/
+echo '{"ready": true, "agent_ready": true, "stop_at_phase": 1}' > .autogate.json
+
+# Run loop - will stop after Phase 1 tasks complete
+./sdd-loop.sh /workspace/repos/
+```
+
+### Documentation
+
+- [sdd-loop-examples.md](skills/project-workflow/scripts/sdd-loop-examples.md) - Comprehensive usage examples
+- [sdd-loop.sh](skills/project-workflow/scripts/sdd-loop.sh) - Full script with `--help` documentation
 
 ## Workflow
 
@@ -408,6 +477,7 @@ plugins/sdd/
 │   ├── do-task.md
 │   ├── epics-status.md
 │   ├── extend.md
+│   ├── fix-pr-feedback.md
 │   ├── import-jira-ticket.md
 │   ├── plan-ticket.md
 │   ├── pr-comments.md

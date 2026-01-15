@@ -35,6 +35,7 @@
 #
 # Output (JSON):
 #   {
+#     "version": "1.0.0",
 #     "timestamp": "2024-01-15T10:30:00+00:00",
 #     "workspace_root": "/workspace/repos/",
 #     "repos": [
@@ -48,8 +49,12 @@
 #
 # JSON Schema:
 #   type: object
-#   required: [timestamp, workspace_root, repos]
+#   required: [version, timestamp, workspace_root, repos]
 #   properties:
+#     version:
+#       type: string
+#       pattern: "^\\d+\\.\\d+\\.\\d+$"
+#       description: Semantic version (MAJOR.MINOR.PATCH) for schema compatibility
 #     timestamp:
 #       type: string
 #       format: date-time
@@ -960,6 +965,7 @@ main() {
     # Build the full output JSON (without recommended_action first)
     local full_json=""
     full_json+="{"$'\n'
+    full_json+="  \"version\": \"$VERSION\","$'\n'
     full_json+="  \"timestamp\": \"$(date -Iseconds)\","$'\n'
     full_json+="  \"workspace_root\": \"$(json_escape "$workspace_root")\","$'\n'
 
