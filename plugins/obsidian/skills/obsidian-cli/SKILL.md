@@ -499,19 +499,268 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 | Quick lookup in another vault | Use `--vault` flag |
 | Scripting across multiple vaults | Always use explicit `--vault` flag |
 
+## Limitations
+
+### Interactive Commands Over SSH
+
+Commands that require interactive input (fuzzy finders, prompts) do not work over SSH non-interactive sessions. The SSH connection from the devcontainer is non-interactive, meaning it cannot display or receive input from terminal UI elements.
+
+**Not Available Over SSH:**
+- `obsidian-cli search` (without pattern argument - launches interactive fuzzy finder)
+- `obsidian-cli search-content` (without pattern argument - launches interactive fuzzy finder)
+- Interactive vault selection prompts
+- Any command that requires user confirmation prompts
+
+**Alternatives:**
+- Use `obsidian-cli search "pattern"` with an explicit search pattern instead of the interactive fuzzy finder
+- Use `obsidian-cli search-content "pattern"` with an explicit pattern for content search
+- Use the `--vault "Name"` flag to target specific vaults explicitly
+- Configure a default vault with `set-default` to avoid vault selection prompts
+- Use `--yes` or similar confirmation flags where available to skip prompts
+
+**Why SSH Limits Interactivity:**
+SSH sessions from the devcontainer do not allocate a pseudo-terminal (PTY) by default, which is required for interactive TUI components like fuzzy finders. Adding `-t` to force PTY allocation does not resolve this since the container-side terminal cannot display the host's TUI.
+
 ## Error Handling
 
-### Common Errors and Solutions
+This section documents common error scenarios, their causes, and resolution steps. Each error includes the error message pattern to help identify the issue.
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `ssh: connect to host ... port 22: Connection refused` | SSH not configured | Verify HOST_USER and SSH keys |
-| `command not found: obsidian-cli` | CLI not installed on host | Install via Homebrew |
-| `Error: No default vault set` | Default vault not configured | Run `obsidian-cli set-default "VaultName"` on host |
-| `Error: Note not found` | Note doesn't exist or wrong path | Check note name and folder path |
-| `Error: Vault not found` | Invalid vault name | List vaults with `list-vaults` command |
+### SSH Connection Refused
 
-### Handling Output
+**Error Pattern:**
+```
+ssh: connect to host host.docker.internal port 22: Connection refused
+```
+
+**Likely Cause:** The `HOST_USER` environment variable is not set or the SSH server on the macOS host is not running/accessible.
+
+**Resolution:**
+1. Verify HOST_USER is set in your devcontainer configuration:
+   ```bash
+   echo $HOST_USER
+   ```
+2. If empty, add to `.devcontainer/devcontainer.json` under `remoteEnv`:
+   ```json
+   "remoteEnv": {
+     "HOST_USER": "${localEnv:USER}"
+   }
+   ```
+3. Rebuild the container: **Dev Containers: Rebuild Container**
+4. Verify SSH is enabled on macOS: **System Preferences > Sharing > Remote Login**
+5. Test connectivity:
+   ```bash
+   ssh -o BatchMode=yes -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal "echo OK"
+   ```
+
+---
+
+### SSH Permission Denied
+
+**Error Pattern:**
+```
+Permission denied (publickey,password).
+```
+or
+```
+Warning: Identity file /home/vscode/.ssh/id_ed25519 not accessible: No such file or directory.
+```
+
+**Likely Cause:** SSH keys are not mounted into the container, or the key file has incorrect permissions.
+
+**Resolution:**
+1. Verify SSH key exists in the container:
+   ```bash
+   ls -la ~/.ssh/id_ed25519
+   ```
+2. If missing, ensure keys are mounted in `.devcontainer/devcontainer.json`:
+   ```json
+   "mounts": [
+     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly"
+   ]
+   ```
+3. Check key permissions (must be 600):
+   ```bash
+   chmod 600 ~/.ssh/id_ed25519
+   ```
+4. Verify the key is authorized on the host:
+   ```bash
+   # On macOS host, ensure your public key is in:
+   cat ~/.ssh/authorized_keys
+   ```
+5. Rebuild container after mount configuration changes
+
+---
+
+### Command Not Found: obsidian-cli
+
+**Error Pattern:**
+```
+bash: obsidian-cli: command not found
+```
+or
+```
+zsh: command not found: obsidian-cli
+```
+
+**Likely Cause:** The obsidian-cli tool is not installed on the macOS host.
+
+**Resolution:**
+1. Install obsidian-cli on the **macOS host** (not in the container):
+   ```bash
+   # Run these commands directly on macOS, not through SSH
+   brew tap yakitrak/yakitrak
+   brew install yakitrak/yakitrak/obsidian-cli
+   ```
+2. Verify installation:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "which obsidian-cli"
+   ```
+3. If `which` returns a path, the installation succeeded
+4. If using a non-standard shell on macOS, ensure the PATH includes Homebrew binaries
+
+---
+
+### No Default Vault Set
+
+**Error Pattern:**
+```
+Error: No default vault set
+```
+or
+```
+Error: Please specify a vault or set a default vault
+```
+
+**Likely Cause:** obsidian-cli requires a default vault to be configured when not using the `--vault` flag.
+
+**Resolution:**
+1. List available vaults:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
+   ```
+2. Set a default vault (run on host or via SSH):
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli set-default 'Your Vault Name'"
+   ```
+3. Verify the default is set:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print-default"
+   ```
+4. Alternative: Use `--vault "Name"` flag with each command instead of setting a default
+
+---
+
+### Note Not Found
+
+**Error Pattern:**
+```
+Error: Note not found
+```
+or
+```
+Error: Note 'NoteName' does not exist
+```
+
+**Likely Cause:** The specified note does not exist in the vault, or the path/name is incorrect.
+
+**Resolution:**
+1. Search for the note to verify the exact name:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'partial-name'"
+   ```
+2. Check if the note is in a subfolder (include the path):
+   ```bash
+   # Instead of 'MyNote', try:
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'Folder/Subfolder/MyNote'"
+   ```
+3. Verify you're targeting the correct vault:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print-default"
+   ```
+4. Note names are case-sensitive - ensure exact capitalization
+
+---
+
+### Vault Not Found
+
+**Error Pattern:**
+```
+Error: Vault not found
+```
+or
+```
+Error: Vault 'VaultName' does not exist
+```
+
+**Likely Cause:** The specified vault name in the `--vault` flag does not match any registered Obsidian vault.
+
+**Resolution:**
+1. List all available vaults:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
+   ```
+2. Use the exact vault name as shown in the list (case-sensitive)
+3. If the vault was recently created, ensure Obsidian has been opened to register it
+4. Check for typos or extra spaces in the vault name
+
+---
+
+### Permission Denied on Vault
+
+**Error Pattern:**
+```
+Error: Permission denied
+```
+or
+```
+Error: EACCES: permission denied, open '/path/to/vault/note.md'
+```
+
+**Likely Cause:** The user account on macOS does not have read/write access to the vault directory.
+
+**Resolution:**
+1. Check vault path permissions on macOS:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "ls -la '/path/to/vault'"
+   ```
+2. Verify your user owns or has access to the vault directory
+3. If the vault is on an external drive, ensure it's mounted and accessible
+4. For iCloud-synced vaults, ensure the files are downloaded (not cloud-only)
+5. Fix permissions if needed:
+   ```bash
+   # On macOS host
+   chmod -R u+rw "/path/to/vault"
+   ```
+
+---
+
+### Shell Escaping Failures
+
+**Error Pattern:**
+- Unexpected command output
+- "hacked" or other injected text appearing in terminal
+- Note created with truncated or wrong name
+- Errors about unexpected tokens
+
+**Likely Cause:** User-provided input (note names, content) contains special characters that weren't properly escaped.
+
+**Resolution:**
+1. Always escape single quotes in user input:
+   ```bash
+   escaped="${var//\'/\'\\\'\'}"
+   ```
+2. Test escaping with the validation command:
+   ```bash
+   note="Test'; echo hacked"
+   escaped="${note//\'/\'\\\'\'}"
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create '${escaped}' --content 'Test content'"
+   # SUCCESS: Should create note literally named "Test'; echo hacked"
+   # FAILURE: If you see "hacked" printed to terminal, escaping failed
+   ```
+3. Review the Shell Escaping section above for proper patterns
+4. Never interpolate user input directly into commands without escaping
+
+### Handling Output Programmatically
 
 ```bash
 # Capture output and check for errors
@@ -521,6 +770,92 @@ if [[ $? -ne 0 ]]; then
 else
     echo "Success: Note created"
 fi
+```
+
+## Troubleshooting
+
+This section organizes common issues by symptom for quick diagnosis.
+
+### SSH Issues
+
+**Symptom: "Connection refused" when running any command**
+- Cause: SSH server not running on macOS or HOST_USER not set
+- Solution: See [SSH Connection Refused](#ssh-connection-refused) above
+
+**Symptom: "Permission denied" immediately after SSH attempt**
+- Cause: SSH keys not mounted or incorrect permissions
+- Solution: See [SSH Permission Denied](#ssh-permission-denied) above
+
+**Symptom: SSH hangs without response**
+- Cause: Network connectivity issue or firewall blocking
+- Solution: Check Docker network configuration; verify `host.docker.internal` resolves:
+  ```bash
+  ping -c 1 host.docker.internal
+  ```
+
+### CLI Issues
+
+**Symptom: Commands work on macOS but fail from container**
+- Cause: Different shell environment or PATH issues
+- Solution: Use full path to obsidian-cli:
+  ```bash
+  ssh ... "/opt/homebrew/bin/obsidian-cli list-vaults"
+  ```
+
+**Symptom: Note content appears garbled or truncated**
+- Cause: Special characters in content not properly escaped
+- Solution: Apply escaping patterns from Shell Escaping section; use single quotes
+
+**Symptom: Command runs but nothing happens (silent failure)**
+- Cause: Command succeeded but output not captured, or note created in unexpected location
+- Solution: Add error checking to capture stderr:
+  ```bash
+  output=$(ssh ... "obsidian-cli create 'Note'" 2>&1)
+  echo "$output"
+  ```
+
+### Vault Issues
+
+**Symptom: "No default vault set" on every command**
+- Cause: Default vault not configured
+- Solution: See [No Default Vault Set](#no-default-vault-set) above
+
+**Symptom: Notes appear in wrong vault**
+- Cause: Default vault is different than expected
+- Solution: Always verify current default before operations:
+  ```bash
+  ssh ... "obsidian-cli print-default"
+  ```
+
+**Symptom: Vault shows in Obsidian but not in `list-vaults`**
+- Cause: obsidian-cli may cache vault list
+- Solution: Check obsidian-cli configuration location and refresh:
+  ```bash
+  ssh ... "obsidian-cli list-vaults --refresh"  # if supported
+  ```
+
+### Quick Diagnostic Commands
+
+Run these commands to quickly diagnose common issues:
+
+```bash
+# 1. Check HOST_USER is set
+echo "HOST_USER: $HOST_USER"
+
+# 2. Test basic SSH connectivity
+ssh -o BatchMode=yes -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal "echo SSH OK"
+
+# 3. Verify SSH key exists and has correct permissions
+ls -la ~/.ssh/id_ed25519
+
+# 4. Check obsidian-cli is installed
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "which obsidian-cli && obsidian-cli --version"
+
+# 5. Verify default vault
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print-default"
+
+# 6. List available vaults
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
 ```
 
 ## Reference
