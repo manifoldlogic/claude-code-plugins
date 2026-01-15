@@ -73,10 +73,10 @@
 
 set -euo pipefail
 
-# Configuration defaults
-readonly DEFAULT_WORKSPACE_ROOT="/workspace/repos/"
-readonly MAX_SEARCH_DEPTH=2
-readonly VERSION="1.0.0"
+# Configuration defaults (guard against re-sourcing)
+[[ -z "${DEFAULT_WORKSPACE_ROOT:-}" ]] && readonly DEFAULT_WORKSPACE_ROOT="/workspace/repos/"
+[[ -z "${MAX_SEARCH_DEPTH:-}" ]] && readonly MAX_SEARCH_DEPTH=2
+[[ -z "${VERSION:-}" ]] && readonly VERSION="1.0.0"
 
 # Global flags
 DEBUG="${DEBUG:-false}"
@@ -92,6 +92,110 @@ debug_log() {
     if [[ "$DEBUG" == "true" ]]; then
         echo "[DEBUG] $*" >&2
     fi
+}
+
+#######################################
+# Strip code blocks from file content
+# Removes fenced code blocks (``` ... ```) to avoid parsing
+# checkboxes that appear in code examples
+# Arguments:
+#   $1 - File content (stdin if not provided)
+# Outputs:
+#   Content with code blocks removed
+#######################################
+strip_code_blocks() {
+    local content
+    if [[ $# -gt 0 ]]; then
+        content="$1"
+    else
+        content=$(cat)
+    fi
+
+    # Use awk to remove content between ``` markers
+    # State machine: in_block toggles on/off when we see ```
+    echo "$content" | awk '
+        BEGIN { in_block = 0 }
+        /^```/ { in_block = !in_block; next }
+        !in_block { print }
+    '
+}
+
+#######################################
+# Scan a task file and extract checkbox status
+# Arguments:
+#   $1 - Path to task markdown file
+# Outputs:
+#   JSON object with task status to stdout
+# Returns:
+#   0 on success
+#   1 if file does not exist
+#######################################
+scan_task() {
+    local task_file="$1"
+
+    # Validate file exists
+    if [[ ! -f "$task_file" ]]; then
+        debug_log "Task file not found: $task_file"
+        # Return JSON with error status
+        printf '{\n'
+        printf '  "file": "%s",\n' "$(json_escape "$task_file")"
+        printf '  "task_id": "",\n'
+        printf '  "task_completed": false,\n'
+        printf '  "tests_pass": false,\n'
+        printf '  "verified": false,\n'
+        printf '  "error": "File not found"\n'
+        printf '}'
+        return 1
+    fi
+
+    # Extract task ID from filename
+    # Supports formats: SDDLOOP-1.1002_task-scanner.md, PROJ.1001_name.md, UIT-9819.1001_name.md
+    local filename
+    filename=$(basename "$task_file" .md)
+    local task_id=""
+    if [[ "$filename" =~ ^([A-Z][A-Z0-9]*(-[A-Z0-9]+)*\.[0-9]+) ]]; then
+        task_id="${BASH_REMATCH[1]}"
+    fi
+
+    debug_log "Scanning task: $task_file (ID: $task_id)"
+
+    # Read file content and strip code blocks
+    local content
+    content=$(strip_code_blocks < "$task_file")
+
+    # Initialize checkbox states (fail-safe: default to false)
+    local task_completed=false
+    local tests_pass=false
+    local verified=false
+
+    # Check for "Task completed" checkbox
+    # Pattern: "- [x] **Task completed**" or "- [X] **Task completed**"
+    # Uses case-insensitive match for x/X
+    if echo "$content" | grep -qE '^\s*-\s*\[[xX]\]\s*\*\*Task completed\*\*'; then
+        task_completed=true
+        debug_log "  Task completed: checked"
+    fi
+
+    # Check for "Tests pass" checkbox
+    if echo "$content" | grep -qE '^\s*-\s*\[[xX]\]\s*\*\*Tests pass\*\*'; then
+        tests_pass=true
+        debug_log "  Tests pass: checked"
+    fi
+
+    # Check for "Verified" checkbox
+    if echo "$content" | grep -qE '^\s*-\s*\[[xX]\]\s*\*\*Verified\*\*'; then
+        verified=true
+        debug_log "  Verified: checked"
+    fi
+
+    # Output JSON object
+    printf '{\n'
+    printf '  "file": "%s",\n' "$(json_escape "$task_file")"
+    printf '  "task_id": "%s",\n' "$(json_escape "$task_id")"
+    printf '  "task_completed": %s,\n' "$task_completed"
+    printf '  "tests_pass": %s,\n' "$tests_pass"
+    printf '  "verified": %s\n' "$verified"
+    printf '}'
 }
 
 #######################################

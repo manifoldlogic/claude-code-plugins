@@ -377,6 +377,452 @@ test_depth_limit() {
 }
 
 #######################################
+# Test: scan_task with all checkboxes unchecked
+#######################################
+test_scan_task_all_unchecked() {
+    echo "--- Test: scan_task with all unchecked ---"
+
+    # Source the script to get access to functions
+    source "$MASTER_SCRIPT"
+
+    # Create test task file with all unchecked
+    local task_file="$TEST_TMP_DIR/PROJ.1001_test-task.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1001]: Test Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Test task content
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_task all unchecked exits with code 0"
+    assert_contains "$output" '"task_id": "PROJ.1001"' "Task ID extracted correctly"
+    assert_contains "$output" '"task_completed": false' "task_completed is false"
+    assert_contains "$output" '"tests_pass": false' "tests_pass is false"
+    assert_contains "$output" '"verified": false' "verified is false"
+}
+
+#######################################
+# Test: scan_task with only task_completed checked
+#######################################
+test_scan_task_only_completed() {
+    echo "--- Test: scan_task with only task_completed checked ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1002_completed-only.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1002]: Completed Only
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": true' "task_completed is true"
+    assert_contains "$output" '"tests_pass": false' "tests_pass is false"
+    assert_contains "$output" '"verified": false' "verified is false"
+}
+
+#######################################
+# Test: scan_task with task_completed and tests_pass checked
+#######################################
+test_scan_task_completed_and_tested() {
+    echo "--- Test: scan_task with completed and tested ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1003_tested.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1003]: Tested
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": true' "task_completed is true"
+    assert_contains "$output" '"tests_pass": true' "tests_pass is true"
+    assert_contains "$output" '"verified": false' "verified is false"
+}
+
+#######################################
+# Test: scan_task with all checkboxes checked (verified)
+#######################################
+test_scan_task_all_checked() {
+    echo "--- Test: scan_task with all checked (verified) ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1004_verified.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1004]: Verified
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [x] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": true' "task_completed is true"
+    assert_contains "$output" '"tests_pass": true' "tests_pass is true"
+    assert_contains "$output" '"verified": true' "verified is true"
+}
+
+#######################################
+# Test: scan_task with uppercase X in checkboxes
+#######################################
+test_scan_task_uppercase_x() {
+    echo "--- Test: scan_task with uppercase X ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1005_uppercase.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1005]: Uppercase X
+
+## Status
+- [X] **Task completed** - acceptance criteria met
+- [X] **Tests pass** - tests executed and passing
+- [X] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": true' "task_completed is true (uppercase X)"
+    assert_contains "$output" '"tests_pass": true' "tests_pass is true (uppercase X)"
+    assert_contains "$output" '"verified": true' "verified is true (uppercase X)"
+}
+
+#######################################
+# Test: scan_task with missing file
+#######################################
+test_scan_task_missing_file() {
+    echo "--- Test: scan_task with missing file ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/nonexistent/PROJ.9999_missing.md"
+    local output
+    local exit_code=0
+    output=$(scan_task "$task_file") || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "scan_task missing file exits with code 1"
+    assert_contains "$output" '"error": "File not found"' "Error message present"
+    assert_contains "$output" '"task_completed": false' "task_completed defaults to false"
+    assert_contains "$output" '"tests_pass": false' "tests_pass defaults to false"
+    assert_contains "$output" '"verified": false' "verified defaults to false"
+}
+
+#######################################
+# Test: scan_task with empty file
+#######################################
+test_scan_task_empty_file() {
+    echo "--- Test: scan_task with empty file ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1006_empty.md"
+    touch "$task_file"
+
+    local output
+    output=$(scan_task "$task_file")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_task empty file exits with code 0"
+    assert_contains "$output" '"task_completed": false' "task_completed is false for empty"
+    assert_contains "$output" '"tests_pass": false' "tests_pass is false for empty"
+    assert_contains "$output" '"verified": false' "verified is false for empty"
+}
+
+#######################################
+# Test: scan_task with no checkboxes
+#######################################
+test_scan_task_no_checkboxes() {
+    echo "--- Test: scan_task with no checkboxes ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1007_no-checkboxes.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1007]: No Checkboxes
+
+## Summary
+This task file has no status checkboxes at all.
+
+## Implementation
+Just some content here.
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_task no checkboxes exits with code 0"
+    assert_contains "$output" '"task_completed": false' "task_completed is false (no checkboxes)"
+    assert_contains "$output" '"tests_pass": false' "tests_pass is false (no checkboxes)"
+    assert_contains "$output" '"verified": false' "verified is false (no checkboxes)"
+}
+
+#######################################
+# Test: scan_task ignores checkboxes in code blocks
+#######################################
+test_scan_task_ignores_code_blocks() {
+    echo "--- Test: scan_task ignores checkboxes in code blocks ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1008_code-blocks.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1008]: Code Blocks
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Example Code
+
+Here is how the checkbox looks in code:
+
+```markdown
+## Status
+- [x] **Task completed** - this is in a code block
+- [x] **Tests pass** - this is in a code block
+- [x] **Verified** - this is in a code block
+```
+
+The above should be ignored.
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": false' "Ignores task_completed in code block"
+    assert_contains "$output" '"tests_pass": false' "Ignores tests_pass in code block"
+    assert_contains "$output" '"verified": false' "Ignores verified in code block"
+}
+
+#######################################
+# Test: scan_task with Jira-style task ID
+#######################################
+test_scan_task_jira_style_id() {
+    echo "--- Test: scan_task with Jira-style ID ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/UIT-9819.1001_jira-style.md"
+    cat > "$task_file" << 'EOF'
+# Task: [UIT-9819.1001]: Jira Style
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_id": "UIT-9819.1001"' "Jira-style task ID extracted"
+    assert_contains "$output" '"task_completed": true' "task_completed is true"
+}
+
+#######################################
+# Test: scan_task with SDDLOOP style task ID
+#######################################
+test_scan_task_sddloop_style_id() {
+    echo "--- Test: scan_task with SDDLOOP-style ID ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/SDDLOOP-1.1002_sddloop-style.md"
+    cat > "$task_file" << 'EOF'
+# Task: [SDDLOOP-1.1002]: SDDLOOP Style
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_id": "SDDLOOP-1.1002"' "SDDLOOP-style task ID extracted"
+    assert_contains "$output" '"task_completed": true' "task_completed is true"
+    assert_contains "$output" '"tests_pass": true' "tests_pass is true"
+}
+
+#######################################
+# Test: scan_task output is valid JSON
+#######################################
+test_scan_task_valid_json() {
+    echo "--- Test: scan_task output is valid JSON ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1009_json-test.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1009]: JSON Validation
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    # Try to parse with jq if available
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "scan_task output is valid JSON" "pass"
+        else
+            log_result "scan_task output is valid JSON" "fail" "JSON parsing failed"
+        fi
+    else
+        # Fallback: basic structure check
+        if [[ "$output" == "{"* && "$output" == *"}" ]]; then
+            log_result "scan_task output is valid JSON (basic check)" "pass"
+        else
+            log_result "scan_task output is valid JSON (basic check)" "fail"
+        fi
+    fi
+}
+
+#######################################
+# Test: scan_task with partial checkboxes (only verified missing)
+#######################################
+test_scan_task_partial_checkboxes() {
+    echo "--- Test: scan_task with partial checkboxes ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1010_partial.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1010]: Partial Checkboxes
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+
+## Summary
+This file is missing the verified checkbox entirely
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": true' "task_completed is true"
+    assert_contains "$output" '"tests_pass": true' "tests_pass is true"
+    assert_contains "$output" '"verified": false' "verified defaults to false when missing"
+}
+
+#######################################
+# Test: strip_code_blocks helper function
+#######################################
+test_strip_code_blocks() {
+    echo "--- Test: strip_code_blocks helper ---"
+
+    source "$MASTER_SCRIPT"
+
+    local input
+    input=$(cat << 'EOF'
+Line 1 before code
+```bash
+This is code
+- [x] **Task completed** - in code block
+```
+Line after code
+EOF
+)
+
+    local output
+    output=$(echo "$input" | strip_code_blocks)
+
+    # Should NOT contain the code block content
+    if [[ "$output" == *"This is code"* ]]; then
+        log_result "strip_code_blocks removes code content" "fail" "Code block content still present"
+    else
+        log_result "strip_code_blocks removes code content" "pass"
+    fi
+
+    # Should contain lines outside code block
+    assert_contains "$output" "Line 1 before code" "Preserves content before code block"
+    assert_contains "$output" "Line after code" "Preserves content after code block"
+}
+
+#######################################
+# Test: scan_task with mixed case x
+#######################################
+test_scan_task_mixed_case() {
+    echo "--- Test: scan_task with mixed case x ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1011_mixed-case.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1011]: Mixed Case
+
+## Status
+- [x] **Task completed** - lowercase x
+- [X] **Tests pass** - uppercase X
+- [x] **Verified** - lowercase x
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" '"task_completed": true' "task_completed handles lowercase x"
+    assert_contains "$output" '"tests_pass": true' "tests_pass handles uppercase X"
+    assert_contains "$output" '"verified": true' "verified handles lowercase x"
+}
+
+#######################################
+# Test: scan_task file path in output
+#######################################
+test_scan_task_file_path() {
+    echo "--- Test: scan_task includes file path in output ---"
+
+    source "$MASTER_SCRIPT"
+
+    local task_file="$TEST_TMP_DIR/PROJ.1012_file-path.md"
+    cat > "$task_file" << 'EOF'
+# Task: [PROJ.1012]: File Path
+
+## Status
+- [ ] **Task completed**
+EOF
+
+    local output
+    output=$(scan_task "$task_file")
+
+    assert_contains "$output" "\"file\": \"$task_file\"" "Output contains full file path"
+}
+
+#######################################
 # Main test runner
 #######################################
 main() {
@@ -397,7 +843,7 @@ main() {
     # Trap to ensure cleanup on exit
     trap teardown EXIT
 
-    # Run tests
+    # Run directory discovery tests
     test_help_option
     echo ""
     test_short_help_option
@@ -423,6 +869,44 @@ main() {
     test_symlink_within_workspace
     echo ""
     test_depth_limit
+    echo ""
+
+    # Run scan_task tests
+    echo "====================================="
+    echo "scan_task() Function Tests"
+    echo "====================================="
+    echo ""
+    test_scan_task_all_unchecked
+    echo ""
+    test_scan_task_only_completed
+    echo ""
+    test_scan_task_completed_and_tested
+    echo ""
+    test_scan_task_all_checked
+    echo ""
+    test_scan_task_uppercase_x
+    echo ""
+    test_scan_task_missing_file
+    echo ""
+    test_scan_task_empty_file
+    echo ""
+    test_scan_task_no_checkboxes
+    echo ""
+    test_scan_task_ignores_code_blocks
+    echo ""
+    test_scan_task_jira_style_id
+    echo ""
+    test_scan_task_sddloop_style_id
+    echo ""
+    test_scan_task_valid_json
+    echo ""
+    test_scan_task_partial_checkboxes
+    echo ""
+    test_strip_code_blocks
+    echo ""
+    test_scan_task_mixed_case
+    echo ""
+    test_scan_task_file_path
     echo ""
 
     # Summary
