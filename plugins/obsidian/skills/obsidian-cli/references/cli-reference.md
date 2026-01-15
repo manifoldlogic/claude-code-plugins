@@ -61,11 +61,28 @@ obsidian-cli create <note-name> [options]
 | `--open` | Open note in Obsidian after creation |
 | `--editor` / `-e` | Open note in default text editor |
 
-**SSH Example:**
+**Example 1: Basic note creation**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli create 'Project Plan' --content '# Project Plan\n\nObjectives:\n- Item 1\n- Item 2'"
 ```
+**Result:** Creates note with markdown header and bullet list
+
+**Example 2: Multi-vault note creation**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Q1 Goals' --vault 'Work Projects' --content '# Team Objectives\n\nQuarterly goals for the engineering team'"
+```
+**Result:** Creates note in "Work Projects" vault instead of the default vault
+
+**Example 3: Note name with special characters**
+```bash
+note_name="John's Meeting Notes"
+escaped="${note_name//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create '${escaped}' --content '# Meeting Notes\n\nAttendees: John, Sarah'"
+```
+**Escaping Note:** Single quotes in note names require escaping. See [SKILL.md Shell Escaping section](../SKILL.md#shell-escaping-critical).
 
 **Creating in Subfolder:**
 ```bash
@@ -73,7 +90,12 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli create 'Projects/Backend/API Design' --content '# API Design'"
 ```
 
-**Escaping Note:** Apply shell escaping to note names and content containing special characters. See [SKILL.md Shell Escaping section](../SKILL.md#shell-escaping-critical).
+**Error Scenario - Note Already Exists:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Existing Note' --content 'New content'"
+```
+**Result:** May return error if note exists. Use `--overwrite` flag to replace, or use `--append` to add to existing note.
 
 ---
 
@@ -92,10 +114,26 @@ obsidian-cli print <note-name> [options]
 |--------|-------------|
 | `--vault <name>` | Target vault (uses default if not specified) |
 
-**SSH Example:**
+**Example 1: Basic note reading**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli print 'Meeting Notes'"
+```
+**Result:** Outputs full note contents including frontmatter to stdout
+
+**Example 2: Multi-vault note reading**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'Team Roadmap' --vault 'Work Projects'"
+```
+**Result:** Reads note from "Work Projects" vault instead of the default vault
+
+**Example 3: Note name with special characters**
+```bash
+note_name="John's API Notes"
+escaped="${note_name//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print '${escaped}'"
 ```
 
 **Reading from Subfolder:**
@@ -104,13 +142,23 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli print 'Projects/Backend/API Design'"
 ```
 
-**Capturing Content:**
+**Capturing Content for Processing:**
 ```bash
 content=$(ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli print 'Project Requirements'" 2>/dev/null)
+
+# Use content in script
+if [ -n "$content" ]; then
+  echo "Note found with $(echo "$content" | wc -l) lines"
+fi
 ```
 
-**Error Handling:** Returns error if note does not exist. Use `search` first to verify note name.
+**Error Scenario - Note Not Found:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'Nonexistent Note'"
+```
+**Result:** Returns `Note not found` error. Use `search` first to verify note name exists.
 
 **Escaping Note:** Apply shell escaping to note names containing special characters.
 
@@ -131,10 +179,26 @@ obsidian-cli delete <note-name> [options]
 |--------|-------------|
 | `--vault <name>` | Target vault (uses default if not specified) |
 
-**SSH Example:**
+**Example 1: Basic deletion**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli delete 'Old Draft'"
+```
+**Result:** Permanently removes note from the vault
+
+**Example 2: Multi-vault deletion**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli delete 'Archived Spec' --vault 'Work Projects'"
+```
+**Result:** Deletes note from "Work Projects" vault instead of the default vault
+
+**Example 3: Deleting note with special characters**
+```bash
+note_name="John's Old Notes"
+escaped="${note_name//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli delete '${escaped}'"
 ```
 
 **Deleting from Subfolder:**
@@ -144,6 +208,13 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 ```
 
 **Warning:** This operation is permanent. The note is deleted from the filesystem, not moved to trash.
+
+**Error Scenario - Note Not Found:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli delete 'Nonexistent Note'"
+```
+**Result:** Returns `Note not found` error. Use `search` first to verify note exists before deletion.
 
 **Escaping Note:** Apply shell escaping to note names containing special characters.
 
@@ -166,21 +237,46 @@ obsidian-cli move <current-path> <new-path> [options]
 | `--open` | Open note in Obsidian after moving |
 | `--editor` / `-e` | Open note in default text editor after moving |
 
-**SSH Example (Rename):**
+**Example 1: Simple rename**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli move 'Draft Document' 'Final Document'"
 ```
+**Result:** Renames note and updates all `[[Draft Document]]` links to `[[Final Document]]`
 
-**SSH Example (Move to Folder):**
+**Example 2: Multi-vault move with folder reorganization**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli move 'Inbox/New Idea' 'Projects/Active/New Idea'"
+  "obsidian-cli move 'Inbox/New Idea' 'Projects/Active/New Idea' --vault 'Work Projects'"
 ```
+**Result:** Moves note from Inbox folder to Projects/Active folder within "Work Projects" vault
+
+**Example 3: Note name with special characters**
+```bash
+old_name="John's Meeting Notes"
+new_name="John's Meeting Notes (Archived)"
+old_escaped="${old_name//\'/\'\\\'\'}"
+new_escaped="${new_name//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli move '${old_escaped}' '${new_escaped}'"
+```
+**Escaping Note:** Both source and destination paths require escaping if they contain special characters.
 
 **Link Updates:** When moving notes, obsidian-cli automatically updates any internal links (`[[Note Name]]`) that reference the moved note.
 
-**Escaping Note:** Apply shell escaping to paths containing special characters.
+**Error Scenario - Source Not Found:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli move 'Nonexistent Note' 'New Location'"
+```
+**Result:** Returns `Note not found` error. Use `search` to verify source note exists.
+
+**Error Scenario - Destination Exists:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli move 'Source Note' 'Existing Note'"
+```
+**Result:** May return error if destination note already exists. Rename the destination first or choose a different name.
 
 ---
 
@@ -205,19 +301,58 @@ obsidian-cli create <note-name> --append --content <text> [options]
 | `--append` | Append mode flag (required) |
 | `--vault <name>` | Target vault (uses default if not specified) |
 
-**SSH Example:**
+**Example 1: Basic append**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli create 'Meeting Notes' --append --content '\n\n## New Section\n\nAdditional content here'"
 ```
+**Result:** Adds new section at the end of the note
 
-**Appending with Timestamp:**
+**Example 2: Multi-vault append with timestamp**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli create 'Daily Log' --append --content '\n\n### $(date +%H:%M)\n\nNew entry'"
+  "obsidian-cli create 'Activity Log' --vault 'Work Projects' --append --content '\n\n### $(date +%H:%M)\n\nCompleted task review'"
 ```
+**Result:** Appends timestamped entry to log in "Work Projects" vault
 
-**Escaping Note:** Apply shell escaping to note names and content containing special characters. See [SKILL.md Shell Escaping section](../SKILL.md#shell-escaping-critical).
+**Example 3: Long content with multiple paragraphs**
+```bash
+content="## API Review Summary
+
+### Endpoints Reviewed
+- /api/users - OK
+- /api/products - Needs refactoring
+- /api/orders - OK
+
+### Next Steps
+1. Refactor products endpoint
+2. Add rate limiting
+3. Update documentation"
+
+# Escape newlines for SSH transport
+escaped_content="${content//$'\n'/\\n}"
+
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Sprint Notes' --append --content '\n\n${escaped_content}'"
+```
+**Result:** Appends multi-paragraph content with preserved formatting
+
+**Example with Special Characters:**
+```bash
+content="John's notes: \"Important\" findings & conclusions"
+escaped="${content//\'/\'\\\'\'}"
+escaped="${escaped//\"/\\\"}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Research Log' --append --content '\n\n${escaped}'"
+```
+**Escaping Note:** Multiple special characters require sequential escaping. See [SKILL.md Shell Escaping section](../SKILL.md#shell-escaping-critical).
+
+**Error Scenario - Note Does Not Exist:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Nonexistent Note' --append --content 'New content'"
+```
+**Result:** Behavior depends on CLI version - may create new note or return error. Use `search` first to verify note exists, or use `create` without `--append` if note does not exist.
 
 ---
 
@@ -240,15 +375,43 @@ obsidian-cli create <note-name> --prepend --content <text> [options]
 | `--prepend` | Prepend mode flag (required) |
 | `--vault <name>` | Target vault (uses default if not specified) |
 
-**SSH Example:**
+**Example 1: Basic prepend**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli create 'Project Log' --prepend --content '## Latest Update\n\nNew content at top\n\n'"
 ```
+**Result:** Adds content at the beginning of the note (after any YAML frontmatter)
 
-**Alternative Approach:** If `--prepend` is not available, read the note content with `print`, prepend content manually, and use `create --overwrite` to replace.
+**Example 2: Multi-vault prepend with status update**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Sprint Backlog' --vault 'Work Projects' --prepend --content '## Status: $(date +%Y-%m-%d)\n\nPriority items updated.\n\n'"
+```
+**Result:** Adds dated status header at top of backlog note in "Work Projects" vault
 
-**Escaping Note:** Apply shell escaping to note names and content containing special characters.
+**Example 3: Prepend with special characters**
+```bash
+update="IMPORTANT: John's review complete - see \"Comments\" section"
+escaped="${update//\'/\'\\\'\'}"
+escaped="${escaped//\"/\\\"}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Feature Spec' --prepend --content '${escaped}\n\n'"
+```
+**Escaping Note:** Handle quotes and special characters before shell transport.
+
+**Alternative Approach (If --prepend Not Available):**
+If `--prepend` is not supported in your CLI version, use the read-modify-write pattern:
+```bash
+# Read current content
+current=$(ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'Project Log'" 2>/dev/null)
+
+# Prepend new content and overwrite
+new_content="## Latest Update\n\nNew content at top\n\n${current}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Project Log' --overwrite --content '${new_content}'"
+```
+**Warning:** The read-modify-write approach does not preserve frontmatter separately. Use with caution on notes with YAML frontmatter.
 
 ---
 
@@ -274,25 +437,50 @@ obsidian-cli frontmatter <note-name> --edit --key <field> --value <value> [optio
 | `--delete` | Delete a frontmatter field (use with `--key`) |
 | `--vault <name>` | Target vault (uses default if not specified) |
 
-**SSH Example (Set Field):**
+**Example 1: Set a simple field**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli frontmatter 'Project Spec' --edit --key status --value 'in-progress'"
 ```
+**Result:** Sets `status: in-progress` in the note's frontmatter
 
-**SSH Example (View Frontmatter):**
+**Example 2: Multi-vault frontmatter update**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli frontmatter 'Team OKRs' --vault 'Work Projects' --edit --key quarter --value 'Q1-2024'"
+```
+**Result:** Updates frontmatter in note within "Work Projects" vault
+
+**Example 3: Value with special characters**
+```bash
+value="John's API Design: Phase 1"
+escaped="${value//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli frontmatter 'Project Spec' --edit --key description --value '${escaped}'"
+```
+**Escaping Note:** Single quotes in values require special handling to avoid shell interpretation.
+
+**View Frontmatter:**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli frontmatter 'Project Spec' --print"
 ```
+**Output:**
+```yaml
+---
+status: in-progress
+tags: [api, backend]
+created: 2024-01-15
+---
+```
 
-**SSH Example (Delete Field):**
+**Delete Field:**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli frontmatter 'Project Spec' --delete --key deprecated"
 ```
 
-**Setting Tags:**
+**Setting Tags (Array Value):**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli frontmatter 'Meeting Notes' --edit --key tags --value '[meeting, backend, q1]'"
@@ -307,7 +495,12 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli frontmatter 'Feature Spec' --edit --key priority --value 'high'"
 ```
 
-**Escaping Note:** Apply shell escaping to note names, keys, and values containing special characters.
+**Error Scenario - Note Not Found:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli frontmatter 'Nonexistent Note' --edit --key status --value 'done'"
+```
+**Result:** Returns `Note not found` error. Use `search` to verify the note exists before updating.
 
 ---
 
@@ -329,13 +522,12 @@ obsidian-cli search [pattern] [options]
 | `--vault <name>` | Target vault (uses default if not specified) |
 | `--editor` / `-e` | Open selected note in text editor |
 
-**SSH Example:**
+**Example 1: Basic filename search**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli search 'architecture'"
 ```
-
-**Interactive Mode:** When called without a pattern, `search` launches an interactive fuzzy finder. This does **NOT** work over SSH non-interactive sessions.
+**Result:** Returns all notes with "architecture" in the filename
 
 **Output Format:**
 ```
@@ -345,13 +537,36 @@ Notes matching 'architecture':
 - Archive/Old Architecture
 ```
 
+**Example 2: Multi-vault search**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli search 'meeting' --vault 'Work Projects'"
+```
+**Result:** Searches only in "Work Projects" vault instead of the default vault
+
+**Example 3: Search pattern with special characters**
+```bash
+pattern="Q1/Q2 Review"
+escaped="${pattern//\//\\/}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli search '${escaped}'"
+```
+**Escaping Note:** Forward slashes may be interpreted as path separators; escape them if searching for literal characters.
+
+**Interactive Mode Limitation:** When called without a pattern, `search` launches an interactive fuzzy finder. This does **NOT** work over SSH non-interactive sessions. Always provide a search pattern when using SSH.
+
 **Content Search:** Use `search-content` for searching within note contents:
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli search-content 'API endpoint'"
 ```
 
-**Escaping Note:** Apply shell escaping to search patterns containing special characters.
+**Error Scenario - No Matches:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli search 'nonexistent-pattern'"
+```
+**Result:** Returns empty result set (no error, just no matches). Check spelling or try broader search terms.
 
 ---
 
@@ -373,21 +588,46 @@ obsidian-cli daily [options]
 | `--vault <name>` | Target vault (uses default if not specified) |
 | `--open` | Open daily note in Obsidian application |
 
-**SSH Example:**
+**Example 1: Create/access today's daily note**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli daily"
 ```
+**Result:** Creates today's daily note if it does not exist, or returns path to existing note. Uses vault's daily notes configuration for naming and templates.
 
-**Opening in Obsidian:**
+**Example 2: Multi-vault daily notes**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli daily --vault 'Work Projects'"
+```
+**Result:** Creates/accesses daily note in "Work Projects" vault (useful for keeping personal and work daily notes separate)
+
+**Example 3: Open daily note in Obsidian**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli daily --open"
 ```
+**Result:** Creates daily note if needed and opens it in the Obsidian application
 
 **Note:** The `--open` flag requires the Obsidian application to be running on the macOS host.
 
 **Daily Note Format:** Uses the vault's configured daily notes format (typically `YYYY-MM-DD.md` in the daily notes folder). Templates are applied if configured.
+
+**Appending to Daily Note:**
+To add content to today's daily note, combine with append:
+```bash
+# First ensure daily note exists
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli daily"
+
+# Get today's date in your vault's format (example: YYYY-MM-DD)
+today=$(date +%Y-%m-%d)
+
+# Append to it
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create '${today}' --append --content '\n\n## New Entry\n\nContent here'"
+```
+**Note:** Daily note naming depends on vault configuration. Adjust date format to match.
 
 ---
 
