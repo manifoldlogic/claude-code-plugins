@@ -305,47 +305,118 @@ poll_status() {
 
 #######################################
 # Execute a single task via Claude Code CLI
+# Invokes Claude Code with the /sdd:do-task command, setting up
+# the appropriate environment variables and working directory.
+#
 # Arguments:
-#   $1 - Task ID (e.g., "TICKET.1001")
-#   $2 - Task file path
-#   $3 - SDD root directory
+#   $1 - Task ID (e.g., "TICKET-1.1001")
+#   $2 - SDD root directory (e.g., "/workspace/repos/project/_SDD")
+#
+# Environment:
+#   SDD_ROOT_DIR is set to the sdd_root parameter for Claude Code
+#   Working directory is set to the repo root (parent of _SDD)
+#
 # Outputs:
 #   Logs execution progress to stderr
+#   Claude Code output goes to stdout/stderr
+#
 # Returns:
 #   0 on success
-#   1 on error (Claude Code failure, timeout)
+#   1 on error (invalid task ID, claude not found, execution failure)
 #######################################
 execute_task() {
     local task_id="$1"
-    local task_file="$2"
-    local sdd_root="$3"
+    local sdd_root="$2"
 
-    log_debug "execute_task: task_id=$task_id, task_file=$task_file, sdd_root=$sdd_root"
+    log_debug "execute_task: task_id=$task_id, sdd_root=$sdd_root"
 
-    # Placeholder implementation - will be completed in subsequent task
-    # This skeleton demonstrates the expected interface
-
-    if [[ "$SDD_LOOP_DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would execute task: $task_id"
-        log_info "[DRY RUN] Task file: $task_file"
-        log_info "[DRY RUN] SDD root: $sdd_root"
-        return 0
-    fi
-
-    # Check if claude CLI is available
-    if ! command -v claude &>/dev/null; then
-        log_error "Claude Code CLI not found. Please install claude-code."
+    # ==========================================================================
+    # Step 1: Validate task ID format (CRITICAL for security)
+    # Pattern: TICKET-ID.NNNN where TICKET-ID is uppercase alphanumeric with dashes
+    # Examples: SDDLOOP-3.1001, TICKET.1001, PROJECT-ABC.2005
+    # ==========================================================================
+    if [[ ! "$task_id" =~ ^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*\.[0-9]+$ ]]; then
+        log_error "Invalid task ID format: $task_id"
         return 1
     fi
 
-    # In full implementation, this will:
-    # 1. Set SDD_ROOT_DIR environment variable
-    # 2. Invoke claude with appropriate arguments
-    # 3. Handle timeout
-    # 4. Parse exit code and output
-    log_info "Would execute task: $task_id (skeleton implementation)"
+    # ==========================================================================
+    # Step 2: Validate sdd_root parameter
+    # ==========================================================================
+    if [[ -z "$sdd_root" ]]; then
+        log_error "SDD root directory not specified"
+        return 1
+    fi
 
-    return 0
+    if [[ ! -d "$sdd_root" ]]; then
+        log_error "SDD root directory does not exist: $sdd_root"
+        return 1
+    fi
+
+    # ==========================================================================
+    # Step 3: Extract repo path from sdd_root (remove /_SDD suffix)
+    # ==========================================================================
+    local repo_path
+    repo_path="${sdd_root%/_SDD}"
+    repo_path="${repo_path%/}"  # Remove trailing slash if present
+
+    # Validate repo path exists
+    if [[ ! -d "$repo_path" ]]; then
+        log_error "Repository directory does not exist: $repo_path"
+        return 1
+    fi
+
+    log_debug "execute_task: repo_path=$repo_path"
+
+    # ==========================================================================
+    # Step 4: Check dry-run mode (skip execution, just log)
+    # ==========================================================================
+    if [[ "$SDD_LOOP_DRY_RUN" == "true" ]]; then
+        log_info "[DRY-RUN] Would execute task: $task_id"
+        log_info "[DRY-RUN] Command: SDD_ROOT_DIR=\"$sdd_root\" claude --dangerously-skip-permissions -p \"/sdd:do-task $task_id\""
+        log_info "[DRY-RUN] Working directory: $repo_path"
+        return 0
+    fi
+
+    # ==========================================================================
+    # Step 5: Check claude CLI availability
+    # ==========================================================================
+    if ! command -v claude &>/dev/null; then
+        log_error "claude CLI not found. Install Claude Code from https://claude.ai/download"
+        return 1
+    fi
+
+    # ==========================================================================
+    # Step 6: Log execution start
+    # ==========================================================================
+    log_info "Executing task: $task_id (repo: $repo_path)"
+
+    # ==========================================================================
+    # Step 7: Execute claude with correct environment and working directory
+    # ==========================================================================
+    local exit_code=0
+
+    # Change to repo directory and execute claude with SDD_ROOT_DIR set
+    # Using subshell to avoid changing cwd in the main script
+    (
+        cd "$repo_path" || exit 1
+        SDD_ROOT_DIR="$sdd_root" claude --dangerously-skip-permissions -p "/sdd:do-task $task_id"
+    )
+    exit_code=$?
+
+    # ==========================================================================
+    # Step 8: Log execution completion with exit code
+    # ==========================================================================
+    if [[ $exit_code -eq 0 ]]; then
+        log_info "Task completed successfully: $task_id (exit code: $exit_code)"
+    else
+        log_error "Task execution failed with exit code $exit_code"
+    fi
+
+    # ==========================================================================
+    # Step 9: Return exit code to caller
+    # ==========================================================================
+    return $exit_code
 }
 
 # =============================================================================
