@@ -1,35 +1,85 @@
 #!/usr/bin/env bash
 #
 # SDD Loop Controller ("Ralph Wiggum Loop")
-# Autonomous SDD workflow controller
+# Autonomous SDD workflow controller for multi-repository development
 #
 # Version: 1.0.0
-# Description: Polls master-status-board.sh for recommended tasks and executes
-#              them via Claude Code CLI in an automated loop.
 #
-# Usage:
-#   bash sdd-loop.sh [options] [workspace_root]
+# DESCRIPTION
+#   Polls master-status-board.sh for recommended tasks and executes them via
+#   Claude Code CLI in an automated loop. The controller continues processing
+#   until no more agent-ready work remains, safety limits are reached, or a
+#   phase boundary is hit.
 #
-# Examples:
-#   bash sdd-loop.sh                              # Use default workspace
-#   bash sdd-loop.sh /workspace/repos/            # Use specific workspace
-#   bash sdd-loop.sh --dry-run                    # Preview actions without executing
-#   bash sdd-loop.sh --max-iterations 10          # Limit to 10 task executions
-#   SDD_LOOP_DRY_RUN=true bash sdd-loop.sh        # Dry run via environment
+# USAGE
+#   sdd-loop.sh [options] [workspace_root]
 #
-# Arguments:
-#   workspace_root    Root directory containing repositories (optional)
-#                     Priority: argument > SDD_LOOP_WORKSPACE_ROOT env var > default
+# OPTIONS
+#   -h, --help              Show full help message and exit
+#   -V, --version           Show version information and exit
+#   -n, --dry-run           Preview actions without executing Claude Code
+#   -v, --verbose           Enable verbose output with progress details
+#   -q, --quiet             Suppress informational messages (errors only)
+#   --debug                 Enable debug-level logging (very verbose)
+#   --max-iterations N      Maximum task iterations before stopping (default: 50)
+#   --max-errors N          Maximum consecutive errors before stopping (default: 3)
+#   --timeout SECONDS       Task execution timeout in seconds (default: 3600)
+#   --poll-interval SECONDS Interval between status polls (default: 5)
+#
+# ARGUMENTS
+#   workspace_root    Root directory containing repositories with _SDD directories
+#                     Priority: CLI argument > SDD_LOOP_WORKSPACE_ROOT env var > default
 #                     Default: /workspace/repos/
 #
-# Exit Codes:
-#   0   - Success (completed work or no work remaining)
-#   1   - General error (task failure, missing dependencies)
-#   2   - Usage error (invalid arguments)
+# ENVIRONMENT VARIABLES
+#   SDD_LOOP_WORKSPACE_ROOT   Default workspace root directory
+#   SDD_LOOP_MAX_ITERATIONS   Maximum iterations (default: 50)
+#   SDD_LOOP_MAX_ERRORS       Maximum consecutive errors (default: 3)
+#   SDD_LOOP_TIMEOUT          Task timeout in seconds (default: 3600)
+#   SDD_LOOP_POLL_INTERVAL    Poll interval in seconds (default: 5)
+#   SDD_LOOP_DRY_RUN          Set to "true" for dry-run mode
+#   SDD_LOOP_VERBOSE          Set to "true" for verbose output
+#   SDD_LOOP_QUIET            Set to "true" for quiet mode
+#   SDD_LOOP_DEBUG            Set to "true" for debug output
+#
+# EXIT CODES
+#   0   - Success (all work completed or no work remaining)
+#   1   - Error (task failure, max limits reached, missing dependencies)
+#   2   - Usage error (invalid arguments or options)
 #   130 - Interrupted by SIGINT (Ctrl+C)
 #   143 - Terminated by SIGTERM
 #
-# See --help for full documentation.
+# EXAMPLES
+#   # Basic usage - run against default workspace
+#   sdd-loop.sh
+#
+#   # Dry-run mode to preview actions without executing
+#   sdd-loop.sh --dry-run /workspace/repos/
+#
+#   # Custom safety limits for testing
+#   sdd-loop.sh --max-iterations 10 --max-errors 5 /workspace/repos/
+#
+#   # Configure via environment variables
+#   export SDD_LOOP_MAX_ITER=100
+#   export SDD_LOOP_TIMEOUT=7200
+#   sdd-loop.sh /workspace/repos/
+#
+#   # CI/CD integration with quiet mode
+#   sdd-loop.sh --quiet --max-iterations 50 /workspace/repos/ || {
+#       echo "Loop failed with exit code $?"
+#       exit 1
+#   }
+#
+# INTEGRATION
+#   The loop controller integrates with:
+#   - master-status-board.sh: Provides recommended_action JSON
+#   - Claude Code CLI: Executes /sdd:do-task commands
+#   - .autogate.json: Reads agent_ready and stop_at_phase settings
+#
+# SEE ALSO
+#   sdd-loop-examples.md - Comprehensive usage examples and patterns
+#   master-status-board.sh - Status board scanner
+#   See --help for full documentation.
 #
 
 set -euo pipefail
