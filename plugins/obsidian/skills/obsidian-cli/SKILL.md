@@ -193,44 +193,311 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create 
 
 ## Common Workflows
 
-### Create a Note
+The following workflows demonstrate the most frequent operations with obsidian-cli. Each example uses the established SSH command pattern. For complete command documentation, see `references/cli-reference.md`.
 
+### Workflow 1: Create Note with Content
+
+**Use Case:** Create a new note with initial content for capturing ideas, meeting notes, or documentation.
+
+**Example:**
 ```bash
-# Simple note
-title="API Design Decisions"
-escaped_title="${title//\'/\'\\\'\'}"
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create '${escaped_title}' --content '# API Design\n\nDecisions made today...'"
-
-# Note in specific folder
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create 'Projects/MyProject/Architecture' --content '..content..'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Project Ideas' --content '# Project Ideas\n\nBrainstorm for Q1 initiatives:\n- API redesign\n- Performance optimization'"
 ```
 
-### Search Notes
+**Result:** Creates note "Project Ideas.md" in the default vault with the specified markdown content.
 
+**Creating Note in a Folder:**
 ```bash
-# Search by filename
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'architecture'"
-
-# Search in specific vault
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'keyword' --vault 'MyVault'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Projects/Backend/API Redesign' --content '# API Redesign\n\nPlanning document for v2 API'"
 ```
 
-### Read Note Content
+**Result:** Creates note at `Projects/Backend/API Redesign.md`, creating parent folders if needed.
 
+**Escaping Note:** If the note name contains single quotes, escape them using the pattern from the Shell Escaping section:
 ```bash
-# Print note content
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'MyNote'"
-
-# Use content in workflow
-content=$(ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'MyNote'" 2>/dev/null)
+# Note name: "John's Meeting Notes"
+note="John's Meeting Notes"
+escaped="${note//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create '${escaped}' --content 'Meeting notes content'"
 ```
 
-### Move a Note
+---
 
+### Workflow 2: Search Notes by Name
+
+**Use Case:** Find notes matching a search term when you need to locate existing content or verify if a note exists.
+
+**Example:**
 ```bash
-# Move note to different folder
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli move 'OldLocation/Note' 'NewLocation/Note'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli search 'architecture'"
 ```
+
+**Result:** Returns a list of notes with "architecture" in their filename:
+```
+Notes matching 'architecture':
+- System Architecture
+- Projects/Backend/Architecture Decisions
+- Archive/Old Architecture
+```
+
+**Narrowing Search:**
+```bash
+# Search for more specific term
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli search 'API architecture'"
+```
+
+**Using Search Results:** Combine with print to read matching notes:
+```bash
+# First search
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'meeting'"
+
+# Then print specific note from results
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'Weekly Meeting Notes'"
+```
+
+---
+
+### Workflow 3: Read Note Contents
+
+**Use Case:** Retrieve the contents of an existing note for analysis, reference, or incorporation into other work.
+
+**Example:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'Weekly Meeting Notes'"
+```
+
+**Result:** Outputs the full markdown content of the note:
+```markdown
+# Weekly Meeting Notes
+
+## 2025-01-15
+
+### Attendees
+- Alice
+- Bob
+
+### Action Items
+- Complete API review
+- Schedule follow-up
+```
+
+**Capturing Content for Processing:**
+```bash
+# Capture note content to a variable
+content=$(ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'Project Requirements'" 2>/dev/null)
+
+# Use content in subsequent processing
+echo "$content" | grep "Priority:"
+```
+
+**Reading Note in Subfolder:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'Projects/Backend/API Spec'"
+```
+
+**Escaping Note:** For notes with special characters in the name:
+```bash
+# Note name: "FAQ's & Tips"
+note="FAQ's & Tips"
+escaped="${note//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print '${escaped}'"
+```
+
+---
+
+### Workflow 4: Create/Open Daily Note
+
+**Use Case:** Create or access today's daily note for journaling, task tracking, or daily standups.
+
+**Example:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli daily"
+```
+
+**Result:** Creates today's daily note if it doesn't exist, or confirms it exists. The note is created using the vault's configured daily notes format (typically `YYYY-MM-DD.md` in the daily notes folder).
+
+**Opening Daily Note in Obsidian GUI:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli daily --open"
+```
+
+**Result:** Creates (if needed) and opens the daily note in the Obsidian application.
+
+**Note:** The `--open` flag requires the Obsidian application to be running on the macOS host. Use without `--open` when only CLI access is needed.
+
+---
+
+### Workflow 5: Update Frontmatter Field
+
+**Use Case:** Modify metadata in a note's YAML frontmatter, such as status, tags, or custom properties.
+
+**Example:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-frontmatter 'Project Roadmap' --key status --value 'in-progress'"
+```
+
+**Result:** Updates or adds the `status` field in the note's frontmatter:
+```yaml
+---
+status: in-progress
+---
+# Project Roadmap
+...
+```
+
+**Setting Multiple Fields:** Run separate commands for each field:
+```bash
+# Set status
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-frontmatter 'Feature Spec' --key status --value 'review'"
+
+# Set priority
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-frontmatter 'Feature Spec' --key priority --value 'high'"
+
+# Set assignee
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-frontmatter 'Feature Spec' --key assignee --value 'alice'"
+```
+
+**Adding Tags via Frontmatter:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-frontmatter 'Meeting Notes' --key tags --value '[meeting, backend, q1]'"
+```
+
+**Escaping Note:** For values with special characters:
+```bash
+# Value containing quotes: "John's Team"
+value="John's Team"
+escaped_value="${value//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-frontmatter 'Team Doc' --key owner --value '${escaped_value}'"
+```
+
+---
+
+## Multi-Vault Usage
+
+Obsidian CLI supports multiple vaults. By default, commands operate on the configured default vault. You can target specific vaults or change the default as needed.
+
+### Default Vault Workflow (Primary Approach)
+
+Most commands work on the default vault without requiring any vault specification. This is the recommended approach when working primarily with one vault.
+
+**Check Current Default Vault:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print-default"
+```
+
+**Result:**
+```
+Default vault: Personal Notes
+Path: /Users/username/Documents/Obsidian/Personal Notes
+```
+
+**Commands Using Default Vault:**
+```bash
+# All of these use the default vault automatically
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create 'New Note'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'keyword'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'Existing Note'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli daily"
+```
+
+### Explicit Vault Targeting with --vault Flag
+
+When you need to access a vault other than the default, use the `--vault` flag.
+
+**List Available Vaults:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli list-vaults"
+```
+
+**Result:**
+```
+Available vaults:
+- Personal Notes (default)
+- Work Projects
+- Reference Library
+```
+
+**Create Note in Specific Vault:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Q1 Planning' --vault 'Work Projects' --content '# Q1 Planning\n\nObjectives...'"
+```
+
+**Search in Specific Vault:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli search 'architecture' --vault 'Work Projects'"
+```
+
+**Read Note from Specific Vault:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print 'API Documentation' --vault 'Reference Library'"
+```
+
+**Escaping Vault Names:** If the vault name contains special characters:
+```bash
+# Vault name: "John's Notes"
+vault="John's Notes"
+escaped_vault="${vault//\'/\'\\\'\'}"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli create 'Test Note' --vault '${escaped_vault}'"
+```
+
+### Changing Default Vault with set-default
+
+When you need to switch your primary working vault, use the `set-default` command.
+
+**Set New Default Vault:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli set-default 'Work Projects'"
+```
+
+**Result:**
+```
+Default vault set to: Work Projects
+```
+
+**Verify Change:**
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
+  "obsidian-cli print-default"
+```
+
+**Use Case Scenarios:**
+- **Project Context Switching:** When starting work on a project that uses a different vault, set it as default to avoid repeating `--vault` flags
+- **Personal vs Work:** Switch default between personal and work vaults based on current focus
+- **One-time Access:** Use `--vault` flag for quick access to another vault without changing the default
+
+### Multi-Vault Decision Guide
+
+| Scenario | Approach |
+|----------|----------|
+| 90% of work in one vault | Set as default, use `--vault` for exceptions |
+| Frequent vault switching | Use `--vault` flag explicitly |
+| Starting extended work in different vault | Use `set-default` to change default |
+| Quick lookup in another vault | Use `--vault` flag |
+| Scripting across multiple vaults | Always use explicit `--vault` flag |
 
 ## Error Handling
 
