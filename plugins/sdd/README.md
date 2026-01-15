@@ -199,6 +199,9 @@ After installation, restart Claude Code to activate the plugin.
 | `/sdd:create-tasks [TICKET_ID]` | Generate tasks from plan |
 | `/sdd:do-all-tasks [TICKET_ID]` | Execute all tasks systematically |
 | `/sdd:do-task [TASK_ID]` | Complete single task workflow |
+| `/sdd:pr [TICKET_ID]` | Create GitHub PR for completed ticket |
+| `/sdd:pr-comments [PR_NUMBER]` | Fetch and classify PR review comments |
+| `/sdd:fix-pr-feedback [PR_NUMBER]` | Critically evaluate and fix valid PR feedback |
 | `/sdd:recommend-agents [TICKET_ID]` | Recommend specialized agents for ticket |
 | `/sdd:assign-agents [TICKET_ID]` | Assign agents to phases and tasks |
 | `/sdd:update [TICKET_ID]` | Update ticket based on review findings |
@@ -474,6 +477,7 @@ plugins/sdd/
 │   ├── do-task.md
 │   ├── epics-status.md
 │   ├── extend.md
+│   ├── fix-pr-feedback.md
 │   ├── import-jira-ticket.md
 │   ├── plan-ticket.md
 │   ├── pr-comments.md
