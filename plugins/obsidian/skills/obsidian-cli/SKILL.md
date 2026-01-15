@@ -18,7 +18,7 @@ This skill enables Claude Code to interact with Obsidian vaults on the macOS hos
 - Create new notes with specified content and frontmatter
 - Search notes by filename or content patterns
 - Retrieve note content for analysis or modification
-- List and manage vaults
+- Manage vault defaults
 - Move notes between folders
 - Open notes in Obsidian (GUI)
 
@@ -81,6 +81,11 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print-d
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli <command> [arguments]"
 ```
 
+**Note on PATH:** Non-interactive SSH sessions may not load the full shell profile, so Homebrew's PATH may not be available. If `obsidian-cli` is not found, use the full path:
+```bash
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "/opt/homebrew/bin/obsidian-cli <command> [arguments]"
+```
+
 ### Pattern Components
 
 | Component | Value | Purpose |
@@ -96,14 +101,14 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli <comman
 # Create a note
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create 'My Note' --content 'Note content here'"
 
-# Search notes
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'keyword'"
+# Search note content (search by filename is interactive-only)
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search-content 'keyword'"
 
 # Print note content
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'My Note'"
 
-# List vaults
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
+# Check default vault
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print-default"
 ```
 
 ## Shell Escaping (CRITICAL)
@@ -226,37 +231,29 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 
 ---
 
-### Workflow 2: Search Notes by Name
+### Workflow 2: Search Note Content
 
-**Use Case:** Find notes matching a search term when you need to locate existing content or verify if a note exists.
+**Use Case:** Find notes containing specific text when you need to locate existing content or verify if information exists in the vault.
+
+**Important:** The `search` command (filename search) is interactive-only and cannot be used over SSH. Use `search-content` for programmatic searching.
 
 **Example:**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli search 'architecture'"
+  "obsidian-cli search-content 'architecture'"
 ```
 
-**Result:** Returns a list of notes with "architecture" in their filename:
-```
-Notes matching 'architecture':
-- System Architecture
-- Projects/Backend/Architecture Decisions
-- Archive/Old Architecture
-```
+**Result:** Returns notes containing "architecture" in their content, then opens an interactive selector. Over SSH, this will find matches but may not complete interactively.
 
-**Narrowing Search:**
+**Alternative - Direct File Search:**
+If you know the vault path, you can search files directly:
 ```bash
-# Search for more specific term
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli search 'API architecture'"
+  "grep -rl 'architecture' '/Users/username/Obsidian/VaultName'"
 ```
 
-**Using Search Results:** Combine with print to read matching notes:
+**Using Search Results:** Once you identify a note name, use print to read it:
 ```bash
-# First search
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'meeting'"
-
-# Then print specific note from results
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'Weekly Meeting Notes'"
 ```
 
@@ -413,7 +410,7 @@ Path: /Users/username/Documents/Obsidian/Personal Notes
 ```bash
 # All of these use the default vault automatically
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli create 'New Note'"
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'keyword'"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search-content 'keyword'"
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print 'Existing Note'"
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli daily"
 ```
@@ -422,18 +419,11 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli daily"
 
 When you need to access a vault other than the default, use the `--vault` flag.
 
-**List Available Vaults:**
+**Find Available Vaults:**
+Obsidian stores vault information in `~/Library/Application Support/obsidian/obsidian.json` on macOS:
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli list-vaults"
-```
-
-**Result:**
-```
-Available vaults:
-- Personal Notes (default)
-- Work Projects
-- Reference Library
+  "cat ~/Library/Application\ Support/obsidian/obsidian.json"
 ```
 
 **Create Note in Specific Vault:**
@@ -442,10 +432,10 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
   "obsidian-cli create 'Q1 Planning' --vault 'Work Projects' --content '# Q1 Planning\n\nObjectives...'"
 ```
 
-**Search in Specific Vault:**
+**Search Content in Specific Vault:**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli search 'architecture' --vault 'Work Projects'"
+  "obsidian-cli search-content 'architecture' --vault 'Work Projects'"
 ```
 
 **Read Note from Specific Vault:**
@@ -506,17 +496,16 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 Commands that require interactive input (fuzzy finders, prompts) do not work over SSH non-interactive sessions. The SSH connection from the devcontainer is non-interactive, meaning it cannot display or receive input from terminal UI elements.
 
 **Not Available Over SSH:**
-- `obsidian-cli search` (without pattern argument - launches interactive fuzzy finder)
-- `obsidian-cli search-content` (without pattern argument - launches interactive fuzzy finder)
+- `obsidian-cli search` - Always launches interactive fuzzy finder (does NOT accept a search pattern argument)
+- `obsidian-cli search-content` - Also interactive; while it accepts a pattern, it opens a fuzzy finder to select from matches
 - Interactive vault selection prompts
 - Any command that requires user confirmation prompts
 
 **Alternatives:**
-- Use `obsidian-cli search "pattern"` with an explicit search pattern instead of the interactive fuzzy finder
-- Use `obsidian-cli search-content "pattern"` with an explicit pattern for content search
+- Use `search-content "pattern"` to find matches (may partially work for finding matches, but selection is interactive)
+- Use direct file search with `grep` if you know the vault path
 - Use the `--vault "Name"` flag to target specific vaults explicitly
 - Configure a default vault with `set-default` to avoid vault selection prompts
-- Use `--yes` or similar confirmation flags where available to skip prompts
 
 **Why SSH Limits Interactivity:**
 SSH sessions from the devcontainer do not allocate a pseudo-terminal (PTY) by default, which is required for interactive TUI components like fuzzy finders. Adding `-t` to force PTY allocation does not resolve this since the container-side terminal cannot display the host's TUI.
@@ -634,11 +623,11 @@ Error: Please specify a vault or set a default vault
 **Likely Cause:** obsidian-cli requires a default vault to be configured when not using the `--vault` flag.
 
 **Resolution:**
-1. List available vaults:
+1. Find available vaults from Obsidian config:
    ```bash
-   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "cat ~/Library/Application\ Support/obsidian/obsidian.json"
    ```
-2. Set a default vault (run on host or via SSH):
+2. Set a default vault (use the vault name from the path):
    ```bash
    ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli set-default 'Your Vault Name'"
    ```
@@ -664,9 +653,9 @@ Error: Note 'NoteName' does not exist
 **Likely Cause:** The specified note does not exist in the vault, or the path/name is incorrect.
 
 **Resolution:**
-1. Search for the note to verify the exact name:
+1. Search for the note using grep on the vault directory:
    ```bash
-   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli search 'partial-name'"
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "find /path/to/vault -name '*partial-name*' -type f"
    ```
 2. Check if the note is in a subfolder (include the path):
    ```bash
@@ -695,11 +684,11 @@ Error: Vault 'VaultName' does not exist
 **Likely Cause:** The specified vault name in the `--vault` flag does not match any registered Obsidian vault.
 
 **Resolution:**
-1. List all available vaults:
+1. Find available vaults from Obsidian config:
    ```bash
-   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
+   ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "cat ~/Library/Application\ Support/obsidian/obsidian.json"
    ```
-2. Use the exact vault name as shown in the list (case-sensitive)
+2. Use the exact vault name (the folder name from the path, case-sensitive)
 3. If the vault was recently created, ensure Obsidian has been opened to register it
 4. Check for typos or extra spaces in the vault name
 
@@ -799,7 +788,7 @@ This section organizes common issues by symptom for quick diagnosis.
 - Cause: Different shell environment or PATH issues
 - Solution: Use full path to obsidian-cli:
   ```bash
-  ssh ... "/opt/homebrew/bin/obsidian-cli list-vaults"
+  ssh ... "/opt/homebrew/bin/obsidian-cli print-default"
   ```
 
 **Symptom: Note content appears garbled or truncated**
@@ -827,11 +816,11 @@ This section organizes common issues by symptom for quick diagnosis.
   ssh ... "obsidian-cli print-default"
   ```
 
-**Symptom: Vault shows in Obsidian but not in `list-vaults`**
-- Cause: obsidian-cli may cache vault list
-- Solution: Check obsidian-cli configuration location and refresh:
+**Symptom: Vault shows in Obsidian but obsidian-cli can't find it**
+- Cause: obsidian-cli uses the vault name (folder name), not the full path
+- Solution: Check Obsidian's config for exact vault names:
   ```bash
-  ssh ... "obsidian-cli list-vaults --refresh"  # if supported
+  ssh ... "cat ~/Library/Application\ Support/obsidian/obsidian.json"
   ```
 
 ### Quick Diagnostic Commands
@@ -848,14 +837,14 @@ ssh -o BatchMode=yes -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal "echo
 # 3. Verify SSH key exists and has correct permissions
 ls -la ~/.ssh/id_ed25519
 
-# 4. Check obsidian-cli is installed
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "which obsidian-cli && obsidian-cli --version"
+# 4. Check obsidian-cli is installed (use full path if 'which' fails)
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "which obsidian-cli || /opt/homebrew/bin/obsidian-cli --version"
 
 # 5. Verify default vault
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli print-default"
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "/opt/homebrew/bin/obsidian-cli print-default"
 
-# 6. List available vaults
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli list-vaults"
+# 6. Find available vaults from Obsidian config
+ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "cat ~/Library/Application\ Support/obsidian/obsidian.json"
 ```
 
 ## Reference
