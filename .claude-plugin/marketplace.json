@@ -26,6 +26,11 @@
       "description": "Semantic code search using crewchief-maproom CLI"
     },
     {
+      "name": "obsidian",
+      "source": "./plugins/obsidian",
+      "description": "Obsidian vault management using obsidian-cli"
+    },
+    {
       "name": "worktree",
       "source": "./plugins/worktree",
       "description": "Git worktree management using crewchief CLI"
