@@ -1395,6 +1395,108 @@ MOCK_EOF
 }
 
 # =============================================================================
+# PRIORITY 6 TESTS (Autogate Error Logging - SDDLOOP-3.4007)
+# =============================================================================
+
+#######################################
+# Test 46: Invalid .autogate.json error visible in quiet mode
+# Validates that parse errors are logged with log_error (visible in quiet mode)
+#######################################
+test_autogate_invalid_json_quiet_mode() {
+    echo "--- Test: Invalid .autogate.json error visible in quiet mode ---"
+
+    setup_test_env
+    reset_counters
+
+    # Create ticket structure
+    mkdir -p "$TEST_TMP_DIR/test-repo/_SDD/tickets/AUTOGATE_test-ticket/tasks"
+    echo "# Autogate Test" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/AUTOGATE_test-ticket/README.md"
+
+    # Create INVALID .autogate.json (malformed JSON)
+    echo "{invalid json" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/AUTOGATE_test-ticket/.autogate.json"
+
+    # Create mock that returns a task for the AUTOGATE ticket
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+COUNTER_FILE="$TEST_TMP_DIR/autogate_counter"
+if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
+COUNTER=\$(cat "\$COUNTER_FILE")
+echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
+if [[ \$COUNTER -lt 1 ]]; then
+    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Autogate test"}}'
+else
+    echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+fi
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    # Run in QUIET mode - only errors should be visible
+    output=$(bash "$SDD_LOOP" --dry-run --quiet --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Invalid autogate exits with code 0 (graceful degradation)"
+    # The key assertion: ERROR message should appear even in quiet mode
+    assert_contains "$output" "[ERROR]" "ERROR level log is visible in quiet mode"
+    assert_contains "$output" "Failed to parse .autogate.json" "Shows parse error message"
+    assert_contains "$output" "invalid JSON format" "Error specifies invalid JSON format"
+    assert_contains "$output" "Phase boundary checking disabled" "Error states phase boundary is disabled"
+    assert_contains "$output" "loop will continue indefinitely" "Error states loop will continue"
+    # Verify quiet mode is actually working - INFO messages should be suppressed
+    assert_not_contains "$output" "[INFO]" "INFO messages are suppressed in quiet mode"
+}
+
+#######################################
+# Test 47: Valid .autogate.json no error logged
+# Validates that valid .autogate.json does not produce error messages
+#######################################
+test_autogate_valid_json_no_error() {
+    echo "--- Test: Valid .autogate.json no error logged ---"
+
+    setup_test_env
+    reset_counters
+
+    # Create ticket structure
+    mkdir -p "$TEST_TMP_DIR/test-repo/_SDD/tickets/VALIDAUTO_test-ticket/tasks"
+    echo "# Valid Autogate Test" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/VALIDAUTO_test-ticket/README.md"
+
+    # Create VALID .autogate.json
+    cat > "$TEST_TMP_DIR/test-repo/_SDD/tickets/VALIDAUTO_test-ticket/.autogate.json" << 'EOF'
+{
+    "ready": true,
+    "agent_ready": true,
+    "stop_at_phase": 5
+}
+EOF
+
+    # Create mock that returns a phase 1 task (should pass phase boundary)
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+COUNTER_FILE="$TEST_TMP_DIR/validauto_counter"
+if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
+COUNTER=\$(cat "\$COUNTER_FILE")
+echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
+if [[ \$COUNTER -lt 1 ]]; then
+    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Valid autogate test"}}'
+else
+    echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+fi
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Valid autogate exits with code 0"
+    # Should NOT contain the parse error
+    assert_not_contains "$output" "Failed to parse .autogate.json" "No parse error for valid JSON"
+    assert_not_contains "$output" "Phase boundary checking disabled" "No disabled message for valid JSON"
+    # Should still process the task
+    assert_contains "$output" "VALIDAUTO.1001" "Task was processed"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -1549,6 +1651,19 @@ main() {
     test_version_mismatch
     echo ""
     test_version_missing
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 6 TESTS (Autogate Error Logging - SDDLOOP-3.4007)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 6 Tests (Autogate Error Logging)"
+    echo "====================================="
+    echo ""
+
+    test_autogate_invalid_json_quiet_mode
+    echo ""
+    test_autogate_valid_json_no_error
     echo ""
 
     # Summary

@@ -664,11 +664,12 @@ check_phase_boundary() {
 
     # Parse JSON and extract stop_at_phase
     # Use jq with error suppression and null handling
-    stop_at_phase=$(jq -r '.stop_at_phase // empty' "$autogate_file" 2>/dev/null)
-    local jq_exit_code=$?
+    # Note: Use || jq_exit_code=$? pattern to capture exit code without triggering set -e
+    local jq_exit_code=0
+    stop_at_phase=$(jq -r '.stop_at_phase // empty' "$autogate_file" 2>/dev/null) || jq_exit_code=$?
 
     if [[ $jq_exit_code -ne 0 ]]; then
-        log_warn "check_phase_boundary: Failed to parse .autogate.json at $autogate_file (invalid JSON)"
+        log_error "Failed to parse .autogate.json at $autogate_file (invalid JSON format). Phase boundary checking disabled - loop will continue indefinitely."
         return 0  # Continue - no limit
     fi
 
