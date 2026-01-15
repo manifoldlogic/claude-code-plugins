@@ -2,6 +2,10 @@
   "env": {
     "SDD_ROOT_DIR": "/workspace/repos/claude-code-plugins/_SDD"
   },
+  "statusLine": {
+    "type": "command",
+    "command": "jq -r '.cwd'"
+  },
   "permissions": {
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
