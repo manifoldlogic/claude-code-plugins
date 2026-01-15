@@ -199,6 +199,162 @@ scan_task() {
 }
 
 #######################################
+# Read autogate configuration from .autogate.json file
+# Arguments:
+#   $1 - Path to .autogate.json file
+# Outputs:
+#   JSON object with autogate configuration to stdout
+# Notes:
+#   This is a stub implementation returning default values.
+#   Full implementation will be added in SDDLOOP-1.2001.
+#######################################
+read_autogate() {
+    local autogate_file="$1"
+
+    # Stub implementation: return default values
+    # Will be fully implemented in SDDLOOP-1.2001
+    debug_log "read_autogate (stub): $autogate_file"
+    echo '{"ready": true, "agent_ready": false, "priority": null, "stop_at_phase": null}'
+}
+
+#######################################
+# Scan a ticket directory and aggregate task status
+# Arguments:
+#   $1 - Path to ticket directory
+# Outputs:
+#   JSON object with ticket status and task summaries to stdout
+# Returns:
+#   0 on success
+#   1 if directory does not exist
+#######################################
+scan_ticket() {
+    local ticket_dir="$1"
+
+    # Validate directory exists
+    if [[ ! -d "$ticket_dir" ]]; then
+        debug_log "Ticket directory not found: $ticket_dir"
+        printf '{\n'
+        printf '  "ticket_id": "",\n'
+        printf '  "name": "",\n'
+        printf '  "path": "%s",\n' "$(json_escape "$ticket_dir")"
+        printf '  "autogate": {"ready": true, "agent_ready": false, "priority": null, "stop_at_phase": null},\n'
+        printf '  "tasks": [],\n'
+        printf '  "summary": {"total_tasks": 0, "pending": 0, "completed": 0, "tested": 0, "verified": 0},\n'
+        printf '  "error": "Directory not found"\n'
+        printf '}'
+        return 1
+    fi
+
+    # Extract ticket ID from directory name
+    local ticket_id
+    ticket_id=$(basename "$ticket_dir")
+    debug_log "Scanning ticket: $ticket_dir (ID: $ticket_id)"
+
+    # Extract ticket name from README.md first line (# Title) or fallback to directory name
+    local ticket_name
+    ticket_name=$(head -n 1 "$ticket_dir/README.md" 2>/dev/null | sed 's/^#[[:space:]]*//')
+    if [[ -z "$ticket_name" ]]; then
+        ticket_name="$ticket_id"
+        debug_log "  No README.md title found, using directory name: $ticket_name"
+    else
+        debug_log "  Ticket name from README: $ticket_name"
+    fi
+
+    # Read autogate configuration (stub returns defaults)
+    local autogate_json
+    local autogate_file="$ticket_dir/.autogate.json"
+    if [[ -f "$autogate_file" ]]; then
+        autogate_json=$(read_autogate "$autogate_file")
+        debug_log "  Read autogate from: $autogate_file"
+    else
+        autogate_json='{"ready": true, "agent_ready": false, "priority": null, "stop_at_phase": null}'
+        debug_log "  No .autogate.json, using defaults"
+    fi
+
+    # Initialize counters
+    local total_tasks=0
+    local pending=0
+    local completed=0
+    local tested=0
+    local verified=0
+
+    # Collect task JSON objects
+    local tasks_json=""
+    local first_task=true
+    local tasks_dir="$ticket_dir/tasks"
+
+    # Scan tasks if tasks/ directory exists
+    if [[ -d "$tasks_dir" ]]; then
+        debug_log "  Scanning tasks directory: $tasks_dir"
+
+        # Find all .md files in tasks directory (not recursive)
+        while IFS= read -r -d '' task_file; do
+            debug_log "    Found task file: $task_file"
+
+            # Get task status by calling scan_task
+            local task_json
+            task_json=$(scan_task "$task_file")
+
+            # Add comma separator between tasks
+            if [[ "$first_task" == "true" ]]; then
+                first_task=false
+            else
+                tasks_json+=","
+            fi
+            tasks_json+=$'\n'"      $task_json"
+
+            # Extract checkbox states for aggregation
+            local task_completed tests_pass task_verified
+            task_completed=$(echo "$task_json" | grep -o '"task_completed": [a-z]*' | grep -o 'true\|false')
+            tests_pass=$(echo "$task_json" | grep -o '"tests_pass": [a-z]*' | grep -o 'true\|false')
+            task_verified=$(echo "$task_json" | grep -o '"verified": [a-z]*' | grep -o 'true\|false')
+
+            # Increment total
+            total_tasks=$((total_tasks + 1))
+
+            # Aggregate logic:
+            # - pending: !task_completed
+            # - completed: task_completed && !tests_pass
+            # - tested: tests_pass && !verified
+            # - verified: verified
+            if [[ "$task_verified" == "true" ]]; then
+                verified=$((verified + 1))
+            elif [[ "$tests_pass" == "true" ]]; then
+                tested=$((tested + 1))
+            elif [[ "$task_completed" == "true" ]]; then
+                completed=$((completed + 1))
+            else
+                pending=$((pending + 1))
+            fi
+        done < <(find "$tasks_dir" -maxdepth 1 -type f -name "*.md" -print0 2>/dev/null | sort -z)
+    else
+        debug_log "  No tasks/ directory found"
+    fi
+
+    # Output JSON object
+    printf '{\n'
+    printf '  "ticket_id": "%s",\n' "$(json_escape "$ticket_id")"
+    printf '  "name": "%s",\n' "$(json_escape "$ticket_name")"
+    printf '  "path": "%s",\n' "$(json_escape "$ticket_dir")"
+    printf '  "autogate": %s,\n' "$autogate_json"
+    printf '  "tasks": ['
+    if [[ -n "$tasks_json" ]]; then
+        printf '%s\n' "$tasks_json"
+        printf '  ],\n'
+    else
+        printf '],\n'
+    fi
+    printf '  "summary": {\n'
+    printf '    "total_tasks": %d,\n' "$total_tasks"
+    printf '    "pending": %d,\n' "$pending"
+    printf '    "completed": %d,\n' "$completed"
+    printf '    "tested": %d,\n' "$tested"
+    printf '    "verified": %d\n' "$verified"
+    printf '  }\n'
+    printf '}'
+}
+
+#######################################
 # Escape string for safe JSON output
 # Arguments:
 #   $1 - String to escape

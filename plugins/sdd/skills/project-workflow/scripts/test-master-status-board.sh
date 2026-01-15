@@ -823,6 +823,501 @@ EOF
 }
 
 #######################################
+# Test: read_autogate stub returns defaults
+#######################################
+test_read_autogate_stub() {
+    echo "--- Test: read_autogate stub returns defaults ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a fake autogate file (content doesn't matter for stub)
+    local autogate_file="$TEST_TMP_DIR/.autogate.json"
+    echo '{"ready": false}' > "$autogate_file"
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    # Stub should always return default values regardless of file content
+    assert_contains "$output" '"ready": true' "Stub returns ready: true"
+    assert_contains "$output" '"agent_ready": false' "Stub returns agent_ready: false"
+    assert_contains "$output" '"priority": null' "Stub returns priority: null"
+    assert_contains "$output" '"stop_at_phase": null' "Stub returns stop_at_phase: null"
+}
+
+#######################################
+# Test: scan_ticket with multiple tasks in various states
+#######################################
+test_scan_ticket_multiple_tasks() {
+    echo "--- Test: scan_ticket with multiple tasks ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket directory structure
+    local ticket_dir="$TEST_TMP_DIR/PROJ-1_test-ticket"
+    mkdir -p "$ticket_dir/tasks"
+
+    # Create README.md with title
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Test Ticket Title
+
+This is a test ticket.
+EOF
+
+    # Create tasks with various states
+    # Task 1: pending (all unchecked)
+    cat > "$ticket_dir/tasks/PROJ-1.1001_pending-task.md" << 'EOF'
+# Task: [PROJ-1.1001]: Pending Task
+
+## Status
+- [ ] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # Task 2: completed (task completed, not tested)
+    cat > "$ticket_dir/tasks/PROJ-1.1002_completed-task.md" << 'EOF'
+# Task: [PROJ-1.1002]: Completed Task
+
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # Task 3: tested (task completed and tests pass, not verified)
+    cat > "$ticket_dir/tasks/PROJ-1.1003_tested-task.md" << 'EOF'
+# Task: [PROJ-1.1003]: Tested Task
+
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # Task 4: verified (all checked)
+    cat > "$ticket_dir/tasks/PROJ-1.1004_verified-task.md" << 'EOF'
+# Task: [PROJ-1.1004]: Verified Task
+
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_ticket exits with code 0"
+    assert_contains "$output" '"ticket_id": "PROJ-1_test-ticket"' "Ticket ID extracted from directory"
+    assert_contains "$output" '"name": "Test Ticket Title"' "Ticket name extracted from README"
+    assert_contains "$output" '"total_tasks": 4' "Total tasks is 4"
+    assert_contains "$output" '"pending": 1' "Pending count is 1"
+    assert_contains "$output" '"completed": 1' "Completed count is 1"
+    assert_contains "$output" '"tested": 1' "Tested count is 1"
+    assert_contains "$output" '"verified": 1' "Verified count is 1"
+
+    # Verify tasks array contains all tasks
+    assert_contains "$output" '"task_id": "PROJ-1.1001"' "Task 1 in output"
+    assert_contains "$output" '"task_id": "PROJ-1.1002"' "Task 2 in output"
+    assert_contains "$output" '"task_id": "PROJ-1.1003"' "Task 3 in output"
+    assert_contains "$output" '"task_id": "PROJ-1.1004"' "Task 4 in output"
+}
+
+#######################################
+# Test: scan_ticket with no tasks/ directory
+#######################################
+test_scan_ticket_no_tasks_dir() {
+    echo "--- Test: scan_ticket with no tasks/ directory ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket directory without tasks/
+    local ticket_dir="$TEST_TMP_DIR/PROJ-2_no-tasks"
+    mkdir -p "$ticket_dir"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Ticket Without Tasks
+
+No tasks subdirectory exists.
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_ticket no tasks dir exits with code 0"
+    assert_contains "$output" '"ticket_id": "PROJ-2_no-tasks"' "Ticket ID present"
+    assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
+    assert_contains "$output" '"pending": 0' "Pending is 0"
+    assert_contains "$output" '"completed": 0' "Completed is 0"
+    assert_contains "$output" '"tested": 0' "Tested is 0"
+    assert_contains "$output" '"verified": 0' "Verified is 0"
+    assert_contains "$output" '"tasks": []' "Tasks array is empty"
+}
+
+#######################################
+# Test: scan_ticket with empty tasks/ directory
+#######################################
+test_scan_ticket_empty_tasks_dir() {
+    echo "--- Test: scan_ticket with empty tasks/ directory ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket directory with empty tasks/
+    local ticket_dir="$TEST_TMP_DIR/PROJ-3_empty-tasks"
+    mkdir -p "$ticket_dir/tasks"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Ticket With Empty Tasks
+
+Tasks directory exists but is empty.
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_ticket empty tasks dir exits with code 0"
+    assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
+    assert_contains "$output" '"tasks": []' "Tasks array is empty"
+}
+
+#######################################
+# Test: scan_ticket with missing README.md (fallback to directory name)
+#######################################
+test_scan_ticket_missing_readme() {
+    echo "--- Test: scan_ticket with missing README.md ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket directory without README.md
+    local ticket_dir="$TEST_TMP_DIR/PROJ-4_missing-readme"
+    mkdir -p "$ticket_dir/tasks"
+
+    # Create one task
+    cat > "$ticket_dir/tasks/PROJ-4.1001_task.md" << 'EOF'
+# Task: [PROJ-4.1001]: A Task
+
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_ticket missing README exits with code 0"
+    # Name should fallback to directory name
+    assert_contains "$output" '"name": "PROJ-4_missing-readme"' "Name fallback to directory name"
+    assert_contains "$output" '"total_tasks": 1' "Total tasks is 1"
+}
+
+#######################################
+# Test: scan_ticket with .autogate.json present
+#######################################
+test_scan_ticket_with_autogate() {
+    echo "--- Test: scan_ticket with .autogate.json present ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket directory with .autogate.json
+    local ticket_dir="$TEST_TMP_DIR/PROJ-5_with-autogate"
+    mkdir -p "$ticket_dir/tasks"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Ticket With Autogate
+
+Has .autogate.json file.
+EOF
+
+    # Create .autogate.json (stub ignores content but file presence is tested)
+    cat > "$ticket_dir/.autogate.json" << 'EOF'
+{
+    "ready": false,
+    "agent_ready": true,
+    "priority": 1,
+    "stop_at_phase": "test"
+}
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_ticket with autogate exits with code 0"
+    # Stub should still return defaults (full implementation in SDDLOOP-1.2001)
+    assert_contains "$output" '"autogate":' "Autogate field present"
+    assert_contains "$output" '"ready": true' "Autogate ready is true (stub default)"
+}
+
+#######################################
+# Test: scan_ticket with missing ticket directory
+#######################################
+test_scan_ticket_missing_dir() {
+    echo "--- Test: scan_ticket with missing directory ---"
+
+    source "$MASTER_SCRIPT"
+
+    local ticket_dir="$TEST_TMP_DIR/nonexistent/PROJ-99_missing"
+    local output
+    local exit_code=0
+    output=$(scan_ticket "$ticket_dir") || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "scan_ticket missing dir exits with code 1"
+    assert_contains "$output" '"error": "Directory not found"' "Error message present"
+    assert_contains "$output" '"ticket_id": ""' "Empty ticket_id"
+    assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
+}
+
+#######################################
+# Test: scan_ticket output is valid JSON
+#######################################
+test_scan_ticket_valid_json() {
+    echo "--- Test: scan_ticket output is valid JSON ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket with multiple tasks
+    local ticket_dir="$TEST_TMP_DIR/PROJ-6_json-test"
+    mkdir -p "$ticket_dir/tasks"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# JSON Validation Ticket
+EOF
+
+    cat > "$ticket_dir/tasks/PROJ-6.1001_task.md" << 'EOF'
+# Task: [PROJ-6.1001]: Task 1
+
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    cat > "$ticket_dir/tasks/PROJ-6.1002_task.md" << 'EOF'
+# Task: [PROJ-6.1002]: Task 2
+
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+
+    # Try to parse with jq if available
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "scan_ticket output is valid JSON" "pass"
+        else
+            log_result "scan_ticket output is valid JSON" "fail" "JSON parsing failed"
+            echo "Output was:" >&2
+            echo "$output" >&2
+        fi
+    else
+        # Fallback: basic structure check
+        if [[ "$output" == "{"* && "$output" == *"}" ]]; then
+            log_result "scan_ticket output is valid JSON (basic check)" "pass"
+        else
+            log_result "scan_ticket output is valid JSON (basic check)" "fail"
+        fi
+    fi
+}
+
+#######################################
+# Test: scan_ticket aggregation logic correctness
+#######################################
+test_scan_ticket_aggregation_logic() {
+    echo "--- Test: scan_ticket aggregation logic ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket with 5 tasks to verify aggregation
+    local ticket_dir="$TEST_TMP_DIR/PROJ-7_aggregation"
+    mkdir -p "$ticket_dir/tasks"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Aggregation Test
+EOF
+
+    # 2 pending tasks
+    cat > "$ticket_dir/tasks/PROJ-7.1001_pending1.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    cat > "$ticket_dir/tasks/PROJ-7.1002_pending2.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # 1 completed task
+    cat > "$ticket_dir/tasks/PROJ-7.1003_completed.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # 1 tested task
+    cat > "$ticket_dir/tasks/PROJ-7.1004_tested.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # 1 verified task
+    cat > "$ticket_dir/tasks/PROJ-7.1005_verified.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+
+    assert_contains "$output" '"total_tasks": 5' "Total tasks is 5"
+    assert_contains "$output" '"pending": 2' "Pending is 2"
+    assert_contains "$output" '"completed": 1' "Completed is 1"
+    assert_contains "$output" '"tested": 1' "Tested is 1"
+    assert_contains "$output" '"verified": 1' "Verified is 1"
+}
+
+#######################################
+# Test: scan_ticket ignores non-.md files in tasks/
+#######################################
+test_scan_ticket_ignores_non_md_files() {
+    echo "--- Test: scan_ticket ignores non-.md files ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket with mixed file types
+    local ticket_dir="$TEST_TMP_DIR/PROJ-8_mixed-files"
+    mkdir -p "$ticket_dir/tasks"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Mixed Files Test
+EOF
+
+    # One real task file
+    cat > "$ticket_dir/tasks/PROJ-8.1001_task.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # Non-.md files that should be ignored
+    echo "some text" > "$ticket_dir/tasks/notes.txt"
+    echo '{"key": "value"}' > "$ticket_dir/tasks/data.json"
+    mkdir -p "$ticket_dir/tasks/subdir"
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+
+    # Should only count the one .md file
+    assert_contains "$output" '"total_tasks": 1' "Only counts .md files"
+    assert_contains "$output" '"completed": 1' "Only one completed task"
+}
+
+#######################################
+# Test: scan_ticket with README that has no heading
+#######################################
+test_scan_ticket_readme_no_heading() {
+    echo "--- Test: scan_ticket README with no heading ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket with README that has no # heading
+    local ticket_dir="$TEST_TMP_DIR/PROJ-9_no-heading"
+    mkdir -p "$ticket_dir"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+This README has no markdown heading.
+Just plain text on the first line.
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_ticket no heading exits with code 0"
+    # Should fallback to directory name since first line doesn't start with #
+    assert_contains "$output" '"name": "This README has no markdown heading."' "Uses first line as name when no heading"
+}
+
+#######################################
+# Test: scan_ticket with all verified tasks
+#######################################
+test_scan_ticket_all_verified() {
+    echo "--- Test: scan_ticket with all verified tasks ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create ticket with all verified tasks
+    local ticket_dir="$TEST_TMP_DIR/PROJ-10_all-verified"
+    mkdir -p "$ticket_dir/tasks"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# All Verified Ticket
+EOF
+
+    cat > "$ticket_dir/tasks/PROJ-10.1001_v1.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    cat > "$ticket_dir/tasks/PROJ-10.1002_v2.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+
+    assert_contains "$output" '"total_tasks": 2' "Total tasks is 2"
+    assert_contains "$output" '"pending": 0' "Pending is 0"
+    assert_contains "$output" '"completed": 0' "Completed is 0"
+    assert_contains "$output" '"tested": 0' "Tested is 0"
+    assert_contains "$output" '"verified": 2' "Verified is 2"
+}
+
+#######################################
+# Test: scan_ticket path in output
+#######################################
+test_scan_ticket_path_in_output() {
+    echo "--- Test: scan_ticket includes path in output ---"
+
+    source "$MASTER_SCRIPT"
+
+    local ticket_dir="$TEST_TMP_DIR/PROJ-11_path-test"
+    mkdir -p "$ticket_dir"
+
+    cat > "$ticket_dir/README.md" << 'EOF'
+# Path Test
+EOF
+
+    local output
+    output=$(scan_ticket "$ticket_dir")
+
+    assert_contains "$output" "\"path\": \"$ticket_dir\"" "Output contains ticket path"
+}
+
+#######################################
 # Main test runner
 #######################################
 main() {
@@ -907,6 +1402,38 @@ main() {
     test_scan_task_mixed_case
     echo ""
     test_scan_task_file_path
+    echo ""
+
+    # Run scan_ticket tests
+    echo "====================================="
+    echo "scan_ticket() Function Tests"
+    echo "====================================="
+    echo ""
+    test_read_autogate_stub
+    echo ""
+    test_scan_ticket_multiple_tasks
+    echo ""
+    test_scan_ticket_no_tasks_dir
+    echo ""
+    test_scan_ticket_empty_tasks_dir
+    echo ""
+    test_scan_ticket_missing_readme
+    echo ""
+    test_scan_ticket_with_autogate
+    echo ""
+    test_scan_ticket_missing_dir
+    echo ""
+    test_scan_ticket_valid_json
+    echo ""
+    test_scan_ticket_aggregation_logic
+    echo ""
+    test_scan_ticket_ignores_non_md_files
+    echo ""
+    test_scan_ticket_readme_no_heading
+    echo ""
+    test_scan_ticket_all_verified
+    echo ""
+    test_scan_ticket_path_in_output
     echo ""
 
     # Summary
