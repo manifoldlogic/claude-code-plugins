@@ -905,6 +905,212 @@ MOCK_EOF
 }
 
 # =============================================================================
+# PRIORITY 3 TESTS (Numeric Argument Validation - SDDLOOP-3.4002)
+# =============================================================================
+
+#######################################
+# Test 24: --max-iterations with valid positive integer
+#######################################
+test_max_iterations_valid() {
+    echo "--- Test: --max-iterations with valid value ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board_with_counter 10
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Valid --max-iterations exits with code 1 (limit reached)"
+    assert_contains "$output" "/5" "Max iterations value 5 is applied"
+}
+
+#######################################
+# Test 25: --max-iterations with zero value
+#######################################
+test_max_iterations_zero() {
+    echo "--- Test: --max-iterations with zero value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-iterations 0 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Zero --max-iterations exits with code 2"
+    assert_contains "$output" "positive integer greater than zero" "Shows zero error message"
+    assert_contains "$output" "got: 0" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 26: --max-iterations with negative value
+#######################################
+test_max_iterations_negative() {
+    echo "--- Test: --max-iterations with negative value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-iterations -5 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Negative --max-iterations exits with code 2"
+    assert_contains "$output" "positive integer" "Shows negative error message"
+    assert_contains "$output" "got:" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 27: --max-iterations with non-numeric value
+#######################################
+test_max_iterations_non_numeric() {
+    echo "--- Test: --max-iterations with non-numeric value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-iterations abc 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Non-numeric --max-iterations exits with code 2"
+    assert_contains "$output" "positive integer" "Shows non-numeric error message"
+    assert_contains "$output" "abc" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 28: --max-iterations with decimal value
+#######################################
+test_max_iterations_decimal() {
+    echo "--- Test: --max-iterations with decimal value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-iterations 3.5 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Decimal --max-iterations exits with code 2"
+    assert_contains "$output" "positive integer" "Shows decimal error message"
+    assert_contains "$output" "3.5" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 29: --max-errors with zero value
+#######################################
+test_max_errors_zero() {
+    echo "--- Test: --max-errors with zero value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-errors 0 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Zero --max-errors exits with code 2"
+    assert_contains "$output" "positive integer greater than zero" "Shows zero error message"
+    assert_contains "$output" "got: 0" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 30: --max-errors with non-numeric value
+#######################################
+test_max_errors_non_numeric() {
+    echo "--- Test: --max-errors with non-numeric value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-errors xyz 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Non-numeric --max-errors exits with code 2"
+    assert_contains "$output" "positive integer" "Shows non-numeric error message"
+    assert_contains "$output" "xyz" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 31: --timeout with zero value
+#######################################
+test_timeout_zero() {
+    echo "--- Test: --timeout with zero value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --timeout 0 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Zero --timeout exits with code 2"
+    assert_contains "$output" "positive integer greater than zero" "Shows zero error message"
+    assert_contains "$output" "got: 0" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 32: --timeout with non-numeric value
+#######################################
+test_timeout_non_numeric() {
+    echo "--- Test: --timeout with non-numeric value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --timeout 10s 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Non-numeric --timeout exits with code 2"
+    assert_contains "$output" "positive integer" "Shows non-numeric error message"
+    assert_contains "$output" "10s" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 33: --poll-interval with valid zero value (allowed)
+#######################################
+test_poll_interval_zero() {
+    echo "--- Test: --poll-interval with zero value (allowed) ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --poll-interval 0 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Zero --poll-interval exits with code 0 (zero is allowed)"
+    assert_not_contains "$output" "requires a" "No validation error for zero poll-interval"
+}
+
+#######################################
+# Test 34: --poll-interval with non-numeric value
+#######################################
+test_poll_interval_non_numeric() {
+    echo "--- Test: --poll-interval with non-numeric value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --poll-interval "5sec" 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Non-numeric --poll-interval exits with code 2"
+    assert_contains "$output" "non-negative integer" "Shows non-numeric error message"
+    assert_contains "$output" "5sec" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 35: --poll-interval with negative value
+#######################################
+test_poll_interval_negative() {
+    echo "--- Test: --poll-interval with negative value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --poll-interval -10 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Negative --poll-interval exits with code 2"
+    assert_contains "$output" "non-negative integer" "Shows negative error message"
+    assert_contains "$output" "-10" "Error message includes the invalid value"
+}
+
+#######################################
+# Test 36: --max-iterations missing value
+#######################################
+test_max_iterations_missing_value() {
+    echo "--- Test: --max-iterations missing value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --max-iterations 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Missing --max-iterations value exits with code 2"
+    assert_contains "$output" "requires a value" "Shows missing value error message"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -988,6 +1194,41 @@ main() {
     test_iteration_count_output
     echo ""
     test_tasks_completed_counter
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 3 TESTS (Numeric Argument Validation - SDDLOOP-3.4002)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 3 Tests (Numeric Validation)"
+    echo "====================================="
+    echo ""
+
+    test_max_iterations_valid
+    echo ""
+    test_max_iterations_zero
+    echo ""
+    test_max_iterations_negative
+    echo ""
+    test_max_iterations_non_numeric
+    echo ""
+    test_max_iterations_decimal
+    echo ""
+    test_max_errors_zero
+    echo ""
+    test_max_errors_non_numeric
+    echo ""
+    test_timeout_zero
+    echo ""
+    test_timeout_non_numeric
+    echo ""
+    test_poll_interval_zero
+    echo ""
+    test_poll_interval_non_numeric
+    echo ""
+    test_poll_interval_negative
+    echo ""
+    test_max_iterations_missing_value
     echo ""
 
     # Summary

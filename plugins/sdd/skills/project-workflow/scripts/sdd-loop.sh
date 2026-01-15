@@ -1001,11 +1001,11 @@ main() {
                     exit 2
                 fi
                 if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    log_error "Option --max-iterations requires a numeric value"
+                    log_error "Option --max-iterations requires a positive integer (got: '$2')"
                     exit 2
                 fi
-                if [[ "$2" -le 0 ]]; then
-                    log_error "Option --max-iterations requires a positive integer (got: $2)"
+                if [[ "$2" -eq 0 ]]; then
+                    log_error "Option --max-iterations requires a positive integer greater than zero (got: $2)"
                     exit 2
                 fi
                 SDD_LOOP_MAX_ITERATIONS="$2"
@@ -1017,11 +1017,11 @@ main() {
                     exit 2
                 fi
                 if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    log_error "Option --max-errors requires a numeric value"
+                    log_error "Option --max-errors requires a positive integer (got: '$2')"
                     exit 2
                 fi
-                if [[ "$2" -le 0 ]]; then
-                    log_error "Option --max-errors requires a positive integer (got: $2)"
+                if [[ "$2" -eq 0 ]]; then
+                    log_error "Option --max-errors requires a positive integer greater than zero (got: $2)"
                     exit 2
                 fi
                 SDD_LOOP_MAX_ERRORS="$2"
@@ -1033,11 +1033,11 @@ main() {
                     exit 2
                 fi
                 if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    log_error "Option --timeout requires a numeric value"
+                    log_error "Option --timeout requires a positive integer (got: '$2')"
                     exit 2
                 fi
-                if [[ "$2" -le 0 ]]; then
-                    log_error "Option --timeout requires a positive integer (got: $2)"
+                if [[ "$2" -eq 0 ]]; then
+                    log_error "Option --timeout requires a positive integer greater than zero (got: $2)"
                     exit 2
                 fi
                 SDD_LOOP_TIMEOUT="$2"
@@ -1049,7 +1049,7 @@ main() {
                     exit 2
                 fi
                 if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    log_error "Option --poll-interval requires a numeric value"
+                    log_error "Option --poll-interval requires a non-negative integer (got: '$2')"
                     exit 2
                 fi
                 SDD_LOOP_POLL_INTERVAL="$2"
