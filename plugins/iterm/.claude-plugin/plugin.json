@@ -1,0 +1,8 @@
+{
+  "name": "iterm",
+  "version": "0.1.0",
+  "description": "iTerm2 tab management for macOS host and Linux container environments",
+  "skills": [
+    "skills/tab-management"
+  ]
+}
