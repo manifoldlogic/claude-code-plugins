@@ -258,6 +258,7 @@ Located in `skills/project-workflow/scripts/`:
 | `validate-structure.sh` | Validate ticket structure |
 | `ticket-summary.sh` | Generate ticket summary |
 | `collect-metrics.sh` | Collect and log workflow metrics |
+| `master-status-board.sh` | Multi-repo status aggregation with recommended actions for autonomous loops |
 
 ## Workflow
 
