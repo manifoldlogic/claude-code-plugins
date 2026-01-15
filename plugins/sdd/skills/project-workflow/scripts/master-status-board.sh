@@ -205,16 +205,55 @@ scan_task() {
 # Outputs:
 #   JSON object with autogate configuration to stdout
 # Notes:
-#   This is a stub implementation returning default values.
-#   Full implementation will be added in SDDLOOP-1.2001.
+#   - Missing file returns default: ready=true, agent_ready=false
+#   - Malformed JSON returns default with warning to stderr
+#   - Missing fields are filled with defaults
+#   - Extra fields are ignored (forward compatibility)
 #######################################
 read_autogate() {
     local autogate_file="$1"
 
-    # Stub implementation: return default values
-    # Will be fully implemented in SDDLOOP-1.2001
-    debug_log "read_autogate (stub): $autogate_file"
-    echo '{"ready": true, "agent_ready": false, "priority": null, "stop_at_phase": null}'
+    # Default values as JSON
+    local default_json='{"ready": true, "agent_ready": false, "priority": null, "stop_at_phase": null}'
+
+    debug_log "read_autogate: $autogate_file"
+
+    # Check if file exists and is readable
+    if [[ ! -f "$autogate_file" ]] || [[ ! -r "$autogate_file" ]]; then
+        debug_log "  File missing or not readable, using defaults"
+        echo "$default_json"
+        return 0
+    fi
+
+    # Check if file is empty
+    if [[ ! -s "$autogate_file" ]]; then
+        echo "Warning: Empty .autogate.json at $autogate_file, using defaults" >&2
+        debug_log "  File is empty, using defaults"
+        echo "$default_json"
+        return 0
+    fi
+
+    # Attempt to parse with jq
+    # Use defaults for missing fields:
+    # - ready: defaults to true (allow human work)
+    # - agent_ready: defaults to false (block autonomous work)
+    # - priority: defaults to null (no priority set)
+    # - stop_at_phase: defaults to null (no phase limit)
+    local parsed
+    if ! parsed=$(jq -c '{
+        ready: (if .ready == null then true else .ready end),
+        agent_ready: (if .agent_ready == null then false else .agent_ready end),
+        priority: (.priority // null),
+        stop_at_phase: (.stop_at_phase // null)
+    }' "$autogate_file" 2>/dev/null); then
+        echo "Warning: Malformed .autogate.json at $autogate_file, using defaults" >&2
+        debug_log "  JSON parse error, using defaults"
+        echo "$default_json"
+        return 0
+    fi
+
+    debug_log "  Parsed autogate: $parsed"
+    echo "$parsed"
 }
 
 #######################################
@@ -350,6 +389,122 @@ scan_ticket() {
     printf '    "completed": %d,\n' "$completed"
     printf '    "tested": %d,\n' "$tested"
     printf '    "verified": %d\n' "$verified"
+    printf '  }\n'
+    printf '}'
+}
+
+#######################################
+# Scan a repository's _SDD directory and aggregate all tickets
+# Arguments:
+#   $1 - Path to _SDD directory
+# Outputs:
+#   JSON object with repo status and ticket summaries to stdout
+# Returns:
+#   0 on success
+#   1 if directory does not exist
+#######################################
+scan_repo() {
+    local sdd_root="$1"
+
+    # Validate directory exists
+    if [[ ! -d "$sdd_root" ]]; then
+        debug_log "SDD root directory not found: $sdd_root"
+        printf '{\n'
+        printf '  "name": "",\n'
+        printf '  "sdd_root": "%s",\n' "$(json_escape "$sdd_root")"
+        printf '  "tickets": [],\n'
+        printf '  "summary": {"total_tickets": 0, "total_tasks": 0, "pending": 0, "completed": 0, "tested": 0, "verified": 0},\n'
+        printf '  "error": "Directory not found"\n'
+        printf '}'
+        return 1
+    fi
+
+    # Extract repo name from parent directory of _SDD
+    local repo_name
+    repo_name=$(basename "$(dirname "$sdd_root")")
+    debug_log "Scanning repo: $repo_name (SDD root: $sdd_root)"
+
+    # Initialize aggregation counters
+    local total_tickets=0
+    local total_tasks=0
+    local total_pending=0
+    local total_completed=0
+    local total_tested=0
+    local total_verified=0
+
+    # Collect ticket JSON objects
+    local tickets_json=""
+    local first_ticket=true
+    local tickets_dir="$sdd_root/tickets"
+
+    # Scan tickets if tickets/ directory exists
+    if [[ -d "$tickets_dir" ]]; then
+        debug_log "  Scanning tickets directory: $tickets_dir"
+
+        # Find all ticket directories (not recursive, one level only)
+        while IFS= read -r -d '' ticket_dir; do
+            # Skip if not a directory (shouldn't happen with -type d, but be safe)
+            [[ ! -d "$ticket_dir" ]] && continue
+
+            debug_log "    Found ticket directory: $ticket_dir"
+
+            # Get ticket status by calling scan_ticket
+            local ticket_json
+            ticket_json=$(scan_ticket "$ticket_dir")
+
+            # Add comma separator between tickets
+            if [[ "$first_ticket" == "true" ]]; then
+                first_ticket=false
+            else
+                tickets_json+=","
+            fi
+            tickets_json+=$'\n'"      $ticket_json"
+
+            # Extract summary values for aggregation
+            local ticket_tasks ticket_pending ticket_completed ticket_tested ticket_verified
+            ticket_tasks=$(echo "$ticket_json" | grep -o '"total_tasks": [0-9]*' | grep -o '[0-9]*')
+            ticket_pending=$(echo "$ticket_json" | grep -o '"pending": [0-9]*' | grep -o '[0-9]*')
+            ticket_completed=$(echo "$ticket_json" | grep -o '"completed": [0-9]*' | grep -o '[0-9]*')
+            ticket_tested=$(echo "$ticket_json" | grep -o '"tested": [0-9]*' | grep -o '[0-9]*')
+            ticket_verified=$(echo "$ticket_json" | grep -o '"verified": [0-9]*' | grep -o '[0-9]*')
+
+            # Handle empty values (default to 0)
+            ticket_tasks=${ticket_tasks:-0}
+            ticket_pending=${ticket_pending:-0}
+            ticket_completed=${ticket_completed:-0}
+            ticket_tested=${ticket_tested:-0}
+            ticket_verified=${ticket_verified:-0}
+
+            # Aggregate
+            total_tickets=$((total_tickets + 1))
+            total_tasks=$((total_tasks + ticket_tasks))
+            total_pending=$((total_pending + ticket_pending))
+            total_completed=$((total_completed + ticket_completed))
+            total_tested=$((total_tested + ticket_tested))
+            total_verified=$((total_verified + ticket_verified))
+        done < <(find "$tickets_dir" -maxdepth 1 -mindepth 1 -type d -print0 2>/dev/null | sort -z)
+    else
+        debug_log "  No tickets/ directory found in $sdd_root"
+    fi
+
+    # Output JSON object
+    printf '{\n'
+    printf '  "name": "%s",\n' "$(json_escape "$repo_name")"
+    printf '  "sdd_root": "%s",\n' "$(json_escape "$sdd_root")"
+    printf '  "tickets": ['
+    if [[ -n "$tickets_json" ]]; then
+        printf '%s\n' "$tickets_json"
+        printf '  ],\n'
+    else
+        printf '],\n'
+    fi
+    printf '  "summary": {\n'
+    printf '    "total_tickets": %d,\n' "$total_tickets"
+    printf '    "total_tasks": %d,\n' "$total_tasks"
+    printf '    "pending": %d,\n' "$total_pending"
+    printf '    "completed": %d,\n' "$total_completed"
+    printf '    "tested": %d,\n' "$total_tested"
+    printf '    "verified": %d\n' "$total_verified"
     printf '  }\n'
     printf '}'
 }
@@ -589,13 +744,120 @@ main() {
 
     debug_log "Resolved workspace root: $workspace_root"
 
-    # Output JSON
+    # Discover all _SDD directories
+    debug_log "Discovering _SDD directories in: $workspace_root"
+
+    local find_output
+    find_output=$(find "$workspace_root" -maxdepth "$MAX_SEARCH_DEPTH" -type d -name "_SDD" 2>&1) || true
+
+    # Separate actual results from errors
+    local sdd_dirs=""
+    local errors=""
+
+    while IFS= read -r line; do
+        if [[ "$line" == *"Permission denied"* ]]; then
+            errors+="$line"$'\n'
+        elif [[ -n "$line" && -d "$line" ]]; then
+            sdd_dirs+="$line"$'\n'
+        fi
+    done <<< "$find_output"
+
+    # Log permission errors to stderr
+    if [[ -n "$errors" ]]; then
+        echo "Warning: Some directories were not accessible:" >&2
+        echo "$errors" >&2
+    fi
+
+    # Initialize workspace-level aggregation counters
+    local total_repos=0
+    local total_tickets=0
+    local total_tasks=0
+    local total_pending=0
+    local total_completed=0
+    local total_tested=0
+    local total_verified=0
+
+    # Collect repo JSON objects
+    local repos_json=""
+    local first_repo=true
+
+    # Process discovered directories
+    if [[ -n "$sdd_dirs" ]]; then
+        # Sort for consistent output
+        local sorted_dirs
+        sorted_dirs=$(echo -n "$sdd_dirs" | sort)
+
+        while IFS= read -r sdd_path; do
+            [[ -z "$sdd_path" ]] && continue
+
+            # Resolve and validate the path
+            local resolved_path
+            resolved_path=$(resolve_path "$sdd_path" "$workspace_root") || {
+                debug_log "Skipping invalid path: $sdd_path"
+                continue
+            }
+
+            debug_log "Found _SDD: $resolved_path"
+
+            # Scan the repo using scan_repo function
+            local repo_json
+            repo_json=$(scan_repo "$resolved_path")
+
+            # Add comma separator between repos
+            if [[ "$first_repo" == "true" ]]; then
+                first_repo=false
+            else
+                repos_json+=","
+            fi
+            repos_json+=$'\n'"    $repo_json"
+
+            # Extract summary values for workspace-level aggregation
+            # Use tail -1 to get the repo-level summary (last occurrence) instead of ticket summaries
+            local repo_tickets repo_tasks repo_pending repo_completed repo_tested repo_verified
+            repo_tickets=$(echo "$repo_json" | grep -o '"total_tickets": [0-9]*' | tail -1 | grep -o '[0-9]*')
+            repo_tasks=$(echo "$repo_json" | grep -o '"total_tasks": [0-9]*' | tail -1 | grep -o '[0-9]*')
+            repo_pending=$(echo "$repo_json" | grep -o '"pending": [0-9]*' | tail -1 | grep -o '[0-9]*')
+            repo_completed=$(echo "$repo_json" | grep -o '"completed": [0-9]*' | tail -1 | grep -o '[0-9]*')
+            repo_tested=$(echo "$repo_json" | grep -o '"tested": [0-9]*' | tail -1 | grep -o '[0-9]*')
+            repo_verified=$(echo "$repo_json" | grep -o '"verified": [0-9]*' | tail -1 | grep -o '[0-9]*')
+
+            # Handle empty values (default to 0)
+            repo_tickets=${repo_tickets:-0}
+            repo_tasks=${repo_tasks:-0}
+            repo_pending=${repo_pending:-0}
+            repo_completed=${repo_completed:-0}
+            repo_tested=${repo_tested:-0}
+            repo_verified=${repo_verified:-0}
+
+            # Aggregate at workspace level
+            total_repos=$((total_repos + 1))
+            total_tickets=$((total_tickets + repo_tickets))
+            total_tasks=$((total_tasks + repo_tasks))
+            total_pending=$((total_pending + repo_pending))
+            total_completed=$((total_completed + repo_completed))
+            total_tested=$((total_tested + repo_tested))
+            total_verified=$((total_verified + repo_verified))
+        done <<< "$sorted_dirs"
+    fi
+
+    # Output final JSON
     echo "{"
     echo "  \"timestamp\": \"$(date -Iseconds)\","
     echo "  \"workspace_root\": \"$(json_escape "$workspace_root")\","
-
-    discover_sdd_directories "$workspace_root"
-
+    echo "  \"repos\": ["
+    if [[ -n "$repos_json" ]]; then
+        echo "$repos_json"
+    fi
+    echo "  ],"
+    echo "  \"summary\": {"
+    echo "    \"total_repos\": $total_repos,"
+    echo "    \"total_tickets\": $total_tickets,"
+    echo "    \"total_tasks\": $total_tasks,"
+    echo "    \"pending\": $total_pending,"
+    echo "    \"completed\": $total_completed,"
+    echo "    \"tested\": $total_tested,"
+    echo "    \"verified\": $total_verified"
+    echo "  }"
     echo "}"
 }
 

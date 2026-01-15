@@ -292,8 +292,8 @@ test_json_structure() {
     assert_contains "$output" '"workspace_root":' "JSON has workspace_root"
     assert_contains "$output" '"repos":' "JSON has repos"
     assert_contains "$output" '"name":' "JSON repos have name"
-    assert_contains "$output" '"sdd_path":' "JSON repos have sdd_path"
-    assert_contains "$output" '"repo_path":' "JSON repos have repo_path"
+    assert_contains "$output" '"sdd_root":' "JSON repos have sdd_root"
+    assert_contains "$output" '"summary":' "JSON has summary"
 }
 
 #######################################
@@ -823,25 +823,336 @@ EOF
 }
 
 #######################################
-# Test: read_autogate stub returns defaults
+# Test: read_autogate with all fields present
 #######################################
-test_read_autogate_stub() {
-    echo "--- Test: read_autogate stub returns defaults ---"
+test_read_autogate_all_fields() {
+    echo "--- Test: read_autogate with all fields present ---"
 
     source "$MASTER_SCRIPT"
 
-    # Create a fake autogate file (content doesn't matter for stub)
-    local autogate_file="$TEST_TMP_DIR/.autogate.json"
-    echo '{"ready": false}' > "$autogate_file"
+    local autogate_file="$TEST_TMP_DIR/.autogate-all-fields.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true,
+    "agent_ready": true,
+    "priority": 1,
+    "stop_at_phase": "test"
+}
+EOF
 
     local output
     output=$(read_autogate "$autogate_file")
 
-    # Stub should always return default values regardless of file content
-    assert_contains "$output" '"ready": true' "Stub returns ready: true"
-    assert_contains "$output" '"agent_ready": false' "Stub returns agent_ready: false"
-    assert_contains "$output" '"priority": null' "Stub returns priority: null"
-    assert_contains "$output" '"stop_at_phase": null' "Stub returns stop_at_phase: null"
+    assert_contains "$output" '"ready":true' "All fields: ready is true"
+    assert_contains "$output" '"agent_ready":true' "All fields: agent_ready is true"
+    assert_contains "$output" '"priority":1' "All fields: priority is 1"
+    assert_contains "$output" '"stop_at_phase":"test"' "All fields: stop_at_phase is test"
+}
+
+#######################################
+# Test: read_autogate with only ready field
+#######################################
+test_read_autogate_only_ready() {
+    echo "--- Test: read_autogate with only ready field ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-only-ready.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"ready":true' "Only ready: ready is true"
+    assert_contains "$output" '"agent_ready":false' "Only ready: agent_ready defaults to false"
+    assert_contains "$output" '"priority":null' "Only ready: priority defaults to null"
+    assert_contains "$output" '"stop_at_phase":null' "Only ready: stop_at_phase defaults to null"
+}
+
+#######################################
+# Test: read_autogate with ready=false (blocks all work)
+#######################################
+test_read_autogate_ready_false() {
+    echo "--- Test: read_autogate with ready=false ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-ready-false.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": false
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"ready":false' "Ready false: ready is false"
+    assert_contains "$output" '"agent_ready":false' "Ready false: agent_ready defaults to false"
+}
+
+#######################################
+# Test: read_autogate with agent_ready=true (forward compatibility)
+#######################################
+test_read_autogate_agent_ready_true() {
+    echo "--- Test: read_autogate with agent_ready=true ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-agent-ready.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true,
+    "agent_ready": true
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"ready":true' "Agent ready: ready is true"
+    assert_contains "$output" '"agent_ready":true' "Agent ready: agent_ready is true"
+}
+
+#######################################
+# Test: read_autogate with missing file
+#######################################
+test_read_autogate_missing_file() {
+    echo "--- Test: read_autogate with missing file ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/nonexistent/.autogate.json"
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"ready": true' "Missing file: ready defaults to true"
+    assert_contains "$output" '"agent_ready": false' "Missing file: agent_ready defaults to false"
+    assert_contains "$output" '"priority": null' "Missing file: priority defaults to null"
+    assert_contains "$output" '"stop_at_phase": null' "Missing file: stop_at_phase defaults to null"
+}
+
+#######################################
+# Test: read_autogate with empty file
+#######################################
+test_read_autogate_empty_file() {
+    echo "--- Test: read_autogate with empty file ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-empty.json"
+    touch "$autogate_file"
+
+    local output
+    local stderr_output
+    stderr_output=$(read_autogate "$autogate_file" 2>&1 >/dev/null)
+    output=$(read_autogate "$autogate_file" 2>/dev/null)
+
+    assert_contains "$output" '"ready": true' "Empty file: ready defaults to true"
+    assert_contains "$output" '"agent_ready": false' "Empty file: agent_ready defaults to false"
+    assert_contains "$stderr_output" "Warning:" "Empty file: warning logged to stderr"
+}
+
+#######################################
+# Test: read_autogate with malformed JSON
+#######################################
+test_read_autogate_malformed_json() {
+    echo "--- Test: read_autogate with malformed JSON ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-malformed.json"
+    cat > "$autogate_file" << 'EOF'
+{ this is not valid json }
+EOF
+
+    local output
+    local stderr_output
+    stderr_output=$(read_autogate "$autogate_file" 2>&1 >/dev/null)
+    output=$(read_autogate "$autogate_file" 2>/dev/null)
+
+    assert_contains "$output" '"ready": true' "Malformed: ready defaults to true"
+    assert_contains "$output" '"agent_ready": false' "Malformed: agent_ready defaults to false"
+    assert_contains "$stderr_output" "Warning:" "Malformed: warning logged to stderr"
+    assert_contains "$stderr_output" "Malformed" "Malformed: warning mentions malformed"
+}
+
+#######################################
+# Test: read_autogate with permission denied
+#######################################
+test_read_autogate_permission_denied() {
+    echo "--- Test: read_autogate with permission denied ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-no-read.json"
+    echo '{"ready": false}' > "$autogate_file"
+    chmod 000 "$autogate_file"
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    # Restore permissions for cleanup
+    chmod 644 "$autogate_file"
+
+    assert_contains "$output" '"ready": true' "Permission denied: ready defaults to true"
+    assert_contains "$output" '"agent_ready": false' "Permission denied: agent_ready defaults to false"
+}
+
+#######################################
+# Test: read_autogate with extra fields (forward compatibility)
+#######################################
+test_read_autogate_extra_fields() {
+    echo "--- Test: read_autogate with extra fields ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-extra-fields.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true,
+    "agent_ready": true,
+    "priority": 2,
+    "stop_at_phase": "verify",
+    "future_field": "should be ignored",
+    "another_future_field": 42
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"ready":true' "Extra fields: ready parsed correctly"
+    assert_contains "$output" '"agent_ready":true' "Extra fields: agent_ready parsed correctly"
+    assert_contains "$output" '"priority":2' "Extra fields: priority parsed correctly"
+    assert_contains "$output" '"stop_at_phase":"verify"' "Extra fields: stop_at_phase parsed correctly"
+
+    # Should NOT contain the extra fields
+    if [[ "$output" == *"future_field"* ]]; then
+        log_result "Extra fields are ignored" "fail" "Output contains future_field"
+    else
+        log_result "Extra fields are ignored" "pass"
+    fi
+}
+
+#######################################
+# Test: read_autogate output is valid JSON
+#######################################
+test_read_autogate_valid_json() {
+    echo "--- Test: read_autogate output is valid JSON ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-json-test.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true,
+    "agent_ready": false,
+    "priority": 5,
+    "stop_at_phase": "implement"
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "read_autogate output is valid JSON" "pass"
+        else
+            log_result "read_autogate output is valid JSON" "fail" "JSON parsing failed"
+        fi
+    else
+        if [[ "$output" == "{"* && "$output" == *"}" ]]; then
+            log_result "read_autogate output is valid JSON (basic check)" "pass"
+        else
+            log_result "read_autogate output is valid JSON (basic check)" "fail"
+        fi
+    fi
+}
+
+#######################################
+# Test: read_autogate with boolean as string "true"
+#######################################
+test_read_autogate_boolean_as_string() {
+    echo "--- Test: read_autogate with boolean as string ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-string-bool.json"
+    # Note: jq treats "true" (string) differently from true (boolean)
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": "true",
+    "agent_ready": "false"
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    # jq will preserve the string values, which is fine for forward compatibility
+    # The key is that output is valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "String boolean produces valid JSON" "pass"
+        else
+            log_result "String boolean produces valid JSON" "fail"
+        fi
+    else
+        log_result "String boolean produces valid JSON (basic check)" "pass"
+    fi
+}
+
+#######################################
+# Test: read_autogate with null priority
+#######################################
+test_read_autogate_null_priority() {
+    echo "--- Test: read_autogate with explicit null values ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-null-values.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true,
+    "agent_ready": false,
+    "priority": null,
+    "stop_at_phase": null
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"priority":null' "Explicit null: priority is null"
+    assert_contains "$output" '"stop_at_phase":null' "Explicit null: stop_at_phase is null"
+}
+
+#######################################
+# Test: read_autogate with priority as integer
+#######################################
+test_read_autogate_priority_integer() {
+    echo "--- Test: read_autogate with priority as integer ---"
+
+    source "$MASTER_SCRIPT"
+
+    local autogate_file="$TEST_TMP_DIR/.autogate-priority-int.json"
+    cat > "$autogate_file" << 'EOF'
+{
+    "ready": true,
+    "priority": 10
+}
+EOF
+
+    local output
+    output=$(read_autogate "$autogate_file")
+
+    assert_contains "$output" '"priority":10' "Integer priority: priority is 10"
 }
 
 #######################################
@@ -1033,7 +1344,7 @@ test_scan_ticket_with_autogate() {
 Has .autogate.json file.
 EOF
 
-    # Create .autogate.json (stub ignores content but file presence is tested)
+    # Create .autogate.json with specific values
     cat > "$ticket_dir/.autogate.json" << 'EOF'
 {
     "ready": false,
@@ -1048,9 +1359,12 @@ EOF
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "scan_ticket with autogate exits with code 0"
-    # Stub should still return defaults (full implementation in SDDLOOP-1.2001)
+    # Full implementation now parses actual values from .autogate.json
     assert_contains "$output" '"autogate":' "Autogate field present"
-    assert_contains "$output" '"ready": true' "Autogate ready is true (stub default)"
+    assert_contains "$output" '"ready":false' "Autogate ready is false (from file)"
+    assert_contains "$output" '"agent_ready":true' "Autogate agent_ready is true (from file)"
+    assert_contains "$output" '"priority":1' "Autogate priority is 1 (from file)"
+    assert_contains "$output" '"stop_at_phase":"test"' "Autogate stop_at_phase is test (from file)"
 }
 
 #######################################
@@ -1318,6 +1632,409 @@ EOF
 }
 
 #######################################
+# Test: scan_repo with multiple tickets
+#######################################
+test_scan_repo_multiple_tickets() {
+    echo "--- Test: scan_repo with multiple tickets ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create repo with _SDD and multiple tickets
+    local repo_dir="$TEST_TMP_DIR/test-repo"
+    local sdd_root="$repo_dir/_SDD"
+    mkdir -p "$sdd_root/tickets/TICKET-1_first/tasks"
+    mkdir -p "$sdd_root/tickets/TICKET-2_second/tasks"
+
+    # Create README files for tickets
+    echo "# First Ticket" > "$sdd_root/tickets/TICKET-1_first/README.md"
+    echo "# Second Ticket" > "$sdd_root/tickets/TICKET-2_second/README.md"
+
+    # Create tasks for first ticket (1 pending, 1 completed)
+    cat > "$sdd_root/tickets/TICKET-1_first/tasks/TICKET-1.1001_task1.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    cat > "$sdd_root/tickets/TICKET-1_first/tasks/TICKET-1.1002_task2.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    # Create tasks for second ticket (1 tested, 1 verified)
+    cat > "$sdd_root/tickets/TICKET-2_second/tasks/TICKET-2.1001_task1.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    cat > "$sdd_root/tickets/TICKET-2_second/tasks/TICKET-2.1002_task2.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(scan_repo "$sdd_root")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_repo multiple tickets exits with code 0"
+    assert_contains "$output" '"name": "test-repo"' "Repo name extracted correctly"
+    assert_contains "$output" '"total_tickets": 2' "Total tickets is 2"
+    assert_contains "$output" '"total_tasks": 4' "Total tasks is 4"
+    assert_contains "$output" '"pending": 1' "Pending is 1"
+    assert_contains "$output" '"completed": 1' "Completed is 1"
+    assert_contains "$output" '"tested": 1' "Tested is 1"
+    assert_contains "$output" '"verified": 1' "Verified is 1"
+}
+
+#######################################
+# Test: scan_repo with no tickets/ directory
+#######################################
+test_scan_repo_no_tickets_dir() {
+    echo "--- Test: scan_repo with no tickets/ directory ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create repo with _SDD but no tickets/
+    local repo_dir="$TEST_TMP_DIR/no-tickets-repo"
+    local sdd_root="$repo_dir/_SDD"
+    mkdir -p "$sdd_root"
+
+    local output
+    output=$(scan_repo "$sdd_root")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_repo no tickets dir exits with code 0"
+    assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
+    assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
+    assert_contains "$output" '"tickets": []' "Tickets array is empty"
+}
+
+#######################################
+# Test: scan_repo with empty tickets/ directory
+#######################################
+test_scan_repo_empty_tickets_dir() {
+    echo "--- Test: scan_repo with empty tickets/ directory ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create repo with empty tickets/
+    local repo_dir="$TEST_TMP_DIR/empty-tickets-repo"
+    local sdd_root="$repo_dir/_SDD"
+    mkdir -p "$sdd_root/tickets"
+
+    local output
+    output=$(scan_repo "$sdd_root")
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "scan_repo empty tickets dir exits with code 0"
+    assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
+    assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
+}
+
+#######################################
+# Test: scan_repo with missing directory
+#######################################
+test_scan_repo_missing_dir() {
+    echo "--- Test: scan_repo with missing directory ---"
+
+    source "$MASTER_SCRIPT"
+
+    local sdd_root="$TEST_TMP_DIR/nonexistent/repo/_SDD"
+    local output
+    local exit_code=0
+    output=$(scan_repo "$sdd_root") || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "scan_repo missing dir exits with code 1"
+    assert_contains "$output" '"error": "Directory not found"' "Error message present"
+    assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
+}
+
+#######################################
+# Test: scan_repo aggregation across tickets
+#######################################
+test_scan_repo_aggregation_logic() {
+    echo "--- Test: scan_repo aggregation logic ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create repo with 3 tickets for thorough aggregation test
+    local repo_dir="$TEST_TMP_DIR/aggregation-repo"
+    local sdd_root="$repo_dir/_SDD"
+    mkdir -p "$sdd_root/tickets/T1/tasks"
+    mkdir -p "$sdd_root/tickets/T2/tasks"
+    mkdir -p "$sdd_root/tickets/T3/tasks"
+
+    echo "# Ticket 1" > "$sdd_root/tickets/T1/README.md"
+    echo "# Ticket 2" > "$sdd_root/tickets/T2/README.md"
+    echo "# Ticket 3" > "$sdd_root/tickets/T3/README.md"
+
+    # T1: 2 pending
+    cat > "$sdd_root/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+EOF
+    cat > "$sdd_root/tickets/T1/tasks/T1.1002.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+EOF
+
+    # T2: 1 completed, 1 tested
+    cat > "$sdd_root/tickets/T2/tasks/T2.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+EOF
+    cat > "$sdd_root/tickets/T2/tasks/T2.1002.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+EOF
+
+    # T3: 2 verified
+    cat > "$sdd_root/tickets/T3/tasks/T3.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+    cat > "$sdd_root/tickets/T3/tasks/T3.1002.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(scan_repo "$sdd_root")
+
+    # Total: 3 tickets, 6 tasks
+    # States: 2 pending, 1 completed, 1 tested, 2 verified
+    assert_contains "$output" '"total_tickets": 3' "Total tickets is 3"
+    assert_contains "$output" '"total_tasks": 6' "Total tasks is 6"
+    assert_contains "$output" '"pending": 2' "Pending is 2"
+    assert_contains "$output" '"completed": 1' "Completed is 1"
+    assert_contains "$output" '"tested": 1' "Tested is 1"
+    assert_contains "$output" '"verified": 2' "Verified is 2"
+}
+
+#######################################
+# Test: scan_repo output is valid JSON
+#######################################
+test_scan_repo_valid_json() {
+    echo "--- Test: scan_repo output is valid JSON ---"
+
+    source "$MASTER_SCRIPT"
+
+    local repo_dir="$TEST_TMP_DIR/json-repo"
+    local sdd_root="$repo_dir/_SDD"
+    mkdir -p "$sdd_root/tickets/TICKET-1/tasks"
+    echo "# Test" > "$sdd_root/tickets/TICKET-1/README.md"
+    cat > "$sdd_root/tickets/TICKET-1/tasks/TICKET-1.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+EOF
+
+    local output
+    output=$(scan_repo "$sdd_root")
+
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "scan_repo output is valid JSON" "pass"
+        else
+            log_result "scan_repo output is valid JSON" "fail" "JSON parsing failed"
+            echo "Output was:" >&2
+            echo "$output" >&2
+        fi
+    else
+        if [[ "$output" == "{"* && "$output" == *"}" ]]; then
+            log_result "scan_repo output is valid JSON (basic check)" "pass"
+        else
+            log_result "scan_repo output is valid JSON (basic check)" "fail"
+        fi
+    fi
+}
+
+#######################################
+# Test: scan_repo extracts repo name from parent directory
+#######################################
+test_scan_repo_extracts_repo_name() {
+    echo "--- Test: scan_repo extracts repo name from parent ---"
+
+    source "$MASTER_SCRIPT"
+
+    local repo_dir="$TEST_TMP_DIR/my-awesome-repo"
+    local sdd_root="$repo_dir/_SDD"
+    mkdir -p "$sdd_root/tickets"
+
+    local output
+    output=$(scan_repo "$sdd_root")
+
+    assert_contains "$output" '"name": "my-awesome-repo"' "Extracted repo name from parent directory"
+}
+
+#######################################
+# Test: Integration - Full workspace scan
+#######################################
+test_integration_full_workspace_scan() {
+    echo "--- Test: Integration - Full workspace scan ---"
+
+    # Create multi-repo workspace
+    local workspace="$TEST_TMP_DIR/workspace"
+    mkdir -p "$workspace/repo-alpha/_SDD/tickets/ALPHA-1/tasks"
+    mkdir -p "$workspace/repo-beta/_SDD/tickets/BETA-1/tasks"
+
+    echo "# Alpha Ticket" > "$workspace/repo-alpha/_SDD/tickets/ALPHA-1/README.md"
+    echo "# Beta Ticket" > "$workspace/repo-beta/_SDD/tickets/BETA-1/README.md"
+
+    cat > "$workspace/repo-alpha/_SDD/tickets/ALPHA-1/tasks/ALPHA-1.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    cat > "$workspace/repo-beta/_SDD/tickets/BETA-1/tasks/BETA-1.1001.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+EOF
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Integration scan exits with code 0"
+    assert_contains "$output" '"name": "repo-alpha"' "Found repo-alpha"
+    assert_contains "$output" '"name": "repo-beta"' "Found repo-beta"
+    assert_contains "$output" '"total_repos": 2' "Total repos is 2"
+}
+
+#######################################
+# Test: Integration - Empty workspace
+#######################################
+test_integration_empty_workspace() {
+    echo "--- Test: Integration - Empty workspace ---"
+
+    local workspace="$TEST_TMP_DIR/empty-workspace"
+    mkdir -p "$workspace"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Empty workspace exits with code 0"
+    assert_contains "$output" '"repos": [' "Output has repos array"
+    assert_contains "$output" '"total_repos": 0' "Total repos is 0"
+    assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
+}
+
+#######################################
+# Test: Integration - Workspace-level summary aggregation
+#######################################
+test_integration_workspace_level_summary() {
+    echo "--- Test: Integration - Workspace-level summary ---"
+
+    local workspace="$TEST_TMP_DIR/summary-workspace"
+    mkdir -p "$workspace/r1/_SDD/tickets/T1/tasks"
+    mkdir -p "$workspace/r2/_SDD/tickets/T2/tasks"
+
+    echo "# T1" > "$workspace/r1/_SDD/tickets/T1/README.md"
+    echo "# T2" > "$workspace/r2/_SDD/tickets/T2/README.md"
+
+    # r1: 1 pending task
+    cat > "$workspace/r1/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+EOF
+
+    # r2: 1 verified task
+    cat > "$workspace/r2/_SDD/tickets/T2/tasks/T2.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [x] **Tests pass**
+- [x] **Verified**
+EOF
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+
+    # Workspace summary should be aggregated
+    assert_contains "$output" '"total_repos": 2' "Workspace total_repos is 2"
+    assert_contains "$output" '"total_tickets": 2' "Workspace total_tickets is 2"
+    assert_contains "$output" '"total_tasks": 2' "Workspace total_tasks is 2"
+}
+
+#######################################
+# Test: Integration - Output is valid JSON
+#######################################
+test_integration_output_valid_json() {
+    echo "--- Test: Integration - Output is valid JSON ---"
+
+    local workspace="$TEST_TMP_DIR/json-workspace"
+    mkdir -p "$workspace/repo/_SDD/tickets/T1/tasks"
+    echo "# T1" > "$workspace/repo/_SDD/tickets/T1/README.md"
+    cat > "$workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+EOF
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "Integration output is valid JSON" "pass"
+        else
+            log_result "Integration output is valid JSON" "fail" "JSON parsing failed"
+            echo "Output was:" >&2
+            echo "$output" >&2
+        fi
+    else
+        if [[ "$output" == "{"* && "$output" == *"}" ]]; then
+            log_result "Integration output is valid JSON (basic check)" "pass"
+        else
+            log_result "Integration output is valid JSON (basic check)" "fail"
+        fi
+    fi
+}
+
+#######################################
+# Test: Integration - Performance (< 5 seconds)
+#######################################
+test_integration_performance() {
+    echo "--- Test: Integration - Performance ---"
+
+    # Test against real workspace if it exists, otherwise use temp
+    local workspace="/workspace/repos"
+    if [[ ! -d "$workspace" ]]; then
+        workspace="$TEST_TMP_DIR/perf-workspace"
+        mkdir -p "$workspace"
+    fi
+
+    local start_time end_time elapsed
+    start_time=$(date +%s%N)
+
+    bash "$MASTER_SCRIPT" "$workspace" >/dev/null 2>&1
+    local exit_code=$?
+
+    end_time=$(date +%s%N)
+    elapsed=$(( (end_time - start_time) / 1000000 ))  # milliseconds
+
+    if [[ $exit_code -eq 0 && $elapsed -lt 5000 ]]; then
+        log_result "Performance test (< 5 seconds)" "pass"
+        echo "       Completed in ${elapsed}ms"
+    else
+        log_result "Performance test (< 5 seconds)" "fail" "Took ${elapsed}ms (limit: 5000ms)"
+    fi
+}
+
+#######################################
 # Main test runner
 #######################################
 main() {
@@ -1404,12 +2121,42 @@ main() {
     test_scan_task_file_path
     echo ""
 
+    # Run read_autogate tests
+    echo "====================================="
+    echo "read_autogate() Function Tests"
+    echo "====================================="
+    echo ""
+    test_read_autogate_all_fields
+    echo ""
+    test_read_autogate_only_ready
+    echo ""
+    test_read_autogate_ready_false
+    echo ""
+    test_read_autogate_agent_ready_true
+    echo ""
+    test_read_autogate_missing_file
+    echo ""
+    test_read_autogate_empty_file
+    echo ""
+    test_read_autogate_malformed_json
+    echo ""
+    test_read_autogate_permission_denied
+    echo ""
+    test_read_autogate_extra_fields
+    echo ""
+    test_read_autogate_valid_json
+    echo ""
+    test_read_autogate_boolean_as_string
+    echo ""
+    test_read_autogate_null_priority
+    echo ""
+    test_read_autogate_priority_integer
+    echo ""
+
     # Run scan_ticket tests
     echo "====================================="
     echo "scan_ticket() Function Tests"
     echo "====================================="
-    echo ""
-    test_read_autogate_stub
     echo ""
     test_scan_ticket_multiple_tasks
     echo ""
@@ -1434,6 +2181,42 @@ main() {
     test_scan_ticket_all_verified
     echo ""
     test_scan_ticket_path_in_output
+    echo ""
+
+    # Run scan_repo tests
+    echo "====================================="
+    echo "scan_repo() Function Tests"
+    echo "====================================="
+    echo ""
+    test_scan_repo_multiple_tickets
+    echo ""
+    test_scan_repo_no_tickets_dir
+    echo ""
+    test_scan_repo_empty_tickets_dir
+    echo ""
+    test_scan_repo_missing_dir
+    echo ""
+    test_scan_repo_aggregation_logic
+    echo ""
+    test_scan_repo_valid_json
+    echo ""
+    test_scan_repo_extracts_repo_name
+    echo ""
+
+    # Run integration tests
+    echo "====================================="
+    echo "Integration Tests"
+    echo "====================================="
+    echo ""
+    test_integration_full_workspace_scan
+    echo ""
+    test_integration_empty_workspace
+    echo ""
+    test_integration_workspace_level_summary
+    echo ""
+    test_integration_output_valid_json
+    echo ""
+    test_integration_performance
     echo ""
 
     # Summary
