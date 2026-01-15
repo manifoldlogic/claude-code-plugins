@@ -172,6 +172,12 @@ POLL_REASON=""
 # Phase boundary state (set by check_phase_boundary function)
 STOP_AT_PHASE=""
 
+# Claude Code process PID (for cleanup on signal)
+CLAUDE_PID=""
+
+# Flag to prevent re-entry into cleanup function
+CLEANUP_IN_PROGRESS=false
+
 # =============================================================================
 # Logging Functions
 # =============================================================================
@@ -477,11 +483,21 @@ execute_task() {
     # Change to repo directory and execute claude with SDD_ROOT_DIR set
     # Using subshell to avoid changing cwd in the main script
     # Wrap with timeout command to enforce task execution time limit
+    # Run in background and capture PID for cleanup on signal
     (
         cd "$repo_path" || exit 1
         timeout "$task_timeout" env SDD_ROOT_DIR="$sdd_root" claude --dangerously-skip-permissions -p "/sdd:do-task $task_id"
-    )
+    ) &
+    CLAUDE_PID=$!
+    log_debug "execute_task: Started Claude process with PID: $CLAUDE_PID"
+
+    # Wait for the backgrounded process to complete
+    wait "$CLAUDE_PID"
     exit_code=$?
+
+    # Clear PID after process completes (no longer running)
+    log_debug "execute_task: Claude process (PID: $CLAUDE_PID) exited with code: $exit_code"
+    CLAUDE_PID=""
 
     # ==========================================================================
     # Step 8: Log execution completion with exit code
@@ -635,6 +651,81 @@ check_phase_boundary() {
 # =============================================================================
 
 #######################################
+# Cleanup Claude Code process if running
+# Terminates any running Claude Code process gracefully (SIGTERM),
+# then forcefully (SIGKILL) if it doesn't exit within timeout.
+# Idempotent - safe to call multiple times.
+#
+# Globals:
+#   CLAUDE_PID - PID of currently running Claude Code process
+#   CLEANUP_IN_PROGRESS - Flag to prevent re-entry
+#
+# Returns:
+#   0 - Always returns success (cleanup is best-effort)
+#######################################
+cleanup_claude_process() {
+    # Prevent re-entry (handles multiple rapid signals)
+    if [[ "$CLEANUP_IN_PROGRESS" == "true" ]]; then
+        log_debug "cleanup_claude_process: Already in progress, skipping"
+        return 0
+    fi
+    CLEANUP_IN_PROGRESS=true
+
+    # Check if we have a PID to clean up
+    if [[ -z "$CLAUDE_PID" ]]; then
+        log_debug "cleanup_claude_process: No Claude PID to clean up"
+        CLEANUP_IN_PROGRESS=false
+        return 0
+    fi
+
+    # Check if process is still running
+    if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
+        log_debug "cleanup_claude_process: Claude process (PID: $CLAUDE_PID) already terminated"
+        CLAUDE_PID=""
+        CLEANUP_IN_PROGRESS=false
+        return 0
+    fi
+
+    # Process is running - terminate it
+    log_info "Terminating Claude Code process (PID: $CLAUDE_PID)..."
+
+    # Send SIGTERM for graceful shutdown
+    kill -TERM "$CLAUDE_PID" 2>/dev/null
+
+    # Wait up to 3 seconds for graceful exit (30 iterations x 0.1 second)
+    local wait_count=0
+    while [[ $wait_count -lt 30 ]]; do
+        if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
+            log_debug "cleanup_claude_process: Claude process terminated gracefully"
+            CLAUDE_PID=""
+            CLEANUP_IN_PROGRESS=false
+            return 0
+        fi
+        sleep 0.1
+        wait_count=$((wait_count + 1))
+    done
+
+    # Process still running after timeout - force kill
+    if kill -0 "$CLAUDE_PID" 2>/dev/null; then
+        log_warn "Claude process did not terminate gracefully, force killing..."
+        kill -KILL "$CLAUDE_PID" 2>/dev/null
+
+        # Brief wait for SIGKILL to take effect
+        sleep 0.2
+
+        if kill -0 "$CLAUDE_PID" 2>/dev/null; then
+            log_error "Failed to kill Claude process (PID: $CLAUDE_PID)"
+        else
+            log_debug "cleanup_claude_process: Claude process killed with SIGKILL"
+        fi
+    fi
+
+    CLAUDE_PID=""
+    CLEANUP_IN_PROGRESS=false
+    return 0
+}
+
+#######################################
 # Cleanup function called on script exit
 # Outputs final status summary showing iterations and tasks completed.
 # Skipped during --help/--version to avoid confusing output.
@@ -647,26 +738,32 @@ check_phase_boundary() {
 cleanup() {
     # Don't output during help/version
     [[ -n "$HELP_SHOWN" ]] && return
+
+    # Clean up any running Claude process
+    cleanup_claude_process
+
     log_info "Exiting after $ITERATION_COUNT iteration(s) ($TASKS_COMPLETED task(s) completed)"
 }
 
 #######################################
 # Handle SIGINT (Ctrl+C) signal
-# Logs message and exits with code 130 (conventional for SIGINT)
+# Cleans up Claude process and exits with code 130 (conventional for SIGINT)
 #######################################
 handle_sigint() {
     EXIT_REQUESTED=true
     log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
+    cleanup_claude_process
     exit 130
 }
 
 #######################################
 # Handle SIGTERM signal
-# Logs message and exits with code 143 (conventional for SIGTERM)
+# Cleans up Claude process and exits with code 143 (conventional for SIGTERM)
 #######################################
 handle_sigterm() {
     EXIT_REQUESTED=true
     log_info "Received SIGTERM, shutting down gracefully..."
+    cleanup_claude_process
     exit 143
 }
 
