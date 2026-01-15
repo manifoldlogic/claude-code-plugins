@@ -1497,6 +1497,304 @@ MOCK_EOF
 }
 
 # =============================================================================
+# PRIORITY 7 TESTS (Structured Logging - SDDLOOP-3.4009)
+# =============================================================================
+
+#######################################
+# Test 48: --log-format text (default behavior)
+# Validates that text format produces human-readable output
+#######################################
+test_log_format_text_default() {
+    echo "--- Test: --log-format text (default behavior) ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Default text format exits with code 0"
+    # Text format should have [LEVEL] format
+    assert_contains "$output" "[INFO]" "Default format shows [INFO] prefix"
+    # Should NOT have JSON structure
+    assert_not_contains "$output" '{"timestamp"' "Default format is not JSON"
+}
+
+#######################################
+# Test 49: --log-format text (explicit)
+# Validates that explicit text format works same as default
+#######################################
+test_log_format_text_explicit() {
+    echo "--- Test: --log-format text (explicit) ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --log-format text --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Explicit text format exits with code 0"
+    assert_contains "$output" "[INFO]" "Explicit text format shows [INFO] prefix"
+    assert_not_contains "$output" '{"timestamp"' "Explicit text format is not JSON"
+}
+
+#######################################
+# Test 50: --log-format json
+# Validates that JSON format produces valid JSON output
+#######################################
+test_log_format_json() {
+    echo "--- Test: --log-format json ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+    # JSON format should contain timestamp field
+    assert_contains "$output" '"timestamp"' "JSON format contains timestamp field"
+    # JSON format should contain level field
+    assert_contains "$output" '"level"' "JSON format contains level field"
+    # JSON format should contain message field
+    assert_contains "$output" '"message"' "JSON format contains message field"
+    # Should NOT have text [INFO] prefix
+    assert_not_contains "$output" "[INFO]" "JSON format does not have [INFO] prefix"
+}
+
+#######################################
+# Test 51: JSON output is valid (passes jq validation)
+# Validates that each JSON log line is valid JSON
+#######################################
+test_log_format_json_valid() {
+    echo "--- Test: JSON output is valid (jq validation) ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Each line should be valid JSON - check first non-empty line
+    local first_json_line
+    first_json_line=$(echo "$output" | head -1)
+
+    local jq_exit=0
+    echo "$first_json_line" | jq empty 2>/dev/null || jq_exit=$?
+
+    if [[ $jq_exit -eq 0 ]]; then
+        log_result "First log line is valid JSON" "pass"
+    else
+        log_result "First log line is valid JSON" "fail" "jq failed to parse: $first_json_line"
+    fi
+}
+
+#######################################
+# Test 52: JSON contains ISO 8601 timestamp
+# Validates timestamp format is UTC ISO 8601
+#######################################
+test_log_format_json_timestamp() {
+    echo "--- Test: JSON contains ISO 8601 timestamp ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Extract timestamp from first JSON line and validate format
+    local first_line
+    first_line=$(echo "$output" | head -1)
+    local timestamp
+    timestamp=$(echo "$first_line" | jq -r '.timestamp' 2>/dev/null)
+
+    # Check ISO 8601 format ending in Z (UTC)
+    if [[ "$timestamp" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+        log_result "Timestamp is ISO 8601 UTC format" "pass"
+    else
+        log_result "Timestamp is ISO 8601 UTC format" "fail" "Got: $timestamp"
+    fi
+}
+
+#######################################
+# Test 53: JSON context includes iteration count
+# Validates context object contains iteration when available
+#######################################
+test_log_format_json_context_iteration() {
+    echo "--- Test: JSON context includes iteration count ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board_with_counter 2
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Look for iteration in context
+    if echo "$output" | grep -q '"iteration"'; then
+        log_result "JSON context contains iteration field" "pass"
+    else
+        log_result "JSON context contains iteration field" "fail" "iteration not found in output"
+    fi
+}
+
+#######################################
+# Test 54: SDD_LOOP_LOG_FORMAT environment variable
+# Validates that environment variable sets format
+#######################################
+test_log_format_env_var() {
+    echo "--- Test: SDD_LOOP_LOG_FORMAT environment variable ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(SDD_LOOP_LOG_FORMAT=json bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Env var JSON format exits with code 0"
+    assert_contains "$output" '"timestamp"' "Env var produces JSON format"
+    assert_not_contains "$output" "[INFO]" "Env var format is not text"
+}
+
+#######################################
+# Test 55: --log-format invalid value
+# Validates that invalid format values are rejected
+#######################################
+test_log_format_invalid() {
+    echo "--- Test: --log-format invalid value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --log-format xml 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Invalid --log-format exits with code 2"
+    assert_contains "$output" "'text' or 'json'" "Error message shows valid options"
+    assert_contains "$output" "'xml'" "Error message shows invalid value"
+}
+
+#######################################
+# Test 56: --log-format missing value
+# Validates that missing format value is rejected
+#######################################
+test_log_format_missing_value() {
+    echo "--- Test: --log-format missing value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --log-format 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Missing --log-format value exits with code 2"
+    assert_contains "$output" "requires a value" "Shows missing value error"
+}
+
+#######################################
+# Test 57: Help output documents --log-format
+# Validates that help text includes --log-format option
+#######################################
+test_log_format_in_help() {
+    echo "--- Test: Help output documents --log-format ---"
+
+    local output
+    output=$(bash "$SDD_LOOP_ORIGINAL" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help exits with code 0"
+    assert_contains "$output" "--log-format" "Help documents --log-format option"
+    assert_contains "$output" "SDD_LOOP_LOG_FORMAT" "Help documents SDD_LOOP_LOG_FORMAT env var"
+    assert_contains "$output" "json" "Help mentions json format"
+}
+
+#######################################
+# Test 58: JSON format with special characters
+# Validates that special characters in messages are properly escaped
+#######################################
+test_log_format_json_special_chars() {
+    echo "--- Test: JSON format with special characters ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create a mock that returns a task with special characters in reason
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << 'MOCK_EOF'
+#!/usr/bin/env bash
+echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Test with \"quotes\" and \\ backslash"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON with special chars exits with code 0"
+
+    # All lines should be valid JSON despite special characters
+    local invalid_lines=0
+    while IFS= read -r line; do
+        if [[ -n "$line" ]]; then
+            if ! echo "$line" | jq empty 2>/dev/null; then
+                invalid_lines=$((invalid_lines + 1))
+            fi
+        fi
+    done <<< "$output"
+
+    if [[ $invalid_lines -eq 0 ]]; then
+        log_result "All JSON lines are valid despite special chars" "pass"
+    else
+        log_result "All JSON lines are valid despite special chars" "fail" "Found $invalid_lines invalid lines"
+    fi
+}
+
+#######################################
+# Test 59: CLI --log-format overrides env var
+# Validates that CLI argument takes precedence over environment variable
+#######################################
+test_log_format_cli_overrides_env() {
+    echo "--- Test: CLI --log-format overrides env var ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    # Set env to json but CLI to text - CLI should win
+    output=$(SDD_LOOP_LOG_FORMAT=json bash "$SDD_LOOP" --dry-run --log-format text --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "CLI override exits with code 0"
+    # Should be text format (CLI override)
+    assert_contains "$output" "[INFO]" "CLI overrides env var to text format"
+    assert_not_contains "$output" '"timestamp"' "CLI overrides env var - no JSON"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -1664,6 +1962,39 @@ main() {
     test_autogate_invalid_json_quiet_mode
     echo ""
     test_autogate_valid_json_no_error
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 7 TESTS (Structured Logging - SDDLOOP-3.4009)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 7 Tests (Structured Logging)"
+    echo "====================================="
+    echo ""
+
+    test_log_format_text_default
+    echo ""
+    test_log_format_text_explicit
+    echo ""
+    test_log_format_json
+    echo ""
+    test_log_format_json_valid
+    echo ""
+    test_log_format_json_timestamp
+    echo ""
+    test_log_format_json_context_iteration
+    echo ""
+    test_log_format_env_var
+    echo ""
+    test_log_format_invalid
+    echo ""
+    test_log_format_missing_value
+    echo ""
+    test_log_format_in_help
+    echo ""
+    test_log_format_json_special_chars
+    echo ""
+    test_log_format_cli_overrides_env
     echo ""
 
     # Summary

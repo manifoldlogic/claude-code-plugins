@@ -137,6 +137,9 @@ SDD_LOOP_QUIET="${SDD_LOOP_QUIET:-false}"
 # Debug mode - debug-level logging
 SDD_LOOP_DEBUG="${SDD_LOOP_DEBUG:-false}"
 
+# Log format - "text" (default) or "json" for structured logging
+SDD_LOOP_LOG_FORMAT="${SDD_LOOP_LOG_FORMAT:-text}"
+
 # =============================================================================
 # Internal State
 # =============================================================================
@@ -183,15 +186,93 @@ CLEANUP_IN_PROGRESS=false
 # =============================================================================
 
 #######################################
+# Format and output a JSON log entry
+# Used internally by log_* functions when SDD_LOOP_LOG_FORMAT is "json"
+#
+# Arguments:
+#   $1 - level: Log level (INFO, ERROR, WARN, VERBOSE, DEBUG)
+#   $2 - message: Log message text
+#
+# Outputs:
+#   Single-line JSON to stderr with format:
+#   {"timestamp":"ISO8601","level":"LEVEL","message":"...","context":{...}}
+#
+# Notes:
+#   - Uses jq for safe JSON string escaping
+#   - Timestamp is UTC in ISO 8601 format
+#   - Context object includes iteration, task_id, ticket_id, consecutive_errors
+#     when those values are available
+#######################################
+format_json_log() {
+    local level="$1"
+    local message="$2"
+
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Use jq to safely escape the message string
+    local msg_json
+    msg_json=$(jq -n --arg msg "$message" '$msg')
+
+    # Build context object with available fields
+    local context_fields=""
+
+    # Add iteration count if available
+    if [[ -n "${ITERATION_COUNT:-}" && "$ITERATION_COUNT" -gt 0 ]]; then
+        context_fields="\"iteration\":$ITERATION_COUNT"
+    fi
+
+    # Add task_id if available
+    if [[ -n "${POLL_TASK:-}" ]]; then
+        if [[ -n "$context_fields" ]]; then
+            context_fields="$context_fields,"
+        fi
+        local task_json
+        task_json=$(jq -n --arg t "$POLL_TASK" '$t')
+        context_fields="${context_fields}\"task_id\":$task_json"
+    fi
+
+    # Add ticket_id if available
+    if [[ -n "${POLL_TICKET:-}" ]]; then
+        if [[ -n "$context_fields" ]]; then
+            context_fields="$context_fields,"
+        fi
+        local ticket_json
+        ticket_json=$(jq -n --arg t "$POLL_TICKET" '$t')
+        context_fields="${context_fields}\"ticket_id\":$ticket_json"
+    fi
+
+    # Add consecutive_errors if available and > 0
+    if [[ -n "${CONSECUTIVE_ERRORS:-}" && "$CONSECUTIVE_ERRORS" -gt 0 ]]; then
+        if [[ -n "$context_fields" ]]; then
+            context_fields="$context_fields,"
+        fi
+        context_fields="${context_fields}\"consecutive_errors\":$CONSECUTIVE_ERRORS"
+    fi
+
+    # Build the final JSON output
+    local context_json=""
+    if [[ -n "$context_fields" ]]; then
+        context_json=",\"context\":{$context_fields}"
+    fi
+
+    echo "{\"timestamp\":\"$timestamp\",\"level\":\"$level\",\"message\":$msg_json$context_json}" >&2
+}
+
+#######################################
 # Log an informational message to stderr
 # Arguments:
 #   $@ - Message to print
 # Outputs:
-#   Writes timestamped message to stderr
+#   Writes timestamped message to stderr (text or JSON format)
 #######################################
 log_info() {
     if [[ "$SDD_LOOP_QUIET" != "true" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*" >&2
+        if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
+            format_json_log "INFO" "$*"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*" >&2
+        fi
     fi
 }
 
@@ -200,10 +281,14 @@ log_info() {
 # Arguments:
 #   $@ - Message to print
 # Outputs:
-#   Writes timestamped error message to stderr
+#   Writes timestamped error message to stderr (text or JSON format)
 #######################################
 log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2
+    if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
+        format_json_log "ERROR" "$*"
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2
+    fi
 }
 
 #######################################
@@ -211,11 +296,15 @@ log_error() {
 # Arguments:
 #   $@ - Message to print
 # Outputs:
-#   Writes timestamped warning message to stderr
+#   Writes timestamped warning message to stderr (text or JSON format)
 #######################################
 log_warn() {
     if [[ "$SDD_LOOP_QUIET" != "true" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >&2
+        if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
+            format_json_log "WARN" "$*"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >&2
+        fi
     fi
 }
 
@@ -224,11 +313,15 @@ log_warn() {
 # Arguments:
 #   $@ - Message to print
 # Outputs:
-#   Writes timestamped message to stderr if verbose mode is enabled and quiet is disabled
+#   Writes timestamped message to stderr if verbose mode is enabled and quiet is disabled (text or JSON format)
 #######################################
 log_verbose() {
     [[ "$SDD_LOOP_VERBOSE" != "true" || "$SDD_LOOP_QUIET" == "true" ]] && return
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [VERBOSE] $*" >&2
+    if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
+        format_json_log "VERBOSE" "$*"
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [VERBOSE] $*" >&2
+    fi
 }
 
 #######################################
@@ -236,11 +329,15 @@ log_verbose() {
 # Arguments:
 #   $@ - Message to print
 # Outputs:
-#   Writes timestamped message to stderr if debug mode is enabled
+#   Writes timestamped message to stderr if debug mode is enabled (text or JSON format)
 #######################################
 log_debug() {
     if [[ "$SDD_LOOP_DEBUG" == "true" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" >&2
+        if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
+            format_json_log "DEBUG" "$*"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" >&2
+        fi
     fi
 }
 
@@ -922,6 +1019,14 @@ OPTIONS
     --debug
         Enable debug-level logging (very verbose).
 
+    --log-format FORMAT
+        Set log output format: "text" (default) or "json".
+        Text format: [YYYY-MM-DD HH:MM:SS] [LEVEL] message
+        JSON format: {"timestamp":"ISO8601","level":"LEVEL","message":"...","context":{...}}
+        JSON output includes optional context object with iteration, task_id,
+        ticket_id, and consecutive_errors when available.
+        Useful for log aggregation systems (ELK, CloudWatch, Datadog).
+
 ENVIRONMENT VARIABLES
     SDD_LOOP_WORKSPACE_ROOT
         Default workspace root directory.
@@ -959,6 +1064,10 @@ ENVIRONMENT VARIABLES
         Set to "true" for debug output.
         Overridden by --debug.
 
+    SDD_LOOP_LOG_FORMAT
+        Log output format: "text" (default) or "json".
+        Overridden by --log-format.
+
 CONFIGURATION HIERARCHY
     Configuration values are resolved in the following order (later overrides earlier):
     1. Built-in defaults (SDD_LOOP_DEFAULT_* constants)
@@ -993,6 +1102,12 @@ EXAMPLES
 
     # Quiet mode for CI/CD pipelines
     sdd-loop.sh --quiet
+
+    # JSON logging for log aggregation
+    sdd-loop.sh --log-format json
+
+    # JSON logging with environment variable
+    SDD_LOOP_LOG_FORMAT=json sdd-loop.sh
 
 INTEGRATION
     The loop controller integrates with:
@@ -1068,6 +1183,18 @@ main() {
             --debug)
                 SDD_LOOP_DEBUG="true"
                 shift
+                ;;
+            --log-format)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "Option --log-format requires a value"
+                    exit 2
+                fi
+                if [[ "$2" != "text" && "$2" != "json" ]]; then
+                    log_error "Option --log-format requires 'text' or 'json' (got: '$2')"
+                    exit 2
+                fi
+                SDD_LOOP_LOG_FORMAT="$2"
+                shift 2
                 ;;
             --max-iterations)
                 if [[ -z "${2:-}" ]]; then
@@ -1225,6 +1352,7 @@ main() {
     log_debug "  Dry run: $SDD_LOOP_DRY_RUN"
     log_debug "  Verbose: $SDD_LOOP_VERBOSE"
     log_debug "  Quiet: $SDD_LOOP_QUIET"
+    log_debug "  Log format: $SDD_LOOP_LOG_FORMAT"
 
     log_info "SDD Loop Controller v$VERSION starting..."
     log_info "Workspace: $workspace_root"
