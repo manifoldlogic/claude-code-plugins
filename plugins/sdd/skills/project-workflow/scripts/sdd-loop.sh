@@ -106,6 +106,12 @@ EXIT_REQUESTED=false
 # Exit code to use when exiting
 EXIT_CODE=0
 
+# Tasks completed counter
+TASKS_COMPLETED=0
+
+# Flag to suppress cleanup output during help/version
+HELP_SHOWN=""
+
 # Poll result state (set by poll_status function)
 POLL_ACTION=""
 POLL_TASK=""
@@ -158,16 +164,15 @@ log_warn() {
 }
 
 #######################################
-# Log a verbose message to stderr (only if verbose mode enabled)
+# Log a verbose message to stderr (only if verbose mode enabled and not quiet)
 # Arguments:
 #   $@ - Message to print
 # Outputs:
-#   Writes timestamped message to stderr if verbose mode is enabled
+#   Writes timestamped message to stderr if verbose mode is enabled and quiet is disabled
 #######################################
 log_verbose() {
-    if [[ "$SDD_LOOP_VERBOSE" == "true" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [VERBOSE] $*" >&2
-    fi
+    [[ "$SDD_LOOP_VERBOSE" != "true" || "$SDD_LOOP_QUIET" == "true" ]] && return
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [VERBOSE] $*" >&2
 }
 
 #######################################
@@ -298,11 +303,9 @@ poll_status() {
         return 1
     fi
 
-    # Log poll results at verbose level
-    log_verbose "Poll result: action=$POLL_ACTION"
-    if [[ -n "$POLL_TASK" ]]; then
-        log_verbose "  Task: $POLL_TASK"
-    fi
+    # Log poll results at verbose level (compact summary)
+    log_verbose "Poll returned: action=$POLL_ACTION, task=$POLL_TASK"
+    # Detailed breakdown follows
     if [[ -n "$POLL_TICKET" ]]; then
         log_verbose "  Ticket: $POLL_TICKET"
     fi
@@ -561,6 +564,9 @@ check_phase_boundary() {
 
     log_debug "check_phase_boundary: current phase=$phase, stop_at_phase=$stop_at_phase"
 
+    # Log verbose for user visibility
+    log_verbose "Checking phase boundary: phase=$phase, stop_at_phase=$stop_at_phase"
+
     # ==========================================================================
     # Step 5: Compare phase with stop_at_phase
     # ==========================================================================
@@ -575,32 +581,49 @@ check_phase_boundary() {
 }
 
 # =============================================================================
-# Signal Handling
+# Signal Handling and Cleanup
 # =============================================================================
 
 #######################################
-# Handle SIGINT (Ctrl+C) signal
+# Cleanup function called on script exit
+# Outputs final status summary showing iterations and tasks completed.
+# Skipped during --help/--version to avoid confusing output.
+#
 # Globals:
-#   EXIT_REQUESTED - Set to true
-#   EXIT_CODE - Set to 130
+#   HELP_SHOWN - If set, suppresses cleanup output
+#   ITERATION_COUNT - Number of iterations completed
+#   TASKS_COMPLETED - Number of tasks successfully executed
+#######################################
+cleanup() {
+    # Don't output during help/version
+    [[ -n "$HELP_SHOWN" ]] && return
+    log_info "Exiting after $ITERATION_COUNT iteration(s) ($TASKS_COMPLETED task(s) completed)"
+}
+
+#######################################
+# Handle SIGINT (Ctrl+C) signal
+# Logs message and exits with code 130 (conventional for SIGINT)
 #######################################
 handle_sigint() {
-    log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
     EXIT_REQUESTED=true
-    EXIT_CODE=130
+    log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
+    exit 130
 }
 
 #######################################
 # Handle SIGTERM signal
-# Globals:
-#   EXIT_REQUESTED - Set to true
-#   EXIT_CODE - Set to 143
+# Logs message and exits with code 143 (conventional for SIGTERM)
 #######################################
 handle_sigterm() {
-    log_info "Received SIGTERM, shutting down gracefully..."
     EXIT_REQUESTED=true
-    EXIT_CODE=143
+    log_info "Received SIGTERM, shutting down gracefully..."
+    exit 143
 }
+
+# Set up trap handlers at script load time
+trap cleanup EXIT
+trap handle_sigint SIGINT INT
+trap handle_sigterm SIGTERM TERM
 
 # =============================================================================
 # Help and Usage
@@ -800,10 +823,12 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
+                HELP_SHOWN=true
                 show_usage
                 exit 0
                 ;;
             -V|--version)
+                HELP_SHOWN=true
                 show_version
                 exit 0
                 ;;
@@ -895,8 +920,8 @@ main() {
                             n) SDD_LOOP_DRY_RUN="true" ;;
                             v) SDD_LOOP_VERBOSE="true" ;;
                             q) SDD_LOOP_QUIET="true" ;;
-                            h) show_usage; exit 0 ;;
-                            V) show_version; exit 0 ;;
+                            h) HELP_SHOWN=true; show_usage; exit 0 ;;
+                            V) HELP_SHOWN=true; show_version; exit 0 ;;
                             *)
                                 unknown_opt="$opt"
                                 break
@@ -993,10 +1018,12 @@ main() {
     # - Task execution timeout (default: 3600s)
     # ==========================================================================
 
-    local iteration=0
     local consecutive_errors=0
     local max_iterations="$SDD_LOOP_MAX_ITERATIONS"
     local max_errors="$SDD_LOOP_MAX_ERRORS"
+
+    # Log verbose configuration
+    log_verbose "Configuration: max_iterations=$max_iterations, max_errors=$max_errors, timeout=$SDD_LOOP_TIMEOUT"
 
     log_info "Safety limits: max_iterations=$max_iterations, max_errors=$max_errors, timeout=${SDD_LOOP_TIMEOUT}s"
 
@@ -1010,23 +1037,23 @@ main() {
         # =======================================================================
         # Safety Check: Max Iterations
         # =======================================================================
-        if [[ $iteration -ge $max_iterations ]]; then
+        if [[ $ITERATION_COUNT -ge $max_iterations ]]; then
             log_warn "Reached maximum iterations ($max_iterations)"
-            log_info "Loop stopped: safety limit reached after $iteration iteration(s)"
+            log_info "Loop stopped: safety limit reached after $ITERATION_COUNT iteration(s)"
             exit 1
         fi
 
-        # Increment iteration counter
-        iteration=$((iteration + 1))
+        # Increment iteration counter (global for cleanup)
+        ITERATION_COUNT=$((ITERATION_COUNT + 1))
 
         # Log iteration start
-        log_info "Iteration $iteration/$max_iterations: polling for next task"
+        log_info "Iteration $ITERATION_COUNT/$max_iterations: polling for next task"
 
         # Poll status board for recommended action
         # Redirect stdout to /dev/null since poll_status outputs JSON to stdout
         # but we only need the global variables it sets
         if ! poll_status "$workspace_root" >/dev/null; then
-            log_error "Polling failed at iteration $iteration"
+            log_error "Polling failed at iteration $ITERATION_COUNT"
             log_info "Loop stopped: polling error"
             exit 1
         fi
@@ -1035,7 +1062,7 @@ main() {
         case "$POLL_ACTION" in
             "none")
                 log_info "No more work available (reason: ${POLL_REASON:-no tasks remaining})"
-                log_info "Loop stopped: all work completed after $iteration iteration(s)"
+                log_info "Loop stopped: all work completed after $ITERATION_COUNT iteration(s)"
                 exit 0
                 ;;
             "do-task")
@@ -1049,7 +1076,10 @@ main() {
                 # Error Tracking: Update consecutive error counter
                 # =============================================================
                 if [[ $task_exit_code -eq 0 ]]; then
-                    # Success: reset consecutive error counter
+                    # Success: increment tasks completed counter
+                    TASKS_COMPLETED=$((TASKS_COMPLETED + 1))
+
+                    # Reset consecutive error counter
                     if [[ $consecutive_errors -gt 0 ]]; then
                         log_verbose "Task succeeded, resetting consecutive error counter (was: $consecutive_errors)"
                     fi
@@ -1063,7 +1093,7 @@ main() {
                     local boundary_result=$?
                     if [[ $boundary_result -eq 1 ]]; then
                         log_info "Phase boundary reached (stop_at_phase: $STOP_AT_PHASE)"
-                        log_info "Loop stopped: phase $STOP_AT_PHASE limit reached after $iteration iteration(s)"
+                        log_info "Loop stopped: phase $STOP_AT_PHASE limit reached after $ITERATION_COUNT iteration(s)"
                         exit 0
                     fi
 
@@ -1078,7 +1108,7 @@ main() {
                     # ==========================================================
                     if [[ $consecutive_errors -ge $max_errors ]]; then
                         log_error "Reached maximum consecutive errors ($max_errors)"
-                        log_info "Loop stopped: too many consecutive failures after $iteration iteration(s)"
+                        log_info "Loop stopped: too many consecutive failures after $ITERATION_COUNT iteration(s)"
                         exit 1
                     fi
 
@@ -1087,7 +1117,7 @@ main() {
                 ;;
             *)
                 log_warn "Unknown action: $POLL_ACTION (treating as 'none')"
-                log_info "Loop stopped: unknown action at iteration $iteration"
+                log_info "Loop stopped: unknown action at iteration $ITERATION_COUNT"
                 exit 0
                 ;;
         esac
