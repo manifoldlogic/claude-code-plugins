@@ -957,30 +957,55 @@ main() {
         echo "[${total_elapsed}s] Total: $total_tickets tickets, $total_tasks tasks in ${total_elapsed}s" >&2
     fi
 
-    # Output final JSON
-    echo "{"
-    echo "  \"timestamp\": \"$(date -Iseconds)\","
-    echo "  \"workspace_root\": \"$(json_escape "$workspace_root")\","
+    # Build the full output JSON (without recommended_action first)
+    local full_json=""
+    full_json+="{"$'\n'
+    full_json+="  \"timestamp\": \"$(date -Iseconds)\","$'\n'
+    full_json+="  \"workspace_root\": \"$(json_escape "$workspace_root")\","$'\n'
 
     # Include repos array only if not summary-only mode
     if [[ "$SUMMARY_ONLY" != "true" ]]; then
-        echo "  \"repos\": ["
+        full_json+="  \"repos\": ["$'\n'
         if [[ -n "$repos_json" ]]; then
-            echo "$repos_json"
+            full_json+="$repos_json"$'\n'
         fi
-        echo "  ],"
+        full_json+="  ],"$'\n'
     fi
 
-    echo "  \"summary\": {"
-    echo "    \"total_repos\": $total_repos,"
-    echo "    \"total_tickets\": $total_tickets,"
-    echo "    \"total_tasks\": $total_tasks,"
-    echo "    \"pending\": $total_pending,"
-    echo "    \"completed\": $total_completed,"
-    echo "    \"tested\": $total_tested,"
-    echo "    \"verified\": $total_verified"
-    echo "  }"
-    echo "}"
+    full_json+="  \"summary\": {"$'\n'
+    full_json+="    \"total_repos\": $total_repos,"$'\n'
+    full_json+="    \"total_tickets\": $total_tickets,"$'\n'
+    full_json+="    \"total_tasks\": $total_tasks,"$'\n'
+    full_json+="    \"pending\": $total_pending,"$'\n'
+    full_json+="    \"completed\": $total_completed,"$'\n'
+    full_json+="    \"tested\": $total_tested,"$'\n'
+    full_json+="    \"verified\": $total_verified"$'\n'
+    full_json+="  },"$'\n'
+
+    # Compute recommended action (only if we have full repo details)
+    if [[ "$SUMMARY_ONLY" != "true" ]]; then
+        # Build temporary JSON with repos for action computation
+        local temp_json="{"
+        temp_json+="\"repos\": ["
+        if [[ -n "$repos_json" ]]; then
+            temp_json+="$repos_json"
+        fi
+        temp_json+="]}"
+
+        local recommended_action
+        recommended_action=$(compute_recommended_action "$temp_json" 2>/dev/null)
+
+        # Add recommended_action to output
+        full_json+="  \"recommended_action\": $recommended_action"$'\n'
+    else
+        # In summary-only mode, we cannot compute recommended action (no repo details)
+        full_json+="  \"recommended_action\": {\"action\": \"none\", \"reason\": \"Summary-only mode - full scan required for recommendation\"}"$'\n'
+    fi
+
+    full_json+="}"
+
+    # Output the final JSON
+    echo "$full_json"
 }
 
 #######################################
