@@ -429,6 +429,55 @@ execute_task() {
     fi
 
     # ==========================================================================
+    # Step 2.5: Validate sdd_root is within workspace boundaries (defense in depth)
+    # Prevents path traversal attacks if master-status-board returns malformed data
+    # ==========================================================================
+    local canonical_workspace
+    local canonical_sdd_root
+
+    # Resolve canonical paths using realpath (preferred) or readlink -f (fallback)
+    if command -v realpath &>/dev/null; then
+        canonical_workspace="$(realpath "$SDD_LOOP_WORKSPACE_ROOT" 2>/dev/null)" || {
+            log_error "Failed to resolve canonical path for workspace: $SDD_LOOP_WORKSPACE_ROOT"
+            return 1
+        }
+        canonical_sdd_root="$(realpath "$sdd_root" 2>/dev/null)" || {
+            log_error "Failed to resolve canonical path for SDD root: $sdd_root"
+            return 1
+        }
+    elif command -v readlink &>/dev/null && readlink -f / &>/dev/null; then
+        # readlink -f is available (GNU coreutils)
+        canonical_workspace="$(readlink -f "$SDD_LOOP_WORKSPACE_ROOT" 2>/dev/null)" || {
+            log_error "Failed to resolve canonical path for workspace: $SDD_LOOP_WORKSPACE_ROOT"
+            return 1
+        }
+        canonical_sdd_root="$(readlink -f "$sdd_root" 2>/dev/null)" || {
+            log_error "Failed to resolve canonical path for SDD root: $sdd_root"
+            return 1
+        }
+    else
+        log_error "Neither realpath nor readlink -f available for path canonicalization"
+        return 1
+    fi
+
+    # Remove trailing slashes for consistent comparison
+    canonical_workspace="${canonical_workspace%/}"
+    canonical_sdd_root="${canonical_sdd_root%/}"
+
+    log_debug "execute_task: canonical_workspace=$canonical_workspace"
+    log_debug "execute_task: canonical_sdd_root=$canonical_sdd_root"
+
+    # Validate sdd_root is a proper subdirectory of workspace (not equal to workspace)
+    # Pattern: sdd_root must start with workspace path followed by "/"
+    if [[ "$canonical_sdd_root" != "$canonical_workspace"/* ]]; then
+        log_error "SDD root outside workspace bounds: $sdd_root (workspace: $SDD_LOOP_WORKSPACE_ROOT)"
+        log_debug "execute_task: Canonical paths - sdd_root=$canonical_sdd_root, workspace=$canonical_workspace"
+        return 1
+    fi
+
+    log_debug "execute_task: Path bounds validation passed"
+
+    # ==========================================================================
     # Step 3: Extract repo path from sdd_root (remove /_SDD suffix)
     # ==========================================================================
     local repo_path
@@ -1137,6 +1186,9 @@ main() {
         log_error "Workspace directory does not exist: $workspace_root"
         exit 1
     fi
+
+    # Update global SDD_LOOP_WORKSPACE_ROOT with resolved value for use in execute_task()
+    SDD_LOOP_WORKSPACE_ROOT="$workspace_root"
 
     # Log startup configuration
     log_debug "Configuration:"

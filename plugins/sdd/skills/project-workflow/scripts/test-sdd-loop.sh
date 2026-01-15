@@ -1111,6 +1111,203 @@ test_max_iterations_missing_value() {
 }
 
 # =============================================================================
+# PRIORITY 4 TESTS (Path Bounds Validation - SDDLOOP-3.4004)
+# =============================================================================
+
+#######################################
+# Test 37: Valid path within workspace (should pass)
+# Validates that tasks with sdd_root inside workspace execute successfully
+#######################################
+test_path_bounds_valid_path() {
+    echo "--- Test: Path bounds - valid path within workspace ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board returning path inside workspace
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+COUNTER_FILE="$TEST_TMP_DIR/valid_path_counter"
+if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
+COUNTER=\$(cat "\$COUNTER_FILE")
+echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
+if [[ \$COUNTER -lt 1 ]]; then
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Valid path test"}}'
+else
+    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+fi
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Valid path within workspace exits with code 0"
+    assert_contains "$output" "[DRY-RUN] Would execute task" "Shows dry-run task execution"
+    assert_not_contains "$output" "outside workspace bounds" "No path bounds error"
+}
+
+#######################################
+# Test 38: Path outside workspace (should fail)
+# Validates that tasks with sdd_root outside workspace are rejected
+#######################################
+test_path_bounds_outside_workspace() {
+    echo "--- Test: Path bounds - path outside workspace ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create a directory outside the workspace (still in temp for safety)
+    mkdir -p "$TEST_TMP_DIR/outside/_SDD"
+
+    # Create mock status board returning path outside workspace
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/_SDD","reason":"Outside workspace test"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Path outside workspace exits with code 1"
+    assert_contains "$output" "outside workspace bounds" "Shows path bounds error message"
+}
+
+#######################################
+# Test 39: Parent traversal attack with ".." (should fail after canonicalization)
+# Validates that ".." traversal attempts are blocked
+#######################################
+test_path_bounds_traversal_attack() {
+    echo "--- Test: Path bounds - parent traversal attack ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create a directory outside workspace that could be reached via traversal
+    mkdir -p "$TEST_TMP_DIR/outside-target/_SDD"
+
+    # Create mock status board returning path with ".." traversal
+    # Path: test-repo/../outside-target/_SDD canonicalizes to outside workspace
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/../outside-target/_SDD","reason":"Traversal attack test"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Traversal attack exits with code 1"
+    assert_contains "$output" "outside workspace bounds" "Shows path bounds error for traversal"
+}
+
+#######################################
+# Test 40: Path exactly equals workspace (should fail - must be subdirectory)
+# Validates that sdd_root cannot be the workspace itself
+#######################################
+test_path_bounds_equals_workspace() {
+    echo "--- Test: Path bounds - path equals workspace ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board returning workspace itself as sdd_root
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo","reason":"Equals workspace test"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Path equals workspace exits with code 1"
+    assert_contains "$output" "outside workspace bounds" "Shows path bounds error when equals workspace"
+}
+
+#######################################
+# Test 41: Symlink to valid path (should pass after resolution)
+# Validates that symlinks are resolved before comparison
+#######################################
+test_path_bounds_symlink_valid() {
+    echo "--- Test: Path bounds - symlink to valid path ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create a symlink inside workspace pointing to the real _SDD
+    ln -sf "$TEST_TMP_DIR/test-repo/_SDD" "$TEST_TMP_DIR/test-repo/symlink_sdd"
+
+    # Create mock status board returning symlink path
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+COUNTER_FILE="$TEST_TMP_DIR/symlink_counter"
+if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
+COUNTER=\$(cat "\$COUNTER_FILE")
+echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
+if [[ \$COUNTER -lt 1 ]]; then
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/symlink_sdd","reason":"Symlink test"}}'
+else
+    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+fi
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Symlink to valid path exits with code 0"
+    assert_not_contains "$output" "outside workspace bounds" "No path bounds error for symlink"
+}
+
+#######################################
+# Test 42: Debug output shows canonical paths
+# Validates that debug mode shows canonical path resolution
+#######################################
+test_path_bounds_debug_output() {
+    echo "--- Test: Path bounds - debug output shows canonical paths ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board returning valid path
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+COUNTER_FILE="$TEST_TMP_DIR/debug_path_counter"
+if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
+COUNTER=\$(cat "\$COUNTER_FILE")
+echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
+if [[ \$COUNTER -lt 1 ]]; then
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Debug test"}}'
+else
+    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+fi
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Debug mode with valid path exits with code 0"
+    assert_contains "$output" "canonical_workspace=" "Debug shows canonical workspace path"
+    assert_contains "$output" "canonical_sdd_root=" "Debug shows canonical sdd_root path"
+    assert_contains "$output" "Path bounds validation passed" "Debug confirms validation passed"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -1229,6 +1426,27 @@ main() {
     test_poll_interval_negative
     echo ""
     test_max_iterations_missing_value
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 4 TESTS (Path Bounds Validation - SDDLOOP-3.4004)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 4 Tests (Path Bounds)"
+    echo "====================================="
+    echo ""
+
+    test_path_bounds_valid_path
+    echo ""
+    test_path_bounds_outside_workspace
+    echo ""
+    test_path_bounds_traversal_attack
+    echo ""
+    test_path_bounds_equals_workspace
+    echo ""
+    test_path_bounds_symlink_valid
+    echo ""
+    test_path_bounds_debug_output
     echo ""
 
     # Summary
