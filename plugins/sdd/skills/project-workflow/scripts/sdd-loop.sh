@@ -25,6 +25,7 @@
 #   --max-errors N          Maximum consecutive errors before stopping (default: 3)
 #   --timeout SECONDS       Task execution timeout in seconds (default: 3600)
 #   --poll-interval SECONDS Interval between status polls (default: 5)
+#   --metrics-file FILE     Write JSON metrics to FILE at end of execution
 #
 # ARGUMENTS
 #   workspace_root    Root directory containing repositories with _SDD directories
@@ -69,6 +70,9 @@
 #       echo "Loop failed with exit code $?"
 #       exit 1
 #   }
+#
+#   # Write metrics file for monitoring
+#   sdd-loop.sh --metrics-file /tmp/metrics.json /workspace/repos/
 #
 # INTEGRATION
 #   The loop controller integrates with:
@@ -161,6 +165,15 @@ EXIT_CODE=0
 
 # Tasks completed counter
 TASKS_COMPLETED=0
+
+# Tasks failed counter
+TASKS_FAILED=0
+
+# Metrics output file path (optional)
+METRICS_FILE=""
+
+# Start time for duration tracking (set in main())
+START_TIME=""
 
 # Flag to suppress cleanup output during help/version
 HELP_SHOWN=""
@@ -818,6 +831,109 @@ check_phase_boundary() {
 }
 
 # =============================================================================
+# Metrics Output
+# =============================================================================
+
+#######################################
+# Write execution metrics to JSON file
+# Outputs machine-readable metrics for observability and monitoring.
+#
+# Arguments:
+#   $1 - exit_code: The exit code of the script
+#
+# Globals:
+#   METRICS_FILE - Path to metrics output file (if empty, no output)
+#   START_TIME - Script start time (epoch seconds)
+#   ITERATION_COUNT - Number of iterations completed
+#   TASKS_COMPLETED - Number of successful task executions
+#   TASKS_FAILED - Number of failed task executions
+#   SDD_LOOP_WORKSPACE_ROOT - Workspace root directory
+#   SDD_LOOP_MAX_ITERATIONS - Max iterations configuration
+#   SDD_LOOP_MAX_ERRORS - Max errors configuration
+#   SDD_LOOP_TIMEOUT - Timeout configuration
+#   SDD_LOOP_POLL_INTERVAL - Poll interval configuration
+#   SDD_LOOP_DRY_RUN - Dry run mode flag
+#   SDD_LOOP_VERBOSE - Verbose mode flag
+#
+# Outputs:
+#   Writes JSON file to METRICS_FILE path
+#   Logs info/error messages to stderr
+#
+# Returns:
+#   0 - Always returns success (non-fatal to preserve original exit code)
+#######################################
+write_metrics() {
+    local exit_code="${1:-0}"
+
+    # Skip if no metrics file specified
+    if [[ -z "$METRICS_FILE" ]]; then
+        log_debug "write_metrics: No metrics file specified, skipping"
+        return 0
+    fi
+
+    log_debug "write_metrics: Writing metrics to $METRICS_FILE"
+
+    # Calculate duration
+    local end_time
+    local duration_seconds
+    end_time=$(date +%s)
+    if [[ -n "$START_TIME" && "$START_TIME" =~ ^[0-9]+$ ]]; then
+        duration_seconds=$((end_time - START_TIME))
+    else
+        duration_seconds=0
+    fi
+
+    # Generate ISO 8601 timestamp
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Determine dry_run boolean for JSON
+    local dry_run_json="false"
+    if [[ "$SDD_LOOP_DRY_RUN" == "true" ]]; then
+        dry_run_json="true"
+    fi
+
+    # Determine verbose boolean for JSON
+    local verbose_json="false"
+    if [[ "$SDD_LOOP_VERBOSE" == "true" ]]; then
+        verbose_json="true"
+    fi
+
+    # Build JSON output using printf (no jq dependency for writing)
+    local json_output
+    json_output=$(cat << EOF
+{
+  "version": "$VERSION",
+  "timestamp": "$timestamp",
+  "workspace_root": "$SDD_LOOP_WORKSPACE_ROOT",
+  "exit_code": $exit_code,
+  "iterations": $ITERATION_COUNT,
+  "tasks_completed": $TASKS_COMPLETED,
+  "tasks_failed": $TASKS_FAILED,
+  "duration_seconds": $duration_seconds,
+  "configuration": {
+    "max_iterations": ${SDD_LOOP_MAX_ITERATIONS:-$SDD_LOOP_DEFAULT_MAX_ITERATIONS},
+    "max_errors": ${SDD_LOOP_MAX_ERRORS:-$SDD_LOOP_DEFAULT_MAX_ERRORS},
+    "timeout": ${SDD_LOOP_TIMEOUT:-$SDD_LOOP_DEFAULT_TIMEOUT},
+    "poll_interval": ${SDD_LOOP_POLL_INTERVAL:-$SDD_LOOP_DEFAULT_POLL_INTERVAL},
+    "dry_run": $dry_run_json,
+    "verbose": $verbose_json
+  }
+}
+EOF
+)
+
+    # Write to file (best-effort, don't fail script)
+    if echo "$json_output" > "$METRICS_FILE" 2>/dev/null; then
+        log_info "Metrics written to: $METRICS_FILE"
+    else
+        log_error "Failed to write metrics to: $METRICS_FILE"
+    fi
+
+    return 0
+}
+
+# =============================================================================
 # Signal Handling and Cleanup
 # =============================================================================
 
@@ -899,12 +1015,15 @@ cleanup_claude_process() {
 #######################################
 # Cleanup function called on script exit
 # Outputs final status summary showing iterations and tasks completed.
+# Writes metrics file if configured.
 # Skipped during --help/--version to avoid confusing output.
 #
 # Globals:
 #   HELP_SHOWN - If set, suppresses cleanup output
 #   ITERATION_COUNT - Number of iterations completed
 #   TASKS_COMPLETED - Number of tasks successfully executed
+#   TASKS_FAILED - Number of tasks that failed
+#   EXIT_CODE - Exit code to report in metrics
 #######################################
 cleanup() {
     # Don't output during help/version
@@ -913,28 +1032,35 @@ cleanup() {
     # Clean up any running Claude process
     cleanup_claude_process
 
+    # Write metrics file if configured
+    write_metrics "$EXIT_CODE"
+
     log_info "Exiting after $ITERATION_COUNT iteration(s) ($TASKS_COMPLETED task(s) completed)"
 }
 
 #######################################
 # Handle SIGINT (Ctrl+C) signal
-# Cleans up Claude process and exits with code 130 (conventional for SIGINT)
+# Cleans up Claude process, writes metrics, and exits with code 130 (conventional for SIGINT)
 #######################################
 handle_sigint() {
     EXIT_REQUESTED=true
+    EXIT_CODE=130
     log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
     cleanup_claude_process
+    write_metrics "$EXIT_CODE"
     exit 130
 }
 
 #######################################
 # Handle SIGTERM signal
-# Cleans up Claude process and exits with code 143 (conventional for SIGTERM)
+# Cleans up Claude process, writes metrics, and exits with code 143 (conventional for SIGTERM)
 #######################################
 handle_sigterm() {
     EXIT_REQUESTED=true
+    EXIT_CODE=143
     log_info "Received SIGTERM, shutting down gracefully..."
     cleanup_claude_process
+    write_metrics "$EXIT_CODE"
     exit 143
 }
 
@@ -1015,6 +1141,14 @@ OPTIONS
         Interval between status board polls in seconds.
         Default: 5.
         [Phase 2 - not yet implemented]
+
+    --metrics-file FILE
+        Write machine-readable JSON metrics to FILE at end of execution.
+        Useful for monitoring, trending, and CI/CD integration.
+        Metrics include: iterations, tasks_completed, tasks_failed,
+        duration_seconds, exit_code, timestamp, and configuration.
+        File write is non-fatal (script continues on write failure).
+        Parent directory must exist and be writable.
 
     --debug
         Enable debug-level logging (very verbose).
@@ -1108,6 +1242,12 @@ EXAMPLES
 
     # JSON logging with environment variable
     SDD_LOOP_LOG_FORMAT=json sdd-loop.sh
+
+    # Write metrics file for monitoring and CI/CD
+    sdd-loop.sh --metrics-file /tmp/sdd-metrics.json
+
+    # Combine with dry-run to test metrics output
+    sdd-loop.sh --dry-run --metrics-file /tmp/metrics.json --max-iterations 5
 
 INTEGRATION
     The loop controller integrates with:
@@ -1256,6 +1396,25 @@ main() {
                 SDD_LOOP_POLL_INTERVAL="$2"
                 shift 2
                 ;;
+            --metrics-file)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "Option --metrics-file requires a file path"
+                    exit 2
+                fi
+                # Validate the parent directory exists and is writable
+                local metrics_dir
+                metrics_dir=$(dirname "$2")
+                if [[ ! -d "$metrics_dir" ]]; then
+                    log_error "Option --metrics-file: directory does not exist: $metrics_dir"
+                    exit 2
+                fi
+                if [[ ! -w "$metrics_dir" ]]; then
+                    log_error "Option --metrics-file: directory is not writable: $metrics_dir"
+                    exit 2
+                fi
+                METRICS_FILE="$2"
+                shift 2
+                ;;
             -*)
                 # Check for combined short options like -nv
                 if [[ "$1" =~ ^-[a-zA-Z]+$ ]]; then
@@ -1342,6 +1501,9 @@ main() {
     # Update global SDD_LOOP_WORKSPACE_ROOT with resolved value for use in execute_task()
     SDD_LOOP_WORKSPACE_ROOT="$workspace_root"
 
+    # Track start time for metrics duration calculation
+    START_TIME=$(date +%s)
+
     # Log startup configuration
     log_debug "Configuration:"
     log_debug "  Workspace root: $workspace_root"
@@ -1392,6 +1554,7 @@ main() {
         if [[ $ITERATION_COUNT -ge $max_iterations ]]; then
             log_warn "Reached maximum iterations ($max_iterations)"
             log_info "Loop stopped: safety limit reached after $ITERATION_COUNT iteration(s)"
+            EXIT_CODE=1
             exit 1
         fi
 
@@ -1407,6 +1570,7 @@ main() {
         if ! poll_status "$workspace_root" >/dev/null; then
             log_error "Polling failed at iteration $ITERATION_COUNT"
             log_info "Loop stopped: polling error"
+            EXIT_CODE=1
             exit 1
         fi
 
@@ -1415,6 +1579,7 @@ main() {
             "none")
                 log_info "No more work available (reason: ${POLL_REASON:-no tasks remaining})"
                 log_info "Loop stopped: all work completed after $ITERATION_COUNT iteration(s)"
+                EXIT_CODE=0
                 exit 0
                 ;;
             "do-task")
@@ -1446,13 +1611,15 @@ main() {
                     if [[ $boundary_result -eq 1 ]]; then
                         log_info "Phase boundary reached (stop_at_phase: $STOP_AT_PHASE)"
                         log_info "Loop stopped: phase $STOP_AT_PHASE limit reached after $ITERATION_COUNT iteration(s)"
+                        EXIT_CODE=0
                         exit 0
                     fi
 
                     log_verbose "Task $POLL_TASK completed, continuing to next iteration"
                 else
-                    # Failure: increment consecutive error counter
+                    # Failure: increment consecutive error counter and tasks failed counter
                     consecutive_errors=$((consecutive_errors + 1))
+                    TASKS_FAILED=$((TASKS_FAILED + 1))
                     log_warn "Task failed (exit code: $task_exit_code), consecutive errors: $consecutive_errors/$max_errors"
 
                     # ==========================================================
@@ -1461,6 +1628,7 @@ main() {
                     if [[ $consecutive_errors -ge $max_errors ]]; then
                         log_error "Reached maximum consecutive errors ($max_errors)"
                         log_info "Loop stopped: too many consecutive failures after $ITERATION_COUNT iteration(s)"
+                        EXIT_CODE=1
                         exit 1
                     fi
 
@@ -1470,6 +1638,7 @@ main() {
             *)
                 log_warn "Unknown action: $POLL_ACTION (treating as 'none')"
                 log_info "Loop stopped: unknown action at iteration $ITERATION_COUNT"
+                EXIT_CODE=0
                 exit 0
                 ;;
         esac

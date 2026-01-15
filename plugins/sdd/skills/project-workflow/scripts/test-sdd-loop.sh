@@ -1795,6 +1795,427 @@ test_log_format_cli_overrides_env() {
 }
 
 # =============================================================================
+# PRIORITY 8 TESTS (Metrics Output - SDDLOOP-3.4010)
+# =============================================================================
+
+#######################################
+# Test 60: --metrics-file creates valid JSON
+# Validates that metrics file is created with valid JSON structure
+#######################################
+test_metrics_file_valid_json() {
+    echo "--- Test: --metrics-file creates valid JSON ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Metrics file creation exits with code 0"
+
+    # Check file was created
+    if [[ -f "$metrics_file" ]]; then
+        log_result "Metrics file created" "pass"
+    else
+        log_result "Metrics file created" "fail" "File not found: $metrics_file"
+        return
+    fi
+
+    # Validate JSON
+    if jq empty "$metrics_file" 2>/dev/null; then
+        log_result "Metrics file contains valid JSON" "pass"
+    else
+        log_result "Metrics file contains valid JSON" "fail" "jq failed to parse metrics file"
+    fi
+}
+
+#######################################
+# Test 61: Metrics JSON has required fields
+# Validates that all required fields are present in metrics JSON
+#######################################
+test_metrics_file_required_fields() {
+    echo "--- Test: Metrics JSON has required fields ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Metrics file creation exits with code 0"
+
+    # Check required fields exist
+    local version timestamp workspace_root exit_code_field iterations tasks_completed tasks_failed duration configuration
+
+    version=$(jq -r '.version' "$metrics_file" 2>/dev/null)
+    timestamp=$(jq -r '.timestamp' "$metrics_file" 2>/dev/null)
+    workspace_root=$(jq -r '.workspace_root' "$metrics_file" 2>/dev/null)
+    exit_code_field=$(jq -r '.exit_code' "$metrics_file" 2>/dev/null)
+    iterations=$(jq -r '.iterations' "$metrics_file" 2>/dev/null)
+    tasks_completed=$(jq -r '.tasks_completed' "$metrics_file" 2>/dev/null)
+    tasks_failed=$(jq -r '.tasks_failed' "$metrics_file" 2>/dev/null)
+    duration=$(jq -r '.duration_seconds' "$metrics_file" 2>/dev/null)
+    configuration=$(jq -r '.configuration' "$metrics_file" 2>/dev/null)
+
+    if [[ -n "$version" && "$version" != "null" ]]; then
+        log_result "Metrics has version field" "pass"
+    else
+        log_result "Metrics has version field" "fail" "version is missing or null"
+    fi
+
+    if [[ -n "$timestamp" && "$timestamp" != "null" ]]; then
+        log_result "Metrics has timestamp field" "pass"
+    else
+        log_result "Metrics has timestamp field" "fail" "timestamp is missing or null"
+    fi
+
+    if [[ -n "$workspace_root" && "$workspace_root" != "null" ]]; then
+        log_result "Metrics has workspace_root field" "pass"
+    else
+        log_result "Metrics has workspace_root field" "fail" "workspace_root is missing or null"
+    fi
+
+    if [[ "$exit_code_field" =~ ^[0-9]+$ ]]; then
+        log_result "Metrics has exit_code field" "pass"
+    else
+        log_result "Metrics has exit_code field" "fail" "exit_code is missing or not a number: $exit_code_field"
+    fi
+
+    if [[ "$iterations" =~ ^[0-9]+$ ]]; then
+        log_result "Metrics has iterations field" "pass"
+    else
+        log_result "Metrics has iterations field" "fail" "iterations is missing or not a number: $iterations"
+    fi
+
+    if [[ "$tasks_completed" =~ ^[0-9]+$ ]]; then
+        log_result "Metrics has tasks_completed field" "pass"
+    else
+        log_result "Metrics has tasks_completed field" "fail" "tasks_completed is missing or not a number: $tasks_completed"
+    fi
+
+    if [[ "$tasks_failed" =~ ^[0-9]+$ ]]; then
+        log_result "Metrics has tasks_failed field" "pass"
+    else
+        log_result "Metrics has tasks_failed field" "fail" "tasks_failed is missing or not a number: $tasks_failed"
+    fi
+
+    if [[ "$duration" =~ ^[0-9]+$ ]]; then
+        log_result "Metrics has duration_seconds field" "pass"
+    else
+        log_result "Metrics has duration_seconds field" "fail" "duration_seconds is missing or not a number: $duration"
+    fi
+
+    if [[ -n "$configuration" && "$configuration" != "null" ]]; then
+        log_result "Metrics has configuration object" "pass"
+    else
+        log_result "Metrics has configuration object" "fail" "configuration is missing or null"
+    fi
+}
+
+#######################################
+# Test 62: Metrics dry_run flag is true in dry-run mode
+# Validates that dry_run is set to true in metrics when running in dry-run mode
+#######################################
+test_metrics_dry_run_flag() {
+    echo "--- Test: Metrics dry_run flag is true in dry-run mode ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Dry-run mode exits with code 0"
+
+    local dry_run_value
+    dry_run_value=$(jq -r '.configuration.dry_run' "$metrics_file" 2>/dev/null)
+
+    if [[ "$dry_run_value" == "true" ]]; then
+        log_result "Metrics dry_run is true in dry-run mode" "pass"
+    else
+        log_result "Metrics dry_run is true in dry-run mode" "fail" "dry_run is: $dry_run_value"
+    fi
+}
+
+#######################################
+# Test 63: Metrics file invalid path error
+# Validates that invalid path shows clear error message
+#######################################
+test_metrics_file_invalid_path() {
+    echo "--- Test: Metrics file invalid path error ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --metrics-file /nonexistent/directory/metrics.json 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Invalid metrics path exits with code 2"
+    assert_contains "$output" "directory does not exist" "Shows directory not found error"
+}
+
+#######################################
+# Test 64: Metrics file non-writable path error
+# Validates that non-writable path shows clear error message
+#######################################
+test_metrics_file_non_writable_path() {
+    echo "--- Test: Metrics file non-writable path error ---"
+
+    # Skip if running as root (root can write anywhere)
+    if [[ $(id -u) -eq 0 ]]; then
+        log_result "Non-writable path test (skipped - running as root)" "pass"
+        return
+    fi
+
+    # Use /root or similar directory that's not writable by normal users
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --metrics-file /root/metrics.json 2>&1) || exit_code=$?
+
+    # Check for either permission error or directory not exist (depends on system)
+    if [[ $exit_code -eq 2 ]]; then
+        log_result "Non-writable path exits with code 2" "pass"
+    else
+        log_result "Non-writable path exits with code 2" "fail" "Exit code was: $exit_code"
+    fi
+}
+
+#######################################
+# Test 65: Metrics file missing value error
+# Validates that missing --metrics-file value shows error
+#######################################
+test_metrics_file_missing_value() {
+    echo "--- Test: Metrics file missing value error ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --metrics-file 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Missing --metrics-file value exits with code 2"
+    assert_contains "$output" "requires a file path" "Shows missing value error"
+}
+
+#######################################
+# Test 66: Metrics timestamp is ISO 8601 format
+# Validates that metrics timestamp is in ISO 8601 UTC format
+#######################################
+test_metrics_timestamp_format() {
+    echo "--- Test: Metrics timestamp is ISO 8601 format ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
+
+    local timestamp
+    timestamp=$(jq -r '.timestamp' "$metrics_file" 2>/dev/null)
+
+    # Check ISO 8601 format ending in Z (UTC)
+    if [[ "$timestamp" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+        log_result "Metrics timestamp is ISO 8601 UTC format" "pass"
+    else
+        log_result "Metrics timestamp is ISO 8601 UTC format" "fail" "Got: $timestamp"
+    fi
+}
+
+#######################################
+# Test 67: Metrics configuration has all settings
+# Validates that configuration object has all expected settings
+#######################################
+test_metrics_configuration_complete() {
+    echo "--- Test: Metrics configuration has all settings ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 5 --max-errors 2 --timeout 100 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
+
+    # Check configuration fields
+    local max_iter max_err timeout poll_int dry_run verbose
+
+    max_iter=$(jq -r '.configuration.max_iterations' "$metrics_file" 2>/dev/null)
+    max_err=$(jq -r '.configuration.max_errors' "$metrics_file" 2>/dev/null)
+    timeout=$(jq -r '.configuration.timeout' "$metrics_file" 2>/dev/null)
+    poll_int=$(jq -r '.configuration.poll_interval' "$metrics_file" 2>/dev/null)
+    dry_run=$(jq -r '.configuration.dry_run' "$metrics_file" 2>/dev/null)
+    verbose=$(jq -r '.configuration.verbose' "$metrics_file" 2>/dev/null)
+
+    if [[ "$max_iter" == "5" ]]; then
+        log_result "Metrics config has max_iterations=5" "pass"
+    else
+        log_result "Metrics config has max_iterations=5" "fail" "Got: $max_iter"
+    fi
+
+    if [[ "$max_err" == "2" ]]; then
+        log_result "Metrics config has max_errors=2" "pass"
+    else
+        log_result "Metrics config has max_errors=2" "fail" "Got: $max_err"
+    fi
+
+    if [[ "$timeout" == "100" ]]; then
+        log_result "Metrics config has timeout=100" "pass"
+    else
+        log_result "Metrics config has timeout=100" "fail" "Got: $timeout"
+    fi
+
+    if [[ "$poll_int" =~ ^[0-9]+$ ]]; then
+        log_result "Metrics config has poll_interval" "pass"
+    else
+        log_result "Metrics config has poll_interval" "fail" "Got: $poll_int"
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        log_result "Metrics config has dry_run=true" "pass"
+    else
+        log_result "Metrics config has dry_run=true" "fail" "Got: $dry_run"
+    fi
+
+    if [[ "$verbose" == "false" || "$verbose" == "true" ]]; then
+        log_result "Metrics config has verbose (boolean)" "pass"
+    else
+        log_result "Metrics config has verbose (boolean)" "fail" "Got: $verbose"
+    fi
+}
+
+#######################################
+# Test 68: Metrics exit_code reflects actual exit
+# Validates that metrics exit_code matches the actual script exit code
+#######################################
+test_metrics_exit_code_accurate() {
+    echo "--- Test: Metrics exit_code reflects actual exit ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board_with_counter 10  # Would run forever without limit
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    # Limit iterations to cause exit with code 1
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Max iterations exits with code 1"
+
+    local metrics_exit_code
+    metrics_exit_code=$(jq -r '.exit_code' "$metrics_file" 2>/dev/null)
+
+    if [[ "$metrics_exit_code" == "1" ]]; then
+        log_result "Metrics exit_code matches actual exit code" "pass"
+    else
+        log_result "Metrics exit_code matches actual exit code" "fail" "Got: $metrics_exit_code"
+    fi
+}
+
+#######################################
+# Test 69: Metrics iterations count is accurate
+# Validates that iterations count matches actual iterations performed
+#######################################
+test_metrics_iterations_accurate() {
+    echo "--- Test: Metrics iterations count is accurate ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board_with_counter 2  # Will run 2 tasks then stop
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 10 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Completed work exits with code 0"
+
+    local metrics_iterations
+    metrics_iterations=$(jq -r '.iterations' "$metrics_file" 2>/dev/null)
+
+    # Should be 3 iterations: 2 tasks + 1 final poll that returns none
+    if [[ "$metrics_iterations" == "3" ]]; then
+        log_result "Metrics iterations count is accurate (3)" "pass"
+    else
+        log_result "Metrics iterations count is accurate (3)" "fail" "Got: $metrics_iterations"
+    fi
+}
+
+#######################################
+# Test 70: Help output documents --metrics-file
+# Validates that help text includes --metrics-file option
+#######################################
+test_metrics_file_in_help() {
+    echo "--- Test: Help output documents --metrics-file ---"
+
+    local output
+    output=$(bash "$SDD_LOOP_ORIGINAL" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help exits with code 0"
+    assert_contains "$output" "--metrics-file" "Help documents --metrics-file option"
+    assert_contains "$output" "JSON metrics" "Help describes metrics as JSON"
+}
+
+#######################################
+# Test 71: Metrics duration is reasonable
+# Validates that duration_seconds is non-negative and reasonable
+#######################################
+test_metrics_duration_reasonable() {
+    echo "--- Test: Metrics duration is reasonable ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
+
+    local duration
+    duration=$(jq -r '.duration_seconds' "$metrics_file" 2>/dev/null)
+
+    # Duration should be a non-negative integer, and reasonably small for a quick test
+    if [[ "$duration" =~ ^[0-9]+$ && "$duration" -ge 0 && "$duration" -lt 60 ]]; then
+        log_result "Metrics duration is reasonable (0-60s)" "pass"
+    else
+        log_result "Metrics duration is reasonable (0-60s)" "fail" "Got: $duration"
+    fi
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -1995,6 +2416,39 @@ main() {
     test_log_format_json_special_chars
     echo ""
     test_log_format_cli_overrides_env
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 8 TESTS (Metrics Output - SDDLOOP-3.4010)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 8 Tests (Metrics Output)"
+    echo "====================================="
+    echo ""
+
+    test_metrics_file_valid_json
+    echo ""
+    test_metrics_file_required_fields
+    echo ""
+    test_metrics_dry_run_flag
+    echo ""
+    test_metrics_file_invalid_path
+    echo ""
+    test_metrics_file_non_writable_path
+    echo ""
+    test_metrics_file_missing_value
+    echo ""
+    test_metrics_timestamp_format
+    echo ""
+    test_metrics_configuration_complete
+    echo ""
+    test_metrics_exit_code_accurate
+    echo ""
+    test_metrics_iterations_accurate
+    echo ""
+    test_metrics_file_in_help
+    echo ""
+    test_metrics_duration_reasonable
     echo ""
 
     # Summary
