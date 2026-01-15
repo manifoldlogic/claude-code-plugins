@@ -388,8 +388,10 @@ EOF
     local task_num
     for ((task_num=1; task_num<=TASK_COUNT; task_num++)); do
         # Distribute tasks across phases 1-4
-        local phase=$(( (task_num % 4) + 1 ))
-        local task_id="LOADTEST.${phase}$(printf '%03d' $task_num)"
+        local phase
+        phase=$(( (task_num % 4) + 1 ))
+        local task_id
+        task_id="LOADTEST.${phase}$(printf '%03d' $task_num)"
 
         cat > "$tasks_dir/${task_id}_load-test-task.md" << EOF
 # Task: [$task_id]: Load Test Task $task_num
@@ -484,8 +486,9 @@ EOF
 fi
 MOCK_SCRIPT
 
-    # Replace placeholder with actual task count
-    sed -i "s/__TASK_COUNT__/$TASK_COUNT/" "$WORKSPACE/scripts/master-status-board.sh"
+    # Replace placeholder with actual task count (portable sed -i)
+    sed -i.bak "s/__TASK_COUNT__/$TASK_COUNT/" "$WORKSPACE/scripts/master-status-board.sh"
+    rm -f "$WORKSPACE/scripts/master-status-board.sh.bak"
     chmod +x "$WORKSPACE/scripts/master-status-board.sh"
 
     log_verbose "Created mock master-status-board.sh"
@@ -545,11 +548,12 @@ else
 fi
 MOCK_CLAUDE
 
-    # Replace placeholders
-    sed -i "s|__WORKSPACE__|$WORKSPACE|g" "$WORKSPACE/bin/claude"
-    sed -i "s|__FAILURE_RATE__|$FAILURE_RATE|g" "$WORKSPACE/bin/claude"
-    sed -i "s|__TASK_DURATION_MIN__|$TASK_DURATION_MIN|g" "$WORKSPACE/bin/claude"
-    sed -i "s|__TASK_DURATION_MAX__|$TASK_DURATION_MAX|g" "$WORKSPACE/bin/claude"
+    # Replace placeholders (portable sed -i)
+    sed -i.bak "s|__WORKSPACE__|$WORKSPACE|g" "$WORKSPACE/bin/claude"
+    sed -i.bak "s|__FAILURE_RATE__|$FAILURE_RATE|g" "$WORKSPACE/bin/claude"
+    sed -i.bak "s|__TASK_DURATION_MIN__|$TASK_DURATION_MIN|g" "$WORKSPACE/bin/claude"
+    sed -i.bak "s|__TASK_DURATION_MAX__|$TASK_DURATION_MAX|g" "$WORKSPACE/bin/claude"
+    rm -f "$WORKSPACE/bin/claude.bak"
     chmod +x "$WORKSPACE/bin/claude"
 
     log_verbose "Created mock claude CLI"
@@ -705,7 +709,11 @@ generate_report() {
     # Calculate derived values using awk (more portable than bc)
     local elapsed_hours success_rate
     elapsed_hours=$(awk "BEGIN {printf \"%.2f\", $elapsed / 3600}")
-    success_rate=$(awk "BEGIN {printf \"%.1f\", $completed * 100 / ($total + 1)}")
+    if [[ $total -gt 0 ]]; then
+        success_rate=$(awk "BEGIN {printf \"%.1f\", $completed * 100 / $total}")
+    else
+        success_rate="0.0"
+    fi
 
     # Build report
     local report

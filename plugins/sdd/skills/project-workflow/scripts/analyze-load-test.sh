@@ -32,8 +32,6 @@ set -euo pipefail
 # Configuration
 # =============================================================================
 
-VERSION="1.0.0"
-
 # Thresholds for leak detection
 MEMORY_GROWTH_THRESHOLD_KB_PER_HOUR=1024  # 1MB/hour considered a leak
 FD_GROWTH_THRESHOLD_PER_HOUR=5             # 5 FDs/hour considered a leak
@@ -44,7 +42,6 @@ CPU_HIGH_THRESHOLD=50                       # >50% average is concerning
 # =============================================================================
 
 METRICS_FILE=""
-WORKSPACE_DIR=""
 
 # =============================================================================
 # Help
@@ -446,7 +443,7 @@ main() {
     fi
 
     METRICS_FILE="$1"
-    WORKSPACE_DIR="${2:-}"
+    # Note: workspace_dir argument accepted but reserved for future use
 
     # Verify file exists
     if [[ ! -f "$METRICS_FILE" ]]; then

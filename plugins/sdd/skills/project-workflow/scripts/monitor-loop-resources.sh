@@ -295,7 +295,8 @@ get_fd_count() {
     else
         # Fall back to lsof (macOS, BSD)
         if command -v lsof &>/dev/null; then
-            fd_count=$(lsof -p "$pid" 2>/dev/null | wc -l)
+            # Skip header line with tail -n +2
+            fd_count=$(lsof -p "$pid" 2>/dev/null | tail -n +2 | wc -l)
         else
             fd_count="0"
         fi

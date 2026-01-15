@@ -147,7 +147,7 @@ For CI/CD environments without API access, you can skip integration tests:
 
 ### Directory Structure
 
-```
+```text
 tests/
 ├── integration-test-sdd-loop.sh   # Main integration test script
 ├── README.md                       # This file
@@ -194,7 +194,7 @@ which claude
 
 3. Verify the task file status:
    ```bash
-   cat /tmp/sdd-integration-test-*/\_SDD/tickets/TEST_integration-test/tasks/TEST.1001_simple-integration-test.md
+   cat /tmp/sdd-integration-test-*/_SDD/tickets/TEST_integration-test/tasks/TEST.1001_simple-integration-test.md
    ```
 
 ### Test Fails: API Authentication

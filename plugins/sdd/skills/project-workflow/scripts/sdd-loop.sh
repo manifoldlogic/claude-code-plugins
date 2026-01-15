@@ -1605,10 +1605,9 @@ main() {
                     # ==========================================================
                     # Phase Boundary Check: Stop if stop_at_phase reached
                     # Note: check_phase_boundary returns 1 (non-zero) when should stop
+                    # Using if ! pattern to avoid set -e terminating on non-zero return
                     # ==========================================================
-                    check_phase_boundary "$POLL_TICKET" "$POLL_TASK" "$POLL_SDD_ROOT"
-                    local boundary_result=$?
-                    if [[ $boundary_result -eq 1 ]]; then
+                    if ! check_phase_boundary "$POLL_TICKET" "$POLL_TASK" "$POLL_SDD_ROOT"; then
                         log_info "Phase boundary reached (stop_at_phase: $STOP_AT_PHASE)"
                         log_info "Loop stopped: phase $STOP_AT_PHASE limit reached after $ITERATION_COUNT iteration(s)"
                         EXIT_CODE=0

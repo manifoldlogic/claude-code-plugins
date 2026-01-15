@@ -460,13 +460,12 @@ MOCK_EOF
     local exit_code=0
     output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
 
-    # Due to `set -e` in sdd-loop.sh, when check_phase_boundary returns 1,
-    # the script exits immediately (before the log_info message).
+    # Phase boundary detection should result in a successful (exit 0) exit
     # We can verify phase boundary detection by checking:
-    # 1. Script exits (with code 1 due to set -e propagating the boundary check return value)
+    # 1. Script exits successfully (code 0 - reaching phase boundary is expected)
     # 2. Loop stops after 1 iteration despite having 5 max iterations
     # 3. The [DRY-RUN] message shows the task was processed
-    assert_exit_code 1 "$exit_code" "Phase boundary causes script exit (set -e behavior)"
+    assert_exit_code 0 "$exit_code" "Phase boundary causes successful exit"
     assert_contains "$output" "1 iteration(s)" "Loop stops after 1 iteration (phase boundary)"
     assert_contains "$output" "PHASE.2001" "Processed the phase 2 task"
 }
