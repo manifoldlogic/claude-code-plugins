@@ -75,9 +75,9 @@ Agent execution approval signal. This field explicitly authorizes autonomous age
 Optional prioritization for execution ordering. Lower numbers indicate higher priority.
 
 **Behavior:**
-- `1` = Highest priority
+- Lower numbers = Higher priority (e.g., 1 is higher than 2, 2 is higher than 3)
 - `null` = Lowest priority (processed last)
-- `0` is a valid priority value (higher than `1`)
+- `0` is valid and would be highest priority (but `1` is conventional)
 - Negative values are rejected with an error
 - No upper bound on priority values
 - Set via `/sdd:mark-ready --priority N`
