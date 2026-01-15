@@ -1308,6 +1308,93 @@ MOCK_EOF
 }
 
 # =============================================================================
+# PRIORITY 5 TESTS (Version Compatibility - SDDLOOP-3.4005)
+# =============================================================================
+
+#######################################
+# Test 43: Version matching (1.0.0) - no warning
+# Validates that matching version does not produce a warning
+#######################################
+test_version_matching() {
+    echo "--- Test: Version matching - no warning ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns correct version 1.0.0
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Version matching exits with code 0"
+    assert_not_contains "$output" "version mismatch" "No version mismatch warning when version matches"
+    assert_contains "$output" "Version check passed" "Debug shows version check passed"
+}
+
+#######################################
+# Test 44: Version mismatch (2.0.0) - warning logged
+# Validates that mismatched version produces a warning
+#######################################
+test_version_mismatch() {
+    echo "--- Test: Version mismatch - warning logged ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns different version 2.0.0
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"version":"2.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Version mismatch still exits with code 0 (graceful degradation)"
+    assert_contains "$output" "version mismatch" "Shows version mismatch warning"
+    assert_contains "$output" "2.0.0" "Warning includes actual version"
+    assert_contains "$output" "expected 1.0.0" "Warning includes expected version"
+}
+
+#######################################
+# Test 45: Version missing - warning logged with "unknown"
+# Validates that missing version field logs warning with "unknown"
+#######################################
+test_version_missing() {
+    echo "--- Test: Version missing - warning with unknown ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON without version field
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Missing version still exits with code 0 (backward compatible)"
+    assert_contains "$output" "version mismatch" "Shows version mismatch warning for missing version"
+    assert_contains "$output" "unknown" "Warning shows 'unknown' for missing version"
+    assert_contains "$output" "expected 1.0.0" "Warning includes expected version"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -1447,6 +1534,21 @@ main() {
     test_path_bounds_symlink_valid
     echo ""
     test_path_bounds_debug_output
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 5 TESTS (Version Compatibility - SDDLOOP-3.4005)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 5 Tests (Version Compatibility)"
+    echo "====================================="
+    echo ""
+
+    test_version_matching
+    echo ""
+    test_version_mismatch
+    echo ""
+    test_version_missing
     echo ""
 
     # Summary

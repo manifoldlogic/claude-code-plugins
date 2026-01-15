@@ -270,6 +270,15 @@ log_debug() {
 #   0 - Success (JSON parsed successfully)
 #   1 - JSON parse error (jq failed or malformed JSON)
 #   2 - master-status-board.sh execution failed
+#
+# Version Compatibility:
+#   Extracts and validates the "version" field from status board JSON output.
+#   Expected version: 1.0.0 (semantic versioning: MAJOR.MINOR.PATCH)
+#   - Logs warning if version mismatches or is missing (falls back to "unknown")
+#   - Version mismatch does NOT fail execution (graceful degradation)
+#   - MAJOR changes indicate breaking schema changes
+#   - MINOR changes indicate backward-compatible additions
+#   - PATCH changes indicate bug fixes with no schema changes
 #######################################
 poll_status() {
     local workspace_root="$1"
@@ -323,6 +332,21 @@ poll_status() {
         log_error "master-status-board.sh returned invalid JSON"
         log_debug "poll_status: Output was: $status_output"
         return 1
+    fi
+
+    # ==========================================================================
+    # Version Compatibility Check
+    # Extract version field and validate before parsing other fields
+    # ==========================================================================
+    local status_version
+    status_version=$(echo "$status_output" | jq -r '.version // "unknown"' 2>/dev/null)
+    local expected_version="1.0.0"
+
+    if [[ "$status_version" != "$expected_version" ]]; then
+        log_warn "Status board version mismatch: $status_version (expected $expected_version)"
+        log_debug "poll_status: Version check - actual=$status_version, expected=$expected_version"
+    else
+        log_debug "poll_status: Version check passed - $status_version"
     fi
 
     # Parse JSON using jq to extract recommended_action fields
