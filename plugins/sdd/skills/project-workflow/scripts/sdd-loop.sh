@@ -106,6 +106,13 @@ EXIT_REQUESTED=false
 # Exit code to use when exiting
 EXIT_CODE=0
 
+# Poll result state (set by poll_status function)
+POLL_ACTION=""
+POLL_TASK=""
+POLL_TICKET=""
+POLL_SDD_ROOT=""
+POLL_REASON=""
+
 # =============================================================================
 # Logging Functions
 # =============================================================================
@@ -166,35 +173,133 @@ log_debug() {
 
 #######################################
 # Poll master-status-board.sh for recommended action
+# Invokes the master status board script to scan the workspace and
+# determine the next recommended task based on autogate configuration.
+#
 # Arguments:
 #   $1 - Workspace root directory
+#
+# Globals Set:
+#   POLL_ACTION   - Recommended action (e.g., "do-task", "none")
+#   POLL_TASK     - Task ID to execute (e.g., "TICKET.1001")
+#   POLL_TICKET   - Ticket ID containing the task
+#   POLL_SDD_ROOT - SDD root directory path
+#   POLL_REASON   - Human-readable reason for recommendation
+#
 # Outputs:
 #   JSON output from master-status-board.sh to stdout
+#
 # Returns:
-#   0 on success
-#   1 on error (status board not found, execution failure)
+#   0 - Success (JSON parsed successfully)
+#   1 - JSON parse error (jq failed or malformed JSON)
+#   2 - master-status-board.sh execution failed
 #######################################
 poll_status() {
     local workspace_root="$1"
 
     log_debug "poll_status: Polling status board for workspace: $workspace_root"
 
-    # Placeholder implementation - will be completed in subsequent task
-    # This skeleton demonstrates the expected interface
+    # Reset poll result state
+    POLL_ACTION=""
+    POLL_TASK=""
+    POLL_TICKET=""
+    POLL_SDD_ROOT=""
+    POLL_REASON=""
 
-    local status_board_script="$SCRIPT_DIR/master-status-board.sh"
-
-    if [[ ! -x "$status_board_script" ]]; then
-        log_error "master-status-board.sh not found or not executable: $status_board_script"
+    # Check if jq is installed (required for JSON parsing)
+    if ! command -v jq &>/dev/null; then
+        log_error "jq not found. Install with: apt-get install jq (Debian/Ubuntu) or brew install jq (macOS)"
         return 1
     fi
 
-    # Execute status board and capture output
-    # In full implementation, this will parse and return the recommended_action
-    log_debug "poll_status: Would execute: $status_board_script $workspace_root"
+    # Build path to master-status-board.sh
+    # The script is in the same directory as sdd-loop.sh
+    local status_board_script="$SCRIPT_DIR/master-status-board.sh"
 
-    # Return placeholder JSON for now
-    echo '{"recommended_action": {"action": "none", "reason": "Skeleton implementation"}}'
+    # Verify script exists and is executable
+    if [[ ! -f "$status_board_script" ]]; then
+        log_error "master-status-board.sh not found: $status_board_script"
+        return 2
+    fi
+
+    if [[ ! -x "$status_board_script" ]]; then
+        # Try to make it executable, or warn user
+        log_debug "poll_status: master-status-board.sh not executable, will invoke with bash"
+    fi
+
+    log_debug "poll_status: Executing: bash $status_board_script --json $workspace_root"
+
+    # Execute master-status-board.sh with --json flag and capture output
+    local status_output
+    local exit_code=0
+    status_output=$(bash "$status_board_script" --json "$workspace_root" 2>&1) || exit_code=$?
+
+    # Check if master-status-board.sh failed
+    if [[ $exit_code -ne 0 ]]; then
+        log_error "master-status-board.sh failed with exit code $exit_code"
+        log_debug "poll_status: Output was: $status_output"
+        return 2
+    fi
+
+    # Validate that output is valid JSON
+    if ! echo "$status_output" | jq empty 2>/dev/null; then
+        log_error "master-status-board.sh returned invalid JSON"
+        log_debug "poll_status: Output was: $status_output"
+        return 1
+    fi
+
+    # Parse JSON using jq to extract recommended_action fields
+    # Use safe defaults (// "") for missing fields
+    local parse_error=0
+
+    POLL_ACTION=$(echo "$status_output" | jq -r '.recommended_action.action // ""' 2>/dev/null) || parse_error=1
+    if [[ $parse_error -ne 0 ]]; then
+        log_error "Failed to parse JSON field: recommended_action.action"
+        return 1
+    fi
+
+    POLL_TASK=$(echo "$status_output" | jq -r '.recommended_action.task // ""' 2>/dev/null) || parse_error=1
+    if [[ $parse_error -ne 0 ]]; then
+        log_error "Failed to parse JSON field: recommended_action.task"
+        return 1
+    fi
+
+    POLL_TICKET=$(echo "$status_output" | jq -r '.recommended_action.ticket // ""' 2>/dev/null) || parse_error=1
+    if [[ $parse_error -ne 0 ]]; then
+        log_error "Failed to parse JSON field: recommended_action.ticket"
+        return 1
+    fi
+
+    POLL_SDD_ROOT=$(echo "$status_output" | jq -r '.recommended_action.sdd_root // ""' 2>/dev/null) || parse_error=1
+    if [[ $parse_error -ne 0 ]]; then
+        log_error "Failed to parse JSON field: recommended_action.sdd_root"
+        return 1
+    fi
+
+    POLL_REASON=$(echo "$status_output" | jq -r '.recommended_action.reason // ""' 2>/dev/null) || parse_error=1
+    if [[ $parse_error -ne 0 ]]; then
+        log_error "Failed to parse JSON field: recommended_action.reason"
+        return 1
+    fi
+
+    # Log poll results at verbose level
+    log_verbose "Poll result: action=$POLL_ACTION"
+    if [[ -n "$POLL_TASK" ]]; then
+        log_verbose "  Task: $POLL_TASK"
+    fi
+    if [[ -n "$POLL_TICKET" ]]; then
+        log_verbose "  Ticket: $POLL_TICKET"
+    fi
+    if [[ -n "$POLL_SDD_ROOT" ]]; then
+        log_verbose "  SDD Root: $POLL_SDD_ROOT"
+    fi
+    if [[ -n "$POLL_REASON" ]]; then
+        log_verbose "  Reason: $POLL_REASON"
+    fi
+
+    # Output the full JSON to stdout for potential downstream use
+    echo "$status_output"
+
     return 0
 }
 
