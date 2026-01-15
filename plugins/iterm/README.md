@@ -288,6 +288,76 @@ plugins/iterm/
 └── README.md
 ```
 
+## Testing
+
+The plugin includes a comprehensive automated test suite to verify functionality across all scripts and execution modes.
+
+### Running Tests
+
+```bash
+# Run all tests (from plugin directory)
+cd plugins/iterm
+./test-iterm-plugin.sh
+
+# Run with verbose output for debugging
+./test-iterm-plugin.sh --verbose
+
+# Test a specific script only
+./test-iterm-plugin.sh --script open-tab
+./test-iterm-plugin.sh --script list-tabs
+./test-iterm-plugin.sh --script close-tab
+
+# Quiet mode for CI/CD (summary only)
+./test-iterm-plugin.sh --quiet
+```
+
+### Test Coverage
+
+The test suite includes 87 tests across 11 categories:
+
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| Script Existence | 7 | All scripts exist and are executable |
+| Help and Usage | 9 | --help/-h flags work correctly |
+| Dry-Run Mode | 8 | AppleScript generation without execution |
+| Argument Parsing | 14 | All flags parsed correctly |
+| Exit Codes | 7 | Error codes match specification |
+| AppleScript Structure | 12 | Generated scripts are well-formed |
+| Error Paths | 4 | Invalid inputs handled properly |
+| Combined Options | 4 | Multiple flags work together |
+| Context Detection | 6 | Host/container mode detection |
+| Edge Cases | 6 | Special characters, spaces in paths |
+| Shell Compatibility | 6 | Shebang, strict mode settings |
+
+### CI/CD Integration
+
+Add to your GitHub Actions workflow:
+
+```yaml
+- name: Test iTerm Plugin
+  run: |
+    cd plugins/iterm
+    ./test-iterm-plugin.sh --quiet
+```
+
+The test script exits with code 0 on success and code 1 if any tests fail.
+
+### Adding New Tests
+
+New tests can be added to `test-iterm-plugin.sh`. Each test follows this pattern:
+
+```bash
+test_my_new_test() {
+    local output
+    output=$("$SCRIPTS_DIR/iterm-open-tab.sh" --my-flag 2>&1)
+    echo "$output" | grep -q "expected pattern"
+}
+
+run_test "Description of test" test_my_new_test
+```
+
+See the script's inline comments for detailed documentation on the test framework.
+
 ## Related
 
 - **worktree-spawn skill**: Uses iTerm tab management for devcontainer worktree workflows
