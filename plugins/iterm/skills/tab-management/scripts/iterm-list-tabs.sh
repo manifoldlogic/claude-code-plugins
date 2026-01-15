@@ -86,9 +86,13 @@ OUTPUT FORMATS:
 
   Table format (default):
     Window  Tab  Title                    Session
-    1       1    Devcontainer             zsh
-    1       2    claude-code-plugins      zsh
-    2       1    System Monitor           zsh
+    1       1    Devcontainer             Devcontainer
+    1       2    claude-code-plugins      claude-code-plugins
+    2       1    System Monitor           System Monitor
+
+  Note: Title and Session show the same value (session name) as iTerm2's
+  AppleScript API exposes the session name for both. The session name is
+  what appears as the tab title in iTerm2.
 
   JSON format:
     {
@@ -96,8 +100,8 @@ OUTPUT FORMATS:
         {
           "index": 1,
           "tabs": [
-            {"index": 1, "title": "Devcontainer", "session": "zsh"},
-            {"index": 2, "title": "claude-code-plugins", "session": "zsh"}
+            {"index": 1, "title": "Devcontainer", "session": "Devcontainer"},
+            {"index": 2, "title": "claude-code-plugins", "session": "claude-code-plugins"}
           ]
         }
       ]

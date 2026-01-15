@@ -245,10 +245,8 @@ test_validate_iterm_local() {
         return $?
     else
         # Should fail with correct exit code
-        if _validate_iterm_local 2>/dev/null; then
-            return 1  # Should have failed
-        fi
-        local exit_code=$?
+        local exit_code
+        _validate_iterm_local 2>/dev/null || exit_code=$?
         [ "$exit_code" = "$EXIT_ITERM_UNAVAILABLE" ] || return 1
         return 0
     fi

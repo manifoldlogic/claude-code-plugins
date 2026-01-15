@@ -132,10 +132,10 @@ The iTerm plugin scripts accept a `--profile` or `-p` flag to specify which iTer
 
 ```bash
 # Example: Open tab with Devcontainer profile
-open-tab.sh --profile Devcontainer
+iterm-open-tab.sh --profile Devcontainer
 
-# Example: Navigate to directory with profile
-open-in-dir.sh /workspace/repos/myproject --profile Devcontainer
+# Example: Open tab in directory with profile
+iterm-open-tab.sh --directory /workspace/repos/myproject --profile Devcontainer
 ```
 
 ### Environment Variable Configuration

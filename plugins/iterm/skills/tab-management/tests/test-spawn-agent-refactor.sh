@@ -446,6 +446,7 @@ main() {
     # Verify spawn-agent.sh exists
     if [[ ! -f "$SPAWN_AGENT_SCRIPT" ]]; then
         fail "spawn-agent.sh not found at: $SPAWN_AGENT_SCRIPT"
+        teardown
         exit 1
     fi
 
