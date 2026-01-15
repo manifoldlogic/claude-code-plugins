@@ -142,6 +142,19 @@ log_error() {
 }
 
 #######################################
+# Log a warning message to stderr
+# Arguments:
+#   $@ - Message to print
+# Outputs:
+#   Writes timestamped warning message to stderr
+#######################################
+log_warn() {
+    if [[ "$SDD_LOOP_QUIET" != "true" ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >&2
+    fi
+}
+
+#######################################
 # Log a verbose message to stderr (only if verbose mode enabled)
 # Arguments:
 #   $@ - Message to print
@@ -815,21 +828,68 @@ main() {
         log_info "Running in DRY-RUN mode - no tasks will be executed"
     fi
 
-    # Main loop placeholder
-    # Full implementation will be added in subsequent tasks
-    log_info "Polling for recommended actions..."
+    # ==========================================================================
+    # Main Poll-Execute Loop (Phase 1)
+    # ==========================================================================
+    # Phase 1 implementation has NO safety limits:
+    # - No max iteration limit
+    # - No error count tracking
+    # - No timeout on task execution
+    # - No phase boundary checking
+    # These will be added in Phase 2.
+    # ==========================================================================
 
-    local status_output
-    if ! status_output=$(poll_status "$workspace_root"); then
-        log_error "Failed to poll status board"
-        exit 1
-    fi
+    local iteration=0
 
-    log_verbose "Status board output: $status_output"
-    log_info "Loop controller skeleton complete. Full implementation pending."
+    while true; do
+        # Check if exit was requested via signal
+        if [[ "$EXIT_REQUESTED" == "true" ]]; then
+            log_info "Loop stopped: exit requested via signal"
+            exit "$EXIT_CODE"
+        fi
 
-    # Clean exit
-    exit "$EXIT_CODE"
+        # Increment iteration counter
+        iteration=$((iteration + 1))
+
+        # Log iteration start
+        log_info "Iteration $iteration: polling for next task"
+
+        # Poll status board for recommended action
+        # Redirect stdout to /dev/null since poll_status outputs JSON to stdout
+        # but we only need the global variables it sets
+        if ! poll_status "$workspace_root" >/dev/null; then
+            log_error "Polling failed at iteration $iteration"
+            log_info "Loop stopped: polling error"
+            exit 1
+        fi
+
+        # Handle the recommended action
+        case "$POLL_ACTION" in
+            "none")
+                log_info "No more work available (reason: ${POLL_REASON:-no tasks remaining})"
+                log_info "Loop stopped: all work completed after $iteration iteration(s)"
+                exit 0
+                ;;
+            "do-task")
+                log_info "Action: execute task $POLL_TASK (ticket: $POLL_TICKET)"
+
+                # Execute the task
+                if ! execute_task "$POLL_TASK" "$POLL_SDD_ROOT"; then
+                    log_error "Task execution failed: $POLL_TASK"
+                    log_info "Loop stopped: task execution error at iteration $iteration"
+                    exit 1
+                fi
+
+                # Task completed successfully, continue to next iteration
+                log_verbose "Task $POLL_TASK completed, continuing to next iteration"
+                ;;
+            *)
+                log_warn "Unknown action: $POLL_ACTION (treating as 'none')"
+                log_info "Loop stopped: unknown action at iteration $iteration"
+                exit 0
+                ;;
+        esac
+    done
 }
 
 # =============================================================================
