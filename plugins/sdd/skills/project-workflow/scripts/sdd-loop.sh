@@ -245,6 +245,32 @@ log_debug() {
 }
 
 # =============================================================================
+# JSON Helper Functions
+# =============================================================================
+
+#######################################
+# Extract JSON field with jq, returning default if field is null/missing
+# This helper reduces code duplication in JSON parsing operations.
+#
+# Arguments:
+#   $1 - json: String containing JSON data
+#   $2 - field_path: jq query path (e.g., ".recommended_action.action")
+#   $3 - default: Default value if field not found or null (optional, defaults to "")
+#
+# Outputs:
+#   Extracted field value or default to stdout
+#
+# Returns:
+#   Always returns 0 (errors suppressed, default returned on failure)
+#######################################
+parse_json_field() {
+    local json="$1"
+    local field_path="$2"
+    local default="${3:-}"
+    echo "$json" | jq -r "$field_path // \"$default\"" 2>/dev/null
+}
+
+# =============================================================================
 # Core Functions (Skeletons for Phase 1)
 # =============================================================================
 
@@ -339,7 +365,7 @@ poll_status() {
     # Extract version field and validate before parsing other fields
     # ==========================================================================
     local status_version
-    status_version=$(echo "$status_output" | jq -r '.version // "unknown"' 2>/dev/null)
+    status_version=$(parse_json_field "$status_output" ".version" "unknown")
     local expected_version="1.0.0"
 
     if [[ "$status_version" != "$expected_version" ]]; then
@@ -349,39 +375,13 @@ poll_status() {
         log_debug "poll_status: Version check passed - $status_version"
     fi
 
-    # Parse JSON using jq to extract recommended_action fields
-    # Use safe defaults (// "") for missing fields
-    local parse_error=0
-
-    POLL_ACTION=$(echo "$status_output" | jq -r '.recommended_action.action // ""' 2>/dev/null) || parse_error=1
-    if [[ $parse_error -ne 0 ]]; then
-        log_error "Failed to parse JSON field: recommended_action.action"
-        return 1
-    fi
-
-    POLL_TASK=$(echo "$status_output" | jq -r '.recommended_action.task // ""' 2>/dev/null) || parse_error=1
-    if [[ $parse_error -ne 0 ]]; then
-        log_error "Failed to parse JSON field: recommended_action.task"
-        return 1
-    fi
-
-    POLL_TICKET=$(echo "$status_output" | jq -r '.recommended_action.ticket // ""' 2>/dev/null) || parse_error=1
-    if [[ $parse_error -ne 0 ]]; then
-        log_error "Failed to parse JSON field: recommended_action.ticket"
-        return 1
-    fi
-
-    POLL_SDD_ROOT=$(echo "$status_output" | jq -r '.recommended_action.sdd_root // ""' 2>/dev/null) || parse_error=1
-    if [[ $parse_error -ne 0 ]]; then
-        log_error "Failed to parse JSON field: recommended_action.sdd_root"
-        return 1
-    fi
-
-    POLL_REASON=$(echo "$status_output" | jq -r '.recommended_action.reason // ""' 2>/dev/null) || parse_error=1
-    if [[ $parse_error -ne 0 ]]; then
-        log_error "Failed to parse JSON field: recommended_action.reason"
-        return 1
-    fi
+    # Parse JSON using helper function to extract recommended_action fields
+    # The parse_json_field helper handles errors gracefully and returns defaults
+    POLL_ACTION=$(parse_json_field "$status_output" ".recommended_action.action" "")
+    POLL_TASK=$(parse_json_field "$status_output" ".recommended_action.task" "")
+    POLL_TICKET=$(parse_json_field "$status_output" ".recommended_action.ticket" "")
+    POLL_SDD_ROOT=$(parse_json_field "$status_output" ".recommended_action.sdd_root" "")
+    POLL_REASON=$(parse_json_field "$status_output" ".recommended_action.reason" "")
 
     # Log poll results at verbose level (compact summary)
     log_verbose "Poll returned: action=$POLL_ACTION, task=$POLL_TASK"
