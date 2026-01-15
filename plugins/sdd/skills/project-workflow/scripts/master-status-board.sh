@@ -9,8 +9,12 @@
 #
 # Usage:
 #   bash master-status-board.sh [options] [workspace_root]
-#   bash master-status-board.sh                    # Use default workspace
-#   bash master-status-board.sh /path/to/repos    # Use specific workspace
+#
+# Examples:
+#   bash master-status-board.sh                         # Use default workspace
+#   bash master-status-board.sh /path/to/repos          # Use specific workspace
+#   bash master-status-board.sh --summary-only /workspace/repos/
+#   bash master-status-board.sh --verbose /workspace/repos/
 #   WORKSPACE_ROOT=/custom/path bash master-status-board.sh
 #
 # Arguments:
@@ -19,11 +23,15 @@
 #                     Default: /workspace/repos/
 #
 # Options:
-#   --help, -h        Show this help message
+#   -h, --help        Show this help message and exit
+#   -s, --summary-only  Output only summary section (no per-repo details)
+#   -v, --verbose     Include timing output for each repo scan (to stderr)
+#   --json            Output JSON format (default, explicit specification)
 #   --debug           Enable debug output to stderr
 #
 # Environment Variables:
 #   WORKSPACE_ROOT    Alternative to passing workspace root as argument
+#   DEBUG             Set to "true" to enable debug output
 #
 # Output (JSON):
 #   {
@@ -73,13 +81,17 @@
 
 set -euo pipefail
 
+# Version constant
+VERSION="1.0.0"
+
 # Configuration defaults (guard against re-sourcing)
 [[ -z "${DEFAULT_WORKSPACE_ROOT:-}" ]] && readonly DEFAULT_WORKSPACE_ROOT="/workspace/repos/"
 [[ -z "${MAX_SEARCH_DEPTH:-}" ]] && readonly MAX_SEARCH_DEPTH=2
-[[ -z "${VERSION:-}" ]] && readonly VERSION="1.0.0"
 
 # Global flags
 DEBUG="${DEBUG:-false}"
+SUMMARY_ONLY="${SUMMARY_ONLY:-false}"
+VERBOSE="${VERBOSE:-false}"
 
 #######################################
 # Print debug message to stderr
@@ -99,21 +111,14 @@ debug_log() {
 # Removes fenced code blocks (``` ... ```) to avoid parsing
 # checkboxes that appear in code examples
 # Arguments:
-#   $1 - File content (stdin if not provided)
+#   None - reads from stdin
 # Outputs:
-#   Content with code blocks removed
+#   Content with code blocks removed to stdout
 #######################################
 strip_code_blocks() {
-    local content
-    if [[ $# -gt 0 ]]; then
-        content="$1"
-    else
-        content=$(cat)
-    fi
-
     # Use awk to remove content between ``` markers
     # State machine: in_block toggles on/off when we see ```
-    echo "$content" | awk '
+    awk '
         BEGIN { in_block = 0 }
         /^```/ { in_block = !in_block; next }
         !in_block { print }
@@ -532,18 +537,28 @@ json_escape() {
 # Outputs:
 #   Help text to stdout
 #######################################
-show_help() {
-    cat << 'EOF'
-Master Status Board - Multi-repository SDD status aggregator
+show_usage() {
+    cat << EOF
+Master Status Board v${VERSION} - Multi-repository SDD status aggregator
 
 Usage:
   bash master-status-board.sh [options] [workspace_root]
 
 Examples:
-  bash master-status-board.sh                         # Use default workspace
-  bash master-status-board.sh /path/to/repos          # Use specific workspace
-  WORKSPACE_ROOT=/custom/path bash master-status-board.sh
-  bash master-status-board.sh --debug /workspace/repos
+  # Full output with all repo details
+  ./master-status-board.sh /workspace/repos/
+
+  # Summary only (no per-repo details)
+  ./master-status-board.sh --summary-only /workspace/repos/
+
+  # Verbose timing output
+  ./master-status-board.sh --verbose /workspace/repos/
+
+  # Combined options
+  ./master-status-board.sh -sv /workspace/repos/
+
+  # Use environment variable
+  WORKSPACE_ROOT=/custom/path ./master-status-board.sh
 
 Arguments:
   workspace_root    Root directory containing repositories (optional)
@@ -551,18 +566,31 @@ Arguments:
                     Default: /workspace/repos/
 
 Options:
-  --help, -h        Show this help message
+  -h, --help        Show this help message and exit
+  -s, --summary-only  Output only summary section (no per-repo details)
+  -v, --verbose     Include timing output for each repo scan (to stderr)
+  --json            Output JSON format (default, explicit specification)
   --debug           Enable debug output to stderr
 
 Environment Variables:
   WORKSPACE_ROOT    Alternative to passing workspace root as argument
   DEBUG             Set to "true" to enable debug output
 
+Timing Output (with --verbose):
+  [0.12s] Scanned repo-a (3 tickets, 15 tasks)
+  [0.25s] Scanned repo-b (2 tickets, 8 tasks)
+  [0.38s] Total: 5 tickets, 23 tasks in 0.38s
+
 Exit Codes:
   0 - Success (including empty workspace)
   1 - Workspace directory does not exist
   2 - Invalid arguments
 EOF
+}
+
+# Alias for backwards compatibility
+show_help() {
+    show_usage
 }
 
 #######################################
@@ -683,6 +711,23 @@ discover_sdd_directories() {
 }
 
 #######################################
+# Format elapsed time in seconds with 2 decimal places
+# Arguments:
+#   $1 - Start time in nanoseconds
+#   $2 - End time in nanoseconds
+# Outputs:
+#   Elapsed time formatted as X.XX
+#######################################
+format_elapsed_time() {
+    local start_ns="$1"
+    local end_ns="$2"
+    local elapsed_ns=$((end_ns - start_ns))
+    local elapsed_s=$((elapsed_ns / 1000000000))
+    local elapsed_ms=$(((elapsed_ns % 1000000000) / 10000000))
+    printf "%d.%02d" "$elapsed_s" "$elapsed_ms"
+}
+
+#######################################
 # Main entry point
 # Arguments:
 #   $@ - Command line arguments
@@ -691,21 +736,59 @@ main() {
     local workspace_root=""
     local positional_args=()
 
-    # Parse arguments
+    # Parse arguments using getopts-style processing
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --help|-h)
-                show_help
+                show_usage
                 exit 0
+                ;;
+            --summary-only|-s)
+                SUMMARY_ONLY="true"
+                shift
+                ;;
+            --verbose|-v)
+                VERBOSE="true"
+                shift
+                ;;
+            --json)
+                # JSON is the default output format, this is a no-op
+                shift
                 ;;
             --debug)
                 DEBUG="true"
                 shift
                 ;;
             -*)
-                echo "Error: Unknown option: $1" >&2
-                echo "Use --help for usage information" >&2
-                exit 2
+                # Check for combined short options like -sv
+                if [[ "$1" =~ ^-[a-zA-Z]+$ ]]; then
+                    local opts="${1:1}"
+                    local i=0
+                    local unknown_opt=""
+                    while [[ $i -lt ${#opts} ]]; do
+                        local opt="${opts:$i:1}"
+                        case "$opt" in
+                            s) SUMMARY_ONLY="true" ;;
+                            v) VERBOSE="true" ;;
+                            h) show_usage; exit 0 ;;
+                            *)
+                                unknown_opt="$opt"
+                                break
+                                ;;
+                        esac
+                        i=$((i + 1))
+                    done
+                    if [[ -n "$unknown_opt" ]]; then
+                        echo "Error: Unknown option: -$unknown_opt" >&2
+                        echo "Use --help for usage information" >&2
+                        exit 2
+                    fi
+                    shift
+                else
+                    echo "Error: Unknown option: $1" >&2
+                    echo "Use --help for usage information" >&2
+                    exit 2
+                fi
                 ;;
             *)
                 positional_args+=("$1")
@@ -743,9 +826,17 @@ main() {
     fi
 
     debug_log "Resolved workspace root: $workspace_root"
+    debug_log "SUMMARY_ONLY: $SUMMARY_ONLY"
+    debug_log "VERBOSE: $VERBOSE"
 
     # Discover all _SDD directories
     debug_log "Discovering _SDD directories in: $workspace_root"
+
+    # Record total start time for verbose mode
+    local total_start_ns
+    if [[ "$VERBOSE" == "true" ]]; then
+        total_start_ns=$(date +%s%N)
+    fi
 
     local find_output
     find_output=$(find "$workspace_root" -maxdepth "$MAX_SEARCH_DEPTH" -type d -name "_SDD" 2>&1) || true
@@ -799,6 +890,12 @@ main() {
 
             debug_log "Found _SDD: $resolved_path"
 
+            # Record start time for this repo if verbose
+            local repo_start_ns
+            if [[ "$VERBOSE" == "true" ]]; then
+                repo_start_ns=$(date +%s%N)
+            fi
+
             # Scan the repo using scan_repo function
             local repo_json
             repo_json=$(scan_repo "$resolved_path")
@@ -829,6 +926,17 @@ main() {
             repo_tested=${repo_tested:-0}
             repo_verified=${repo_verified:-0}
 
+            # Output timing for this repo if verbose
+            if [[ "$VERBOSE" == "true" ]]; then
+                local repo_end_ns
+                repo_end_ns=$(date +%s%N)
+                local repo_elapsed
+                repo_elapsed=$(format_elapsed_time "$repo_start_ns" "$repo_end_ns")
+                local repo_name
+                repo_name=$(basename "$(dirname "$resolved_path")")
+                echo "[${repo_elapsed}s] Scanned $repo_name ($repo_tickets tickets, $repo_tasks tasks)" >&2
+            fi
+
             # Aggregate at workspace level
             total_repos=$((total_repos + 1))
             total_tickets=$((total_tickets + repo_tickets))
@@ -840,15 +948,29 @@ main() {
         done <<< "$sorted_dirs"
     fi
 
+    # Output total timing if verbose
+    if [[ "$VERBOSE" == "true" ]]; then
+        local total_end_ns
+        total_end_ns=$(date +%s%N)
+        local total_elapsed
+        total_elapsed=$(format_elapsed_time "$total_start_ns" "$total_end_ns")
+        echo "[${total_elapsed}s] Total: $total_tickets tickets, $total_tasks tasks in ${total_elapsed}s" >&2
+    fi
+
     # Output final JSON
     echo "{"
     echo "  \"timestamp\": \"$(date -Iseconds)\","
     echo "  \"workspace_root\": \"$(json_escape "$workspace_root")\","
-    echo "  \"repos\": ["
-    if [[ -n "$repos_json" ]]; then
-        echo "$repos_json"
+
+    # Include repos array only if not summary-only mode
+    if [[ "$SUMMARY_ONLY" != "true" ]]; then
+        echo "  \"repos\": ["
+        if [[ -n "$repos_json" ]]; then
+            echo "$repos_json"
+        fi
+        echo "  ],"
     fi
-    echo "  ],"
+
     echo "  \"summary\": {"
     echo "    \"total_repos\": $total_repos,"
     echo "    \"total_tickets\": $total_tickets,"
@@ -911,6 +1033,7 @@ compute_recommended_action() {
     # 4. For each ticket, finds the first actionable task by state priority
     # 5. Returns the first overall match
     local recommendation
+    local jq_exit_code=0
     recommendation=$(echo "$scan_output" | jq -c '
         # Helper function to determine task state priority
         # Returns: 1 for pending, 2 for completed (needs testing), 3 for tested (needs verification), 4 for verified (skip)
@@ -1004,10 +1127,10 @@ compute_recommended_action() {
                 }
               end
           end
-    ' 2>/dev/null)
+    ' 2>/dev/null) || jq_exit_code=$?
 
     # Check if jq succeeded
-    if [[ $? -ne 0 ]] || [[ -z "$recommendation" ]]; then
+    if [[ $jq_exit_code -ne 0 ]] || [[ -z "$recommendation" ]]; then
         debug_log "  jq parsing failed, returning none"
         printf '{\n'
         printf '  "action": "none",\n'

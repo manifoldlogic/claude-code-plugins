@@ -312,6 +312,249 @@ test_unknown_option() {
 }
 
 #######################################
+# Test: --summary-only produces valid JSON without repos array
+#######################################
+test_summary_only_option() {
+    echo "--- Test: --summary-only option ---"
+
+    local test_workspace="$TEST_TMP_DIR/summary_workspace"
+    mkdir -p "$test_workspace/repo/_SDD/tickets/T1/tasks"
+    echo "# Test" > "$test_workspace/repo/_SDD/tickets/T1/README.md"
+    cat > "$test_workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --summary-only "$test_workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Summary-only exits with code 0"
+
+    # Should NOT contain repos array
+    if [[ "$output" == *'"repos":'* ]]; then
+        log_result "Summary-only omits repos array" "fail" "Output contains repos array"
+    else
+        log_result "Summary-only omits repos array" "pass"
+    fi
+
+    # Should contain summary
+    assert_contains "$output" '"summary":' "Summary-only includes summary"
+    assert_contains "$output" '"total_repos":' "Summary-only includes total_repos"
+    assert_contains "$output" '"total_tickets":' "Summary-only includes total_tickets"
+
+    # Output should be valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "Summary-only output is valid JSON" "pass"
+        else
+            log_result "Summary-only output is valid JSON" "fail" "JSON parsing failed"
+        fi
+    fi
+}
+
+#######################################
+# Test: -s short option for summary-only
+#######################################
+test_summary_only_short_option() {
+    echo "--- Test: -s short option ---"
+
+    local test_workspace="$TEST_TMP_DIR/summary_short_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" -s "$test_workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "-s option exits with code 0"
+
+    # Should NOT contain repos array
+    if [[ "$output" == *'"repos":'* ]]; then
+        log_result "-s option omits repos array" "fail" "Output contains repos array"
+    else
+        log_result "-s option omits repos array" "pass"
+    fi
+}
+
+#######################################
+# Test: --verbose includes timing output to stderr
+#######################################
+test_verbose_option() {
+    echo "--- Test: --verbose option ---"
+
+    local test_workspace="$TEST_TMP_DIR/verbose_workspace"
+    mkdir -p "$test_workspace/repo/_SDD/tickets/T1/tasks"
+    echo "# Test" > "$test_workspace/repo/_SDD/tickets/T1/README.md"
+    cat > "$test_workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+EOF
+
+    local stdout_output
+    local stderr_output
+
+    # Capture stdout and stderr separately
+    stderr_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Verbose option exits with code 0"
+
+    # stderr should contain timing information
+    assert_contains "$stderr_output" "Scanned" "Verbose includes 'Scanned' in timing"
+    assert_contains "$stderr_output" "tickets" "Verbose includes 'tickets' in timing"
+    assert_contains "$stderr_output" "tasks" "Verbose includes 'tasks' in timing"
+    assert_contains "$stderr_output" "Total:" "Verbose includes total timing"
+
+    # stderr should contain timing format [X.XXs]
+    if [[ "$stderr_output" =~ \[[0-9]+\.[0-9]+s\] ]]; then
+        log_result "Verbose timing format [X.XXs]" "pass"
+    else
+        log_result "Verbose timing format [X.XXs]" "fail" "Timing format not found"
+    fi
+}
+
+#######################################
+# Test: -v short option for verbose
+#######################################
+test_verbose_short_option() {
+    echo "--- Test: -v short option ---"
+
+    local test_workspace="$TEST_TMP_DIR/verbose_short_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" -v "$test_workspace" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "-v option exits with code 0"
+
+    # stderr should contain timing information
+    assert_contains "$stderr_output" "Total:" "-v includes total timing"
+}
+
+#######################################
+# Test: Combined -sv options
+#######################################
+test_combined_short_options() {
+    echo "--- Test: Combined -sv options ---"
+
+    local test_workspace="$TEST_TMP_DIR/combined_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local stdout_output
+    local stderr_output
+
+    # Capture both outputs
+    stdout_output=$(bash "$MASTER_SCRIPT" -sv "$test_workspace" 2>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" -sv "$test_workspace" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Combined -sv exits with code 0"
+
+    # Verify summary-only effect on stdout (no repos array)
+    if [[ "$stdout_output" == *'"repos":'* ]]; then
+        log_result "Combined -sv omits repos array" "fail" "Output contains repos array"
+    else
+        log_result "Combined -sv omits repos array" "pass"
+    fi
+
+    # Verify verbose effect on stderr
+    assert_contains "$stderr_output" "Total:" "Combined -sv includes timing"
+}
+
+#######################################
+# Test: --json option (explicit, default behavior)
+#######################################
+test_json_option() {
+    echo "--- Test: --json option ---"
+
+    local test_workspace="$TEST_TMP_DIR/json_option_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --json "$test_workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "--json option exits with code 0"
+
+    # Should produce valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "--json produces valid JSON" "pass"
+        else
+            log_result "--json produces valid JSON" "fail" "JSON parsing failed"
+        fi
+    else
+        assert_contains "$output" '"timestamp":' "--json contains timestamp"
+    fi
+}
+
+#######################################
+# Test: Verbose output goes to stderr, not stdout
+#######################################
+test_verbose_output_streams() {
+    echo "--- Test: Verbose output to stderr only ---"
+
+    local test_workspace="$TEST_TMP_DIR/streams_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local stdout_output
+    local stderr_output
+
+    stdout_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>&1 1>/dev/null)
+
+    # stdout should NOT contain timing output
+    if [[ "$stdout_output" == *"[0."* ]] || [[ "$stdout_output" == *"Scanned"* ]]; then
+        log_result "Timing NOT in stdout" "fail" "Timing output found in stdout"
+    else
+        log_result "Timing NOT in stdout" "pass"
+    fi
+
+    # stdout should still be valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$stdout_output" | jq . >/dev/null 2>&1; then
+            log_result "Verbose stdout is valid JSON" "pass"
+        else
+            log_result "Verbose stdout is valid JSON" "fail" "JSON parsing failed"
+        fi
+    fi
+
+    # stderr should contain timing
+    assert_contains "$stderr_output" "Total:" "Timing is in stderr"
+}
+
+#######################################
+# Test: Unknown short option shows error
+#######################################
+test_unknown_short_option() {
+    echo "--- Test: Unknown short option ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" -x 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Unknown short option exits with code 2"
+    assert_contains "$output" "Error:" "Unknown short option shows error"
+}
+
+#######################################
+# Test: Unknown option in combined short options
+#######################################
+test_unknown_combined_option() {
+    echo "--- Test: Unknown combined option ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" -svx 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Unknown combined option exits with code 2"
+    assert_contains "$output" "Error:" "Unknown combined option shows error"
+}
+
+#######################################
 # Test: Debug mode outputs to stderr
 #######################################
 test_debug_mode() {
@@ -2587,6 +2830,24 @@ main() {
     test_json_structure
     echo ""
     test_unknown_option
+    echo ""
+    test_summary_only_option
+    echo ""
+    test_summary_only_short_option
+    echo ""
+    test_verbose_option
+    echo ""
+    test_verbose_short_option
+    echo ""
+    test_combined_short_options
+    echo ""
+    test_json_option
+    echo ""
+    test_verbose_output_streams
+    echo ""
+    test_unknown_short_option
+    echo ""
+    test_unknown_combined_option
     echo ""
     test_debug_mode
     echo ""
