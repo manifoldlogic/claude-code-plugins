@@ -274,18 +274,47 @@ Commands in the `commands/` directory provide user-friendly interfaces:
 
 | Command | Delegates To |
 |---------|--------------|
-| `/sdd:start-epic` | scaffold-epic.sh + epic-planner |
-| `/sdd:plan-ticket` | scaffold-ticket.sh + ticket-planner |
-| `/sdd:import-jira-ticket` | acli jira + scaffold-ticket.sh + ticket-planner |
-| `/sdd:review` | ticket-reviewer agent |
-| `/sdd:recommend-agents` | agent-recommender agent |
+| `/sdd:archive` | structure-validator + archive logic |
 | `/sdd:assign-agents` | agent-assigner agent |
 | `/sdd:create-tasks` | task-creator agent |
 | `/sdd:do-all-tasks` | Sequential task execution |
 | `/sdd:do-task` | Single task workflow |
-| `/sdd:tasks-status` | task-status.sh + status-reporter |
+| `/sdd:import-jira-ticket` | acli jira + scaffold-ticket.sh + ticket-planner |
+| `/sdd:mark-ready` | Update .autogate.json with agent_ready: true |
+| `/sdd:plan-ticket` | scaffold-ticket.sh + ticket-planner |
 | `/sdd:pr` | Create GitHub Pull Request for completed ticket |
-| `/sdd:archive` | structure-validator + archive logic |
+| `/sdd:recommend-agents` | agent-recommender agent |
+| `/sdd:review` | ticket-reviewer agent |
+| `/sdd:start-epic` | scaffold-epic.sh + epic-planner |
+| `/sdd:tasks-status` | task-status.sh + status-reporter |
+| `/sdd:unmark-ready` | Update .autogate.json with agent_ready: false |
+
+### Autonomous Execution Commands
+
+These commands control the agent-ready status for autonomous execution via the Ralph Loop Controller (SDDLOOP-3).
+
+#### /sdd:mark-ready
+
+**File:** [mark-ready.md](commands/mark-ready.md)
+**Argument Hint:** TICKET_ID [--priority N]
+**Description:** Mark a ticket as ready for autonomous agent execution. Creates or updates `.autogate.json` with `agent_ready: true`.
+
+**Usage:**
+- Basic: `/sdd:mark-ready SDDLOOP-2`
+- With priority: `/sdd:mark-ready SDDLOOP-2 --priority 1`
+
+**See:** [autogate-schema.md](references/autogate-schema.md) for field details.
+
+#### /sdd:unmark-ready
+
+**File:** [unmark-ready.md](commands/unmark-ready.md)
+**Argument Hint:** TICKET_ID
+**Description:** Remove agent-ready status from a ticket. Sets `agent_ready: false` in `.autogate.json`.
+
+**Usage:**
+- `/sdd:unmark-ready SDDLOOP-2`
+
+**See:** [autogate-schema.md](references/autogate-schema.md) for field details.
 
 ## Complete Ticket Workflow
 
