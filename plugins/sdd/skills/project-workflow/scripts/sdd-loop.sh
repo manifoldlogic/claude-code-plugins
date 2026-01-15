@@ -113,6 +113,9 @@ POLL_TICKET=""
 POLL_SDD_ROOT=""
 POLL_REASON=""
 
+# Phase boundary state (set by check_phase_boundary function)
+STOP_AT_PHASE=""
+
 # =============================================================================
 # Logging Functions
 # =============================================================================
@@ -444,6 +447,131 @@ execute_task() {
     # Step 9: Return exit code to caller
     # ==========================================================================
     return $exit_code
+}
+
+#######################################
+# Check if phase boundary has been reached based on .autogate.json
+# Reads stop_at_phase from the ticket's .autogate.json file and compares
+# it with the current task's phase number.
+#
+# Arguments:
+#   $1 - Ticket ID (e.g., "SDDLOOP-3")
+#   $2 - Task ID (e.g., "SDDLOOP-3.1001")
+#   $3 - SDD root directory (e.g., "/workspace/repos/project/_SDD")
+#
+# Globals Set:
+#   STOP_AT_PHASE - The stop_at_phase value from .autogate.json (for logging)
+#
+# Returns:
+#   0 - Continue (no limit, or current phase < stop_at_phase)
+#   1 - Should stop (current phase >= stop_at_phase)
+#
+# Error Handling (graceful - default to continue):
+#   - Missing .autogate.json: Log verbose, return 0
+#   - Invalid JSON: Log warning, return 0
+#   - Invalid task ID format: Log warning, return 0
+#   - stop_at_phase not a number: Log warning, return 0
+#
+# Note: Phase extraction handles single-digit phases only (1-9).
+#       Task ID format: TICKET.XYYY where X is phase number (1-9).
+#       Phases 10+ would require regex update (unlikely in practice).
+#######################################
+check_phase_boundary() {
+    local ticket_id="$1"
+    local task_id="$2"
+    local sdd_root="$3"
+
+    log_debug "check_phase_boundary: ticket_id=$ticket_id, task_id=$task_id, sdd_root=$sdd_root"
+
+    # Reset global state
+    STOP_AT_PHASE=""
+
+    # ==========================================================================
+    # Step 1: Find ticket directory
+    # ==========================================================================
+    local ticket_dir
+    ticket_dir=$(find "$sdd_root/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -n1)
+
+    if [[ -z "$ticket_dir" ]]; then
+        log_verbose "check_phase_boundary: Ticket directory not found for $ticket_id"
+        return 0  # Continue - no limit
+    fi
+
+    log_debug "check_phase_boundary: Found ticket directory: $ticket_dir"
+
+    # ==========================================================================
+    # Step 2: Check if .autogate.json exists
+    # ==========================================================================
+    local autogate_file="$ticket_dir/.autogate.json"
+
+    if [[ ! -f "$autogate_file" ]]; then
+        log_verbose "check_phase_boundary: No .autogate.json found at $autogate_file"
+        return 0  # Continue - no limit
+    fi
+
+    # ==========================================================================
+    # Step 3: Parse stop_at_phase from .autogate.json
+    # ==========================================================================
+    local stop_at_phase
+
+    # Check if jq is available
+    if ! command -v jq &>/dev/null; then
+        log_warn "check_phase_boundary: jq not found, cannot parse .autogate.json"
+        return 0  # Continue - no limit
+    fi
+
+    # Parse JSON and extract stop_at_phase
+    # Use jq with error suppression and null handling
+    stop_at_phase=$(jq -r '.stop_at_phase // empty' "$autogate_file" 2>/dev/null)
+    local jq_exit_code=$?
+
+    if [[ $jq_exit_code -ne 0 ]]; then
+        log_warn "check_phase_boundary: Failed to parse .autogate.json at $autogate_file (invalid JSON)"
+        return 0  # Continue - no limit
+    fi
+
+    # If stop_at_phase is empty or null, no limit is set
+    if [[ -z "$stop_at_phase" ]]; then
+        log_verbose "check_phase_boundary: stop_at_phase not set in $autogate_file"
+        return 0  # Continue - no limit
+    fi
+
+    # Validate stop_at_phase is a positive integer
+    if ! [[ "$stop_at_phase" =~ ^[0-9]+$ ]]; then
+        log_warn "check_phase_boundary: stop_at_phase is not a valid number: $stop_at_phase"
+        return 0  # Continue - no limit
+    fi
+
+    # Set global for logging
+    STOP_AT_PHASE="$stop_at_phase"
+    log_debug "check_phase_boundary: stop_at_phase=$stop_at_phase"
+
+    # ==========================================================================
+    # Step 4: Extract phase number from task ID
+    # ==========================================================================
+    # Task ID format: TICKET.XYYY where X is phase number (1-9)
+    # Examples: SDDLOOP-3.1001 -> phase 1, TICKET.2005 -> phase 2
+    local phase
+    phase=$(echo "$task_id" | sed -n 's/.*\.\([0-9]\)[0-9]\{3\}/\1/p')
+
+    if [[ -z "$phase" ]]; then
+        log_warn "check_phase_boundary: Could not extract phase from task ID: $task_id"
+        return 0  # Continue - no limit
+    fi
+
+    log_debug "check_phase_boundary: current phase=$phase, stop_at_phase=$stop_at_phase"
+
+    # ==========================================================================
+    # Step 5: Compare phase with stop_at_phase
+    # ==========================================================================
+    # Stop if current_phase >= stop_at_phase
+    if [[ "$phase" -ge "$stop_at_phase" ]]; then
+        log_debug "check_phase_boundary: Phase boundary reached (phase $phase >= stop_at_phase $stop_at_phase)"
+        return 1  # Should stop
+    fi
+
+    log_debug "check_phase_boundary: Phase boundary not reached (phase $phase < stop_at_phase $stop_at_phase)"
+    return 0  # Continue
 }
 
 # =============================================================================
@@ -926,6 +1054,19 @@ main() {
                         log_verbose "Task succeeded, resetting consecutive error counter (was: $consecutive_errors)"
                     fi
                     consecutive_errors=0
+
+                    # ==========================================================
+                    # Phase Boundary Check: Stop if stop_at_phase reached
+                    # Note: check_phase_boundary returns 1 (non-zero) when should stop
+                    # ==========================================================
+                    check_phase_boundary "$POLL_TICKET" "$POLL_TASK" "$POLL_SDD_ROOT"
+                    local boundary_result=$?
+                    if [[ $boundary_result -eq 1 ]]; then
+                        log_info "Phase boundary reached (stop_at_phase: $STOP_AT_PHASE)"
+                        log_info "Loop stopped: phase $STOP_AT_PHASE limit reached after $iteration iteration(s)"
+                        exit 0
+                    fi
+
                     log_verbose "Task $POLL_TASK completed, continuing to next iteration"
                 else
                     # Failure: increment consecutive error counter
