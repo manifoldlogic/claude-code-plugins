@@ -312,6 +312,249 @@ test_unknown_option() {
 }
 
 #######################################
+# Test: --summary-only produces valid JSON without repos array
+#######################################
+test_summary_only_option() {
+    echo "--- Test: --summary-only option ---"
+
+    local test_workspace="$TEST_TMP_DIR/summary_workspace"
+    mkdir -p "$test_workspace/repo/_SDD/tickets/T1/tasks"
+    echo "# Test" > "$test_workspace/repo/_SDD/tickets/T1/README.md"
+    cat > "$test_workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [x] **Task completed**
+- [ ] **Tests pass**
+- [ ] **Verified**
+EOF
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --summary-only "$test_workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Summary-only exits with code 0"
+
+    # Should NOT contain repos array
+    if [[ "$output" == *'"repos":'* ]]; then
+        log_result "Summary-only omits repos array" "fail" "Output contains repos array"
+    else
+        log_result "Summary-only omits repos array" "pass"
+    fi
+
+    # Should contain summary
+    assert_contains "$output" '"summary":' "Summary-only includes summary"
+    assert_contains "$output" '"total_repos":' "Summary-only includes total_repos"
+    assert_contains "$output" '"total_tickets":' "Summary-only includes total_tickets"
+
+    # Output should be valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "Summary-only output is valid JSON" "pass"
+        else
+            log_result "Summary-only output is valid JSON" "fail" "JSON parsing failed"
+        fi
+    fi
+}
+
+#######################################
+# Test: -s short option for summary-only
+#######################################
+test_summary_only_short_option() {
+    echo "--- Test: -s short option ---"
+
+    local test_workspace="$TEST_TMP_DIR/summary_short_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" -s "$test_workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "-s option exits with code 0"
+
+    # Should NOT contain repos array
+    if [[ "$output" == *'"repos":'* ]]; then
+        log_result "-s option omits repos array" "fail" "Output contains repos array"
+    else
+        log_result "-s option omits repos array" "pass"
+    fi
+}
+
+#######################################
+# Test: --verbose includes timing output to stderr
+#######################################
+test_verbose_option() {
+    echo "--- Test: --verbose option ---"
+
+    local test_workspace="$TEST_TMP_DIR/verbose_workspace"
+    mkdir -p "$test_workspace/repo/_SDD/tickets/T1/tasks"
+    echo "# Test" > "$test_workspace/repo/_SDD/tickets/T1/README.md"
+    cat > "$test_workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+## Status
+- [ ] **Task completed**
+EOF
+
+    local stdout_output
+    local stderr_output
+
+    # Capture stdout and stderr separately
+    stderr_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Verbose option exits with code 0"
+
+    # stderr should contain timing information
+    assert_contains "$stderr_output" "Scanned" "Verbose includes 'Scanned' in timing"
+    assert_contains "$stderr_output" "tickets" "Verbose includes 'tickets' in timing"
+    assert_contains "$stderr_output" "tasks" "Verbose includes 'tasks' in timing"
+    assert_contains "$stderr_output" "Total:" "Verbose includes total timing"
+
+    # stderr should contain timing format [X.XXs]
+    if [[ "$stderr_output" =~ \[[0-9]+\.[0-9]+s\] ]]; then
+        log_result "Verbose timing format [X.XXs]" "pass"
+    else
+        log_result "Verbose timing format [X.XXs]" "fail" "Timing format not found"
+    fi
+}
+
+#######################################
+# Test: -v short option for verbose
+#######################################
+test_verbose_short_option() {
+    echo "--- Test: -v short option ---"
+
+    local test_workspace="$TEST_TMP_DIR/verbose_short_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" -v "$test_workspace" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "-v option exits with code 0"
+
+    # stderr should contain timing information
+    assert_contains "$stderr_output" "Total:" "-v includes total timing"
+}
+
+#######################################
+# Test: Combined -sv options
+#######################################
+test_combined_short_options() {
+    echo "--- Test: Combined -sv options ---"
+
+    local test_workspace="$TEST_TMP_DIR/combined_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local stdout_output
+    local stderr_output
+
+    # Capture both outputs
+    stdout_output=$(bash "$MASTER_SCRIPT" -sv "$test_workspace" 2>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" -sv "$test_workspace" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Combined -sv exits with code 0"
+
+    # Verify summary-only effect on stdout (no repos array)
+    if [[ "$stdout_output" == *'"repos":'* ]]; then
+        log_result "Combined -sv omits repos array" "fail" "Output contains repos array"
+    else
+        log_result "Combined -sv omits repos array" "pass"
+    fi
+
+    # Verify verbose effect on stderr
+    assert_contains "$stderr_output" "Total:" "Combined -sv includes timing"
+}
+
+#######################################
+# Test: --json option (explicit, default behavior)
+#######################################
+test_json_option() {
+    echo "--- Test: --json option ---"
+
+    local test_workspace="$TEST_TMP_DIR/json_option_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --json "$test_workspace" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "--json option exits with code 0"
+
+    # Should produce valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "--json produces valid JSON" "pass"
+        else
+            log_result "--json produces valid JSON" "fail" "JSON parsing failed"
+        fi
+    else
+        assert_contains "$output" '"timestamp":' "--json contains timestamp"
+    fi
+}
+
+#######################################
+# Test: Verbose output goes to stderr, not stdout
+#######################################
+test_verbose_output_streams() {
+    echo "--- Test: Verbose output to stderr only ---"
+
+    local test_workspace="$TEST_TMP_DIR/streams_workspace"
+    mkdir -p "$test_workspace/repo/_SDD"
+
+    local stdout_output
+    local stderr_output
+
+    stdout_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>&1 1>/dev/null)
+
+    # stdout should NOT contain timing output
+    if [[ "$stdout_output" == *"[0."* ]] || [[ "$stdout_output" == *"Scanned"* ]]; then
+        log_result "Timing NOT in stdout" "fail" "Timing output found in stdout"
+    else
+        log_result "Timing NOT in stdout" "pass"
+    fi
+
+    # stdout should still be valid JSON
+    if command -v jq &>/dev/null; then
+        if echo "$stdout_output" | jq . >/dev/null 2>&1; then
+            log_result "Verbose stdout is valid JSON" "pass"
+        else
+            log_result "Verbose stdout is valid JSON" "fail" "JSON parsing failed"
+        fi
+    fi
+
+    # stderr should contain timing
+    assert_contains "$stderr_output" "Total:" "Timing is in stderr"
+}
+
+#######################################
+# Test: Unknown short option shows error
+#######################################
+test_unknown_short_option() {
+    echo "--- Test: Unknown short option ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" -x 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Unknown short option exits with code 2"
+    assert_contains "$output" "Error:" "Unknown short option shows error"
+}
+
+#######################################
+# Test: Unknown option in combined short options
+#######################################
+test_unknown_combined_option() {
+    echo "--- Test: Unknown combined option ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" -svx 2>&1) || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Unknown combined option exits with code 2"
+    assert_contains "$output" "Error:" "Unknown combined option shows error"
+}
+
+#######################################
 # Test: Debug mode outputs to stderr
 #######################################
 test_debug_mode() {
@@ -2035,6 +2278,518 @@ test_integration_performance() {
 }
 
 #######################################
+# Test: compute_recommended_action with multiple priorities
+#######################################
+test_recommended_action_multiple_priorities() {
+    echo "--- Test: compute_recommended_action with multiple priorities ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output with multiple tickets at different priorities
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "LOW-1_low-priority",
+          "name": "Low Priority Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/LOW-1_low-priority",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 3, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/LOW-1.1001.md", "task_id": "LOW-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        },
+        {
+          "ticket_id": "HIGH-1_high-priority",
+          "name": "High Priority Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/HIGH-1_high-priority",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/HIGH-1.1001.md", "task_id": "HIGH-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        },
+        {
+          "ticket_id": "MED-1_medium-priority",
+          "name": "Medium Priority Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/MED-1_medium-priority",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 2, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/MED-1.1001.md", "task_id": "MED-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 3, "total_tasks": 3, "pending": 3, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 3, "total_tasks": 3, "pending": 3, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "do-task"' "Action is do-task"
+    assert_contains "$output" '"ticket": "HIGH-1_high-priority"' "Highest priority ticket selected"
+    assert_contains "$output" '"task": "HIGH-1.1001"' "Task from highest priority ticket"
+}
+
+#######################################
+# Test: compute_recommended_action with tied priorities (lexicographic)
+#######################################
+test_recommended_action_tied_priorities() {
+    echo "--- Test: compute_recommended_action with tied priorities ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output with tickets at same priority - should use lexicographic ordering
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "ZEBRA-1_later-alphabetically",
+          "name": "Zebra Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/ZEBRA-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/ZEBRA-1.1001.md", "task_id": "ZEBRA-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        },
+        {
+          "ticket_id": "ALPHA-1_earlier-alphabetically",
+          "name": "Alpha Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/ALPHA-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/ALPHA-1.1001.md", "task_id": "ALPHA-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 2, "total_tasks": 2, "pending": 2, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 2, "total_tasks": 2, "pending": 2, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "do-task"' "Action is do-task"
+    assert_contains "$output" '"ticket": "ALPHA-1_earlier-alphabetically"' "Lexicographically first ticket selected on tie"
+    assert_contains "$output" '"task": "ALPHA-1.1001"' "Task from lexicographically first ticket"
+}
+
+#######################################
+# Test: compute_recommended_action filters ready=false tickets
+#######################################
+test_recommended_action_ready_false_filtered() {
+    echo "--- Test: compute_recommended_action filters ready=false ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output where only ticket has ready=false
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "BLOCKED-1_not-ready",
+          "name": "Blocked Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/BLOCKED-1",
+          "autogate": {"ready": false, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/BLOCKED-1.1001.md", "task_id": "BLOCKED-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "none"' "Action is none when ready=false"
+    assert_contains "$output" '"reason": "No agent-ready work remaining"' "Reason explains no agent-ready work"
+}
+
+#######################################
+# Test: compute_recommended_action filters agent_ready=false tickets
+#######################################
+test_recommended_action_agent_ready_false_filtered() {
+    echo "--- Test: compute_recommended_action filters agent_ready=false ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output where ticket has ready=true but agent_ready=false
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "MANUAL-1_human-only",
+          "name": "Human Only Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/MANUAL-1",
+          "autogate": {"ready": true, "agent_ready": false, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/MANUAL-1.1001.md", "task_id": "MANUAL-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "none"' "Action is none when agent_ready=false"
+    assert_contains "$output" '"reason": "No agent-ready work remaining"' "Reason explains no agent-ready work"
+}
+
+#######################################
+# Test: compute_recommended_action selects agent_ready=true tickets
+#######################################
+test_recommended_action_agent_ready_true_selected() {
+    echo "--- Test: compute_recommended_action selects agent_ready=true ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output with mixed agent_ready values - should select the agent_ready one
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "AAAAAA-1_first-but-not-agent-ready",
+          "name": "First but not agent ready",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/AAAAAA-1",
+          "autogate": {"ready": true, "agent_ready": false, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/AAAAAA-1.1001.md", "task_id": "AAAAAA-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        },
+        {
+          "ticket_id": "ZZZZZZ-1_last-but-agent-ready",
+          "name": "Last but agent ready",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/ZZZZZZ-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/ZZZZZZ-1.1001.md", "task_id": "ZZZZZZ-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 2, "total_tasks": 2, "pending": 2, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 2, "total_tasks": 2, "pending": 2, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "do-task"' "Action is do-task"
+    assert_contains "$output" '"ticket": "ZZZZZZ-1_last-but-agent-ready"' "Agent-ready ticket selected even if later alphabetically"
+    assert_contains "$output" '"task": "ZZZZZZ-1.1001"' "Task from agent-ready ticket"
+}
+
+#######################################
+# Test: compute_recommended_action returns none when all verified
+#######################################
+test_recommended_action_all_verified_returns_none() {
+    echo "--- Test: compute_recommended_action all verified returns none ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output where all tasks are verified
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "DONE-1_all-verified",
+          "name": "All Done Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/DONE-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/DONE-1.1001.md", "task_id": "DONE-1.1001", "task_completed": true, "tests_pass": true, "verified": true},
+            {"file": "/path/DONE-1.1002.md", "task_id": "DONE-1.1002", "task_completed": true, "tests_pass": true, "verified": true}
+          ],
+          "summary": {"total_tasks": 2, "pending": 0, "completed": 0, "tested": 0, "verified": 2}
+        }
+      ],
+      "summary": {"total_tickets": 1, "total_tasks": 2, "pending": 0, "completed": 0, "tested": 0, "verified": 2}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 1, "total_tasks": 2, "pending": 0, "completed": 0, "tested": 0, "verified": 2}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "none"' "Action is none when all verified"
+    assert_contains "$output" '"reason": "All agent-ready work completed"' "Reason explains all work completed"
+}
+
+#######################################
+# Test: compute_recommended_action returns none when no tickets
+#######################################
+test_recommended_action_no_tickets_returns_none() {
+    echo "--- Test: compute_recommended_action no tickets returns none ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output with no tickets
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "empty-repo",
+      "sdd_root": "/workspace/repos/empty-repo/_SDD",
+      "tickets": [],
+      "summary": {"total_tickets": 0, "total_tasks": 0, "pending": 0, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 0, "total_tasks": 0, "pending": 0, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "none"' "Action is none when no tickets"
+    assert_contains "$output" '"reason": "No agent-ready work remaining"' "Reason explains no work"
+}
+
+#######################################
+# Test: compute_recommended_action task state priority (pending > completed > tested)
+#######################################
+test_recommended_action_task_state_priority() {
+    echo "--- Test: compute_recommended_action task state priority ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create scan output with tasks in different states - should prioritize pending
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "MIXED-1_mixed-states",
+          "name": "Mixed States Ticket",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/MIXED-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/MIXED-1.1003.md", "task_id": "MIXED-1.1003", "task_completed": true, "tests_pass": true, "verified": false},
+            {"file": "/path/MIXED-1.1002.md", "task_id": "MIXED-1.1002", "task_completed": true, "tests_pass": false, "verified": false},
+            {"file": "/path/MIXED-1.1001.md", "task_id": "MIXED-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 3, "pending": 1, "completed": 1, "tested": 1, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 1, "total_tasks": 3, "pending": 1, "completed": 1, "tested": 1, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 1, "total_tasks": 3, "pending": 1, "completed": 1, "tested": 1, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"action": "do-task"' "Action is do-task"
+    assert_contains "$output" '"task": "MIXED-1.1001"' "Pending task selected over completed and tested"
+    assert_contains "$output" '"reason": "Next pending task in highest priority ticket"' "Reason indicates pending task"
+}
+
+#######################################
+# Test: compute_recommended_action includes sdd_root in output
+#######################################
+test_recommended_action_includes_sdd_root() {
+    echo "--- Test: compute_recommended_action includes sdd_root ---"
+
+    source "$MASTER_SCRIPT"
+
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "my-repo",
+      "sdd_root": "/workspace/repos/my-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "TEST-1_sdd-root-test",
+          "name": "SDD Root Test",
+          "path": "/workspace/repos/my-repo/_SDD/tickets/TEST-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/workspace/repos/my-repo/_SDD/tickets/TEST-1/tasks/TEST-1.1001.md", "task_id": "TEST-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    assert_contains "$output" '"sdd_root": "/workspace/repos/my-repo/_SDD"' "Output includes sdd_root path"
+    assert_contains "$output" '"task_file":' "Output includes task_file path"
+}
+
+#######################################
+# Test: compute_recommended_action output is valid JSON
+#######################################
+test_recommended_action_valid_json_output() {
+    echo "--- Test: compute_recommended_action output is valid JSON ---"
+
+    source "$MASTER_SCRIPT"
+
+    local scan_output
+    scan_output=$(cat << 'EOF'
+{
+  "timestamp": "2026-01-15T10:00:00+00:00",
+  "workspace_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "test-repo",
+      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "tickets": [
+        {
+          "ticket_id": "JSON-1_json-test",
+          "name": "JSON Test",
+          "path": "/workspace/repos/test-repo/_SDD/tickets/JSON-1",
+          "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
+          "tasks": [
+            {"file": "/path/JSON-1.1001.md", "task_id": "JSON-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+          ],
+          "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+        }
+      ],
+      "summary": {"total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+    }
+  ],
+  "summary": {"total_repos": 1, "total_tickets": 1, "total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
+}
+EOF
+)
+
+    local output
+    output=$(compute_recommended_action "$scan_output")
+
+    if command -v jq &>/dev/null; then
+        if echo "$output" | jq . >/dev/null 2>&1; then
+            log_result "compute_recommended_action output is valid JSON" "pass"
+        else
+            log_result "compute_recommended_action output is valid JSON" "fail" "JSON parsing failed"
+            echo "Output was:" >&2
+            echo "$output" >&2
+        fi
+    else
+        if [[ "$output" == "{"* && "$output" == *"}" ]]; then
+            log_result "compute_recommended_action output is valid JSON (basic check)" "pass"
+        else
+            log_result "compute_recommended_action output is valid JSON (basic check)" "fail"
+        fi
+    fi
+}
+
+#######################################
+# Test: compute_recommended_action with empty input
+#######################################
+test_recommended_action_empty_input() {
+    echo "--- Test: compute_recommended_action with empty input ---"
+
+    source "$MASTER_SCRIPT"
+
+    local output
+    output=$(compute_recommended_action "")
+
+    assert_contains "$output" '"action": "none"' "Action is none for empty input"
+    assert_contains "$output" '"reason":' "Reason field is present"
+}
+
+#######################################
 # Main test runner
 #######################################
 main() {
@@ -2075,6 +2830,24 @@ main() {
     test_json_structure
     echo ""
     test_unknown_option
+    echo ""
+    test_summary_only_option
+    echo ""
+    test_summary_only_short_option
+    echo ""
+    test_verbose_option
+    echo ""
+    test_verbose_short_option
+    echo ""
+    test_combined_short_options
+    echo ""
+    test_json_option
+    echo ""
+    test_verbose_output_streams
+    echo ""
+    test_unknown_short_option
+    echo ""
+    test_unknown_combined_option
     echo ""
     test_debug_mode
     echo ""
@@ -2217,6 +2990,34 @@ main() {
     test_integration_output_valid_json
     echo ""
     test_integration_performance
+    echo ""
+
+    # Run compute_recommended_action tests
+    echo "====================================="
+    echo "compute_recommended_action() Function Tests"
+    echo "====================================="
+    echo ""
+    test_recommended_action_multiple_priorities
+    echo ""
+    test_recommended_action_tied_priorities
+    echo ""
+    test_recommended_action_ready_false_filtered
+    echo ""
+    test_recommended_action_agent_ready_false_filtered
+    echo ""
+    test_recommended_action_agent_ready_true_selected
+    echo ""
+    test_recommended_action_all_verified_returns_none
+    echo ""
+    test_recommended_action_no_tickets_returns_none
+    echo ""
+    test_recommended_action_task_state_priority
+    echo ""
+    test_recommended_action_includes_sdd_root
+    echo ""
+    test_recommended_action_valid_json_output
+    echo ""
+    test_recommended_action_empty_input
     echo ""
 
     # Summary
