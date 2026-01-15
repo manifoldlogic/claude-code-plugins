@@ -400,20 +400,30 @@ execute_task() {
     fi
 
     # ==========================================================================
-    # Step 6: Log execution start
+    # Step 5b: Check timeout command availability
     # ==========================================================================
-    log_info "Executing task: $task_id (repo: $repo_path)"
+    if ! command -v timeout &>/dev/null; then
+        log_error "timeout command not found. Install GNU coreutils (apt-get install coreutils or brew install coreutils)"
+        return 1
+    fi
 
     # ==========================================================================
-    # Step 7: Execute claude with correct environment and working directory
+    # Step 6: Log execution start
+    # ==========================================================================
+    local task_timeout="${SDD_LOOP_TIMEOUT:-$SDD_LOOP_DEFAULT_TIMEOUT}"
+    log_info "Executing task: $task_id (repo: $repo_path, timeout: ${task_timeout}s)"
+
+    # ==========================================================================
+    # Step 7: Execute claude with correct environment, working directory, and timeout
     # ==========================================================================
     local exit_code=0
 
     # Change to repo directory and execute claude with SDD_ROOT_DIR set
     # Using subshell to avoid changing cwd in the main script
+    # Wrap with timeout command to enforce task execution time limit
     (
         cd "$repo_path" || exit 1
-        SDD_ROOT_DIR="$sdd_root" claude --dangerously-skip-permissions -p "/sdd:do-task $task_id"
+        timeout "$task_timeout" env SDD_ROOT_DIR="$sdd_root" claude --dangerously-skip-permissions -p "/sdd:do-task $task_id"
     )
     exit_code=$?
 
@@ -422,8 +432,12 @@ execute_task() {
     # ==========================================================================
     if [[ $exit_code -eq 0 ]]; then
         log_info "Task completed successfully: $task_id (exit code: $exit_code)"
+    elif [[ $exit_code -eq 124 ]]; then
+        log_error "Task timed out after $task_timeout seconds: $task_id"
+    elif [[ $exit_code -eq 137 ]]; then
+        log_error "Task killed by timeout (SIGKILL) after $task_timeout seconds: $task_id"
     else
-        log_error "Task execution failed with exit code $exit_code"
+        log_error "Task execution failed with exit code $exit_code: $task_id"
     fi
 
     # ==========================================================================
@@ -513,18 +527,20 @@ OPTIONS
 
     --max-iterations N
         Maximum number of task iterations before stopping.
-        Default: 50. Set to 0 for unlimited (not recommended).
-        [Phase 2 - not yet implemented]
+        Default: 50. Must be a positive integer.
+        Loop exits with code 1 when limit is reached.
 
     --max-errors N
         Maximum consecutive errors before stopping.
-        Default: 3.
-        [Phase 2 - not yet implemented]
+        Default: 3. Must be a positive integer.
+        Counter resets to 0 on successful task execution.
+        Loop exits with code 1 when limit is reached.
 
     --timeout SECONDS
         Task execution timeout in seconds.
-        Default: 3600 (1 hour).
-        [Phase 2 - not yet implemented]
+        Default: 3600 (1 hour). Must be a positive integer.
+        Timeout uses GNU coreutils timeout command.
+        Exit code 124 indicates timeout occurred.
 
     --poll-interval SECONDS
         Interval between status board polls in seconds.
@@ -688,6 +704,10 @@ main() {
                     log_error "Option --max-iterations requires a numeric value"
                     exit 2
                 fi
+                if [[ "$2" -le 0 ]]; then
+                    log_error "Option --max-iterations requires a positive integer (got: $2)"
+                    exit 2
+                fi
                 SDD_LOOP_MAX_ITERATIONS="$2"
                 shift 2
                 ;;
@@ -700,6 +720,10 @@ main() {
                     log_error "Option --max-errors requires a numeric value"
                     exit 2
                 fi
+                if [[ "$2" -le 0 ]]; then
+                    log_error "Option --max-errors requires a positive integer (got: $2)"
+                    exit 2
+                fi
                 SDD_LOOP_MAX_ERRORS="$2"
                 shift 2
                 ;;
@@ -710,6 +734,10 @@ main() {
                 fi
                 if ! [[ "$2" =~ ^[0-9]+$ ]]; then
                     log_error "Option --timeout requires a numeric value"
+                    exit 2
+                fi
+                if [[ "$2" -le 0 ]]; then
+                    log_error "Option --timeout requires a positive integer (got: $2)"
                     exit 2
                 fi
                 SDD_LOOP_TIMEOUT="$2"
@@ -829,17 +857,20 @@ main() {
     fi
 
     # ==========================================================================
-    # Main Poll-Execute Loop (Phase 1)
+    # Main Poll-Execute Loop
     # ==========================================================================
-    # Phase 1 implementation has NO safety limits:
-    # - No max iteration limit
-    # - No error count tracking
-    # - No timeout on task execution
-    # - No phase boundary checking
-    # These will be added in Phase 2.
+    # Safety limits enforced:
+    # - Max iteration limit (default: 50)
+    # - Consecutive error tracking (default: 3)
+    # - Task execution timeout (default: 3600s)
     # ==========================================================================
 
     local iteration=0
+    local consecutive_errors=0
+    local max_iterations="$SDD_LOOP_MAX_ITERATIONS"
+    local max_errors="$SDD_LOOP_MAX_ERRORS"
+
+    log_info "Safety limits: max_iterations=$max_iterations, max_errors=$max_errors, timeout=${SDD_LOOP_TIMEOUT}s"
 
     while true; do
         # Check if exit was requested via signal
@@ -848,11 +879,20 @@ main() {
             exit "$EXIT_CODE"
         fi
 
+        # =======================================================================
+        # Safety Check: Max Iterations
+        # =======================================================================
+        if [[ $iteration -ge $max_iterations ]]; then
+            log_warn "Reached maximum iterations ($max_iterations)"
+            log_info "Loop stopped: safety limit reached after $iteration iteration(s)"
+            exit 1
+        fi
+
         # Increment iteration counter
         iteration=$((iteration + 1))
 
         # Log iteration start
-        log_info "Iteration $iteration: polling for next task"
+        log_info "Iteration $iteration/$max_iterations: polling for next task"
 
         # Poll status board for recommended action
         # Redirect stdout to /dev/null since poll_status outputs JSON to stdout
@@ -873,15 +913,36 @@ main() {
             "do-task")
                 log_info "Action: execute task $POLL_TASK (ticket: $POLL_TICKET)"
 
-                # Execute the task
-                if ! execute_task "$POLL_TASK" "$POLL_SDD_ROOT"; then
-                    log_error "Task execution failed: $POLL_TASK"
-                    log_info "Loop stopped: task execution error at iteration $iteration"
-                    exit 1
-                fi
+                # Execute the task and capture exit code
+                local task_exit_code=0
+                execute_task "$POLL_TASK" "$POLL_SDD_ROOT" || task_exit_code=$?
 
-                # Task completed successfully, continue to next iteration
-                log_verbose "Task $POLL_TASK completed, continuing to next iteration"
+                # =============================================================
+                # Error Tracking: Update consecutive error counter
+                # =============================================================
+                if [[ $task_exit_code -eq 0 ]]; then
+                    # Success: reset consecutive error counter
+                    if [[ $consecutive_errors -gt 0 ]]; then
+                        log_verbose "Task succeeded, resetting consecutive error counter (was: $consecutive_errors)"
+                    fi
+                    consecutive_errors=0
+                    log_verbose "Task $POLL_TASK completed, continuing to next iteration"
+                else
+                    # Failure: increment consecutive error counter
+                    consecutive_errors=$((consecutive_errors + 1))
+                    log_warn "Task failed (exit code: $task_exit_code), consecutive errors: $consecutive_errors/$max_errors"
+
+                    # ==========================================================
+                    # Safety Check: Max Consecutive Errors
+                    # ==========================================================
+                    if [[ $consecutive_errors -ge $max_errors ]]; then
+                        log_error "Reached maximum consecutive errors ($max_errors)"
+                        log_info "Loop stopped: too many consecutive failures after $iteration iteration(s)"
+                        exit 1
+                    fi
+
+                    log_info "Continuing despite error ($consecutive_errors/$max_errors consecutive errors)"
+                fi
                 ;;
             *)
                 log_warn "Unknown action: $POLL_ACTION (treating as 'none')"
