@@ -5,7 +5,7 @@ description: Manage Obsidian vault notes using obsidian-cli from a devcontainer 
 
 # Obsidian CLI Skill
 
-**Last Updated:** 2025-01-15
+**Last Updated:** 2026-01-15
 **CLI Tool:** obsidian-cli (Yakitrak)
 
 ## Overview
@@ -345,7 +345,7 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 **Example:**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli set-frontmatter 'Project Roadmap' --key status --value 'in-progress'"
+  "obsidian-cli frontmatter 'Project Roadmap' --edit --key status --value 'in-progress'"
 ```
 
 **Result:** Updates or adds the `status` field in the note's frontmatter:
@@ -361,21 +361,21 @@ status: in-progress
 ```bash
 # Set status
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli set-frontmatter 'Feature Spec' --key status --value 'review'"
+  "obsidian-cli frontmatter 'Feature Spec' --edit --key status --value 'review'"
 
 # Set priority
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli set-frontmatter 'Feature Spec' --key priority --value 'high'"
+  "obsidian-cli frontmatter 'Feature Spec' --edit --key priority --value 'high'"
 
 # Set assignee
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli set-frontmatter 'Feature Spec' --key assignee --value 'alice'"
+  "obsidian-cli frontmatter 'Feature Spec' --edit --key assignee --value 'alice'"
 ```
 
 **Adding Tags via Frontmatter:**
 ```bash
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli set-frontmatter 'Meeting Notes' --key tags --value '[meeting, backend, q1]'"
+  "obsidian-cli frontmatter 'Meeting Notes' --edit --key tags --value '[meeting, backend, q1]'"
 ```
 
 **Escaping Note:** For values with special characters:
@@ -384,7 +384,7 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 value="John's Team"
 escaped_value="${value//\'/\'\\\'\'}"
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli set-frontmatter 'Team Doc' --key owner --value '${escaped_value}'"
+  "obsidian-cli frontmatter 'Team Doc' --edit --key owner --value '${escaped_value}'"
 ```
 
 ---

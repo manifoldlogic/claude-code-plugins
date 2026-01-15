@@ -16,9 +16,8 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal "obsidian-cli <comman
 | `search` | Search notes by filename pattern | Yes (without pattern) |
 | `delete` | Remove a note from vault | No |
 | `move` | Move or rename a note | No |
-| `append` | Add content to end of existing note | No |
-| `prepend` | Add content to beginning of existing note | No |
-| `set-frontmatter` | Update YAML metadata fields | No |
+| `append` | Add content to end of existing note (via create --append) | No |
+| `frontmatter` | View and modify YAML metadata fields | No |
 | `open` | Open note in Obsidian application | No (requires GUI) |
 | `daily` | Create or open today's daily note | No |
 | `print-default` | Show the default vault name and path | No |
@@ -310,10 +309,12 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 
 **Example 2: Multi-vault append with timestamp**
 ```bash
+# Generate timestamp on local machine before SSH
+timestamp=$(date +%H:%M)
 ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli create 'Activity Log' --vault 'Work Projects' --append --content '\n\n### $(date +%H:%M)\n\nCompleted task review'"
+  "obsidian-cli create 'Activity Log' --vault 'Work Projects' --append --content '\n\n### ${timestamp}\n\nCompleted task review'"
 ```
-**Result:** Appends timestamped entry to log in "Work Projects" vault
+**Result:** Appends timestamped entry to log in "Work Projects" vault. Note: timestamp is captured locally before the SSH command.
 
 **Example 3: Long content with multiple paragraphs**
 ```bash
@@ -356,66 +357,7 @@ ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
 
 ---
 
-### prepend
-
-**Purpose:** Add content to the beginning of an existing note (after frontmatter if present).
-
-**Syntax:**
-```
-obsidian-cli create <note-name> --prepend --content <text> [options]
-```
-
-**Note:** Prepend functionality may be implemented via the `create` command with a `--prepend` flag. Verify availability with `obsidian-cli create --help`.
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--content <text>` | Content to prepend (required) |
-| `--prepend` | Prepend mode flag (required) |
-| `--vault <name>` | Target vault (uses default if not specified) |
-
-**Example 1: Basic prepend**
-```bash
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli create 'Project Log' --prepend --content '## Latest Update\n\nNew content at top\n\n'"
-```
-**Result:** Adds content at the beginning of the note (after any YAML frontmatter)
-
-**Example 2: Multi-vault prepend with status update**
-```bash
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli create 'Sprint Backlog' --vault 'Work Projects' --prepend --content '## Status: $(date +%Y-%m-%d)\n\nPriority items updated.\n\n'"
-```
-**Result:** Adds dated status header at top of backlog note in "Work Projects" vault
-
-**Example 3: Prepend with special characters**
-```bash
-update="IMPORTANT: John's review complete - see \"Comments\" section"
-escaped="${update//\'/\'\\\'\'}"
-escaped="${escaped//\"/\\\"}"
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli create 'Feature Spec' --prepend --content '${escaped}\n\n'"
-```
-**Escaping Note:** Handle quotes and special characters before shell transport.
-
-**Alternative Approach (If --prepend Not Available):**
-If `--prepend` is not supported in your CLI version, use the read-modify-write pattern:
-```bash
-# Read current content
-current=$(ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli print 'Project Log'" 2>/dev/null)
-
-# Prepend new content and overwrite
-new_content="## Latest Update\n\nNew content at top\n\n${current}"
-ssh -i ~/.ssh/id_ed25519 ${HOST_USER}@host.docker.internal \
-  "obsidian-cli create 'Project Log' --overwrite --content '${new_content}'"
-```
-**Warning:** The read-modify-write approach does not preserve frontmatter separately. Use with caution on notes with YAML frontmatter.
-
----
-
-### set-frontmatter
+### frontmatter
 
 **Purpose:** Update or add YAML frontmatter fields in a note.
 

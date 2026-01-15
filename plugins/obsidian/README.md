@@ -23,7 +23,8 @@ Install obsidian-cli on your macOS host machine using Homebrew:
 
 ```bash
 # Install obsidian-cli
-brew install yakitrak/tap/obsidian-cli
+brew tap yakitrak/yakitrak
+brew install yakitrak/yakitrak/obsidian-cli
 
 # Verify installation
 obsidian-cli --version
@@ -246,7 +247,8 @@ Then rebuild the container: F1 > "Dev Containers: Rebuild Container"
    ```
 2. If not installed, install via Homebrew:
    ```bash
-   brew install yakitrak/tap/obsidian-cli
+   brew tap yakitrak/yakitrak
+   brew install yakitrak/yakitrak/obsidian-cli
    ```
 3. Ensure the CLI is in the PATH for non-interactive SSH sessions. Add to `~/.zshrc` or `~/.bash_profile` on the host:
    ```bash
@@ -354,7 +356,9 @@ plugins/obsidian/
 │   └── plugin.json
 ├── skills/
 │   └── obsidian-cli/
-│       └── SKILL.md
+│       ├── SKILL.md
+│       └── references/
+│           └── cli-reference.md
 └── README.md
 ```
 
