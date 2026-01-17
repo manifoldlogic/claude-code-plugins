@@ -1,0 +1,153 @@
+# CLAUDE.md
+
+######## IMPORTANT! SHELL TARGET: ZSH ######## IMPORTANT! SHELL TARGET: ZSH ########
+All commands execute in ZSH. Use POSIX-compatible syntax. Never use bash-only syntax.
+Avoid: $RANDOM, [[ ]], bash arrays, `which`. Use: command -v, [ ], grep -E, portable syntax.
+######## IMPORTANT! SHELL TARGET: ZSH ######## IMPORTANT! SHELL TARGET: ZSH ########
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+CrewChief Plugins for Claude Code - a collection of plugins for development workflows, project management, and CI/CD automation. This is a **plugin repository**, not a compiled application.
+
+## Testing
+
+Run hook tests manually from the plugin directory:
+
+```bash
+# SDD plugin hook tests
+bash plugins/sdd/hooks/test-workflow-guidance.sh
+bash plugins/sdd/hooks/test-setup-sdd-env.sh
+bash plugins/sdd/hooks/test-block-dangerous-git.sh
+bash plugins/sdd/hooks/test-warn-sdd-refs.sh
+
+# iTerm plugin tests
+bash plugins/iterm/skills/tab-management/tests/test-core-functions.sh
+bash plugins/iterm/skills/tab-management/tests/test-integration.sh
+```
+
+No automated CI/CD - tests are executed manually.
+
+## Architecture
+
+### Plugin Structure
+
+Each plugin follows this pattern:
+
+```
+plugins/{name}/
+├── .claude-plugin/plugin.json    # Metadata, hooks registration
+├── agents/                       # Agent definitions (markdown)
+├── commands/                     # Slash commands (markdown)
+├── hooks/                        # Python/JS hooks
+├── skills/                       # Reusable capabilities
+│   └── {skill-name}/
+│       ├── SKILL.md              # Skill documentation
+│       ├── scripts/              # Shell scripts
+│       ├── templates/            # Document templates
+│       └── references/           # Reference docs
+└── README.md
+```
+
+### Hook System
+
+Hooks are registered in `plugin.json` and execute at specific lifecycle points:
+
+| Type | Purpose | Exit Codes |
+|------|---------|------------|
+| SessionStart | Environment setup | 0=success |
+| PreToolUse | Input validation/blocking | 0=allow, 2=block |
+| PostToolUse | Output warnings | 0=success |
+| Stop | Workflow guidance | 0=allow, 2=block stop |
+
+### Agent Model Strategy
+
+- **Haiku**: Mechanical/structured tasks (status reports, commits, test execution)
+- **Sonnet**: Reasoning work (planning, review, verification)
+- **Opus**: Complex decisions (ticket planning with research)
+
+### Orchestrator Pattern
+
+Commands are orchestrators that delegate work - they coordinate but don't do work directly:
+
+- Scripts handle mechanical tasks (scaffolding, inventory)
+- Agents handle judgment (planning, verification)
+- Preserves context and extends session longevity
+
+## Available Plugins
+
+| Plugin | Purpose |
+|--------|---------|
+| `sdd` | Spec-Driven Development workflow (epics → tickets → tasks) |
+| `github-actions` | CI/CD workflow creation and optimization |
+| `claude-code-dev` | Tools for creating new skills and managing marketplaces |
+| `maproom` | Semantic code search via crewchief-maproom CLI |
+| `worktree` | Git worktree management via crewchief CLI |
+| `vscode` | VS Code workspace configuration |
+| `iterm` | iTerm2 tab management (macOS host and container modes) |
+| `obsidian` | Obsidian vault management via SSH to host |
+| `game-design` | Game design consultant agents |
+| `analysis` | Deep analytical thinking (`/ultrathink` command) |
+
+## SDD Plugin Core Workflow
+
+```
+/sdd:plan-ticket → /sdd:review → /sdd:create-tasks → /sdd:do-all-tasks → /sdd:archive
+```
+
+Work hierarchy: Epic (research) → Ticket (planning/execution) → Task (individual work item)
+
+Task execution flow: `implement (Sonnet) → test (Haiku) → verify (Sonnet) → commit (Haiku)`
+
+### Key Commands
+
+| Command | Description |
+|---------|-------------|
+| `/sdd:plan-ticket [description]` | Create ticket with planning docs |
+| `/sdd:review [TICKET_ID]` | Critical review before task creation |
+| `/sdd:create-tasks [TICKET_ID]` | Generate tasks from plan |
+| `/sdd:do-task [TASK_ID]` | Complete single task with verification |
+| `/sdd:do-all-tasks [TICKET_ID]` | Execute all tasks systematically |
+| `/sdd:status` | Check epic/ticket/task status |
+| `/sdd:archive [TICKET_ID]` | Archive completed ticket |
+
+## Configuration
+
+### Marketplace Registration
+
+Plugins are registered in `.claude-plugin/marketplace.json`. The marketplace name is "crewchief".
+
+### Environment
+
+- `SDD_ROOT_DIR`: Location of SDD data directory (epics, tickets, tasks)
+- `SDD_DISABLE_STOP_HOOK=1`: Disable workflow guidance
+- `AUTOGATE_BYPASS=true`: Bypass work gates
+
+### Work Gates
+
+`.autogate.json` files in ticket/epic directories control autonomous work:
+
+```json
+{"ready": false}                    // Block all autonomous work
+{"ready": true, "stop_at_phase": 1} // Stop after Phase 1
+```
+
+## Adding a New Plugin
+
+1. Create directory: `plugins/{name}/`
+2. Add `.claude-plugin/plugin.json` with metadata
+3. Register in `.claude-plugin/marketplace.json`
+4. Add agents in `agents/` (markdown with frontmatter)
+5. Add commands in `commands/` (markdown with workflow instructions)
+6. Add skills in `skills/{skill-name}/` with SKILL.md
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `.claude-plugin/marketplace.json` | Plugin registry |
+| `plugins/sdd/hooks/workflow-guidance.py` | Stop hook providing contextual next steps (1,362 lines) |
+| `plugins/sdd/skills/project-workflow/scripts/` | Scaffolding and status scripts |
+| `plugins/sdd/skills/project-workflow/templates/` | Ticket/epic/task templates |
+| `crewchief.config.js` | CrewChief CLI configuration |
