@@ -169,6 +169,10 @@ TASKS_COMPLETED=0
 # Tasks failed counter
 TASKS_FAILED=0
 
+# Circuit breaker tracking (for metrics output)
+CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
 # Metrics output file path (optional)
 METRICS_FILE=""
 
@@ -918,6 +922,10 @@ write_metrics() {
     "poll_interval": ${SDD_LOOP_POLL_INTERVAL:-$SDD_LOOP_DEFAULT_POLL_INTERVAL},
     "dry_run": $dry_run_json,
     "verbose": $verbose_json
+  },
+  "circuit_breaker": {
+    "warnings_logged": $CIRCUIT_BREAKER_WARNINGS_LOGGED,
+    "warning_iterations": [${CIRCUIT_BREAKER_WARNING_ITERATIONS}]
   }
 }
 EOF
@@ -1068,6 +1076,61 @@ handle_sigterm() {
 trap cleanup EXIT
 trap handle_sigint SIGINT INT
 trap handle_sigterm SIGTERM TERM
+
+# =============================================================================
+# Circuit Breaker (Advisory Safety Monitoring)
+# =============================================================================
+
+#######################################
+# Check iteration count and log advisory warnings at thresholds
+# This is an advisory-only function that monitors loop execution duration
+# and logs warnings at predefined thresholds. It NEVER aborts the loop -
+# it only provides visibility into long-running executions.
+#
+# Globals:
+#   ITERATION_COUNT - Current iteration count from main loop
+#
+# Outputs:
+#   Logs warning messages to stderr at threshold iterations
+#
+# Returns:
+#   0 - Always returns success (advisory only, never aborts)
+#
+# Thresholds:
+#   25 - First warning: indicates loop is running longer than typical
+#   40 - Second warning: approaching max_iterations (default 50)
+#######################################
+circuit_breaker_check() {
+    # Advisory warnings based on iteration count
+    # Uses existing ITERATION_COUNT from main loop
+
+    # Threshold 1: 25 iterations - indicates longer-than-typical execution
+    if [ "$ITERATION_COUNT" -eq 25 ]; then
+        log_warn "Circuit breaker: Long-running loop detected (iteration $ITERATION_COUNT)"
+        # Track warning for metrics
+        CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
+        if [ -n "$CIRCUIT_BREAKER_WARNING_ITERATIONS" ]; then
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="${CIRCUIT_BREAKER_WARNING_ITERATIONS}, $ITERATION_COUNT"
+        else
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="$ITERATION_COUNT"
+        fi
+    fi
+
+    # Threshold 2: 40 iterations - approaching default max_iterations (50)
+    if [ "$ITERATION_COUNT" -eq 40 ]; then
+        log_warn "Circuit breaker: Extended loop execution (iteration $ITERATION_COUNT, approaching max_iterations)"
+        # Track warning for metrics
+        CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
+        if [ -n "$CIRCUIT_BREAKER_WARNING_ITERATIONS" ]; then
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="${CIRCUIT_BREAKER_WARNING_ITERATIONS}, $ITERATION_COUNT"
+        else
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="$ITERATION_COUNT"
+        fi
+    fi
+
+    # Always continue - circuit breaker is advisory only
+    return 0
+}
 
 # =============================================================================
 # Help and Usage
@@ -1260,6 +1323,27 @@ INTEGRATION
     2. Run loop: sdd-loop.sh /workspace/repos/
     3. Monitor logs for progress
     4. Review completed work
+
+SAFETY FEATURES
+    Circuit Breaker (Advisory-Only)
+        Logs warnings at iteration thresholds but NEVER aborts automatically:
+        - Iteration 25: "Long-running loop detected" (informational)
+        - Iteration 40: "Extended loop execution" (elevated warning)
+
+        Loop only stops at legitimate milestones (no work remaining,
+        max iterations, stop_at_phase, or user interruption).
+
+        Metrics JSON includes circuit_breaker section with warnings_logged
+        count and warning_iterations array for post-execution analysis.
+
+    Catastrophic Command Filter
+        Claude Code hooks block 3 catastrophic command patterns:
+        - Root deletion: rm -rf / or rm -rf /*
+        - Root permission: chmod -R 777 / or chmod -R 777 /*
+        - Disk wiping: dd to /dev/sd* devices
+
+        Safe commands like rm -rf /tmp/* are allowed. Blocked commands
+        receive clear error messages explaining the catastrophic risk.
 
 SEE ALSO
     master-status-board.sh - Status board scanner
@@ -1560,6 +1644,9 @@ main() {
 
         # Increment iteration counter (global for cleanup)
         ITERATION_COUNT=$((ITERATION_COUNT + 1))
+
+        # Circuit breaker advisory check (logs warnings at thresholds)
+        circuit_breaker_check
 
         # Log iteration start
         log_info "Iteration $ITERATION_COUNT/$max_iterations: polling for next task"
