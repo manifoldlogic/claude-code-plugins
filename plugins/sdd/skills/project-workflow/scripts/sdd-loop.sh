@@ -1070,6 +1070,47 @@ trap handle_sigint SIGINT INT
 trap handle_sigterm SIGTERM TERM
 
 # =============================================================================
+# Circuit Breaker (Advisory Safety Monitoring)
+# =============================================================================
+
+#######################################
+# Check iteration count and log advisory warnings at thresholds
+# This is an advisory-only function that monitors loop execution duration
+# and logs warnings at predefined thresholds. It NEVER aborts the loop -
+# it only provides visibility into long-running executions.
+#
+# Globals:
+#   ITERATION_COUNT - Current iteration count from main loop
+#
+# Outputs:
+#   Logs warning messages to stderr at threshold iterations
+#
+# Returns:
+#   0 - Always returns success (advisory only, never aborts)
+#
+# Thresholds:
+#   25 - First warning: indicates loop is running longer than typical
+#   40 - Second warning: approaching max_iterations (default 50)
+#######################################
+circuit_breaker_check() {
+    # Advisory warnings based on iteration count
+    # Uses existing ITERATION_COUNT from main loop
+
+    # Threshold 1: 25 iterations - indicates longer-than-typical execution
+    if [ "$ITERATION_COUNT" -eq 25 ]; then
+        log_warn "Circuit breaker: Long-running loop detected (iteration $ITERATION_COUNT)"
+    fi
+
+    # Threshold 2: 40 iterations - approaching default max_iterations (50)
+    if [ "$ITERATION_COUNT" -eq 40 ]; then
+        log_warn "Circuit breaker: Extended loop execution (iteration $ITERATION_COUNT, approaching max_iterations)"
+    fi
+
+    # Always continue - circuit breaker is advisory only
+    return 0
+}
+
+# =============================================================================
 # Help and Usage
 # =============================================================================
 
