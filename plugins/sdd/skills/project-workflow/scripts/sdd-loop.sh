@@ -1602,6 +1602,9 @@ main() {
         # Increment iteration counter (global for cleanup)
         ITERATION_COUNT=$((ITERATION_COUNT + 1))
 
+        # Circuit breaker advisory check (logs warnings at thresholds)
+        circuit_breaker_check
+
         # Log iteration start
         log_info "Iteration $ITERATION_COUNT/$max_iterations: polling for next task"
 
