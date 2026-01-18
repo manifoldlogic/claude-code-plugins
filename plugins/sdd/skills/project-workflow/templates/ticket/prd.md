@@ -28,7 +28,7 @@
 [Quality attributes and constraints. Include performance, scalability, security, accessibility, and reliability requirements as applicable.]
 
 ### Performance
-- [Performance requirement, e.g., "Response time under 200ms"]
+- [Performance requirement, e.g., "Response time under 200 ms"]
 
 ### Security
 - [Security requirement, e.g., "Input validation on all user-provided data"]

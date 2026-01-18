@@ -170,7 +170,7 @@ fi
 
 When recommended documents are missing but required documents are present:
 
-```
+```text
 Validating planning documents...
 
 ═══════════════════════════════════════════════════════════════════
@@ -199,7 +199,7 @@ Task creation proceeds normally after warnings. Existing tickets without PRD.md 
 
 When PRD.md exists but has insufficient content:
 
-```
+```text
 Validating planning documents...
 
 ═══════════════════════════════════════════════════════════════════
@@ -225,7 +225,7 @@ Delegating to task-creator agent...
 
 When required documents are missing or insufficient:
 
-```
+```text
 Validating planning documents...
 
 ═══════════════════════════════════════════════════════════════════
