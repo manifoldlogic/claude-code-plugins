@@ -69,11 +69,12 @@ Context:
 Instructions:
 1. Research the problem space and codebase
 2. Fill analysis.md with problem analysis
-3. Create architecture.md with solution design
-4. Define plan.md with phased execution
-5. Write quality-strategy.md with testing approach
-6. Complete security-review.md with security assessment
-7. Update README.md with overview
+3. Create prd.md with product requirements (source of truth for requirements)
+4. Create architecture.md with solution design
+5. Define plan.md with phased execution
+6. Write quality-strategy.md with testing approach
+7. Complete security-review.md with security assessment
+8. Update README.md with overview
 
 Follow enterprise-grade quality standards with disciplined scope management.
 
@@ -97,7 +98,7 @@ Create comprehensive planning documents for ticket {TICKET_ID}_{name}
 - Follow enterprise-grade quality standards
 
 ## Expected Output
-- All planning documents completed (analysis.md, architecture.md, plan.md, quality-strategy.md, security-review.md)
+- All planning documents completed (analysis.md, prd.md, architecture.md, plan.md, quality-strategy.md, security-review.md)
 - README.md updated with overview
 - Summary of planning decisions
 
@@ -133,6 +134,7 @@ ${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/
 ├── README.md
 ├── planning/
 │   ├── analysis.md
+│   ├── prd.md
 │   ├── architecture.md
 │   ├── plan.md
 │   ├── quality-strategy.md
