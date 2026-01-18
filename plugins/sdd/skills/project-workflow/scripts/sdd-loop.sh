@@ -1324,6 +1324,27 @@ INTEGRATION
     3. Monitor logs for progress
     4. Review completed work
 
+SAFETY FEATURES
+    Circuit Breaker (Advisory-Only)
+        Logs warnings at iteration thresholds but NEVER aborts automatically:
+        - Iteration 25: "Long-running loop detected" (informational)
+        - Iteration 40: "Extended loop execution" (elevated warning)
+
+        Loop only stops at legitimate milestones (no work remaining,
+        max iterations, stop_at_phase, or user interruption).
+
+        Metrics JSON includes circuit_breaker section with warnings_logged
+        count and warning_iterations array for post-execution analysis.
+
+    Catastrophic Command Filter
+        Claude Code hooks block 3 catastrophic command patterns:
+        - Root deletion: rm -rf / or rm -rf /*
+        - Root permission: chmod -R 777 / or chmod -R 777 /*
+        - Disk wiping: dd to /dev/sd* devices
+
+        Safe commands like rm -rf /tmp/* are allowed. Blocked commands
+        receive clear error messages explaining the catastrophic risk.
+
 SEE ALSO
     master-status-board.sh - Status board scanner
     sdd:mark-ready - Enable/disable agent processing

@@ -491,6 +491,7 @@ plugins/sdd/
 │   ├── tickets-status.md
 │   └── update.md
 ├── hooks/
+│   ├── block-catastrophic-commands.py
 │   ├── block-dangerous-git.py
 │   ├── setup-sdd-env.js
 │   ├── warn-sdd-refs.py
@@ -617,6 +618,70 @@ The plugin enforces enterprise-grade testing:
 ### Archive failures
 - All tickets must have "Verified" checkbox checked
 - Run `/sdd:tasks-status TICKET_ID` to identify incomplete tickets
+
+## Safety Features
+
+### Circuit Breaker Warnings (Advisory-Only)
+
+The loop controller monitors iteration count and logs advisory warnings at predefined thresholds:
+
+| Iteration | Warning Message | Severity |
+|-----------|-----------------|----------|
+| 25 | "Long-running loop detected" | Informational |
+| 40 | "Extended loop execution, approaching max_iterations" | Elevated |
+
+**Important:** Warnings are advisory only. The loop NEVER aborts automatically based on circuit breaker thresholds - it only stops at legitimate milestones:
+- No work remaining
+- Maximum iterations reached (default: 50)
+- Stop-at-phase boundary reached
+- User interruption (Ctrl+C)
+
+Metrics JSON includes circuit breaker data for post-execution analysis:
+
+```json
+{
+  "circuit_breaker": {
+    "warnings_logged": 2,
+    "warning_iterations": [25, 40]
+  }
+}
+```
+
+### Catastrophic Command Filter
+
+The plugin blocks catastrophic system-level commands that could cause irreversible harm. This is a hardcoded filter with no configuration - it cannot be disabled.
+
+**Blocked patterns (exit code 2):**
+
+| Pattern | Description |
+|---------|-------------|
+| `rm -rf /` or `rm -rf /*` | Root filesystem deletion |
+| `chmod -R 777 /` or `chmod -R 777 /*` | Root permission compromise |
+| `dd if=... of=/dev/sd*` | Disk wiping |
+
+**Safe commands (allowed):**
+
+| Command | Why Allowed |
+|---------|-------------|
+| `rm -rf /tmp/test` | Non-root deletion |
+| `chmod 755 /usr/bin/script` | Non-777 permissions |
+| `dd if=/dev/zero of=/tmp/file` | File write, not disk |
+
+Blocked commands receive clear error messages explaining the catastrophic risk:
+
+```
+BLOCKED: Catastrophic command detected: rm -rf / (root filesystem deletion)
+Command: rm -rf /
+```
+
+### Hook Chain
+
+Safety hooks run as PreToolUse hooks on the Bash tool:
+
+1. **block-dangerous-git.py** - Blocks destructive git commands (`git reset --hard`, `git clean -fd`)
+2. **block-catastrophic-commands.py** - Blocks system-level catastrophic operations
+
+If any hook returns exit code 2, the command is blocked before execution.
 
 ## Version History
 
