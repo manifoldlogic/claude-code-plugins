@@ -34,9 +34,17 @@ TICKET_PATH=$(ls -d ${SDD_ROOT_DIR:-/app/.sdd}/tickets/${ARGUMENTS}_* 2>/dev/nul
 
 If ticket doesn't exist, report error and exit.
 
-### Step 2: Pre-Execution Validation (BLOCKING)
+### Step 2: Pre-Execution Validation
 
-**CRITICAL: These validations MUST pass before proceeding. If any validation fails, create-tasks CANNOT continue.**
+The create-tasks command performs two tiers of validation before delegating to the task-creator agent.
+
+#### Validation Tiers
+
+**Required (Blocking)** - These documents MUST exist and have substantial content (100+ words). If any required validation fails, task creation CANNOT proceed.
+
+**Recommended (Warning Only)** - These documents should exist but are not required. If missing or insufficient, a warning is shown but task creation continues. This maintains backward compatibility with existing tickets.
+
+#### Validation Checks
 
 Run the following validation checks:
 
@@ -45,22 +53,19 @@ Run the following validation checks:
 TICKET_PATH=$(ls -d ${SDD_ROOT_DIR:-/app/.sdd}/tickets/${ARGUMENTS}_* 2>/dev/null | head -1)
 VALIDATION_FAILED=false
 ERRORS=""
+WARNINGS=""
 
-# Check 1: Required documents exist
+# ═══════════════════════════════════════════════════════════════════
+# REQUIRED VALIDATIONS (BLOCKING)
+# ═══════════════════════════════════════════════════════════════════
+
 echo "Validating planning documents..."
 
+# Check 1: plan.md (REQUIRED)
 if [ ! -f "$TICKET_PATH/planning/plan.md" ]; then
   ERRORS="${ERRORS}\n❌ planning/plan.md - NOT FOUND (REQUIRED)"
   VALIDATION_FAILED=true
-fi
-
-if [ ! -f "$TICKET_PATH/planning/architecture.md" ]; then
-  ERRORS="${ERRORS}\n❌ planning/architecture.md - NOT FOUND (REQUIRED)"
-  VALIDATION_FAILED=true
-fi
-
-# Check 2: Required documents have substantial content (>100 words)
-if [ -f "$TICKET_PATH/planning/plan.md" ]; then
+else
   PLAN_WORDS=$(wc -w < "$TICKET_PATH/planning/plan.md")
   if [ "$PLAN_WORDS" -lt 100 ]; then
     ERRORS="${ERRORS}\n❌ planning/plan.md - insufficient content ($PLAN_WORDS words, need 100+)"
@@ -68,7 +73,11 @@ if [ -f "$TICKET_PATH/planning/plan.md" ]; then
   fi
 fi
 
-if [ -f "$TICKET_PATH/planning/architecture.md" ]; then
+# Check 2: architecture.md (REQUIRED)
+if [ ! -f "$TICKET_PATH/planning/architecture.md" ]; then
+  ERRORS="${ERRORS}\n❌ planning/architecture.md - NOT FOUND (REQUIRED)"
+  VALIDATION_FAILED=true
+else
   ARCH_WORDS=$(wc -w < "$TICKET_PATH/planning/architecture.md")
   if [ "$ARCH_WORDS" -lt 100 ]; then
     ERRORS="${ERRORS}\n❌ planning/architecture.md - insufficient content ($ARCH_WORDS words, need 100+)"
@@ -76,14 +85,62 @@ if [ -f "$TICKET_PATH/planning/architecture.md" ]; then
   fi
 fi
 
-# Check 3: quality-strategy.md recommended (warn but don't block)
-if [ ! -f "$TICKET_PATH/planning/quality-strategy.md" ]; then
-  echo "⚠️  planning/quality-strategy.md - NOT FOUND (recommended for testing requirements)"
+# ═══════════════════════════════════════════════════════════════════
+# RECOMMENDED VALIDATIONS (WARNING ONLY)
+# ═══════════════════════════════════════════════════════════════════
+
+# Check 3: prd.md (RECOMMENDED)
+if [ ! -f "$TICKET_PATH/planning/prd.md" ]; then
+  WARNINGS="${WARNINGS}\n⚠️  PRD.md not found at planning/prd.md"
+  WARNINGS="${WARNINGS}\n"
+  WARNINGS="${WARNINGS}\n   Consider creating a Product Requirements Document to:"
+  WARNINGS="${WARNINGS}\n   - Define clear functional and non-functional requirements"
+  WARNINGS="${WARNINGS}\n   - Establish measurable acceptance criteria"
+  WARNINGS="${WARNINGS}\n   - Clarify what is in/out of scope"
+  WARNINGS="${WARNINGS}\n   - Document assumptions and success metrics"
+  WARNINGS="${WARNINGS}\n"
+  WARNINGS="${WARNINGS}\n   This is recommended but not required. Task creation will continue."
+else
+  PRD_WORDS=$(wc -w < "$TICKET_PATH/planning/prd.md")
+  if [ "$PRD_WORDS" -lt 100 ]; then
+    WARNINGS="${WARNINGS}\n⚠️  PRD.md exists but is very short ($PRD_WORDS words, recommend 100+)"
+    WARNINGS="${WARNINGS}\n"
+    WARNINGS="${WARNINGS}\n   A comprehensive PRD should include:"
+    WARNINGS="${WARNINGS}\n   - Product vision and target users"
+    WARNINGS="${WARNINGS}\n   - Functional and non-functional requirements"
+    WARNINGS="${WARNINGS}\n   - User stories and acceptance criteria"
+    WARNINGS="${WARNINGS}\n   - Scope boundaries and assumptions"
+    WARNINGS="${WARNINGS}\n"
+    WARNINGS="${WARNINGS}\n   Consider expanding PRD.md before creating tasks."
+    WARNINGS="${WARNINGS}\n   Task creation will continue."
+  fi
 fi
 
-# Report validation result
+# Check 4: quality-strategy.md (RECOMMENDED)
+if [ ! -f "$TICKET_PATH/planning/quality-strategy.md" ]; then
+  WARNINGS="${WARNINGS}\n⚠️  planning/quality-strategy.md - NOT FOUND (recommended for testing requirements)"
+fi
+
+# ═══════════════════════════════════════════════════════════════════
+# REPORT VALIDATION RESULTS
+# ═══════════════════════════════════════════════════════════════════
+
+# Show warnings (non-blocking)
+if [ -n "$WARNINGS" ]; then
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo "RECOMMENDED DOCUMENT WARNINGS"
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo -e "$WARNINGS"
+  echo ""
+fi
+
+# Check for blocking failures
 if [ "$VALIDATION_FAILED" = true ]; then
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════════"
   echo "❌ VALIDATION FAILED: Cannot create tasks for ticket"
+  echo "═══════════════════════════════════════════════════════════════════"
   echo -e "$ERRORS"
   echo ""
   echo "Action Required:"
@@ -92,26 +149,97 @@ if [ "$VALIDATION_FAILED" = true ]; then
   echo "3. Run /sdd:plan-ticket or manually create missing docs"
   echo "4. Re-run /sdd:create-tasks after planning is complete"
   # EXIT - Do not proceed
+else
+  echo ""
+  echo "✓ Validation passed (required documents present)."
+  echo "Delegating to task-creator agent..."
 fi
 ```
 
-**Validation Requirements:**
+#### Validation Requirements Summary
 
-| Document | Required | Min Content |
-|----------|----------|-------------|
-| planning/plan.md | YES | 100+ words |
-| planning/architecture.md | YES | 100+ words |
-| planning/quality-strategy.md | Recommended | - |
-| planning/ticket-review.md | Recommended | - |
+| Document | Status | Min Content | Behavior |
+|----------|--------|-------------|----------|
+| planning/plan.md | **REQUIRED** | 100+ words | Blocks if missing/insufficient |
+| planning/architecture.md | **REQUIRED** | 100+ words | Blocks if missing/insufficient |
+| planning/prd.md | Recommended | 100+ words | Warning only, continues |
+| planning/quality-strategy.md | Recommended | - | Warning only, continues |
+| planning/ticket-review.md | Recommended | - | Warning only, continues |
 
-**If validation fails:**
+#### Example: Validation with Warnings (Backward Compatible)
+
+When recommended documents are missing but required documents are present:
+
 ```
+Validating planning documents...
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED DOCUMENT WARNINGS
+═══════════════════════════════════════════════════════════════════
+
+⚠️  PRD.md not found at planning/prd.md
+
+   Consider creating a Product Requirements Document to:
+   - Define clear functional and non-functional requirements
+   - Establish measurable acceptance criteria
+   - Clarify what is in/out of scope
+   - Document assumptions and success metrics
+
+   This is recommended but not required. Task creation will continue.
+
+⚠️  planning/quality-strategy.md - NOT FOUND (recommended for testing requirements)
+
+✓ Validation passed (required documents present).
+Delegating to task-creator agent...
+```
+
+Task creation proceeds normally after warnings. Existing tickets without PRD.md will see this warning but can still create tasks.
+
+#### Example: Thin PRD.md Warning
+
+When PRD.md exists but has insufficient content:
+
+```
+Validating planning documents...
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED DOCUMENT WARNINGS
+═══════════════════════════════════════════════════════════════════
+
+⚠️  PRD.md exists but is very short (42 words, recommend 100+)
+
+   A comprehensive PRD should include:
+   - Product vision and target users
+   - Functional and non-functional requirements
+   - User stories and acceptance criteria
+   - Scope boundaries and assumptions
+
+   Consider expanding PRD.md before creating tasks.
+   Task creation will continue.
+
+✓ Validation passed (required documents present).
+Delegating to task-creator agent...
+```
+
+#### Example: Required Validation Fails
+
+When required documents are missing or insufficient:
+
+```
+Validating planning documents...
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED DOCUMENT WARNINGS
+═══════════════════════════════════════════════════════════════════
+
+⚠️  PRD.md not found at planning/prd.md
+   ...
+
+═══════════════════════════════════════════════════════════════════
 ❌ VALIDATION FAILED: Cannot create tasks for ticket
+═══════════════════════════════════════════════════════════════════
 
-Missing Required Documents:
 ❌ planning/plan.md - NOT FOUND (REQUIRED)
-
-Documents with Insufficient Content:
 ❌ planning/architecture.md - insufficient content (45 words, need 100+)
 
 Action Required:
@@ -121,7 +249,7 @@ Action Required:
 4. Re-run /sdd:create-tasks after planning is complete
 ```
 
-**DO NOT PROCEED if validation fails. The task-creator agent cannot create quality tasks from incomplete plans.**
+**DO NOT PROCEED if required validation fails.** The task-creator agent cannot create quality tasks from incomplete plans. However, warnings about recommended documents (PRD.md, quality-strategy.md) do not block task creation.
 
 ### Step 3: Check Review Status (Warning Only)
 
@@ -164,6 +292,7 @@ Context:
 - Ticket path: {ticket_path}
 - Plan: {ticket_path}/planning/plan.md
 - Architecture: {ticket_path}/planning/architecture.md
+- PRD (if exists): {ticket_path}/planning/prd.md
 - Quality strategy: {ticket_path}/planning/quality-strategy.md
 - Additional instructions: {ARGUMENTS after TICKET_ID, or "None provided"}
 
