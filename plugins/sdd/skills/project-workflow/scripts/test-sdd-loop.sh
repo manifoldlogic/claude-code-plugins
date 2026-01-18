@@ -2215,6 +2215,284 @@ test_metrics_duration_reasonable() {
 }
 
 # =============================================================================
+# Circuit Breaker Tests (SDDLOOP-4.1005)
+# =============================================================================
+
+#######################################
+# Test: Circuit breaker warning at iteration 25
+#######################################
+test_circuit_breaker_warning_at_25() {
+    echo "--- Test: Circuit breaker warns at iteration 25 ---"
+
+    setup_test_env
+
+    # Source sdd-loop.sh to get access to circuit_breaker_check function
+    source "$SDD_LOOP"
+
+    # Set global variables that circuit_breaker_check uses
+    ITERATION_COUNT=25
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
+    # Capture output from circuit_breaker_check (warnings go to stderr via log_warn)
+    local output
+    local exit_code=0
+    output=$(circuit_breaker_check 2>&1) || exit_code=$?
+
+    if [[ "$output" == *"Long-running loop detected"* ]]; then
+        log_result "Warning logged at iteration 25" "pass"
+    else
+        log_result "Warning logged at iteration 25" "fail" "Expected warning message not found in: $output"
+    fi
+
+    if [[ "$exit_code" -eq 0 ]]; then
+        log_result "Circuit breaker returns 0 (continues)" "pass"
+    else
+        log_result "Circuit breaker returns 0 (continues)" "fail" "Got exit code: $exit_code"
+    fi
+
+    # Test counter increment directly (not in subshell)
+    ITERATION_COUNT=25
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+    circuit_breaker_check >/dev/null 2>&1
+
+    if [[ "$CIRCUIT_BREAKER_WARNINGS_LOGGED" -eq 1 ]]; then
+        log_result "Warning counter incremented" "pass"
+    else
+        log_result "Warning counter incremented" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
+    fi
+}
+
+#######################################
+# Test: Circuit breaker no warning at iteration 24
+#######################################
+test_circuit_breaker_no_warning_at_24() {
+    echo "--- Test: Circuit breaker no warning at iteration 24 ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    ITERATION_COUNT=24
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
+    local output
+    local exit_code=0
+    output=$(circuit_breaker_check 2>&1) || exit_code=$?
+
+    if [[ "$output" != *"Long-running loop"* && "$output" != *"Extended loop"* ]]; then
+        log_result "No warning at iteration 24" "pass"
+    else
+        log_result "No warning at iteration 24" "fail" "Unexpected warning: $output"
+    fi
+
+    if [[ "$exit_code" -eq 0 ]]; then
+        log_result "Still returns 0" "pass"
+    else
+        log_result "Still returns 0" "fail" "Got: $exit_code"
+    fi
+
+    if [[ "$CIRCUIT_BREAKER_WARNINGS_LOGGED" -eq 0 ]]; then
+        log_result "Warning counter unchanged" "pass"
+    else
+        log_result "Warning counter unchanged" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
+    fi
+}
+
+#######################################
+# Test: Circuit breaker warning at iteration 40
+#######################################
+test_circuit_breaker_warning_at_40() {
+    echo "--- Test: Circuit breaker warns at iteration 40 ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    ITERATION_COUNT=40
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
+    local output
+    local exit_code=0
+    output=$(circuit_breaker_check 2>&1) || exit_code=$?
+
+    if [[ "$output" == *"Extended loop execution"* ]]; then
+        log_result "Warning logged at iteration 40" "pass"
+    else
+        log_result "Warning logged at iteration 40" "fail" "Expected warning message not found in: $output"
+    fi
+
+    if [[ "$output" == *"approaching max_iterations"* ]]; then
+        log_result "Warning mentions max_iterations" "pass"
+    else
+        log_result "Warning mentions max_iterations" "fail" "Missing max_iterations mention"
+    fi
+
+    # Test counter increment directly (not in subshell)
+    ITERATION_COUNT=40
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+    circuit_breaker_check >/dev/null 2>&1
+
+    if [[ "$CIRCUIT_BREAKER_WARNINGS_LOGGED" -eq 1 ]]; then
+        log_result "Warning counter incremented at 40" "pass"
+    else
+        log_result "Warning counter incremented at 40" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
+    fi
+}
+
+#######################################
+# Test: Circuit breaker no warning at iteration 39
+#######################################
+test_circuit_breaker_no_warning_at_39() {
+    echo "--- Test: Circuit breaker no warning at iteration 39 ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    ITERATION_COUNT=39
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
+    local output
+    local exit_code=0
+    output=$(circuit_breaker_check 2>&1) || exit_code=$?
+
+    if [[ "$output" != *"Long-running loop"* && "$output" != *"Extended loop"* ]]; then
+        log_result "No warning at iteration 39" "pass"
+    else
+        log_result "No warning at iteration 39" "fail" "Unexpected warning: $output"
+    fi
+
+    if [[ "$CIRCUIT_BREAKER_WARNINGS_LOGGED" -eq 0 ]]; then
+        log_result "Warning counter unchanged at 39" "pass"
+    else
+        log_result "Warning counter unchanged at 39" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
+    fi
+}
+
+#######################################
+# Test: Circuit breaker no warning at iteration 26 (after threshold)
+#######################################
+test_circuit_breaker_no_warning_at_26() {
+    echo "--- Test: Circuit breaker no warning at iteration 26 ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    ITERATION_COUNT=26
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
+    local output
+    local exit_code=0
+    output=$(circuit_breaker_check 2>&1) || exit_code=$?
+
+    if [[ "$output" != *"Long-running loop"* && "$output" != *"Extended loop"* ]]; then
+        log_result "No warning at iteration 26" "pass"
+    else
+        log_result "No warning at iteration 26" "fail" "Unexpected warning: $output"
+    fi
+
+    if [[ "$CIRCUIT_BREAKER_WARNINGS_LOGGED" -eq 0 ]]; then
+        log_result "Warning counter unchanged at 26" "pass"
+    else
+        log_result "Warning counter unchanged at 26" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
+    fi
+}
+
+#######################################
+# Test: Metrics JSON contains circuit_breaker section
+#######################################
+test_metrics_circuit_breaker_section() {
+    echo "--- Test: Metrics JSON contains circuit_breaker section ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local metrics_file="$TEST_TMP_DIR/metrics.json"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
+
+    # Check circuit_breaker section exists
+    local warnings_logged warning_iterations
+
+    warnings_logged=$(jq -r '.circuit_breaker.warnings_logged' "$metrics_file" 2>/dev/null)
+    warning_iterations=$(jq -r '.circuit_breaker.warning_iterations' "$metrics_file" 2>/dev/null)
+
+    if [[ "$warnings_logged" =~ ^[0-9]+$ ]]; then
+        log_result "circuit_breaker.warnings_logged is a number" "pass"
+    else
+        log_result "circuit_breaker.warnings_logged is a number" "fail" "Got: $warnings_logged"
+    fi
+
+    if [[ "$warning_iterations" != "null" ]]; then
+        log_result "circuit_breaker.warning_iterations exists" "pass"
+    else
+        log_result "circuit_breaker.warning_iterations exists" "fail" "Field is null or missing"
+    fi
+
+    # For a short run (1 iteration), should have 0 warnings
+    if [[ "$warnings_logged" -eq 0 ]]; then
+        log_result "No warnings in short run" "pass"
+    else
+        log_result "No warnings in short run" "fail" "Got: $warnings_logged warnings"
+    fi
+}
+
+#######################################
+# Test: Circuit breaker tracks warning iterations correctly
+#######################################
+test_circuit_breaker_warning_iterations_tracking() {
+    echo "--- Test: Circuit breaker tracks warning iterations ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Simulate reaching both thresholds
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
+    # First threshold at 25
+    ITERATION_COUNT=25
+    circuit_breaker_check >/dev/null 2>&1
+
+    if [[ "$CIRCUIT_BREAKER_WARNING_ITERATIONS" == "25" ]]; then
+        log_result "Tracks iteration 25" "pass"
+    else
+        log_result "Tracks iteration 25" "fail" "Got: $CIRCUIT_BREAKER_WARNING_ITERATIONS"
+    fi
+
+    # Second threshold at 40
+    ITERATION_COUNT=40
+    circuit_breaker_check >/dev/null 2>&1
+
+    if [[ "$CIRCUIT_BREAKER_WARNING_ITERATIONS" == "25, 40" ]]; then
+        log_result "Tracks both iterations 25 and 40" "pass"
+    else
+        log_result "Tracks both iterations 25 and 40" "fail" "Got: $CIRCUIT_BREAKER_WARNING_ITERATIONS"
+    fi
+
+    if [[ "$CIRCUIT_BREAKER_WARNINGS_LOGGED" -eq 2 ]]; then
+        log_result "Total warnings count is 2" "pass"
+    else
+        log_result "Total warnings count is 2" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
+    fi
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -2448,6 +2726,29 @@ main() {
     test_metrics_file_in_help
     echo ""
     test_metrics_duration_reasonable
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 9 TESTS (Circuit Breaker - SDDLOOP-4.1005)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 9 Tests (Circuit Breaker)"
+    echo "====================================="
+    echo ""
+
+    test_circuit_breaker_warning_at_25
+    echo ""
+    test_circuit_breaker_no_warning_at_24
+    echo ""
+    test_circuit_breaker_warning_at_40
+    echo ""
+    test_circuit_breaker_no_warning_at_39
+    echo ""
+    test_circuit_breaker_no_warning_at_26
+    echo ""
+    test_metrics_circuit_breaker_section
+    echo ""
+    test_circuit_breaker_warning_iterations_tracking
     echo ""
 
     # Summary
