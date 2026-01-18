@@ -77,6 +77,46 @@ class TestDiskWipeBlocking:
         assert "disk wipe" in result.stderr
 
 
+class TestCommandSubstitutionBypass:
+    """Tests for command substitution bypass patterns."""
+
+    def test_blocks_rm_rf_in_subshell(self):
+        """$(rm -rf /) should be blocked."""
+        result = run_hook("echo $(rm -rf /)")
+        assert result.returncode == 2
+        assert "root filesystem deletion" in result.stderr
+
+    def test_blocks_rm_rf_in_backticks(self):
+        """`rm -rf /` should be blocked."""
+        result = run_hook("echo `rm -rf /`")
+        assert result.returncode == 2
+        assert "root filesystem deletion" in result.stderr
+
+    def test_blocks_chmod_in_subshell(self):
+        """$(chmod -R 777 /) should be blocked."""
+        result = run_hook("echo $(chmod -R 777 /)")
+        assert result.returncode == 2
+        assert "root permission compromise" in result.stderr
+
+    def test_blocks_chmod_in_backticks(self):
+        """`chmod -R 777 /` should be blocked."""
+        result = run_hook("echo `chmod -R 777 /`")
+        assert result.returncode == 2
+        assert "root permission compromise" in result.stderr
+
+    def test_blocks_nested_substitution(self):
+        """Nested command substitution should be blocked."""
+        result = run_hook("foo=$(bar=$(rm -rf /))")
+        assert result.returncode == 2
+        assert "root filesystem deletion" in result.stderr
+
+    def test_blocks_rm_rf_in_quotes(self):
+        """rm -rf / in double quotes should be blocked."""
+        result = run_hook('bash -c "rm -rf /"')
+        assert result.returncode == 2
+        assert "root filesystem deletion" in result.stderr
+
+
 # =============================================================================
 # Safe Command Tests (should allow - exit code 0)
 # =============================================================================

@@ -19,12 +19,16 @@ import sys
 import re
 
 # Hardcoded catastrophic patterns (no configuration)
+# Patterns use (\s|$|[)`'"]) to catch:
+#   - Direct commands: rm -rf /
+#   - Command substitution: $(rm -rf /) or `rm -rf /`
+#   - Quoted strings: "rm -rf /"
 CATASTROPHIC_PATTERNS = [
     # Root filesystem deletion
-    (r"\brm\s+-rf\s+/+\s*$", "rm -rf / (root filesystem deletion)"),
+    (r"\brm\s+-rf\s+/+(\s|$|[)`'\"])", "rm -rf / (root filesystem deletion)"),
     (r"\brm\s+-rf\s+/\*", "rm -rf /* (root filesystem deletion)"),
     # Root permission compromise
-    (r"\bchmod\s+-R\s+777\s+/+\s*$", "chmod -R 777 / (root permission compromise)"),
+    (r"\bchmod\s+-R\s+777\s+/+(\s|$|[)`'\"])", "chmod -R 777 / (root permission compromise)"),
     (r"\bchmod\s+-R\s+777\s+/\*", "chmod -R 777 /* (root permission compromise)"),
     # Disk wiping
     (r"\bdd\b.*of=/dev/sd", "dd to block device (disk wipe)"),
