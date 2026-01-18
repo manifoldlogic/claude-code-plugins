@@ -169,6 +169,10 @@ TASKS_COMPLETED=0
 # Tasks failed counter
 TASKS_FAILED=0
 
+# Circuit breaker tracking (for metrics output)
+CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+
 # Metrics output file path (optional)
 METRICS_FILE=""
 
@@ -918,6 +922,10 @@ write_metrics() {
     "poll_interval": ${SDD_LOOP_POLL_INTERVAL:-$SDD_LOOP_DEFAULT_POLL_INTERVAL},
     "dry_run": $dry_run_json,
     "verbose": $verbose_json
+  },
+  "circuit_breaker": {
+    "warnings_logged": $CIRCUIT_BREAKER_WARNINGS_LOGGED,
+    "warning_iterations": [${CIRCUIT_BREAKER_WARNING_ITERATIONS}]
   }
 }
 EOF
@@ -1099,11 +1107,25 @@ circuit_breaker_check() {
     # Threshold 1: 25 iterations - indicates longer-than-typical execution
     if [ "$ITERATION_COUNT" -eq 25 ]; then
         log_warn "Circuit breaker: Long-running loop detected (iteration $ITERATION_COUNT)"
+        # Track warning for metrics
+        CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
+        if [ -n "$CIRCUIT_BREAKER_WARNING_ITERATIONS" ]; then
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="${CIRCUIT_BREAKER_WARNING_ITERATIONS}, $ITERATION_COUNT"
+        else
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="$ITERATION_COUNT"
+        fi
     fi
 
     # Threshold 2: 40 iterations - approaching default max_iterations (50)
     if [ "$ITERATION_COUNT" -eq 40 ]; then
         log_warn "Circuit breaker: Extended loop execution (iteration $ITERATION_COUNT, approaching max_iterations)"
+        # Track warning for metrics
+        CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
+        if [ -n "$CIRCUIT_BREAKER_WARNING_ITERATIONS" ]; then
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="${CIRCUIT_BREAKER_WARNING_ITERATIONS}, $ITERATION_COUNT"
+        else
+            CIRCUIT_BREAKER_WARNING_ITERATIONS="$ITERATION_COUNT"
+        fi
     fi
 
     # Always continue - circuit breaker is advisory only
