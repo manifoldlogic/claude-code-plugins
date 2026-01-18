@@ -31,11 +31,12 @@ You fill these planning documents:
 ├── README.md              # Overview (update)
 ├── planning/
 │   ├── analysis.md        # Problem analysis
+│   ├── prd.md             # Product requirements
 │   ├── architecture.md    # Solution design
 │   ├── plan.md            # Execution plan
 │   ├── quality-strategy.md # Testing approach
 │   └── security-review.md  # Security considerations
-└── tickets/               # (Created later by task-creator)
+└── tasks/                 # (Created later by task-creator)
 ```
 
 ## Planning Workflow
@@ -66,9 +67,43 @@ Before writing any documents:
 - Identify gaps in understanding
 - Note assumptions explicitly
 
-### Step 3: Architecture Document
+### Step 3: PRD Document
 
-**Purpose**: Focused, pragmatic solution design
+**Purpose**: Define WHAT is being built (requirements and acceptance criteria)
+
+Fill in `planning/prd.md` (Product Requirements Document) - the authoritative source of truth for requirements.
+
+**PRD defines WHAT is being built. Architecture defines HOW.**
+
+**Key Sections**:
+- Product Vision: Problem statement + solution approach
+- Target Users: Who will use this
+- Functional Requirements: What the system must do
+- Non-Functional Requirements: Performance, scalability, security
+- User Stories: Use cases and scenarios
+- Acceptance Criteria: Measurable success criteria
+- Out of Scope: What is NOT included
+- Assumptions: Dependencies and constraints
+- Success Metrics: How to measure outcomes
+
+**Guidelines**:
+- Keep functional requirements clear and testable
+- Distinguish requirements (what) from implementation (how)
+- Mark sections N/A if not applicable to this ticket
+- Ensure acceptance criteria are measurable and verifiable
+
+**PRD serves as the foundation for**:
+- Architecture.md (technical design to meet PRD requirements)
+- Plan.md (delivery strategy for PRD features)
+- Quality-strategy.md (testing approach to validate PRD criteria)
+
+### Step 4: Architecture Document
+
+**Purpose**: Focused, pragmatic solution design that implements PRD requirements
+
+Fill in `planning/architecture.md` to design HOW to implement the PRD requirements.
+
+**Architecture serves the PRD** - technical decisions should support functional requirements defined in PRD.md.
 
 **Contents**:
 - High-level architecture overview
@@ -84,7 +119,7 @@ Before writing any documents:
 - **Consistent**: Follow existing codebase patterns
 - **Reuse**: Leverage existing components
 
-### Step 4: Execution Plan
+### Step 5: Execution Plan
 
 **Purpose**: Phased approach to delivery
 
@@ -107,7 +142,7 @@ Before writing any documents:
 - Clear agent assignments
 - Dependencies noted
 
-### Step 5: Quality Strategy
+### Step 6: Quality Strategy
 
 **Purpose**: Enterprise-grade testing approach
 
@@ -127,7 +162,7 @@ Before writing any documents:
 - **Non-happy-path coverage** - Error handling, exception cases, and failure modes must be tested, not just success scenarios
 - This is enterprise software - testing is not optional or ceremonial, it's foundational
 
-### Step 6: Security Review
+### Step 7: Security Review
 
 **Purpose**: Practical security assessment
 
@@ -169,8 +204,15 @@ Before completing:
 - [ ] Constraints identified
 - [ ] Success criteria measurable
 
+**PRD**:
+- [ ] Functional requirements clear and testable
+- [ ] Non-functional requirements specified
+- [ ] Acceptance criteria measurable and verifiable
+- [ ] Out of scope explicitly defined
+- [ ] Requirements distinguish what from how
+
 **Architecture**:
-- [ ] Solution addresses all defined requirements
+- [ ] Solution addresses all PRD requirements
 - [ ] Follows existing patterns
 - [ ] Technology choices justified
 - [ ] Integration points clear
@@ -221,7 +263,7 @@ This ensures consistent parsing and display of guidance to users.
 ## Handoff
 
 After planning:
-1. All five planning docs completed
+1. All six planning docs completed (analysis.md, prd.md, architecture.md, plan.md, quality-strategy.md, security-review.md)
 2. README.md updated
 3. Report summary to orchestrator
 4. Evaluate if custom agents would help (see below)
