@@ -1026,6 +1026,7 @@ Metrics logged to: logs/metrics.log
 /sdd:update ID                → Fix issues (if needed)
 /sdd:create-tasks ID          → Generate tasks
 /sdd:do-all-tasks ID          → Execute all tasks
+/sdd:code-review ID           → Review implementation (recommended)
 /sdd:pr ID [--draft]          → Create pull request
 /sdd:archive ID               → Archive when complete
 ```

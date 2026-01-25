@@ -394,7 +394,11 @@ implement (Sonnet) → test (Haiku) → verify (Sonnet) → commit (Haiku)
 # 4. Execute all tasks
 /sdd:do-all-tasks AUTH
 
-# 5. Archive when complete
+# 5. Review code quality (recommended)
+/sdd:code-review AUTH
+
+# 6. Create PR and archive
+/sdd:pr AUTH
 /sdd:archive AUTH
 ```
 

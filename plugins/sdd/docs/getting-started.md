@@ -218,6 +218,8 @@ References Updated: 0 files
 /sdd:do-all-tasks [ID]           → Execute all tasks systematically
 /sdd:do-task [TASK_ID]           → Execute single task (e.g., DEMO.1001)
 /sdd:tasks-status [ID]           → Check progress
+/sdd:code-review [ID]            → Review implementation (recommended)
+/sdd:pr [ID]                     → Create pull request
 /sdd:archive [ID]                → Archive completed ticket
 ```
 

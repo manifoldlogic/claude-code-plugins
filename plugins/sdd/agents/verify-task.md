@@ -275,7 +275,9 @@ Audit Log Updated:
 | 2025-01-15 | verify-task | PASS | All 3 acceptance criteria met, tests passing |
 
 ---
-RECOMMENDED NEXT STEP: /sdd:commit-task {TASK_ID}
+RECOMMENDED NEXT STEP:
+{If more tasks remain: /sdd:commit-task {TICKET_ID}.{TASK_ID}}
+{If ticket complete: /sdd:code-review {TICKET_ID} or /sdd:commit-task to commit this task}
 Commit these verified changes.
 ```
 

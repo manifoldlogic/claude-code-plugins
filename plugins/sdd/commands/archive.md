@@ -9,11 +9,11 @@ argument-hint: [TICKET_ID or empty to review all]
 
 Ticket: $ARGUMENTS (optional - if empty, reviews all tasks)
 
-**Note:** Consider creating a Pull Request before archiving:
-```bash
-/sdd:pr {TICKET_ID}
-```
-This is optional but recommended for code review workflow.
+**Note:** Consider running code review before archiving:
+- Review code: `/sdd:code-review {TICKET_ID}` (recommended)
+- Create PR: `/sdd:pr {TICKET_ID}`
+
+These steps are optional but recommended for production code.
 
 ## Workflow
 

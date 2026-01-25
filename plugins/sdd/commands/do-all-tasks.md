@@ -213,7 +213,9 @@ Git Status:
 
 ---
 RECOMMENDED NEXT STEP:
-If all tasks verified: /sdd:pr {TICKET_ID}
+If all tasks verified:
+  - Code review (recommended): /sdd:code-review {TICKET_ID}
+  - Create PR directly: /sdd:pr {TICKET_ID}
 If tasks have failures: /sdd:do-task {TICKET_ID}.{failed_task_id}
 If review needed: /sdd:review {TICKET_ID}
 ```
