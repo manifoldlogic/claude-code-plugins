@@ -268,6 +268,17 @@ Located in `skills/project-workflow/scripts/`:
 
 The SDD Loop Controller ("Ralph Wiggum Loop") provides autonomous task execution across multiple repositories. It continuously polls for work, executes tasks via Claude Code, and respects safety limits and phase boundaries.
 
+> **Important:** Before using autonomous execution, review [Safety Guidelines](docs/safety-guidelines.md) for complete documentation of safety mechanisms.
+
+#### Safety Features Quick Reference
+
+| Feature | Description | Purpose |
+|---------|-------------|---------|
+| Circuit Breaker | Warnings at iterations 25, 40 | Advisory visibility |
+| Catastrophic Filter | Blocks dangerous commands | Prevents destructive operations |
+| Error Limits | Max 3 consecutive errors | Prevents runaway failures |
+| Phase Boundaries | `stop_at_phase` configuration | Staged execution control |
+
 ### Quick Start
 
 ```bash
@@ -328,6 +339,8 @@ echo '{"ready": true, "agent_ready": true, "stop_at_phase": 1}' > .autogate.json
 
 - [sdd-loop-examples.md](skills/project-workflow/scripts/sdd-loop-examples.md) - Comprehensive usage examples
 - [sdd-loop.sh](skills/project-workflow/scripts/sdd-loop.sh) - Full script with `--help` documentation
+
+For troubleshooting loop execution issues, see [Loop Controller Issues](docs/troubleshooting.md#loop-controller-issues).
 
 ## Workflow
 
