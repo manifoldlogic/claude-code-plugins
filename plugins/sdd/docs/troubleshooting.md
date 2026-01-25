@@ -21,6 +21,7 @@ Common issues and solutions for the SDD plugin.
 - [Archive Issues](#archive-issues)
 - [General Issues](#general-issues)
 - [Recovery Procedures](#recovery-procedures)
+- [Loop Controller Issues](#loop-controller-issues)
 
 ---
 
@@ -331,6 +332,339 @@ If ticket directory is corrupted:
 3. If planning intact: Continue from last checkpoint
 4. If planning lost: Recover from git history
 5. If unrecoverable: Start new ticket, reference old work in notes
+
+---
+
+## Loop Controller Issues
+
+This section covers issues specific to autonomous loop execution via `sdd-loop.sh`.
+For detailed safety feature documentation, see the [Safety Guidelines](./safety-guidelines.md).
+
+### Loop Stops Immediately
+
+**Symptoms**:
+- Loop exits with "No more work available" after first iteration
+- Message shows "reason: no tasks remaining" or similar
+- Zero tasks were executed
+
+**Cause**: No agent-ready tasks are available for autonomous execution. This can happen when:
+- No tasks have been created yet (`/sdd:create-tasks` not run)
+- All tasks are already completed
+- Tasks exist but `.autogate.json` blocks autonomous execution
+- Tasks have unmet dependencies that prevent execution
+
+**Solution**:
+1. Check task status: `/sdd:tasks-status [TICKET_ID]`
+2. Verify tasks exist in `tasks/` directory
+3. Check `.autogate.json` configuration:
+   ```bash
+   cat _SDD/tickets/TICKET_name/.autogate.json
+   ```
+4. Ensure both `ready` and `agent_ready` are `true`:
+   ```json
+   {"ready": true, "agent_ready": true}
+   ```
+5. Check for dependency blocks - prerequisite tasks must be complete
+
+**Prevention**: Always verify task status and `.autogate.json` configuration before starting the loop. Run `/sdd:tasks-status` to confirm agent-ready tasks exist.
+
+---
+
+### Task Times Out
+
+**Symptoms**:
+- Task execution stopped mid-work
+- Log shows timeout-related termination
+- Claude process killed after extended execution
+
+**Cause**: Task execution exceeded the configured timeout limit (default: 3600 seconds / 1 hour). Complex tasks involving large file operations, extensive testing, or external API calls may exceed this limit.
+
+**Solution**:
+1. Review the task complexity - is it too large for a single task?
+2. Increase timeout for complex tasks:
+   ```bash
+   ./sdd-loop.sh --timeout 7200 /workspace/repos/  # 2 hours
+   ```
+3. Or set via environment variable:
+   ```bash
+   export SDD_LOOP_TIMEOUT=7200
+   ./sdd-loop.sh /workspace/repos/
+   ```
+4. Check if the task is stuck (infinite loop, waiting for input)
+5. Review Claude execution logs for clues about why it ran long
+
+**Prevention**:
+- Break large tasks into smaller, focused units (aim for under 30 minutes each)
+- Set appropriate timeouts based on expected task complexity
+- Use phase boundaries to create natural checkpoints
+
+See [Safety Guidelines > Configuration for Safety](./safety-guidelines.md#4-configuration-for-safety) for timeout configuration details.
+
+---
+
+### Max Iterations Reached
+
+**Symptoms**:
+- Log message: "Reached maximum iterations (50)"
+- Loop stops with exit code 1
+- Tasks may still be pending
+
+**Cause**: The loop executed 50 iterations (default limit) without completing all work. This typically indicates:
+- Large backlog of tasks (legitimate, but consider phased execution)
+- Tasks are being re-queued without completing
+- Circular dependency or stuck task pattern
+
+**Solution**:
+1. Review progress - are tasks actually completing?
+   ```bash
+   ./master-status-board.sh /workspace/repos/ | jq '.repos[].tickets'
+   ```
+2. If legitimate large workload, increase the limit:
+   ```bash
+   ./sdd-loop.sh --max-iterations 100 /workspace/repos/
+   ```
+3. Check for stuck tasks that keep failing and retrying
+4. Resume the loop if more work remains:
+   ```bash
+   ./sdd-loop.sh --verbose /workspace/repos/
+   ```
+
+**Prevention**:
+- Use phase boundaries (`stop_at_phase` in `.autogate.json`) for staged execution
+- Break large tickets into multiple smaller tickets
+- Monitor progress periodically for long-running sessions
+
+See [Safety Guidelines > Error Limits](./safety-guidelines.md#33-error-limits) for iteration limit configuration.
+
+---
+
+### Consecutive Error Limit Reached
+
+**Symptoms**:
+- Log message: "Reached maximum consecutive errors (3)"
+- Loop aborts with exit code 1
+- Same or similar tasks failing repeatedly
+
+**Cause**: Three consecutive task executions failed. This safety feature prevents runaway failure loops that waste resources. Common causes:
+- Task definition has errors (missing files, bad acceptance criteria)
+- Environment issue (missing dependencies, permission problems)
+- External service unavailable
+- Task prerequisites not met
+
+**Solution**:
+1. Identify the failing task from logs:
+   ```bash
+   ./master-status-board.sh /workspace/repos/ | jq '.recommended_action'
+   ```
+2. Review the task definition for issues
+3. Check prerequisites are satisfied
+4. Fix the underlying problem before retrying
+5. Resume the loop:
+   ```bash
+   ./sdd-loop.sh --verbose /workspace/repos/
+   ```
+
+**Prevention**:
+- Test tasks manually before autonomous execution
+- Ensure task acceptance criteria are clear and achievable
+- Verify environment dependencies are available
+- Use dry-run mode first: `./sdd-loop.sh --dry-run`
+
+Note: The consecutive error counter resets to zero after each successful task, allowing recovery from occasional failures.
+
+See [Safety Guidelines > Error Limits](./safety-guidelines.md#33-error-limits) for error limit configuration.
+
+---
+
+### Circuit Breaker Warnings
+
+**Symptoms**:
+- Log warning: "Circuit breaker: Long-running loop detected (iteration 25)"
+- Log warning: "Circuit breaker: Extended loop execution (iteration 40)"
+- Loop continues executing (warnings are advisory only)
+
+**Cause**: The loop has been running for an extended number of iterations. These are advisory warnings, not errors:
+- **Iteration 25**: Indicates loop is running longer than typical
+- **Iteration 40**: Approaching default max_iterations (50)
+
+The circuit breaker is intentionally advisory-only to avoid aborting productive work.
+
+**Solution**:
+1. Review loop progress - is work being completed?
+2. Check if tasks are completing or repeatedly failing
+3. Consider whether to intervene:
+   - Continue if making good progress
+   - Stop (`Ctrl+C`) if stuck or problematic
+4. Review metrics after completion:
+   ```bash
+   cat /tmp/metrics.json | jq '.circuit_breaker'
+   ```
+
+**Prevention**:
+- Use phase boundaries for natural checkpoints
+- Set appropriate `--max-iterations` based on expected workload
+- Monitor long-running loops periodically
+
+See [Safety Guidelines > Circuit Breaker](./safety-guidelines.md#31-circuit-breaker-advisory-warnings) for detailed circuit breaker documentation.
+
+---
+
+### Claude CLI Not Found
+
+**Symptoms**:
+- Error: "claude CLI not found"
+- Recommendation to install from https://claude.ai/download
+- Task execution fails before starting
+
+**Cause**: The Claude Code CLI is not installed or not in the system PATH. The loop controller requires Claude Code to execute tasks.
+
+**Solution**:
+1. Verify Claude is installed:
+   ```bash
+   claude --version
+   ```
+2. If not installed, install Claude Code:
+   - Visit https://claude.ai/download
+   - Follow installation instructions for your platform
+3. If installed but not found, check PATH:
+   ```bash
+   command -v claude
+   echo $PATH
+   ```
+4. Add Claude to PATH if necessary:
+   ```bash
+   export PATH="$PATH:/path/to/claude/bin"
+   ```
+5. Restart your shell or source your profile:
+   ```bash
+   source ~/.bashrc  # or ~/.zshrc
+   ```
+
+**Prevention**:
+- Install Claude Code before using the loop controller
+- Verify installation with `claude --version` before starting loops
+- Ensure Claude is in PATH for the user running the loop
+
+---
+
+### Permission Errors
+
+**Symptoms**:
+- Errors about "Permission denied" or "Cannot write"
+- Failed to create or modify files in workspace
+- Task execution fails with file operation errors
+
+**Cause**: The loop controller or Claude process lacks permissions to read/write required directories. Common causes:
+- Running as wrong user
+- Workspace owned by different user
+- Read-only filesystem or directory
+- Docker volume permission issues
+
+**Solution**:
+1. Check workspace ownership:
+   ```bash
+   ls -la _SDD/
+   ls -la _SDD/tickets/
+   ```
+2. Verify current user:
+   ```bash
+   whoami
+   id
+   ```
+3. Fix ownership if needed:
+   ```bash
+   sudo chown -R $(whoami):$(whoami) _SDD/
+   ```
+4. Check directory permissions:
+   ```bash
+   ls -ld _SDD/tickets/TICKET_name/
+   ```
+5. Ensure write permissions:
+   ```bash
+   chmod u+w _SDD/tickets/TICKET_name/
+   ```
+
+**Prevention**:
+- Run the loop as the user who owns the workspace
+- Ensure workspace directories are writable before starting
+- In Docker, verify volume mounts have correct permissions
+- Check containerized environments for UID/GID mapping issues
+
+---
+
+### Task Execution Fails Silently
+
+**Symptoms**:
+- Task marked as failed but no clear error message
+- Claude exited without completing work
+- Incomplete changes in workspace
+
+**Cause**: Claude execution ended unexpectedly without explicit error output. Possible causes:
+- Memory limits exceeded
+- Signal interruption
+- Network disconnection (for API-based Claude)
+- Task instructions unclear or malformed
+
+**Solution**:
+1. Enable verbose logging for more details:
+   ```bash
+   ./sdd-loop.sh --verbose /workspace/repos/
+   ```
+2. Enable debug mode for maximum detail:
+   ```bash
+   ./sdd-loop.sh --debug /workspace/repos/
+   ```
+3. Check workspace state:
+   ```bash
+   git status
+   git diff
+   ```
+4. Review the task definition for issues
+5. Try executing the task manually:
+   ```bash
+   claude "/sdd:do-task TASK_ID"
+   ```
+
+**Prevention**:
+- Use verbose mode for better visibility
+- Write clear, specific task acceptance criteria
+- Keep tasks focused and reasonably scoped
+- Monitor system resources during execution
+
+---
+
+### .autogate.json Parse Errors
+
+**Symptoms**:
+- Error parsing `.autogate.json`
+- Unexpected loop behavior (skipping tasks, not respecting phase boundaries)
+- JSON syntax error messages
+
+**Cause**: The `.autogate.json` file contains invalid JSON syntax. Common mistakes:
+- Trailing commas
+- Missing quotes around strings
+- Using single quotes instead of double quotes
+- Comments in JSON (not allowed)
+
+**Solution**:
+1. Validate the JSON file:
+   ```bash
+   cat _SDD/tickets/TICKET_name/.autogate.json | jq .
+   ```
+2. Fix any syntax errors
+3. Ensure proper format:
+   ```json
+   {"ready": true, "agent_ready": true, "stop_at_phase": 2}
+   ```
+4. Recreate the file if corrupted:
+   ```bash
+   echo '{"ready": true, "agent_ready": true}' > _SDD/tickets/TICKET_name/.autogate.json
+   ```
+
+**Prevention**:
+- Use a JSON validator when editing `.autogate.json`
+- Copy from template rather than typing manually
+- Test with `jq .` after any edits
 
 ---
 
