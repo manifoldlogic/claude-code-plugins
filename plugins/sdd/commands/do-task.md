@@ -479,8 +479,9 @@ Changes:
 Commit: {type}({scope}): {TASK_ID} {message}
 
 ---
-RECOMMENDED NEXT STEP: {Next task in sequence or ticket complete}
-Continue with next task in sequence.
+RECOMMENDED NEXT STEP:
+{If more tasks: Next task in sequence}
+{If ticket complete: /sdd:code-review {TICKET_ID} (recommended) or /sdd:pr {TICKET_ID}}
 ```
 
 ## Failure Handling
