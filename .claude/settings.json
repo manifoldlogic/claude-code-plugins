@@ -1,6 +1,7 @@
 {
   "env": {
-    "SDD_ROOT_DIR": "/workspace/_SPECS/claude-code-plugins"
+    "SDD_ROOT_DIR": "/workspace/_SPECS/claude-code-plugins",
+    "MAPROOM_DB_ROOT": "/home/vscode/.maproom/claude-code-plugins/maproom.db"
   },
   "statusLine": {
     "type": "command",
