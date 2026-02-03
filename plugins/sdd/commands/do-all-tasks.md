@@ -131,6 +131,78 @@ Proceeding with execution...
 
 ---
 
+## Step 1.5: Tasks API Hydration (Optional)
+
+**This step enables real-time progress tracking via Claude Code's Tasks API (Ctrl+T view).**
+
+### Feature Flag Check
+
+If `SDD_TASKS_API_ENABLED` is explicitly set to `'false'`, skip all Tasks API operations and proceed directly to the workflow.
+
+```bash
+# Check feature flag
+# Default is ENABLED (feature flag only disables when explicitly set to 'false')
+TASKS_API_ENABLED=true
+if [ "$SDD_TASKS_API_ENABLED" = "false" ]; then
+  echo "Tasks API disabled via SDD_TASKS_API_ENABLED=false"
+  TASKS_API_ENABLED=false
+fi
+```
+
+### Bulk Hydration Process
+
+If Tasks API is enabled, hydrate all task files to the Tasks API before execution begins:
+
+```bash
+# Only run hydration if Tasks API is enabled
+if [ "$TASKS_API_ENABLED" = "true" ]; then
+  echo "=== TASKS API HYDRATION ==="
+
+  # Set CLAUDE_TASK_LIST_ID to ticket ID for scoping
+  export CLAUDE_TASK_LIST_ID="${ARGUMENTS}"
+  echo "Set CLAUDE_TASK_LIST_ID=${ARGUMENTS}"
+
+  # Call hydration module
+  HYDRATION_OUTPUT=$(python ${CLAUDE_PLUGIN_ROOT}/hooks/hydrate-tasks.py "$TICKET_PATH" "${ARGUMENTS}" 2>&1)
+  HYDRATION_STATUS=$?
+
+  if [ $HYDRATION_STATUS -eq 0 ]; then
+    # Extract task count from hydration output
+    HYDRATED_COUNT=$(echo "$HYDRATION_OUTPUT" | grep -oE 'Hydrated [0-9]+ tasks' | grep -oE '[0-9]+' || echo "0")
+    echo "Hydrated $HYDRATED_COUNT tasks to Tasks API"
+    echo ""
+  else
+    echo "Warning: Tasks API hydration failed, continuing in file-only mode"
+    echo "Hydration output: $HYDRATION_OUTPUT"
+    TASKS_API_ENABLED=false
+    echo ""
+  fi
+fi
+```
+
+### Hydration Summary Output
+
+```
+=== TASKS API HYDRATION ===
+Set CLAUDE_TASK_LIST_ID={TICKET_ID}
+Hydrated {N} tasks to Tasks API
+
+{If hydration failed:}
+Warning: Tasks API hydration failed, continuing in file-only mode
+```
+
+### Graceful Degradation
+
+| Error | Behavior |
+|-------|----------|
+| Hydration script fails | Log warning, continue with file-only mode |
+| Tasks API unavailable | Skip API operations, proceed with existing workflow |
+| Feature flag disabled | Skip hydration entirely, use file-only mode |
+
+**Note:** The file remains authoritative. If Tasks API hydration fails, the file-based workflow continues to function normally. The Tasks API integration is a visibility enhancement, not a blocking requirement.
+
+---
+
 ## Workflow
 
 **IMPORTANT: You are an orchestrator. You coordinate ticket execution by delegating to /sdd:do-task for each ticket.**
@@ -194,6 +266,16 @@ Summary:
 - Verified: {verified_count}
 - Failed: {failed_count}
 - Skipped: {skipped_count}
+
+{If Tasks API was enabled:}
+Tasks API Status:
+- Hydration: Successful ({hydrated_count} tasks)
+- Tracking: Enabled via CLAUDE_TASK_LIST_ID={TICKET_ID}
+- All task updates synced to Tasks API
+
+{If Tasks API was disabled or failed:}
+Tasks API Status:
+- Mode: File-only (Tasks API not used)
 
 Completed Tasks:
 ✓ {TICKET_ID.1001}: {title}
