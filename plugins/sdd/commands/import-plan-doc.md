@@ -35,6 +35,80 @@ Parse user input to detect one of three modes:
 Execute this bash logic to parse arguments:
 
 ```bash
+# Helper function for error logging
+log_validation_error() {
+    local msg="$1"
+    SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|$msg" >> "$SDD_ROOT/logs/workflow.log"
+}
+
+# Validate TICKET_ID format and security
+validate_ticket_id() {
+    local ticket_id="$1"
+
+    # Check for path traversal
+    case "$ticket_id" in
+        *..* | */*)
+            echo "ERROR: TICKET_ID contains path traversal characters" >&2
+            echo "TICKET_ID cannot contain '..' or '/' sequences" >&2
+            echo "" >&2
+            echo "Example: /sdd:import-plan-doc MYTICKET feature-name ./plan.md" >&2
+            return 1
+            ;;
+    esac
+
+    # Check minimum length
+    if [ ${#ticket_id} -lt 2 ]; then
+        echo "ERROR: TICKET_ID must be at least 2 characters" >&2
+        echo "Received: '$ticket_id'" >&2
+        echo "" >&2
+        echo "Example: /sdd:import-plan-doc MYTICKET feature-name ./plan.md" >&2
+        return 1
+    fi
+
+    # Check format (uppercase alphanumeric only)
+    # Use grep -E for POSIX compatibility
+    if echo "$ticket_id" | grep -Eq '[^A-Z0-9]'; then
+        echo "ERROR: TICKET_ID must be uppercase alphanumeric (A-Z, 0-9)" >&2
+        echo "Received: '$ticket_id'" >&2
+        echo "" >&2
+        echo "Example: /sdd:import-plan-doc MYTICKET feature-name ./plan.md" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+# Validate name format and security
+validate_name() {
+    local name="$1"
+
+    # Check for path traversal
+    case "$name" in
+        *..* | */*)
+            echo "ERROR: name contains path traversal characters" >&2
+            echo "name cannot contain '..' or '/' sequences" >&2
+            echo "" >&2
+            echo "Example: /sdd:import-plan-doc MYTICKET feature-name ./plan.md" >&2
+            return 1
+            ;;
+    esac
+
+    # Check for spaces
+    case "$name" in
+        *\ *)
+            echo "ERROR: name cannot contain spaces. Use hyphens instead." >&2
+            echo "Example: 'feature-name' not 'feature name'" >&2
+            echo "" >&2
+            echo "Usage: /sdd:import-plan-doc MYTICKET feature-name ./plan.md" >&2
+            return 1
+            ;;
+    esac
+
+    return 0
+}
+
 # Get argument count
 arg_count=$(echo "$ARGUMENTS" | awk '{print NF}')
 
@@ -88,6 +162,21 @@ elif [ -n "$is_uppercase" ] && [ "$arg_count" -ge 3 ]; then
 else
     # Invalid input
     MODE="invalid"
+fi
+
+# Validate explicit TICKET_ID and name if provided (Mode 2: explicit_ids)
+if [ "$MODE" = "explicit_ids" ]; then
+    # Validate TICKET_ID
+    if ! validate_ticket_id "$TICKET_ID"; then
+        log_validation_error "Invalid TICKET_ID: $TICKET_ID"
+        exit 1
+    fi
+
+    # Validate name
+    if ! validate_name "$name"; then
+        log_validation_error "Invalid name: $name"
+        exit 1
+    fi
 fi
 ```
 
