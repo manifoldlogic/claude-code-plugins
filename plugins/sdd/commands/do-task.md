@@ -587,13 +587,12 @@ If `TASKS_API_ACTIVE` was set to `false` in Step 1.6 (due to API unavailability)
 **Tasks API Completion Flow:**
 
 1. **Update task status to 'completed' in Tasks API:**
-   ```
-   TaskUpdate:
-     taskId: "{ARGUMENTS}"
-     status: "completed"
-   ```
-   - This updates Ctrl+T view to show task completion
-   - Unblocks any dependent tasks waiting on this one
+
+   After successful commit, **invoke the TaskUpdate tool** to mark the task complete:
+   - Call TaskUpdate with parameter `taskId` set to "{ARGUMENTS}" (the task ID from command arguments)
+   - Set `status` to "completed"
+
+   This updates the Ctrl+T view to show task completion and unblocks any dependent tasks waiting on this one.
 
 2. **Sync completion to task file (bidirectional sync):**
    - Call sync-task-status.sh with retry logic to update the file checkbox:
