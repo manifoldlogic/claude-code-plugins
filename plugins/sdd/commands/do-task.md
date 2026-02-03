@@ -163,13 +163,13 @@ fi
    ```
 
 3. **Set task status to 'in_progress':**
-   - Call TaskUpdate to mark work has begun:
-   ```
-   TaskUpdate:
-     taskId: "{ARGUMENTS}"
-     status: "in_progress"
-   ```
-   - This enables Ctrl+T real-time visibility showing the task is active
+
+   Before beginning implementation, **invoke the TaskUpdate tool** to mark the task as active:
+   - Call TaskUpdate with parameter `taskId` set to "{ARGUMENTS}" (the task ID from command arguments, e.g., "TICKET.1001")
+   - Set `status` to "in_progress"
+   - Optionally set `activeForm` to "Implementing {task title}" (extracted from task file Summary)
+
+   This makes the task visible in Ctrl+T as actively being worked on, enabling real-time progress tracking.
 
 **Error Handling with Retry Logic:**
 
