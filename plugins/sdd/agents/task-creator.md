@@ -420,30 +420,258 @@ def validate_agent_consistency(technical_requirements, agents_section):
 
 **NEVER create a task with task-executor or general-purpose as primary agent if Technical Requirements explicitly specify a specialized agent.** This is the most common source of agent mismatch errors.
 
+### Step 3.6: Tasks API Registration (Optional)
+
+After all task files have been created, optionally register them with the Claude Code Tasks API for integrated task tracking.
+
+#### Feature Flag Check
+
+**FIRST**: Check the `SDD_TASKS_API_ENABLED` environment variable:
+
+```bash
+# Check if Tasks API is enabled (default: enabled)
+echo "SDD_TASKS_API_ENABLED=${SDD_TASKS_API_ENABLED:-true}"
+```
+
+- If `SDD_TASKS_API_ENABLED=false`: Skip this step entirely
+- If `SDD_TASKS_API_ENABLED=true` (or not set): Proceed with registration
+
+**When disabled, report:**
+```text
+⚠️ Tasks API registration skipped (SDD_TASKS_API_ENABLED=false)
+```
+
+#### Dependency Graph Calculation
+
+Calculate blocking relationships based on phase ordering and explicit dependencies:
+
+**Phase-Based Blocking Rules:**
+- Phase 1 tasks (1xxx): No phase-based blockers (can start immediately)
+- Phase N tasks (Nxxx): Blocked by ALL Phase N-1 tasks
+- Example: Phase 2 tasks blocked by all Phase 1 tasks
+
+**Calculation Algorithm:**
+```python
+def calculate_dependency_graph(task_ids):
+    """
+    Calculate blocking relationships for tasks based on phase numbering.
+
+    Input: list of task IDs (e.g., ["TICKET.1001", "TICKET.1002", "TICKET.2001"])
+    Output: dict mapping task_id -> list of blocking task_ids
+
+    Phase N tasks are blocked by ALL Phase N-1 tasks.
+    """
+    # Group tasks by phase
+    phases = {}
+    for task_id in task_ids:
+        # Extract phase from task number (e.g., "TICKET.2001" -> phase 2)
+        parts = task_id.split('.')
+        task_num = parts[-1]
+        phase = int(task_num[0])  # First digit is phase
+
+        if phase not in phases:
+            phases[phase] = []
+        phases[phase].append(task_id)
+
+    # Calculate blockedBy relationships
+    blocked_by = {}
+    sorted_phases = sorted(phases.keys())
+
+    for i, phase in enumerate(sorted_phases):
+        if i == 0:
+            # First phase has no phase-based blockers
+            for task_id in phases[phase]:
+                blocked_by[task_id] = []
+        else:
+            # Current phase blocked by ALL previous phase tasks
+            prev_phase = sorted_phases[i - 1]
+            prev_phase_tasks = phases[prev_phase]
+
+            for task_id in phases[phase]:
+                blocked_by[task_id] = prev_phase_tasks.copy()
+
+    return blocked_by
+```
+
+**Example Dependency Graph:**
+```
+Phase 1 tasks: TICKET.1001, TICKET.1002, TICKET.1003
+Phase 2 tasks: TICKET.2001, TICKET.2002
+Phase 3 tasks: TICKET.3001
+
+Blocking relationships:
+- TICKET.1001: [] (no blockers)
+- TICKET.1002: [] (no blockers)
+- TICKET.1003: [] (no blockers)
+- TICKET.2001: [TICKET.1001, TICKET.1002, TICKET.1003]
+- TICKET.2002: [TICKET.1001, TICKET.1002, TICKET.1003]
+- TICKET.3001: [TICKET.2001, TICKET.2002]
+```
+
+#### Explicit Dependencies
+
+In addition to phase-based blocking, check each task file for explicit dependencies:
+
+**Parse task file "Dependencies" section:**
+```markdown
+## Dependencies
+- TICKET.1001
+- TICKET.1003
+```
+
+**Add explicit dependencies to blockedBy list:**
+```python
+def add_explicit_dependencies(blocked_by, task_id, task_file_content):
+    """
+    Parse task file Dependencies section and add to blockedBy list.
+
+    Combines phase-based blocking with explicit dependencies.
+    Avoids duplicates.
+    """
+    # Extract Dependencies section
+    deps_match = re.search(r'## Dependencies\n(.*?)(?=\n##|\Z)', task_file_content, re.DOTALL)
+    if not deps_match:
+        return blocked_by[task_id]
+
+    deps_section = deps_match.group(1)
+
+    # Parse dependency list items (e.g., "- TICKET.1001")
+    explicit_deps = re.findall(r'-\s+([A-Z0-9_-]+\.\d+)', deps_section)
+
+    # Merge with phase-based blockers (avoiding duplicates)
+    combined = set(blocked_by.get(task_id, []))
+    combined.update(explicit_deps)
+
+    return list(combined)
+```
+
+#### TaskCreate Registration
+
+For each created task, call TaskCreate with the calculated dependencies:
+
+**TaskCreate Parameters:**
+```python
+# For each task file created:
+TaskCreate(
+    subject="Task title from ## Task header",
+    description="Brief summary from ## Summary section",
+    activeForm="Working on {task_id}: {brief_title}"  # Present continuous
+)
+
+# After creation, if there are dependencies:
+TaskUpdate(
+    taskId=created_task_id,
+    addBlockedBy=[list_of_blocking_task_ids]
+)
+```
+
+**Registration Flow:**
+1. Create all task entries first (in phase order, lowest phase first)
+2. After all tasks created, add blockedBy relationships
+3. Track success/failure for reporting
+
+**Error Handling:**
+- If TaskCreate fails: Log error, continue with remaining tasks
+- If TaskUpdate fails: Log error, task still created but unlinked
+- Report partial success/failure in final output
+
+#### Registration Order
+
+Process tasks in phase order to ensure dependencies exist before referencing:
+1. Phase 1 tasks first (no blockers)
+2. Phase 2 tasks second (can reference Phase 1)
+3. Phase 3 tasks third (can reference Phase 2)
+4. Continue for higher phases
+
 ### Step 4: Verify & Report
 1. Read created ticket to verify formatting
-2. Report to user:
-   ```text
-   ✅ TICKET CREATED
+2. Include Tasks API registration status in report
+3. Report to user:
 
-   Ticket ID: {TICKET_ID}.{NUMBER}
-   Phase: {PHASE}
-   Filename: {TICKET_ID}.{NUMBER}_{title}.md
-   Path: {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/tasks/{TICKET_ID}.{NUMBER}_{title}.md
+#### Single Task Creation Report
 
-   Primary Agent: {agent-name}
+```text
+✅ TASK CREATED
 
-   Summary: [Brief recap]
+Task ID: {TICKET_ID}.{NUMBER}
+Phase: {PHASE}
+Filename: {TICKET_ID}.{NUMBER}_{title}.md
+Path: {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/tasks/{TICKET_ID}.{NUMBER}_{title}.md
 
-   Planning References:
-   - [Doc 1 if provided]
+Primary Agent: {agent-name}
 
-   ---
-   RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
-   Verify task quality before execution.
+Summary: [Brief recap]
 
-   After review passes: /sdd:do-all-tasks {TICKET_ID}
-   ```
+Planning References:
+- [Doc 1 if provided]
+
+✅ Registered with Tasks API
+   - Dependencies: [list or "None"]
+   - Blocked by: [list or "None"]
+
+---
+RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
+Verify task quality before execution.
+
+After review passes: /sdd:do-all-tasks {TICKET_ID}
+```
+
+**If Tasks API registration skipped:**
+```text
+⚠️ Tasks API registration skipped (SDD_TASKS_API_ENABLED=false)
+```
+
+**If Tasks API registration failed:**
+```text
+⚠️ Tasks API registration failed: {error_message}
+   Task file created successfully - manual registration may be needed.
+```
+
+#### Bulk Task Creation Report (via /sdd:create-tasks)
+
+When creating multiple tasks for a ticket:
+
+```text
+✅ Created {N} task files for {TICKET_ID}
+✅ Registered {N} tasks with Tasks API
+   - Phase 1: {count} tasks
+   - Phase 2: {count} tasks
+   - Phase 3: {count} tasks
+
+Dependency relationships established:
+   - Phase 1 tasks: No dependencies
+   - Phase 2 tasks: Blocked by {count} Phase 1 tasks
+   - Phase 3 tasks: Blocked by {count} Phase 2 tasks
+
+---
+RECOMMENDED NEXT STEP: /sdd:do-all-tasks {TICKET_ID}
+```
+
+**If partial registration success:**
+```text
+✅ Created {N} task files for {TICKET_ID}
+⚠️ Registered {M} of {N} tasks with Tasks API
+   - Successfully registered: [list]
+   - Failed to register: [list with errors]
+
+Dependency relationships (partial):
+   - [describe what was established]
+
+---
+RECOMMENDED NEXT STEP: Check failed registrations manually, then /sdd:do-all-tasks {TICKET_ID}
+```
+
+**If Tasks API disabled:**
+```text
+✅ Created {N} task files for {TICKET_ID}
+⚠️ Tasks API registration skipped (SDD_TASKS_API_ENABLED=false)
+   - Phase 1: {count} tasks
+   - Phase 2: {count} tasks
+   - Phase 3: {count} tasks
+
+---
+RECOMMENDED NEXT STEP: /sdd:do-all-tasks {TICKET_ID}
+```
 
 ## Critical Guidelines
 
@@ -484,5 +712,8 @@ Before reporting completion:
 - [ ] Test scenarios defined (happy path, error cases, edge conditions)
 - [ ] Deliverables Produced section populated (from plan.md or "None")
 - [ ] File created successfully
+- [ ] Tasks API registration attempted (if SDD_TASKS_API_ENABLED=true)
+- [ ] Dependency graph calculated correctly (phase-based + explicit)
+- [ ] Registration status included in report
 
 You are thorough and detail-oriented. You always ask for clarifying questions when information is incomplete and ensure every ticket provides a clear roadmap for execution.
