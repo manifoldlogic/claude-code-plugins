@@ -126,6 +126,9 @@ if [ ! -f "$FILE_PATH" ]; then
     echo "  /sdd:import-plan-doc ./my-plan.md"
     echo "  /sdd:import-plan-doc /path/to/plan.md MYTICKET feature-name"
     echo "  /sdd:import-plan-doc ./plan.md Focus on security aspects"
+    SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|File not found: $FILE_PATH" >> "$SDD_ROOT/logs/workflow.log"
     exit 1
 fi
 
@@ -141,12 +144,33 @@ if [ ! -r "$FILE_PATH" ]; then
     echo "  /sdd:import-plan-doc ./my-plan.md"
     echo "  /sdd:import-plan-doc /path/to/plan.md MYTICKET feature-name"
     echo "  /sdd:import-plan-doc ./plan.md Focus on security aspects"
+    SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|File not readable: $FILE_PATH" >> "$SDD_ROOT/logs/workflow.log"
     exit 1
 fi
 
 # THEN resolve to absolute path (POSIX-compatible)
 # This is guaranteed to work since file existence was validated above
 FILE_PATH_ABS=$(cd "$(dirname "$FILE_PATH")" && pwd)/$(basename "$FILE_PATH")
+
+# Check file size (10MB limit to prevent memory exhaustion)
+file_size=$(wc -c < "$FILE_PATH" | tr -d ' ')
+max_size=10485760  # 10MB
+
+if [ "$file_size" -gt "$max_size" ]; then
+    echo "ERROR: Plan file too large: $(($file_size / 1048576))MB"
+    echo "Maximum allowed: 10MB"
+    echo ""
+    echo "For large files, consider:"
+    echo "  1. Split into multiple smaller plans"
+    echo "  2. Summarize content before importing"
+    echo "  3. Create plan manually with /sdd:plan-ticket"
+    SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|File too large: $(($file_size / 1048576))MB" >> "$SDD_ROOT/logs/workflow.log"
+    exit 1
+fi
 ```
 
 ### Step 3: Read File Content
@@ -168,6 +192,9 @@ fi
 If not explicitly provided (Mode 1 or 3), derive identifiers from plan content:
 
 ```bash
+# Force C locale for consistent tr/sed behavior across all environments
+export LC_ALL=C
+
 # Only derive if not in explicit_ids mode
 if [ "$MODE" != "explicit_ids" ]; then
     # Extract first heading from plan file
@@ -182,6 +209,13 @@ if [ "$MODE" != "explicit_ids" ]; then
     # Fallback if derivation fails
     [ -z "$TICKET_ID" ] && TICKET_ID="PLAN$(date +%s)"
     [ -z "$name" ] && name="imported-plan"
+fi
+
+# Validate TICKET_ID minimum length (at least 2 characters)
+if [ ${#TICKET_ID} -lt 2 ]; then
+    echo "WARNING: Derived TICKET_ID too short: '$TICKET_ID'"
+    echo "Using fallback identifier"
+    TICKET_ID="PLAN$(date +%s)"
 fi
 ```
 
@@ -206,16 +240,59 @@ if [ -n "$existing" ]; then
     echo "  /sdd:import-plan-doc ./my-plan.md"
     echo "  /sdd:import-plan-doc /path/to/plan.md MYTICKET feature-name"
     echo "  /sdd:import-plan-doc ./plan.md Focus on security aspects"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|Duplicate ticket ID: $TICKET_ID" >> "$SDD_ROOT/logs/workflow.log"
     exit 1
 fi
+
+# Cleanup function for error recovery
+cleanup_on_error() {
+    if [ -n "$TICKET_ID" ] && [ -n "$name" ]; then
+        ticket_path="${SDD_ROOT}/tickets/${TICKET_ID}_${name}"
+        if [ -d "$ticket_path" ]; then
+            echo "Cleaning up incomplete ticket: $ticket_path"
+            rm -rf "$ticket_path"
+        fi
+    fi
+}
+
+# Register trap to clean up on error (before scaffolding creates directory)
+trap cleanup_on_error ERR EXIT
 ```
 
 ### Step 5: Scaffold Structure
 
+**Validate scaffold script exists:**
+
+```bash
+# Validate scaffold-ticket.sh exists and is executable
+scaffold_script="${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts/scaffold-ticket.sh"
+
+if [ ! -f "$scaffold_script" ]; then
+    echo "ERROR: scaffold-ticket.sh not found"
+    echo "Expected location: $scaffold_script"
+    echo "Please verify plugin installation."
+    SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|Scaffolding failed: script not found" >> "$SDD_ROOT/logs/workflow.log"
+    exit 1
+fi
+
+if [ ! -x "$scaffold_script" ]; then
+    echo "ERROR: scaffold-ticket.sh not executable"
+    echo "Location: $scaffold_script"
+    echo "Run: chmod +x $scaffold_script"
+    SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+    mkdir -p "$SDD_ROOT/logs"
+    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|Scaffolding failed: script not executable" >> "$SDD_ROOT/logs/workflow.log"
+    exit 1
+fi
+```
+
 **Delegate to script:**
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts/scaffold-ticket.sh" "${TICKET_ID}" "${name}"
+bash "$scaffold_script" "${TICKET_ID}" "${name}"
 ```
 
 This creates:
@@ -224,6 +301,18 @@ This creates:
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/tasks/`
 
 ### Step 6: Fill Planning Documents
+
+**Display progress messages:**
+
+```bash
+echo ""
+echo "Importing plan from: ${FILE_PATH_ABS}"
+echo "Creating ticket: ${TICKET_ID}_${name}"
+echo ""
+echo "Delegating to ticket-planner agent..."
+echo "(This may take 30-60 seconds while agent researches codebase)"
+echo ""
+```
 
 **Delegate to ticket-planner agent (Opus):**
 
@@ -260,6 +349,41 @@ Instructions:
 Return: Summary of planning decisions made
 ```
 
+**Display completion message:**
+
+```bash
+echo "Planning documents created successfully."
+echo ""
+```
+
+**Verify planning documents were created:**
+
+```bash
+# Verify all planning docs exist and are non-empty
+SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
+ticket_path="${SDD_ROOT}/tickets/${TICKET_ID}_${name}"
+
+for doc in analysis.md prd.md architecture.md plan.md quality-strategy.md security-review.md; do
+    doc_path="${ticket_path}/planning/${doc}"
+    if [ ! -f "$doc_path" ]; then
+        echo "ERROR: Agent failed to create $doc"
+        echo "Ticket directory: $ticket_path"
+        echo "Please check agent logs and retry import."
+        mkdir -p "$SDD_ROOT/logs"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|Agent failed to create planning docs: $TICKET_ID" >> "$SDD_ROOT/logs/workflow.log"
+        exit 1
+    fi
+    if [ ! -s "$doc_path" ]; then
+        echo "ERROR: Agent created empty $doc"
+        echo "Ticket directory: $ticket_path"
+        echo "Please check agent logs and retry import."
+        mkdir -p "$SDD_ROOT/logs"
+        echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|IMPORT_FAILED|${TICKET_ID:-UNKNOWN}|-|import-plan-doc|Agent failed to create planning docs: $TICKET_ID" >> "$SDD_ROOT/logs/workflow.log"
+        exit 1
+    fi
+done
+```
+
 ### Step 7: Log and Report
 
 **Log the import event:**
@@ -268,6 +392,9 @@ Return: Summary of planning decisions made
 SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
 mkdir -p "$SDD_ROOT/logs"
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|TICKET_IMPORTED|${TICKET_ID}|-|import-plan-doc|Imported from file ${FILE_PATH_ABS}" >> "$SDD_ROOT/logs/workflow.log"
+
+# Disable cleanup trap on success (ticket is complete)
+trap - ERR EXIT
 ```
 
 **Report success:**
