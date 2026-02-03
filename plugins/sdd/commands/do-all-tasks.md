@@ -188,9 +188,7 @@ if [ "$TASKS_API_ENABLED" = "true" ]; then
   HYDRATION_STATUS=$?
 
   if [ $HYDRATION_STATUS -eq 0 ]; then
-    # Extract task count from hydration output
-    HYDRATED_COUNT=$(echo "$HYDRATION_OUTPUT" | grep -oE 'Hydrated [0-9]+ tasks' | grep -oE '[0-9]+' || echo "0")
-    echo "Hydrated $HYDRATED_COUNT tasks to Tasks API"
+    echo "Hydration script executed successfully"
     echo ""
   else
     echo "Warning: Tasks API hydration failed, continuing in file-only mode"
@@ -201,22 +199,42 @@ if [ "$TASKS_API_ENABLED" = "true" ]; then
 fi
 ```
 
-### Hydration Summary Output
+**After running the hydration script successfully:**
 
-```
-=== TASKS API HYDRATION ===
-Set CLAUDE_TASK_LIST_ID={TICKET_ID}
-Hydrated {N} tasks to Tasks API
+1. **Parse the JSON output from HYDRATION_OUTPUT:**
+   The output contains a JSON array of task objects. Parse this array natively (Claude can parse JSON without external tools).
 
-{If hydration failed:}
-Warning: Tasks API hydration failed, continuing in file-only mode
-```
+2. **For each task object in the JSON array, invoke the TaskCreate tool:**
+   - Call TaskCreate with parameter `subject` set to the task object's `subject` field
+   - Set `description` to the task object's `description` field
+   - Set `status` to the task object's `status` field ("pending" or "completed")
+   - Set `activeForm` to the task object's `activeForm` field
+   - Include `metadata` object with the task's `file_path`, `phase`, and `source` fields
+
+3. **For tasks with dependencies (non-empty blockedBy array):**
+   After creating the task, invoke TaskUpdate to set dependencies:
+   - Call TaskUpdate with parameter `taskId` set to the task's `task_id`
+   - Set `addBlockedBy` to the task's `blockedBy` array
+
+4. **If TaskCreate fails for any task:**
+   - Log warning with task ID and error details
+   - Continue creating remaining tasks (do not abort)
+   - Count successful vs. failed hydrations
+
+5. **After processing all tasks, report summary:**
+   - Count total tasks created
+   - Report: "Hydrated {N} tasks to Tasks API"
+
+### JSON Parsing Note
+
+Claude can parse JSON natively without requiring `jq` or other external tools. The `HYDRATION_OUTPUT` variable contains a JSON array - extract each object and access its fields directly.
 
 ### Graceful Degradation
 
 | Error | Behavior |
 |-------|----------|
 | Hydration script fails | Log warning, continue with file-only mode |
+| TaskCreate fails for task | Log warning, continue with remaining tasks |
 | Tasks API unavailable | Skip API operations, proceed with existing workflow |
 | Feature flag disabled | Skip hydration entirely, use file-only mode |
 
