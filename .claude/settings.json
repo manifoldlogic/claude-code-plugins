@@ -1,6 +1,7 @@
 {
   "env": {
-    "SDD_ROOT_DIR": "/workspace/repos/claude-code-plugins/_SDD"
+    "SDD_ROOT_DIR": "/workspace/_SPECS/claude-code-plugins",
+    "MAPROOM_DB_ROOT": "/home/vscode/.maproom/claude-code-plugins/maproom.db"
   },
   "statusLine": {
     "type": "command",
@@ -9,7 +10,7 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
-      "/workspace/repos/claude-code-plugins/_SDD/"
+      "/workspace/_SPECS/claude-code-plugins/"
     ]
   },
   "hooks": {

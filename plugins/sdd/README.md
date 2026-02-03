@@ -19,6 +19,8 @@ Epic (research/discovery)
 - **Sonnet agents for reasoning** - Planning, review, verification
 - **Strict delegation** - Orchestrator coordinates, never does work itself
 - **Workflow guidance** - Stop hook provides contextual next-step suggestions
+- **Tasks API integration** - Real-time progress tracking via Ctrl+T view
+- **Parallel execution** - Optional concurrent task execution for faster completion
 
 ## Workflow Guidance (Stop Hook)
 
@@ -175,6 +177,66 @@ Found a bug or have suggestions? [File an issue](https://github.com/manifoldlogi
 - Steps to reproduce
 - Expected vs actual behavior
 - Relevant transcript context (if possible)
+
+## Tasks API Integration
+
+The SDD plugin integrates with Claude Code's native Tasks API for improved visibility and optional parallel execution.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Real-time tracking | Active tasks visible in Ctrl+T view |
+| Cross-session persistence | Task state survives session restarts |
+| Parallel execution | Optional concurrent task execution (20-30% faster for eligible tickets) |
+| Hybrid architecture | File remains authoritative, API adds visibility |
+
+### Configuration
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `SDD_TASKS_API_ENABLED` | `true` | Enable Tasks API. Set to `'false'` to disable. |
+| `CLAUDE_TASK_LIST_ID` | Auto-set | Scopes tasks to current ticket. |
+
+### Parallel Execution
+
+Enable parallel execution for faster completion of tickets with independent tasks:
+
+```bash
+# Sequential (default)
+/sdd:do-all-tasks TICKET_ID
+
+# Parallel (opt-in)
+/sdd:do-all-tasks TICKET_ID --parallel
+```
+
+**Performance expectations:**
+
+| Ticket Type | Independent Tasks | Time Improvement |
+|-------------|-------------------|------------------|
+| Medium (12 tasks) | 6+ | ~32% faster |
+| Large (22 tasks) | 12+ | ~28% faster |
+| Small/Linear | < 3 | No benefit |
+
+**When to use --parallel:**
+- 3+ independent tasks within a phase
+- Medium to large tickets
+- Time-sensitive work
+
+**When to use sequential:**
+- Small tickets (< 6 tasks)
+- Linear dependency chains
+- Debugging or first-time execution
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Tasks API unavailable | Automatic fallback to file-only mode |
+| Parallel execution errors | Automatic fallback to sequential mode |
+| State mismatch | File is authoritative; re-run command to re-sync |
+
+For detailed documentation, see [SKILL.md](skills/project-workflow/SKILL.md).
 
 ## Installation
 
@@ -635,6 +697,29 @@ The plugin enforces enterprise-grade testing:
 ### Archive failures
 - All tickets must have "Verified" checkbox checked
 - Run `/sdd:tasks-status TICKET_ID` to identify incomplete tickets
+
+### Tasks API Issues
+
+**Tasks API unavailable:**
+- Plugin automatically falls back to file-only mode
+- No action needed - workflow continues normally
+- To explicitly disable: `export SDD_TASKS_API_ENABLED=false`
+
+**Parallel execution not working:**
+- Ensure Tasks API is enabled (not set to `false`)
+- Verify ticket has independent tasks within phases
+- Check for errors in output (will show fallback message)
+- Linear tickets (all tasks dependent) cannot benefit from parallelism
+
+**Task state mismatch (file vs API):**
+- File is authoritative - task file checkbox is the source of truth
+- Re-running the command will re-sync states
+- If needed, delete `.sdd-task-state/` to clear cached state
+
+**Parallel mode slower than expected:**
+- Small tickets (< 6 tasks) may see minimal benefit or slight overhead
+- Linear dependency chains cannot be parallelized
+- Check benchmark expectations: 20-30% improvement for 3+ independent tasks
 
 ## Safety Features
 

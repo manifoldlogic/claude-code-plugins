@@ -244,6 +244,95 @@ else
 fi
 ```
 
+### Step 4.5: Tasks API Enhanced Status (Parallel Execution)
+
+**This section provides real-time task status when Tasks API is enabled.**
+
+```bash
+# Check if Tasks API is enabled
+TASKS_API_ENABLED="${SDD_TASKS_API_ENABLED:-true}"
+CLAUDE_TASK_LIST_ID="${CLAUDE_TASK_LIST_ID:-}"
+
+if [ "$TASKS_API_ENABLED" != "false" ] && [ -n "$CLAUDE_TASK_LIST_ID" ]; then
+  echo "=== REAL-TIME TASK STATUS (Tasks API) ==="
+  echo "Task List ID: $CLAUDE_TASK_LIST_ID"
+  echo ""
+
+  # Note: Tasks API queries should be performed via TaskList tool
+  # The agent executing this command should query TaskList for real-time status
+  # and display parallel execution information below
+fi
+```
+
+**When Tasks API is available, query TaskList tool and display:**
+
+If `SDD_TASKS_API_ENABLED` is not `false` and `CLAUDE_TASK_LIST_ID` is set, use the TaskList tool to get real-time task status. Format the output as follows:
+
+**Parallel Execution Display:**
+
+When parallel execution is active, show enhanced status with phase breakdown:
+
+```
+Ticket: {TICKET_ID} - {ticket_name}
+Status: In Progress (Parallel Mode)
+
+Phase 0: [STATUS] ([completed]/[total] tasks)
+Phase 1: [STATUS] ([completed]/[total] tasks)
+Phase 2: [STATUS] ([completed]/[total] tasks)
+  [INDICATOR] {TASK_ID} - {task_summary} (STATUS)
+  ...
+Phase 3: [STATUS] ([completed]/[total] tasks)
+
+Parallel Execution:
+  {N} tasks running concurrently
+  {M} tasks available for launch
+```
+
+**Task Status Indicators:**
+- `>` IN PROGRESS: Task currently executing
+- `*` BLOCKED: Task waiting for dependencies (show blockedBy IDs)
+- `-` PENDING: Task ready but not started
+- `+` COMPLETED: Task finished and verified
+
+**Phase Status Indicators:**
+- `[Complete]` All tasks in phase are verified
+- `[In Progress]` Some tasks running or completed
+- `[Blocked]` All tasks blocked by previous phase
+- `[Pending]` All tasks pending, no blockers
+
+**Example Output:**
+```
+Ticket: TASKINT - Claude Code Tasks Integration
+Status: In Progress (Parallel Mode)
+
+Phase 0: [Complete] (4/4 tasks)
+Phase 1: [Complete] (5/5 tasks)
+Phase 2: [In Progress] (2/4 tasks)
+  > TASKINT.2001 - do-task integration (IN PROGRESS)
+  > TASKINT.2002 - do-all-tasks integration (IN PROGRESS)
+  * TASKINT.2003 - workflow-guidance update (BLOCKED by 2001, 2002)
+  - TASKINT.2004 - task-creator update (PENDING)
+Phase 3: [Blocked] (0/5 tasks started)
+
+Parallel Execution:
+  2 tasks running concurrently
+  2 tasks available for launch
+```
+
+**Fallback Behavior:**
+
+If `SDD_TASKS_API_ENABLED=false` or `CLAUDE_TASK_LIST_ID` is not set:
+- Use file inspection only (Steps 3-4 above)
+- Do not show parallel execution information
+- Show traditional status output
+
+**Implementation Notes:**
+- The agent executing this command should use the TaskList tool when available
+- Parse task metadata for phase information (stored in task descriptions or metadata)
+- Calculate concurrent task count from tasks with status `in_progress`
+- Calculate available tasks as `pending` tasks with no `blockedBy` dependencies
+- Group tasks by phase number extracted from task ID (e.g., TASKINT.2001 = Phase 2)
+
 ### Step 5: Generate Recommended Actions
 
 ```bash

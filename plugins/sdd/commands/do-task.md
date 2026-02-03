@@ -119,6 +119,121 @@ Compare the extracted agent name against this **Standard Agent List**:
   To use a specialized agent, add an Agents section with the primary agent listed first.
 ```
 
+### Step 1.6: Tasks API Integration (Setup)
+
+**This step integrates with Claude Code's native Tasks API for real-time status tracking (Ctrl+T view).**
+
+**Feature Flag Check:**
+
+If `SDD_TASKS_API_ENABLED` is explicitly set to `'false'`, skip all Tasks API operations in this step and continue with the existing file-only workflow.
+
+```
+# Check feature flag
+# Default is ENABLED (feature flag only disables when explicitly set to 'false')
+if [ "$SDD_TASKS_API_ENABLED" = "false" ]; then
+  # Skip Tasks API operations, continue with file-only mode
+  echo "Tasks API disabled via SDD_TASKS_API_ENABLED=false"
+fi
+```
+
+**Tasks API Setup Flow:**
+
+1. **Check if task exists in Tasks API:**
+   - Use TaskGet to query for task ID: `{ARGUMENTS}` (e.g., TASKINT.2001)
+   - The task may already exist if hydrated by `/sdd:do-all-tasks` or a previous session
+
+2. **If task NOT found in Tasks API, hydrate single task:**
+   - Determine ticket ID from task ID: `TICKET_ID=$(echo "$ARGUMENTS" | cut -d. -f1)`
+   - Locate ticket directory: `${SDD_ROOT_DIR}/tickets/${TICKET_ID}_*`
+   - Call hydration module for single task:
+   ```bash
+   # Hydrate tasks from ticket (will create task entry in Tasks API)
+   python ${PLUGIN_DIR}/hooks/hydrate-tasks.py "${TICKET_PATH}" "${TICKET_ID}"
+   ```
+   - Alternatively, if single-task mode is needed, use TaskCreate directly:
+   ```
+   TaskCreate:
+     subject: {task title from file}
+     description: {task summary from file}
+     status: pending
+     activeForm: "Implementing {task title}"
+     metadata:
+       file_path: {path to task file}
+       source: "do-task-hydration"
+   ```
+
+3. **Set task status to 'in_progress':**
+   - Call TaskUpdate to mark work has begun:
+   ```
+   TaskUpdate:
+     taskId: "{ARGUMENTS}"
+     status: "in_progress"
+   ```
+   - This enables Ctrl+T real-time visibility showing the task is active
+
+**Error Handling with Retry Logic:**
+
+| Error | Behavior | Retry |
+|-------|----------|-------|
+| TaskGet fails | Log warning, retry once, then continue with file-only mode | 1 retry |
+| Hydration fails | Log warning, retry once, then continue with file-only mode | 1 retry |
+| TaskUpdate fails | Log warning, retry once, then continue (file is authoritative) | 1 retry |
+| Tasks API unavailable | Skip all API operations, proceed with existing workflow | No retry |
+
+**Retry Logic Pattern for API Calls:**
+
+```bash
+# Retry pattern for transient API failures
+MAX_RETRIES=1
+RETRY_DELAY=1
+
+retry_task_update() {
+  local task_id="$1"
+  local status="$2"
+  local attempt=0
+
+  while [ $attempt -le $MAX_RETRIES ]; do
+    if TaskUpdate taskId="$task_id" status="$status"; then
+      return 0
+    fi
+
+    if [ $attempt -lt $MAX_RETRIES ]; then
+      echo "Warning: TaskUpdate failed, retrying in ${RETRY_DELAY}s..."
+      sleep $RETRY_DELAY
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  echo "Warning: TaskUpdate failed after $MAX_RETRIES retries, continuing with file-only mode"
+  return 1
+}
+```
+
+**Graceful Degradation:**
+
+If any Tasks API operation fails:
+1. Log the error with context for debugging
+2. Set internal flag `TASKS_API_ACTIVE=false` to skip completion sync in Step 6.5
+3. Continue with existing file-based workflow (no blocking)
+
+**JSON Error Handling:**
+
+All Python hooks (hydrate-tasks.py, conflict-resolution.py, workflow-guidance.py) handle malformed JSON gracefully:
+- JSON parsing wrapped in try/except blocks
+- Malformed responses trigger fallback to file-only mode
+- Errors logged for debugging, workflow continues
+
+```
+# Example graceful degradation pattern
+TASKS_API_ACTIVE=true
+if ! TaskUpdate succeeds; then
+  echo "Warning: Tasks API unavailable, continuing with file-only mode"
+  TASKS_API_ACTIVE=false
+fi
+```
+
+---
+
 ### Step 2: Check Dependencies (BLOCKING)
 
 **CRITICAL: Dependencies MUST be satisfied before proceeding. If any dependency is incomplete, task execution CANNOT continue.**
@@ -459,6 +574,80 @@ Instructions:
 Return: Commit confirmation
 ```
 
+### Step 6.5: Tasks API Integration (Completion)
+
+**This step completes the Tasks API integration by marking the task complete and syncing to the file.**
+
+**Feature Flag Check:**
+
+If `SDD_TASKS_API_ENABLED` is explicitly set to `'false'`, skip all Tasks API operations in this step.
+
+If `TASKS_API_ACTIVE` was set to `false` in Step 1.6 (due to API unavailability), skip Tasks API operations but still attempt file sync.
+
+**Tasks API Completion Flow:**
+
+1. **Update task status to 'completed' in Tasks API:**
+   ```
+   TaskUpdate:
+     taskId: "{ARGUMENTS}"
+     status: "completed"
+   ```
+   - This updates Ctrl+T view to show task completion
+   - Unblocks any dependent tasks waiting on this one
+
+2. **Sync completion to task file (bidirectional sync):**
+   - Call sync-task-status.sh with retry logic to update the file checkbox:
+   ```bash
+   # Update task file checkbox: - [ ] → - [x] for "Task completed"
+   # Uses retry logic for transient failures (see Sync Write Retry Logic below)
+   if ! ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"; then
+     echo "Warning: Sync write failed, retrying..."
+     sleep 1
+     if ! ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"; then
+       echo "Error: Sync write failed after retry. File may need manual update."
+       # Continue anyway - verification agent already checked the box
+     fi
+   fi
+   ```
+   - This ensures file state matches API state
+   - Exit codes are checked to detect sync failures
+
+3. **Verify file and API state match:**
+   - Check that task file has `- [x] **Task completed**` checkbox checked
+   - Log confirmation of sync success
+   ```
+   ✓ Tasks API: status=completed
+   ✓ Task file: checkbox checked
+   ✓ Sync verified: file and API state match
+   ```
+
+**Error Handling:**
+
+| Error | Behavior | Recovery |
+|-------|----------|----------|
+| TaskUpdate fails | Log warning, continue | File checkbox still updated |
+| Sync write fails | Log error, retry once | If still fails, log and continue |
+| Verification mismatch | Log warning | Manual intervention may be needed |
+| Tasks API unavailable | Skip API operations | File update continues (file is authoritative) |
+
+**Sync Write Retry Logic:**
+
+```bash
+# Attempt sync write with retry
+if ! ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"; then
+  echo "Warning: Sync write failed, retrying..."
+  sleep 1
+  if ! ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"; then
+    echo "Error: Sync write failed after retry. File may need manual update."
+    # Continue anyway - verification agent already checked the box
+  fi
+fi
+```
+
+**Note:** The file remains authoritative. If Tasks API is unavailable or fails, the file-based workflow continues to function. The Tasks API integration is a visibility enhancement, not a blocking requirement.
+
+---
+
 ### Step 7: Report
 
 ```
@@ -499,3 +688,61 @@ If any phase fails:
 - DO NOT skip verification
 - DO NOT implement code yourself
 - DO NOT commit without verification
+
+---
+
+## Help / Quick Reference
+
+### Usage
+
+```bash
+/sdd:do-task TASK_ID
+```
+
+**Example:**
+```bash
+/sdd:do-task AUTH.1001
+```
+
+### What This Command Does
+
+1. **Locates the task** - Finds task file by ID pattern
+2. **Checks dependencies** - Blocks if dependent tasks are incomplete
+3. **Delegates implementation** - Spawns specialized or general-purpose subagent
+4. **Runs tests** - unit-test-runner verifies coverage
+5. **Verifies completion** - verify-task agent checks acceptance criteria
+6. **Commits changes** - commit-task creates atomic commit
+
+### Tasks API Integration
+
+When enabled (default), this command:
+- Marks task as `in_progress` in Tasks API (visible in Ctrl+T)
+- Updates status to `completed` when done
+- Syncs completion back to task file checkbox
+
+**Disable Tasks API:**
+```bash
+export SDD_TASKS_API_ENABLED=false
+```
+
+### Feature Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SDD_TASKS_API_ENABLED` | `true` | Enable Tasks API tracking |
+| `CLAUDE_TASK_LIST_ID` | Auto-set | Scopes to ticket (set by /sdd:do-all-tasks) |
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Task not found | Check TASK_ID format (TICKET_ID.NNNN) |
+| Dependency blocked | Complete dependent tasks first |
+| Verification fails | Review acceptance criteria, fix implementation |
+| Tasks API unavailable | Automatic file-only fallback |
+
+### See Also
+
+- `/sdd:do-all-tasks` - Execute all tasks for a ticket
+- `/sdd:tasks-status` - Check task completion status
+- [SKILL.md](../skills/project-workflow/SKILL.md) - Full documentation

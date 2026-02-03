@@ -697,6 +697,179 @@ def generate_task_in_progress_message(context: dict, task_status: dict) -> str:
 
 
 # ============================================================================
+# Tasks API Detection (Phase 2)
+# ============================================================================
+
+# Tasks API state cache directory (relative to SDD_ROOT_DIR)
+TASKS_API_CACHE_DIR = '.sdd-tasks-cache'
+
+# Feature flag environment variable
+TASKS_API_FEATURE_FLAG = 'SDD_TASKS_API_ENABLED'
+
+# Task list ID environment variable (set by Claude Code when Tasks API is active)
+TASK_LIST_ID_ENV = 'CLAUDE_TASK_LIST_ID'
+
+
+def detect_tasks_api_context() -> Optional[dict]:
+    """
+    Detect Tasks API context from environment variables.
+
+    This function checks if the Tasks API integration is enabled and active.
+    The Tasks API provides cross-session awareness of in-progress tasks through
+    Claude Code's native task tracking system.
+
+    Detection logic:
+    1. Check SDD_TASKS_API_ENABLED feature flag (enabled by default, set to 'false' to disable)
+    2. Check CLAUDE_TASK_LIST_ID environment variable (set when Tasks API is active)
+
+    Returns:
+        Dictionary with Tasks API context if active:
+            - task_list_id: str (the CLAUDE_TASK_LIST_ID value)
+            - enabled: bool (True)
+        Returns None if:
+            - Feature flag is set to 'false'
+            - CLAUDE_TASK_LIST_ID is not set
+    """
+    # Check feature flag - enabled by default, only disable if explicitly set to 'false'
+    feature_flag = os.environ.get(TASKS_API_FEATURE_FLAG, '')
+    if feature_flag.lower() == 'false':
+        return None
+
+    # Check for active task list ID
+    task_list_id = os.environ.get(TASK_LIST_ID_ENV, '')
+    if not task_list_id:
+        return None
+
+    return {
+        'task_list_id': task_list_id,
+        'enabled': True,
+    }
+
+
+def read_tasks_api_cache(sdd_root: str, task_list_id: str) -> Optional[dict]:
+    """
+    Read cached Tasks API state from the cache file.
+
+    The cache file is populated by hydrate-tasks.py or sync-task-status.sh
+    and contains the current state of tasks in the Tasks API.
+
+    Cache file location: ${SDD_ROOT_DIR}/.sdd-tasks-cache/${task_list_id}.json
+
+    Args:
+        sdd_root: Path to the SDD root directory.
+        task_list_id: The CLAUDE_TASK_LIST_ID value.
+
+    Returns:
+        Dictionary with cached task state if available:
+            - tasks: list of task entries with status
+            - in_progress_tasks: list of task IDs with status 'in_progress'
+            - updated_at: timestamp of cache update
+        Returns None if:
+            - Cache file doesn't exist
+            - Cache file is invalid JSON
+            - Any error reading the file
+    """
+    if not sdd_root or not task_list_id:
+        return None
+
+    try:
+        cache_dir = os.path.join(sdd_root, TASKS_API_CACHE_DIR)
+        cache_file = os.path.join(cache_dir, f'{task_list_id}.json')
+
+        if not os.path.exists(cache_file):
+            return None
+
+        with open(cache_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        data = json.loads(content)
+
+        # Validate structure
+        if not isinstance(data, dict):
+            return None
+
+        return data
+
+    except (json.JSONDecodeError, IOError, OSError):
+        return None
+    except Exception:
+        return None
+
+
+def get_in_progress_from_cache(cache_data: dict) -> list[str]:
+    """
+    Extract in-progress task IDs from cache data.
+
+    Args:
+        cache_data: Dictionary from read_tasks_api_cache().
+
+    Returns:
+        List of task IDs with 'in_progress' status.
+    """
+    if not cache_data:
+        return []
+
+    # Check for pre-computed in_progress_tasks list
+    if 'in_progress_tasks' in cache_data:
+        return cache_data['in_progress_tasks']
+
+    # Alternatively, scan tasks list for in_progress status
+    tasks = cache_data.get('tasks', [])
+    in_progress = []
+
+    for task in tasks:
+        if isinstance(task, dict):
+            if task.get('status') == 'in_progress':
+                task_id = task.get('task_id') or task.get('id')
+                if task_id:
+                    in_progress.append(task_id)
+
+    return in_progress
+
+
+def generate_tasks_api_guidance(api_context: dict, in_progress_tasks: list[str], ticket_id: Optional[str]) -> str:
+    """
+    Generate guidance message when Tasks API shows in-progress work.
+
+    This message is shown when the Tasks API cache indicates tasks are in progress.
+    Unlike task file inspection, this is API-aware and provides enhanced
+    cross-session visibility.
+
+    Args:
+        api_context: Dictionary from detect_tasks_api_context().
+        in_progress_tasks: List of in-progress task IDs.
+        ticket_id: Current ticket ID if known.
+
+    Returns:
+        Human-readable guidance message.
+    """
+    task_list_id = api_context.get('task_list_id', 'unknown')
+    ticket_str = f" (ticket: {ticket_id})" if ticket_id else ""
+
+    if len(in_progress_tasks) == 1:
+        task_id = in_progress_tasks[0]
+        return (
+            f"TASKS API: Task {task_id} is in progress{ticket_str}.\n\n"
+            f"The Tasks API shows this task has status 'in_progress'.\n\n"
+            f"Please complete this task by:\n"
+            f"1. Finishing the implementation work\n"
+            f"2. Running tests if applicable\n"
+            f"3. Updating the task status when complete\n\n"
+            f"Use /sdd:status to see current task progress."
+        )
+
+    # Multiple tasks in progress
+    task_list = ', '.join(in_progress_tasks[:5])
+    more = f" and {len(in_progress_tasks) - 5} more" if len(in_progress_tasks) > 5 else ""
+    return (
+        f"TASKS API: {len(in_progress_tasks)} tasks are in progress{ticket_str}: {task_list}{more}\n\n"
+        f"The Tasks API shows these tasks have status 'in_progress'.\n\n"
+        f"Please complete these tasks before switching context.\n\n"
+        f"Use /sdd:status to see current task progress."
+    )
+
+
+# ============================================================================
 # Session State File Detection (Phase 2)
 # ============================================================================
 
@@ -1291,11 +1464,11 @@ def main() -> None:
                 pass
 
         # ====================================================================
-        # Session State File Detection (Phase 2)
+        # Session State File Detection (Priority 1)
         # Check if THIS session has active work using session-scoped state files.
-        # Priority: session state file > task file inspection
+        # Priority: session state file > Tasks API > task file inspection
         # Blocks with exit 2 if session has work in progress.
-        # All errors fail-safe to fall back to task file inspection.
+        # All errors fail-safe to fall back to Tasks API detection.
         # ====================================================================
         session_id = input_data.get('session_id', '')
         session_state_detected = False
@@ -1310,17 +1483,53 @@ def main() -> None:
                         task_status = check_task_status(sdd_root, active_work['ticket_id'])
                         if task_status.get('has_in_progress', False):
                             message = generate_work_guidance(active_work, task_status)
+                            log("BLOCK: session state - active work detected")
                             output_and_exit('block', message, 2)
                         session_state_detected = True  # Session state exists but task completed
         except Exception:
-            # Session state errors should not prevent fallback to task file inspection
-            # Fail-safe: continue to task file inspection below
+            # Session state errors should not prevent fallback to Tasks API detection
+            # Fail-safe: continue to Tasks API detection below
             pass
 
         # ====================================================================
-        # Task File Inspection (Phase 1 Fallback)
-        # Check if any tasks are in progress (unchecked "Task completed").
+        # Tasks API Detection (Priority 2)
+        # Check for in-progress tasks via Tasks API cache.
         # Only runs if session state detection didn't find active work.
+        # Uses cached task state from hydrate-tasks or sync-task-status.
+        # Blocks with exit 2 if in-progress tasks detected.
+        # All errors fail-safe to fall back to task file inspection.
+        # ====================================================================
+        tasks_api_detected = False
+
+        try:
+            if not session_state_detected:
+                api_context = detect_tasks_api_context()
+                if api_context:
+                    task_list_id = api_context.get('task_list_id', '')
+                    log(f"Tasks API: enabled, task_list_id={task_list_id[:20]}...")
+
+                    # Read cached task state
+                    cache_data = read_tasks_api_cache(sdd_root, task_list_id)
+                    if cache_data:
+                        in_progress = get_in_progress_from_cache(cache_data)
+                        if in_progress:
+                            ticket_id = context.get('ticket_id')
+                            message = generate_tasks_api_guidance(api_context, in_progress, ticket_id)
+                            log(f"BLOCK: Tasks API - {len(in_progress)} in-progress tasks")
+                            output_and_exit('block', message, 2)
+                        tasks_api_detected = True  # API context exists but no in-progress tasks
+                    else:
+                        log("Tasks API: no cache file found, falling back to file inspection")
+        except Exception as e:
+            # Tasks API errors should not prevent fallback to task file inspection
+            # Fail-safe: continue to task file inspection below
+            log(f"Tasks API: error - {e}")
+            pass
+
+        # ====================================================================
+        # Task File Inspection (Priority 3 - Fallback)
+        # Check if any tasks are in progress (unchecked "Task completed").
+        # Only runs if session state and Tasks API detection didn't find active work.
         # Blocks with exit 2 if work is detected.
         # All errors fail-safe to allow stop (exit 0).
         #
@@ -1329,12 +1538,15 @@ def main() -> None:
         # Users can bypass with SDD_DISABLE_STOP_HOOK=1 if needed.
         # ====================================================================
         try:
-            # Skip task file inspection if session state was detected (already handled above)
-            if not session_state_detected and sdd_root and context.get('ticket_id'):
-                task_status = check_task_status(sdd_root, context['ticket_id'])
-                if task_status.get('has_in_progress', False):
-                    message = generate_task_in_progress_message(context, task_status)
-                    output_and_exit('block', message, 2)
+            # Skip task file inspection if session state or Tasks API was already checked
+            # (either found no in-progress tasks or handled blocking above)
+            if not session_state_detected and not tasks_api_detected:
+                if sdd_root and context.get('ticket_id'):
+                    task_status = check_task_status(sdd_root, context['ticket_id'])
+                    if task_status.get('has_in_progress', False):
+                        message = generate_task_in_progress_message(context, task_status)
+                        log("BLOCK: file inspection - in-progress tasks")
+                        output_and_exit('block', message, 2)
         except Exception:
             # Task inspection errors should not prevent workflow guidance
             # Fail-safe: continue to guidance below

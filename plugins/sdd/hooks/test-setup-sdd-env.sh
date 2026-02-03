@@ -485,6 +485,264 @@ else
 fi
 
 echo ""
+echo "--- CLAUDE_TASK_LIST_ID Detection Tests ---"
+echo ""
+
+# Helper function to create a mock session state file
+create_session_state() {
+    local sdd_root="$1"
+    local session_id="$2"
+    local ticket_id="$3"
+    mkdir -p "$sdd_root/.sdd-session-states"
+    cat > "$sdd_root/.sdd-session-states/$session_id.json" << EOF
+{
+  "session_id": "$session_id",
+  "ticket_id": "$ticket_id",
+  "task_id": "${ticket_id%%_*}.1001",
+  "phase": "implementation",
+  "started_at": "2026-01-01T00:00:00Z"
+}
+EOF
+}
+
+# Helper function to create a mock task file with unchecked Task completed
+create_incomplete_task() {
+    local sdd_root="$1"
+    local ticket_dir="$2"
+    local task_id="$3"
+    mkdir -p "$sdd_root/tickets/$ticket_dir/tasks"
+    cat > "$sdd_root/tickets/$ticket_dir/tasks/${task_id}_test-task.md" << 'EOF'
+# Task: Test Task
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Test task for session start hook testing.
+EOF
+}
+
+# Helper function to create a mock task file with checked Task completed
+create_complete_task() {
+    local sdd_root="$1"
+    local ticket_dir="$2"
+    local task_id="$3"
+    mkdir -p "$sdd_root/tickets/$ticket_dir/tasks"
+    cat > "$sdd_root/tickets/$ticket_dir/tasks/${task_id}_test-task.md" << 'EOF'
+# Task: Test Task
+
+## Status
+- [x] **Task completed** - acceptance criteria met
+- [x] **Tests pass** - tests executed and passing
+- [x] **Verified** - by the verify-task agent
+
+## Summary
+Completed test task.
+EOF
+}
+
+# Test 21: Detect ticket from session state file
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Detect ticket from session state file"
+test_sdd_root="$TEST_DIR/test21_sdd"
+test_env_file="$TEST_DIR/test21_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+create_session_state "$test_sdd_root" "test-session-21" "TASKINT_test-ticket"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="TASKINT"' "$test_env_file"; then
+    pass
+else
+    fail "CLAUDE_TASK_LIST_ID not set from session state (expected TASKINT)"
+fi
+
+# Test 22: Detect ticket from task files fallback (no session state)
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Detect ticket from task files fallback"
+test_sdd_root="$TEST_DIR/test22_sdd"
+test_env_file="$TEST_DIR/test22_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+create_incomplete_task "$test_sdd_root" "FALLBACK_test-ticket" "FALLBACK.1001"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="FALLBACK"' "$test_env_file"; then
+    pass
+else
+    fail "CLAUDE_TASK_LIST_ID not set from task files fallback (expected FALLBACK)"
+fi
+
+# Test 23: No CLAUDE_TASK_LIST_ID when all tasks complete
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: No CLAUDE_TASK_LIST_ID when all tasks complete"
+test_sdd_root="$TEST_DIR/test23_sdd"
+test_env_file="$TEST_DIR/test23_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+create_complete_task "$test_sdd_root" "COMPLETE_test-ticket" "COMPLETE.1001"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && ! grep -q 'CLAUDE_TASK_LIST_ID' "$test_env_file"; then
+    pass
+else
+    fail "CLAUDE_TASK_LIST_ID should not be set when all tasks are complete"
+fi
+
+# Test 24: Session state takes priority over task files
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Session state takes priority over task files"
+test_sdd_root="$TEST_DIR/test24_sdd"
+test_env_file="$TEST_DIR/test24_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+# Create both session state and incomplete task for different tickets
+create_session_state "$test_sdd_root" "test-session-24" "PRIORITY_first-ticket"
+create_incomplete_task "$test_sdd_root" "FALLBACK_second-ticket" "FALLBACK.1001"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="PRIORITY"' "$test_env_file"; then
+    pass
+else
+    fail "Session state should take priority over task files (expected PRIORITY, not FALLBACK)"
+fi
+
+# Test 25: Feature flag SDD_TASKS_API_ENABLED=false disables task list detection
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Feature flag SDD_TASKS_API_ENABLED=false disables detection"
+test_sdd_root="$TEST_DIR/test25_sdd"
+test_env_file="$TEST_DIR/test25_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+create_session_state "$test_sdd_root" "test-session-25" "DISABLED_test-ticket"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" SDD_TASKS_API_ENABLED="false" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && ! grep -q 'CLAUDE_TASK_LIST_ID' "$test_env_file"; then
+    pass
+else
+    fail "CLAUDE_TASK_LIST_ID should not be set when SDD_TASKS_API_ENABLED=false"
+fi
+
+# Test 26: Feature flag SDD_TASKS_API_ENABLED=true enables task list detection
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Feature flag SDD_TASKS_API_ENABLED=true enables detection"
+test_sdd_root="$TEST_DIR/test26_sdd"
+test_env_file="$TEST_DIR/test26_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+create_session_state "$test_sdd_root" "test-session-26" "ENABLED_test-ticket"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" SDD_TASKS_API_ENABLED="true" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="ENABLED"' "$test_env_file"; then
+    pass
+else
+    fail "CLAUDE_TASK_LIST_ID should be set when SDD_TASKS_API_ENABLED=true"
+fi
+
+# Test 27: Default behavior (no flag) enables task list detection
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Default behavior (no flag) enables task list detection"
+test_sdd_root="$TEST_DIR/test27_sdd"
+test_env_file="$TEST_DIR/test27_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+create_session_state "$test_sdd_root" "test-session-27" "DEFAULT_test-ticket"
+set +e
+# Run without SDD_TASKS_API_ENABLED set
+env -i PATH="$PATH" HOME="$HOME" SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="DEFAULT"' "$test_env_file"; then
+    pass
+else
+    fail "CLAUDE_TASK_LIST_ID should be set by default (no flag)"
+fi
+
+# Test 28: Handle invalid JSON in session state file gracefully
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Handle invalid JSON in session state file gracefully"
+test_sdd_root="$TEST_DIR/test28_sdd"
+test_env_file="$TEST_DIR/test28_env"
+mkdir -p "$test_sdd_root/.sdd-session-states"
+touch "$test_env_file"
+# Create invalid JSON
+echo "{this is not valid json}" > "$test_sdd_root/.sdd-session-states/bad-session.json"
+# Create a valid incomplete task as fallback
+create_incomplete_task "$test_sdd_root" "VALID_test-ticket" "VALID.1001"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+# Should exit 0 and fall back to task file detection
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="VALID"' "$test_env_file"; then
+    pass
+else
+    fail "Should handle invalid JSON gracefully and fall back to task files"
+fi
+
+# Test 29: Handle missing .sdd-session-states directory gracefully
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Handle missing .sdd-session-states directory gracefully"
+test_sdd_root="$TEST_DIR/test29_sdd"
+test_env_file="$TEST_DIR/test29_env"
+mkdir -p "$test_sdd_root"
+touch "$test_env_file"
+# No .sdd-session-states directory, but create incomplete task
+create_incomplete_task "$test_sdd_root" "NOSESSION_test-ticket" "NOSESSION.1001"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="NOSESSION"' "$test_env_file"; then
+    pass
+else
+    fail "Should handle missing session states dir and fall back to task files"
+fi
+
+# Test 30: Jira-style ticket ID detection (e.g., AUTH-123)
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Jira-style ticket ID detection (AUTH-123 format)"
+test_sdd_root="$TEST_DIR/test30_sdd"
+test_env_file="$TEST_DIR/test30_env"
+mkdir -p "$test_sdd_root/.sdd-session-states"
+touch "$test_env_file"
+# Create session state with Jira-style ticket ID
+cat > "$test_sdd_root/.sdd-session-states/jira-session.json" << 'EOF'
+{
+  "session_id": "jira-session",
+  "ticket_id": "AUTH-123",
+  "task_id": "AUTH.1001",
+  "phase": "implementation",
+  "started_at": "2026-01-01T00:00:00Z"
+}
+EOF
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+# For Jira-style IDs, we use the full ID before underscore (AUTH-123 has no underscore, so full ID)
+# Actually the code splits on '_' so AUTH-123 stays as AUTH-123
+if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="AUTH-123"' "$test_env_file"; then
+    pass
+else
+    fail "Should detect Jira-style ticket ID (AUTH-123)"
+fi
+
+echo ""
 echo "============================================"
 echo "Cleanup"
 echo "============================================"

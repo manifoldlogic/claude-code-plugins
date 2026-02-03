@@ -3345,6 +3345,599 @@ rm -rf "$TEST_SDD_ROOT/tickets/MULTI_test"
 echo ""
 
 # ============================================================================
+# SECTION 29: Tasks API Detection - Unit Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 29: Tasks API Detection - Unit Tests${NC}"
+echo "---------------------------------------------"
+
+# Test 29.1: detect_tasks_api_context returns None when disabled
+run_python_unit_test "detect_tasks_api_context returns None when disabled" "
+import sys
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Temporarily set feature flag to false
+os.environ['SDD_TASKS_API_ENABLED'] = 'false'
+try:
+    result = module.detect_tasks_api_context()
+    assert result is None, f'Expected None when disabled, got {result}'
+finally:
+    del os.environ['SDD_TASKS_API_ENABLED']
+"
+
+# Test 29.2: detect_tasks_api_context returns None when no CLAUDE_TASK_LIST_ID
+run_python_unit_test "detect_tasks_api_context returns None without task list ID" "
+import sys
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Ensure no CLAUDE_TASK_LIST_ID is set
+if 'CLAUDE_TASK_LIST_ID' in os.environ:
+    del os.environ['CLAUDE_TASK_LIST_ID']
+
+result = module.detect_tasks_api_context()
+assert result is None, f'Expected None without task list ID, got {result}'
+"
+
+# Test 29.3: detect_tasks_api_context returns context when enabled and ID set
+run_python_unit_test "detect_tasks_api_context returns context when active" "
+import sys
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Set CLAUDE_TASK_LIST_ID
+os.environ['CLAUDE_TASK_LIST_ID'] = 'test-task-list-123'
+# Ensure feature flag is not disabled
+if 'SDD_TASKS_API_ENABLED' in os.environ:
+    del os.environ['SDD_TASKS_API_ENABLED']
+
+try:
+    result = module.detect_tasks_api_context()
+    assert result is not None, 'Expected context, got None'
+    assert result['task_list_id'] == 'test-task-list-123', f'Wrong task_list_id: {result}'
+    assert result['enabled'] == True, f'Expected enabled=True: {result}'
+finally:
+    del os.environ['CLAUDE_TASK_LIST_ID']
+"
+
+# Test 29.4: detect_tasks_api_context enabled by default
+run_python_unit_test "detect_tasks_api_context enabled by default (no flag)" "
+import sys
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Set task list ID, ensure no feature flag
+os.environ['CLAUDE_TASK_LIST_ID'] = 'test-123'
+if 'SDD_TASKS_API_ENABLED' in os.environ:
+    del os.environ['SDD_TASKS_API_ENABLED']
+
+try:
+    result = module.detect_tasks_api_context()
+    assert result is not None, 'Should be enabled by default'
+finally:
+    del os.environ['CLAUDE_TASK_LIST_ID']
+"
+
+# Test 29.5: detect_tasks_api_context with explicit true value
+run_python_unit_test "detect_tasks_api_context with explicit true" "
+import sys
+import os
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+os.environ['CLAUDE_TASK_LIST_ID'] = 'test-123'
+os.environ['SDD_TASKS_API_ENABLED'] = 'true'
+
+try:
+    result = module.detect_tasks_api_context()
+    assert result is not None, 'Should be enabled when flag is true'
+finally:
+    del os.environ['CLAUDE_TASK_LIST_ID']
+    del os.environ['SDD_TASKS_API_ENABLED']
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 30: Tasks API Cache Reading Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 30: Tasks API Cache Reading Tests${NC}"
+echo "------------------------------------------"
+
+# Test 30.1: read_tasks_api_cache handles missing cache file
+run_python_unit_test "read_tasks_api_cache handles missing cache file" "
+import sys
+import tempfile
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    result = module.read_tasks_api_cache(tmpdir, 'nonexistent-list')
+    assert result is None, f'Expected None for missing cache, got {result}'
+"
+
+# Test 30.2: read_tasks_api_cache reads valid cache
+run_python_unit_test "read_tasks_api_cache reads valid cache" "
+import sys
+import os
+import json
+import tempfile
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+cache_data = {
+    'tasks': [
+        {'task_id': 'TEST.1001', 'status': 'pending'},
+        {'task_id': 'TEST.1002', 'status': 'in_progress'},
+    ],
+    'in_progress_tasks': ['TEST.1002'],
+    'updated_at': '2026-01-03T12:00:00Z',
+}
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    cache_dir = os.path.join(tmpdir, '.sdd-tasks-cache')
+    os.makedirs(cache_dir)
+    cache_file = os.path.join(cache_dir, 'test-list-123.json')
+    with open(cache_file, 'w') as f:
+        json.dump(cache_data, f)
+
+    result = module.read_tasks_api_cache(tmpdir, 'test-list-123')
+    assert result is not None, 'Expected cache data, got None'
+    assert 'tasks' in result, 'Expected tasks in result'
+    assert 'in_progress_tasks' in result, 'Expected in_progress_tasks in result'
+    assert result['in_progress_tasks'] == ['TEST.1002'], f'Wrong in_progress: {result}'
+"
+
+# Test 30.3: read_tasks_api_cache handles invalid JSON
+run_python_unit_test "read_tasks_api_cache handles invalid JSON" "
+import sys
+import os
+import tempfile
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    cache_dir = os.path.join(tmpdir, '.sdd-tasks-cache')
+    os.makedirs(cache_dir)
+    cache_file = os.path.join(cache_dir, 'bad-json.json')
+    with open(cache_file, 'w') as f:
+        f.write('{this is not valid json}')
+
+    result = module.read_tasks_api_cache(tmpdir, 'bad-json')
+    assert result is None, f'Expected None for invalid JSON, got {result}'
+"
+
+# Test 30.4: read_tasks_api_cache handles empty sdd_root
+run_python_unit_test "read_tasks_api_cache handles empty sdd_root" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+result = module.read_tasks_api_cache('', 'test-list')
+assert result is None, f'Expected None for empty sdd_root, got {result}'
+
+result = module.read_tasks_api_cache(None, 'test-list')
+assert result is None, f'Expected None for None sdd_root, got {result}'
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 31: Tasks API In-Progress Extraction Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 31: Tasks API In-Progress Extraction Tests${NC}"
+echo "---------------------------------------------------"
+
+# Test 31.1: get_in_progress_from_cache with pre-computed list
+run_python_unit_test "get_in_progress_from_cache uses pre-computed list" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+cache_data = {
+    'in_progress_tasks': ['TEST.1001', 'TEST.1002'],
+}
+result = module.get_in_progress_from_cache(cache_data)
+assert result == ['TEST.1001', 'TEST.1002'], f'Expected pre-computed list, got {result}'
+"
+
+# Test 31.2: get_in_progress_from_cache extracts from tasks list
+run_python_unit_test "get_in_progress_from_cache extracts from tasks list" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+cache_data = {
+    'tasks': [
+        {'task_id': 'TEST.1001', 'status': 'pending'},
+        {'task_id': 'TEST.1002', 'status': 'in_progress'},
+        {'task_id': 'TEST.1003', 'status': 'completed'},
+        {'task_id': 'TEST.1004', 'status': 'in_progress'},
+    ],
+}
+result = module.get_in_progress_from_cache(cache_data)
+assert result == ['TEST.1002', 'TEST.1004'], f'Expected in_progress tasks, got {result}'
+"
+
+# Test 31.3: get_in_progress_from_cache handles empty/None
+run_python_unit_test "get_in_progress_from_cache handles empty/None" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+assert module.get_in_progress_from_cache(None) == [], 'None should return empty list'
+assert module.get_in_progress_from_cache({}) == [], 'Empty dict should return empty list'
+assert module.get_in_progress_from_cache({'tasks': []}) == [], 'Empty tasks should return empty list'
+"
+
+# Test 31.4: get_in_progress_from_cache uses 'id' fallback
+run_python_unit_test "get_in_progress_from_cache uses id fallback" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+cache_data = {
+    'tasks': [
+        {'id': 'TEST.1001', 'status': 'in_progress'},  # Uses 'id' instead of 'task_id'
+    ],
+}
+result = module.get_in_progress_from_cache(cache_data)
+assert result == ['TEST.1001'], f'Expected to use id fallback, got {result}'
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 32: Tasks API Guidance Generation Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 32: Tasks API Guidance Generation Tests${NC}"
+echo "------------------------------------------------"
+
+# Test 32.1: generate_tasks_api_guidance single task
+run_python_unit_test "generate_tasks_api_guidance single task" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+api_context = {'task_list_id': 'test-list-123', 'enabled': True}
+in_progress = ['TEST.1001']
+ticket_id = 'TEST_ticket'
+
+message = module.generate_tasks_api_guidance(api_context, in_progress, ticket_id)
+assert 'TASKS API' in message, 'Should have TASKS API header'
+assert 'TEST.1001' in message, 'Should contain task ID'
+assert 'TEST_ticket' in message, 'Should contain ticket ID'
+assert 'in progress' in message.lower(), 'Should mention in progress'
+"
+
+# Test 32.2: generate_tasks_api_guidance multiple tasks
+run_python_unit_test "generate_tasks_api_guidance multiple tasks" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+api_context = {'task_list_id': 'test-list', 'enabled': True}
+in_progress = ['TEST.1001', 'TEST.1002', 'TEST.1003']
+ticket_id = 'TEST_ticket'
+
+message = module.generate_tasks_api_guidance(api_context, in_progress, ticket_id)
+assert 'TASKS API' in message, 'Should have TASKS API header'
+assert '3 tasks' in message, 'Should mention task count'
+assert 'TEST.1001' in message, 'Should list tasks'
+"
+
+# Test 32.3: generate_tasks_api_guidance truncates long list
+run_python_unit_test "generate_tasks_api_guidance truncates long list" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+api_context = {'task_list_id': 'test-list', 'enabled': True}
+in_progress = [f'TEST.{i}' for i in range(1001, 1011)]  # 10 tasks
+ticket_id = 'TEST_ticket'
+
+message = module.generate_tasks_api_guidance(api_context, in_progress, ticket_id)
+assert '10 tasks' in message, 'Should mention count'
+assert 'and 5 more' in message, 'Should indicate more tasks'
+"
+
+# Test 32.4: generate_tasks_api_guidance without ticket_id
+run_python_unit_test "generate_tasks_api_guidance without ticket_id" "
+import sys
+sys.path.insert(0, '$SCRIPT_DIR')
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+spec = spec_from_loader('workflow_guidance', SourceFileLoader('workflow_guidance', '$HOOK'))
+module = module_from_spec(spec)
+spec.loader.exec_module(module)
+
+api_context = {'task_list_id': 'test-list', 'enabled': True}
+in_progress = ['TEST.1001']
+
+message = module.generate_tasks_api_guidance(api_context, in_progress, None)
+assert 'TASKS API' in message, 'Should have TASKS API header'
+assert 'TEST.1001' in message, 'Should contain task ID'
+# Should not crash without ticket_id
+"
+
+echo ""
+
+# ============================================================================
+# SECTION 33: Tasks API Integration Tests
+# ============================================================================
+
+echo -e "${BLUE}SECTION 33: Tasks API Integration Tests${NC}"
+echo "----------------------------------------"
+
+# Test 33.1: Hook uses Tasks API cache when available
+mkdir -p "$TEST_SDD_ROOT/.sdd-tasks-cache"
+TASK_LIST_ID="integration-test-list-$(date +%s)"
+
+# Create cache file with in-progress task
+cat > "$TEST_SDD_ROOT/.sdd-tasks-cache/$TASK_LIST_ID.json" << EOF
+{
+  "tasks": [
+    {"task_id": "API.1001", "status": "in_progress"},
+    {"task_id": "API.1002", "status": "pending"}
+  ],
+  "in_progress_tasks": ["API.1001"],
+  "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+
+cat > "$TEMP_DIR/transcript-api-test.jsonl" << EOF
+{"display": "/sdd:do-task API.1001", "timestamp": 1700000001000, "sessionId": "test"}
+{"display": "Working on API_test", "timestamp": 1700000002000, "sessionId": "test"}
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "api-test-session",
+  "transcript_path": "$TEMP_DIR/transcript-api-test.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+# Run with CLAUDE_TASK_LIST_ID set to trigger Tasks API detection
+TESTS_RUN=$((TESTS_RUN + 1))
+echo -n "Test: Hook blocks with Tasks API cache (in-progress) ... "
+actual_exit=0
+output=$(export SDD_ROOT_DIR="$TEST_SDD_ROOT" && export CLAUDE_TASK_LIST_ID="$TASK_LIST_ID" && cat "$TEMP_DIR/input.json" | python3 "$HOOK" 2>&1) || actual_exit=$?
+if [ "$actual_exit" -eq 2 ] && echo "$output" | grep -q "TASKS API"; then
+    echo -e "${GREEN}PASS${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC} (expected exit 2 with TASKS API, got exit $actual_exit)"
+    if [ "$VERBOSE" = true ]; then
+        echo "  Output: $output"
+    fi
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+# Test 33.2: Hook allows when Tasks API shows no in-progress tasks
+cat > "$TEST_SDD_ROOT/.sdd-tasks-cache/$TASK_LIST_ID.json" << EOF
+{
+  "tasks": [
+    {"task_id": "API.1001", "status": "completed"},
+    {"task_id": "API.1002", "status": "completed"}
+  ],
+  "in_progress_tasks": [],
+  "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+
+TESTS_RUN=$((TESTS_RUN + 1))
+echo -n "Test: Hook allows with Tasks API cache (no in-progress) ... "
+actual_exit=0
+output=$(export SDD_ROOT_DIR="$TEST_SDD_ROOT" && export CLAUDE_TASK_LIST_ID="$TASK_LIST_ID" && cat "$TEMP_DIR/input.json" | python3 "$HOOK" 2>&1) || actual_exit=$?
+if [ "$actual_exit" -eq 0 ]; then
+    echo -e "${GREEN}PASS${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC} (expected exit 0, got exit $actual_exit)"
+    if [ "$VERBOSE" = true ]; then
+        echo "  Output: $output"
+    fi
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+# Test 33.3: SDD_TASKS_API_ENABLED=false skips API detection
+# Reset cache to have in-progress task
+cat > "$TEST_SDD_ROOT/.sdd-tasks-cache/$TASK_LIST_ID.json" << EOF
+{
+  "tasks": [
+    {"task_id": "API.1001", "status": "in_progress"}
+  ],
+  "in_progress_tasks": ["API.1001"],
+  "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+
+TESTS_RUN=$((TESTS_RUN + 1))
+echo -n "Test: SDD_TASKS_API_ENABLED=false skips API detection ... "
+actual_exit=0
+# With API disabled, should fall back to task file inspection (which will allow since no task files exist)
+output=$(export SDD_ROOT_DIR="$TEST_SDD_ROOT" && export CLAUDE_TASK_LIST_ID="$TASK_LIST_ID" && export SDD_TASKS_API_ENABLED="false" && cat "$TEMP_DIR/input.json" | python3 "$HOOK" 2>&1) || actual_exit=$?
+if [ "$actual_exit" -eq 0 ] && ! echo "$output" | grep -q "TASKS API"; then
+    echo -e "${GREEN}PASS${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC} (expected exit 0 without TASKS API, got exit $actual_exit)"
+    if [ "$VERBOSE" = true ]; then
+        echo "  Output: $output"
+    fi
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+# Test 33.4: Tasks API skipped when no CLAUDE_TASK_LIST_ID
+TESTS_RUN=$((TESTS_RUN + 1))
+echo -n "Test: No CLAUDE_TASK_LIST_ID skips API detection ... "
+actual_exit=0
+# Without CLAUDE_TASK_LIST_ID, should fall back to task file inspection
+output=$(export SDD_ROOT_DIR="$TEST_SDD_ROOT" && unset CLAUDE_TASK_LIST_ID && cat "$TEMP_DIR/input.json" | python3 "$HOOK" 2>&1) || actual_exit=$?
+if [ "$actual_exit" -eq 0 ] && ! echo "$output" | grep -q "TASKS API"; then
+    echo -e "${GREEN}PASS${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC} (expected exit 0 without TASKS API, got exit $actual_exit)"
+    if [ "$VERBOSE" = true ]; then
+        echo "  Output: $output"
+    fi
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+# Test 33.5: Session state takes priority over Tasks API
+mkdir -p "$TEST_SDD_ROOT/.sdd-session-states"
+mkdir -p "$TEST_SDD_ROOT/tickets/API_test/tasks"
+
+# Create session state for a different task
+SESSION_API_TEST="session-api-priority-test"
+cat > "$TEST_SDD_ROOT/.sdd-session-states/$SESSION_API_TEST.json" << EOF
+{
+  "session_id": "$SESSION_API_TEST",
+  "ticket_id": "API_test",
+  "task_id": "API.9999",
+  "phase": "implementation",
+  "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "command": "/sdd:do-task API.9999"
+}
+EOF
+
+# Create matching task file that is in progress
+cat > "$TEST_SDD_ROOT/tickets/API_test/tasks/API.9999_session-priority.md" << 'EOF'
+# Task: [API.9999]: Session Priority Test
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+
+## Summary
+Test task for session state priority.
+EOF
+
+cat > "$TEMP_DIR/input.json" << EOF
+{
+  "session_id": "$SESSION_API_TEST",
+  "transcript_path": "$TEMP_DIR/transcript-api-test.jsonl",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false
+}
+EOF
+
+TESTS_RUN=$((TESTS_RUN + 1))
+echo -n "Test: Session state takes priority over Tasks API ... "
+actual_exit=0
+output=$(export SDD_ROOT_DIR="$TEST_SDD_ROOT" && export CLAUDE_TASK_LIST_ID="$TASK_LIST_ID" && cat "$TEMP_DIR/input.json" | python3 "$HOOK" 2>&1) || actual_exit=$?
+if [ "$actual_exit" -eq 2 ] && echo "$output" | grep -q "ACTIVE WORK.*API.9999"; then
+    echo -e "${GREEN}PASS${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC} (expected ACTIVE WORK for API.9999, got exit $actual_exit)"
+    if [ "$VERBOSE" = true ]; then
+        echo "  Output: $output"
+    fi
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+# Cleanup
+rm -rf "$TEST_SDD_ROOT/.sdd-tasks-cache"
+rm -rf "$TEST_SDD_ROOT/.sdd-session-states"
+rm -rf "$TEST_SDD_ROOT/tickets/API_test"
+
+echo ""
+
+# ============================================================================
 # Summary
 # ============================================================================
 
