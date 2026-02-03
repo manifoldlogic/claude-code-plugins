@@ -171,14 +171,43 @@ fi
    ```
    - This enables Ctrl+T real-time visibility showing the task is active
 
-**Error Handling:**
+**Error Handling with Retry Logic:**
 
-| Error | Behavior |
-|-------|----------|
-| TaskGet fails | Log warning, continue with file-only mode |
-| Hydration fails | Log warning, continue with file-only mode |
-| TaskUpdate fails | Log warning, continue (file is authoritative) |
-| Tasks API unavailable | Skip all API operations, proceed with existing workflow |
+| Error | Behavior | Retry |
+|-------|----------|-------|
+| TaskGet fails | Log warning, retry once, then continue with file-only mode | 1 retry |
+| Hydration fails | Log warning, retry once, then continue with file-only mode | 1 retry |
+| TaskUpdate fails | Log warning, retry once, then continue (file is authoritative) | 1 retry |
+| Tasks API unavailable | Skip all API operations, proceed with existing workflow | No retry |
+
+**Retry Logic Pattern for API Calls:**
+
+```bash
+# Retry pattern for transient API failures
+MAX_RETRIES=1
+RETRY_DELAY=1
+
+retry_task_update() {
+  local task_id="$1"
+  local status="$2"
+  local attempt=0
+
+  while [ $attempt -le $MAX_RETRIES ]; do
+    if TaskUpdate taskId="$task_id" status="$status"; then
+      return 0
+    fi
+
+    if [ $attempt -lt $MAX_RETRIES ]; then
+      echo "Warning: TaskUpdate failed, retrying in ${RETRY_DELAY}s..."
+      sleep $RETRY_DELAY
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  echo "Warning: TaskUpdate failed after $MAX_RETRIES retries, continuing with file-only mode"
+  return 1
+}
+```
 
 **Graceful Degradation:**
 
@@ -186,6 +215,13 @@ If any Tasks API operation fails:
 1. Log the error with context for debugging
 2. Set internal flag `TASKS_API_ACTIVE=false` to skip completion sync in Step 6.5
 3. Continue with existing file-based workflow (no blocking)
+
+**JSON Error Handling:**
+
+All Python hooks (hydrate-tasks.py, conflict-resolution.py, workflow-guidance.py) handle malformed JSON gracefully:
+- JSON parsing wrapped in try/except blocks
+- Malformed responses trigger fallback to file-only mode
+- Errors logged for debugging, workflow continues
 
 ```
 # Example graceful degradation pattern
@@ -560,12 +596,21 @@ If `TASKS_API_ACTIVE` was set to `false` in Step 1.6 (due to API unavailability)
    - Unblocks any dependent tasks waiting on this one
 
 2. **Sync completion to task file (bidirectional sync):**
-   - Call sync-task-status.sh to update the file checkbox:
+   - Call sync-task-status.sh with retry logic to update the file checkbox:
    ```bash
    # Update task file checkbox: - [ ] → - [x] for "Task completed"
-   ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"
+   # Uses retry logic for transient failures (see Sync Write Retry Logic below)
+   if ! ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"; then
+     echo "Warning: Sync write failed, retrying..."
+     sleep 1
+     if ! ${PLUGIN_DIR}/scripts/sync-task-status.sh "${ARGUMENTS}" "completed"; then
+       echo "Error: Sync write failed after retry. File may need manual update."
+       # Continue anyway - verification agent already checked the box
+     fi
+   fi
    ```
    - This ensures file state matches API state
+   - Exit codes are checked to detect sync failures
 
 3. **Verify file and API state match:**
    - Check that task file has `- [x] **Task completed**` checkbox checked
