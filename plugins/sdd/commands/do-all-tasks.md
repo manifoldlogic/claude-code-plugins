@@ -1,6 +1,6 @@
 ---
-description: Execute all tasks for a ticket systematically
-argument-hint: [TICKET_ID]
+description: Execute all tasks for a ticket systematically (supports --parallel for concurrent execution)
+argument-hint: [TICKET_ID] [--parallel]
 ---
 
 # Work on Ticket
@@ -10,6 +10,27 @@ argument-hint: [TICKET_ID]
 Ticket: $ARGUMENTS
 Task folder: `${SDD_ROOT_DIR}/tickets/$ARGUMENTS_*/`
 Tasks: `${SDD_ROOT_DIR}/tickets/$ARGUMENTS_*/tasks/`
+
+## Argument Parsing
+
+Parse arguments to detect mode:
+- Default: Sequential execution (existing behavior)
+- `--parallel`: Enable parallel execution mode (experimental)
+
+```bash
+# Parse arguments
+TICKET_ID="${ARGUMENTS%% *}"  # First argument is ticket ID (strip --parallel if present)
+TICKET_ID="${TICKET_ID%%--*}"  # Remove any flags from ticket ID
+TICKET_ID="${TICKET_ID%% }"   # Trim trailing space
+
+if echo "$ARGUMENTS" | grep -q "\-\-parallel"; then
+  PARALLEL_MODE=true
+  echo "=== PARALLEL MODE ENABLED ==="
+else
+  PARALLEL_MODE=false
+  echo "=== SEQUENTIAL MODE (default) ==="
+fi
+```
 
 ## Pre-Execution Checklist (BLOCKING)
 
@@ -203,6 +224,56 @@ Warning: Tasks API hydration failed, continuing in file-only mode
 
 ---
 
+## Step 1.6: Parallel Mode Setup (Optional)
+
+**This step only runs when --parallel flag is provided.**
+
+### Calculate Dependency Graph
+
+If parallel mode enabled:
+
+```bash
+if [ "$PARALLEL_MODE" = "true" ]; then
+  echo "=== PARALLEL MODE SETUP ==="
+
+  # Verify Tasks API is enabled (required for parallel mode)
+  if [ "$TASKS_API_ENABLED" != "true" ]; then
+    echo "Warning: Tasks API not enabled, falling back to sequential mode"
+    echo "Parallel mode requires Tasks API for task state coordination"
+    PARALLEL_MODE=false
+  fi
+fi
+
+if [ "$PARALLEL_MODE" = "true" ]; then
+  # Calculate dependency graph
+  DEP_GRAPH=$(python ${CLAUDE_PLUGIN_ROOT}/scripts/calculate-dependency-graph.py "$TICKET_PATH" 2>&1)
+  DEP_STATUS=$?
+
+  if [ $DEP_STATUS -ne 0 ]; then
+    echo "Warning: Dependency graph calculation failed, falling back to sequential mode"
+    echo "Error: $DEP_GRAPH"
+    PARALLEL_MODE=false
+  else
+    echo "Dependency graph calculated successfully"
+    # Parse graph output for phase and dependency information
+    echo "$DEP_GRAPH" | head -20
+    echo ""
+  fi
+fi
+```
+
+### Parallel Execution Prerequisites
+
+| Prerequisite | Required | Fallback |
+|--------------|----------|----------|
+| Tasks API enabled | YES | Falls back to sequential |
+| Dependency graph calculates | YES | Falls back to sequential |
+| Tasks hydrated with blockedBy | YES | Falls back to sequential |
+
+**Note:** If any prerequisite fails, execution continues in sequential mode with a warning. This ensures robustness - parallel mode is an optimization, not a requirement.
+
+---
+
 ## Workflow
 
 **IMPORTANT: You are an orchestrator. You coordinate ticket execution by delegating to /sdd:do-task for each ticket.**
@@ -267,6 +338,17 @@ Summary:
 - Failed: {failed_count}
 - Skipped: {skipped_count}
 
+{If PARALLEL_MODE was true:}
+Execution Mode: PARALLEL
+- Max concurrent tasks: 3
+- Phases executed: {phase_count}
+- Total duration: {duration}
+
+{If PARALLEL_MODE was false (default):}
+Execution Mode: SEQUENTIAL
+- Tasks executed in order
+- Total duration: {duration}
+
 {If Tasks API was enabled:}
 Tasks API Status:
 - Hydration: Successful ({hydrated_count} tasks)
@@ -285,6 +367,12 @@ Completed Tasks:
 {If any failed:}
 Failed Tasks:
 ✗ {TICKET_ID.XXXX}: {reason}
+
+{If parallel mode fell back to sequential:}
+Fallback Note:
+- Parallel execution encountered issues
+- Switched to sequential mode at task {TASK_ID}
+- Remaining tasks completed sequentially
 
 {If any follow-up:}
 Follow-up Tasks Created:
@@ -329,3 +417,226 @@ fi
 - Complete tasks in dependency order
 - Do NOT skip verification steps
 - Do NOT use workarounds for blocked tasks
+
+---
+
+## Parallel Workflow (--parallel flag)
+
+**IMPORTANT: This is an experimental feature. Only use when tasks within a phase are truly independent.**
+
+When `--parallel` flag is provided and all prerequisites pass (Tasks API enabled, dependency graph calculated), use this parallel workflow instead of the sequential workflow above.
+
+### Parallel Execution Algorithm
+
+1. Calculate dependency graph (done in Step 1.6)
+2. Identify independent tasks within current phase (tasks with empty blockedBy)
+3. Launch Task tool for each independent task simultaneously (up to MAX_CONCURRENT)
+4. Poll TaskList for completions
+5. When tasks complete, find newly unblocked tasks
+6. Repeat until all tasks complete
+
+### Concurrency Limits
+
+- Maximum concurrent tasks: 3 (to avoid context limits)
+- Phase boundaries enforced by blockedBy relationships
+- Tasks in Phase N+1 cannot start until all Phase N tasks complete
+
+### Step P1: Initialize Parallel State
+
+```bash
+# Initialize parallel execution state
+PARALLEL_TASKS_RUNNING=0
+MAX_CONCURRENT=3
+COMPLETED_TASKS=""
+FAILED_TASKS=""
+PARALLEL_START_TIME=$(date +%s)
+```
+
+### Step P2: Parallel Execution Loop
+
+**Main loop - repeat until all tasks complete:**
+
+For each iteration:
+1. Query TaskList to get current task states
+2. Identify available tasks (status='pending', blockedBy is empty or all blockedBy tasks completed)
+3. Launch up to MAX_CONCURRENT available tasks in parallel using Task tool
+4. Poll TaskList periodically (every 30 seconds) for status changes
+5. When tasks complete:
+   - Update COMPLETED_TASKS or FAILED_TASKS list
+   - Check for newly available tasks (blockedBy now resolved)
+   - Launch newly available tasks (respecting MAX_CONCURRENT)
+6. Continue until no tasks remain pending
+
+```markdown
+WHILE tasks remain pending:
+
+  # Query current state
+  Use TaskList to get all task statuses
+
+  # Find available tasks
+  AVAILABLE = tasks where:
+    - status = 'pending'
+    - blockedBy is empty OR all blockedBy tasks have status='completed'
+
+  # Launch available tasks (up to limit)
+  FOR each task in AVAILABLE (limit MAX_CONCURRENT - currently_running):
+    Launch: Task(subagent_type="general-purpose", prompt="Execute /sdd:do-task {TASK_ID}")
+    Update TaskUpdate(taskId={id}, status="in_progress")
+    Increment PARALLEL_TASKS_RUNNING
+
+  # Poll for completions
+  WAIT 30 seconds
+  Query TaskList for status changes
+
+  # Process completions
+  FOR each newly completed task:
+    Decrement PARALLEL_TASKS_RUNNING
+    IF task succeeded:
+      Add to COMPLETED_TASKS
+    ELSE:
+      Add to FAILED_TASKS
+      Log: "Task {TASK_ID} failed, continuing with independent tasks"
+
+  # Check for newly available tasks
+  LOOP (back to Query current state)
+
+END WHILE
+```
+
+### Step P3: Launching Concurrent Tasks
+
+Use the Task tool to launch multiple subagents simultaneously:
+
+```markdown
+For each available task (up to MAX_CONCURRENT):
+
+  1. Update task status to in_progress:
+     TaskUpdate(taskId="{TASK_ID}", status="in_progress")
+
+  2. Launch subagent:
+     Task(
+       subagent_type="general-purpose",
+       prompt="Execute /sdd:do-task {TASK_ID}. Complete the full workflow: implement, test, verify, commit."
+     )
+
+  3. Track task as running:
+     RUNNING_TASKS="${RUNNING_TASKS} {TASK_ID}"
+```
+
+**Note:** The Task tool allows multiple concurrent calls. Launch all available tasks (up to MAX_CONCURRENT) in a single response to maximize parallelism.
+
+### Step P4: Polling for Completion
+
+Use TaskList to check task status:
+
+```markdown
+Query: TaskList()
+
+For each task in response:
+  IF task.status = 'completed' AND task.id in RUNNING_TASKS:
+    Remove from RUNNING_TASKS
+    Add to COMPLETED_TASKS
+    PARALLEL_TASKS_RUNNING -= 1
+
+  IF task.status = 'pending' AND task.blockedBy is empty:
+    Add to AVAILABLE_TASKS (for next launch cycle)
+```
+
+Poll every 30 seconds until all tasks complete or fail.
+
+### Step P5: Error Handling in Parallel Mode
+
+**Single Task Failure:**
+
+If a task fails:
+- Log the failure with reason
+- Continue with independent tasks (do NOT cascade failure)
+- Tasks that depend on the failed task will remain blocked
+- Report failed tasks in final summary
+
+```markdown
+IF task fails:
+  Log: "Task {TASK_ID} failed: {error_reason}"
+  Add to FAILED_TASKS
+  Continue execution loop (do not abort)
+```
+
+**Parallel Execution Error:**
+
+If the parallel execution mechanism itself encounters issues:
+
+```markdown
+IF parallel execution error (TaskList unavailable, Task tool error, etc.):
+  Log: "Warning: Parallel execution error, falling back to sequential mode"
+  Set PARALLEL_MODE=false
+  Continue with remaining tasks using sequential workflow (Step 3 above)
+```
+
+**Error Recovery:**
+- Completed tasks remain completed
+- In-progress tasks continue (tracked by subagents)
+- Pending tasks continue in sequential mode
+
+### Step P6: Parallel Mode Final Report
+
+When parallel execution completes, generate the enhanced report:
+
+```
+=== PARALLEL EXECUTION REPORT ===
+
+Mode: Parallel (--parallel)
+Max concurrent: 3
+
+Timing:
+  Start: {start_time}
+  End: {end_time}
+  Duration: {parallel_duration}
+
+Phase Breakdown:
+  Phase 0: {count} tasks ({parallel_batches} parallel batches)
+  Phase 1: {count} tasks ({parallel_batches} parallel batches)
+  Phase 2: {count} tasks ({parallel_batches} parallel batches)
+  Phase 3: {count} tasks ({parallel_batches} parallel batches)
+
+Results:
+  Completed: {completed_count}
+  Failed: {failed_count}
+
+Completed Tasks:
+{foreach completed task:}
+  {timestamp} {TASK_ID}: {title}
+
+{If any failed:}
+Failed Tasks:
+  {TASK_ID}: {error_reason}
+
+{If fallback occurred:}
+Note: Parallel execution encountered issues at {timestamp}
+      Fell back to sequential mode for remaining {count} tasks
+
+=== END PARALLEL EXECUTION REPORT ===
+```
+
+### Parallel vs Sequential Mode Summary
+
+| Aspect | Sequential (default) | Parallel (--parallel) |
+|--------|---------------------|----------------------|
+| Task execution | One at a time | Up to 3 concurrent |
+| Dependencies | Phase order | blockedBy graph |
+| Error handling | Stop or continue | Continue with independent |
+| Prerequisites | None | Tasks API + dependency graph |
+| Fallback | N/A | Falls back to sequential |
+| Use case | Safety, simplicity | Speed with independent tasks |
+
+### When to Use Parallel Mode
+
+**Good candidates for parallel execution:**
+- Tickets with many independent tasks in the same phase
+- Tasks that don't share files or resources
+- Well-defined dependency graph
+
+**Avoid parallel execution when:**
+- Tasks have implicit dependencies not in the graph
+- Tasks modify shared files
+- Debugging is needed (sequential is easier to follow)
+- First time running a ticket (use sequential to verify correctness)
