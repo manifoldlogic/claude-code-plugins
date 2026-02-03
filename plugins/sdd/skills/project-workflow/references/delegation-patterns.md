@@ -362,3 +362,140 @@ Markdown table with status summary, grouped by phase.
 - Highlight tickets needing attention
 - Keep concise (one screen)
 ```
+
+## Pattern 7: Parallel Task Execution
+
+Execute independent tasks concurrently within a phase to reduce total execution time.
+
+### When to Use
+
+Use parallel execution when:
+
+1. **Multiple independent tasks exist** within a phase (no inter-task dependencies)
+2. **Medium to large tickets** (6+ tasks total, 3+ independent)
+3. **Time-sensitive delivery** where every minute saved matters
+4. **Implementation-heavy tasks** (longer tasks benefit more from parallelism)
+
+### When NOT to Use
+
+Stick to sequential execution when:
+
+1. **Linear dependency chains** (each task depends on the previous)
+2. **Small tickets** (< 6 tasks) - coordination overhead exceeds savings
+3. **Shared file modifications** - parallel writes can cause conflicts
+4. **Debugging issues** - sequential is easier to follow
+5. **Context-constrained sessions** - parallel adds context pressure
+
+### Enabling Parallel Execution
+
+```bash
+# Default: Sequential execution
+/sdd:do-all-tasks TICKET_ID
+
+# Opt-in: Parallel execution
+/sdd:do-all-tasks TICKET_ID --parallel
+```
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Phase 0 (Sequential)                     │
+│  TASK.0001 ─────> TASK.0002                                │
+│  (decision chain - must be sequential)                      │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Phase 1 (Parallel)                       │
+│  ┌─────────┐   ┌─────────┐   ┌─────────┐                   │
+│  │TASK.1001│   │TASK.1002│   │TASK.1003│   ─> TASK.1004   │
+│  │  (ind)  │   │  (ind)  │   │  (ind)  │   (depends on all)│
+│  └────┬────┘   └────┬────┘   └────┬────┘                   │
+│       │             │             │                         │
+│       └─────────────┼─────────────┘                         │
+│                     │ (concurrent execution)                │
+│                     ▼                                       │
+│              [All complete]                                 │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Phase 2 (Sequential)                     │
+│  TASK.2001 ─────> Verification/cleanup                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Concurrency Limits
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| Default max concurrent | 3 | Balance speed and context usage |
+| Hard limit | 4 | Prevent context exhaustion |
+| Context overhead | +5-10% per concurrent task | Plan for ~20% total overhead |
+
+### Performance Expectations
+
+Based on benchmarks with typical ticket structures:
+
+| Ticket Type | Tasks | Independent | Time Saved | Recommendation |
+|-------------|-------|-------------|------------|----------------|
+| Small | 5 | 2 | ~15% | Sequential (marginal benefit) |
+| Medium | 12 | 6 | **~32%** | Parallel recommended |
+| Large | 22 | 12 | **~28%** | Parallel recommended |
+| Linear | 10 | 0 | 0% | Sequential (no benefit possible) |
+
+**Key insight:** Parallel execution provides 20-30% improvement when tickets have 3+ independent tasks within phases. Linear dependency chains see no benefit (slight overhead).
+
+### Decision Matrix
+
+```
+Independent Tasks in Phase:
+  ├── 0 tasks → Use sequential (no parallelism possible)
+  ├── 1-2 tasks → Use sequential (overhead > benefit)
+  ├── 3-4 tasks → Consider parallel (good balance)
+  └── 5+ tasks → Use parallel (significant benefit)
+```
+
+### Example: Parallel Execution
+
+```markdown
+# Ticket FEATURE with 8 tasks
+
+Phase 1 has 4 independent tasks: FEATURE.1001, 1002, 1003, 1004
+Phase 2 has 2 independent tasks: FEATURE.2001, 2002
+Phase 3 has 2 sequential tasks: FEATURE.3001 → 3002
+
+Sequential time estimate: 8 tasks × 6 min = 48 minutes
+
+Parallel execution:
+- Phase 1: 4 independent tasks → 2 batches × 6 min = 12 min (vs 24 min)
+- Phase 2: 2 independent tasks → 1 batch × 6 min = 6 min (vs 12 min)
+- Phase 3: 2 sequential tasks → 12 min (no parallelism)
+
+Parallel time estimate: 12 + 6 + 12 = 30 minutes
+Time saved: 18 minutes (37.5% improvement)
+```
+
+### Error Handling in Parallel Mode
+
+**Single task failure:**
+- Continue with independent tasks
+- Failed task's dependents remain blocked
+- Report failure in final summary
+
+**Parallel mechanism failure:**
+- Log warning
+- Fall back to sequential mode automatically
+- Continue execution without interruption
+
+### Integration with Tasks API
+
+Parallel execution requires Tasks API for coordination:
+
+1. **Dependency graph** calculated from task files
+2. **Task states** tracked via Tasks API (blockedBy relationships)
+3. **Concurrent launch** via Task tool with multiple subagents
+4. **Completion polling** via TaskList to detect newly unblocked tasks
+
+If Tasks API is unavailable, parallel mode falls back to sequential automatically.

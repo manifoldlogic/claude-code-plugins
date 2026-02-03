@@ -443,3 +443,133 @@ This enables automatic Jira ticket linking for tickets imported via `/sdd:import
 2. Keep tasks at 2-8 hour scope
 3. Document decisions in tickets
 4. Archive completed tickets promptly
+
+---
+
+## Tasks API Integration
+
+The SDD plugin integrates with Claude Code's native Tasks API for improved task tracking and optional parallel execution.
+
+### Features
+
+- **Real-time task status** in Ctrl+T view
+- **Cross-session persistence** - task state survives session restarts
+- **Optional parallel execution** for independent tasks within phases
+- **Hybrid file+API architecture** - file remains authoritative
+
+### Architecture
+
+The Tasks API integration uses a hybrid approach:
+
+```
+Task File (.md)          Tasks API
+     |                       |
+     v                       v
+  Authoritative          Visibility
+  Source of Truth        Enhancement
+     |                       |
+     +--------> Sync <-------+
+```
+
+**Key Principle:** The task file is always authoritative. If the Tasks API is unavailable or states diverge, the file takes precedence.
+
+### Configuration
+
+#### Feature Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SDD_TASKS_API_ENABLED` | `true` | Enable Tasks API integration. Set to `'false'` to disable. |
+| `CLAUDE_TASK_LIST_ID` | Auto-set | Scopes tasks to a ticket. Set automatically by commands. |
+
+#### Disabling Tasks API
+
+To run in file-only mode (legacy behavior):
+
+```bash
+export SDD_TASKS_API_ENABLED=false
+```
+
+### How It Works
+
+1. **Hydration**: When `/sdd:do-all-tasks` runs, it hydrates task files to the Tasks API
+2. **Status Sync**: Task completion updates both the file checkbox and API status
+3. **Visibility**: Active tasks appear in Claude Code's Ctrl+T task view
+4. **Fallback**: If API is unavailable, file-only mode activates automatically
+
+### Parallel Execution
+
+When enabled via `--parallel` flag, independent tasks within a phase can execute concurrently:
+
+```bash
+/sdd:do-all-tasks TICKET_ID --parallel
+```
+
+**Performance expectations** (based on benchmarks):
+
+| Ticket Type | Tasks | Independent | Expected Improvement |
+|-------------|-------|-------------|---------------------|
+| Small | 5 | 2 | ~15% (marginal) |
+| Medium | 12 | 6 | **~32%** (significant) |
+| Large | 22 | 12 | **~28%** (significant) |
+| Linear | 10 | 0 | 0% (no benefit) |
+
+**When to use --parallel:**
+- Medium/large tickets with 3+ independent tasks per phase
+- Implementation-heavy tasks (longer tasks = more savings)
+- Time-sensitive deliveries
+
+**When to use sequential (default):**
+- Small tickets (< 6 tasks)
+- Linear dependency chains
+- First-time execution (simpler to debug)
+- Context-constrained sessions
+
+See [delegation-patterns.md](references/delegation-patterns.md) for detailed parallel execution patterns.
+
+### Troubleshooting
+
+#### Tasks API not available
+
+If Tasks API is unavailable, the plugin falls back to file-only mode automatically:
+
+```
+Warning: Tasks API unavailable, continuing with file-only mode
+```
+
+No action needed - workflow continues normally.
+
+#### Parallel execution issues
+
+If parallel execution encounters errors, it falls back to sequential mode:
+
+```
+Warning: Parallel execution error, falling back to sequential mode
+```
+
+To troubleshoot:
+1. Check that Tasks API is enabled (`SDD_TASKS_API_ENABLED` not set to `false`)
+2. Verify ticket structure with `/sdd:tasks-status TICKET_ID`
+3. Run without `--parallel` flag to isolate the issue
+
+#### State mismatch between file and API
+
+If file and API states diverge:
+
+1. **File is authoritative** - the file checkbox determines actual status
+2. **Re-sync by re-running command** - task status will be re-hydrated
+3. **Clear stale state** - delete `.sdd-task-state/` directory if needed
+
+### Migration Guide
+
+**Existing tickets work without modification.** When you run a command on an existing ticket:
+
+1. Tasks are automatically hydrated to the Tasks API on first load
+2. No manual migration steps required
+3. Existing file-based workflows continue to work
+4. Tasks API integration is purely additive
+
+To opt out of Tasks API for a specific session:
+```bash
+export SDD_TASKS_API_ENABLED=false
+```

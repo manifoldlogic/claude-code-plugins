@@ -640,3 +640,80 @@ Note: Parallel execution encountered issues at {timestamp}
 - Tasks modify shared files
 - Debugging is needed (sequential is easier to follow)
 - First time running a ticket (use sequential to verify correctness)
+
+---
+
+## Help / Quick Reference
+
+### Usage
+
+```bash
+# Sequential execution (default)
+/sdd:do-all-tasks TICKET_ID
+
+# Parallel execution (opt-in)
+/sdd:do-all-tasks TICKET_ID --parallel
+```
+
+**Examples:**
+```bash
+/sdd:do-all-tasks AUTH
+/sdd:do-all-tasks FEATURE --parallel
+```
+
+### What This Command Does
+
+1. **Validates ticket** - Checks review approval and task existence
+2. **Gathers inventory** - Scans tasks and their status
+3. **Hydrates to Tasks API** - Enables Ctrl+T tracking (if enabled)
+4. **Executes tasks** - Calls `/sdd:do-task` for each unverified task
+5. **Reports progress** - Provides summary at completion
+
+### Parallel Mode (--parallel)
+
+Enable concurrent execution of independent tasks within phases:
+
+| Mode | Execution | Best For |
+|------|-----------|----------|
+| Sequential (default) | One task at a time | Small tickets, debugging |
+| Parallel (--parallel) | Up to 3 concurrent | Medium/large tickets with independent tasks |
+
+**Performance expectations:**
+
+| Ticket Type | Independent Tasks | Expected Improvement |
+|-------------|-------------------|---------------------|
+| Medium (12 tasks) | 6+ | ~32% faster |
+| Large (22 tasks) | 12+ | ~28% faster |
+| Small (< 6 tasks) | Any | Minimal benefit |
+| Linear chain | 0 | No benefit (slight overhead) |
+
+### Feature Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SDD_TASKS_API_ENABLED` | `true` | Enable Tasks API. Set to `'false'` to disable. |
+| `CLAUDE_TASK_LIST_ID` | Auto-set | Set automatically to TICKET_ID |
+
+### Disable Tasks API (file-only mode)
+
+```bash
+SDD_TASKS_API_ENABLED=false /sdd:do-all-tasks TICKET_ID
+```
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Review not approved | Run `/sdd:review TICKET_ID` first |
+| No tasks found | Run `/sdd:create-tasks TICKET_ID` first |
+| Parallel mode slower | Normal for small/linear tickets; use sequential |
+| Tasks API unavailable | Automatic fallback to file-only mode |
+| Parallel execution error | Automatic fallback to sequential mode |
+
+### See Also
+
+- `/sdd:do-task` - Execute single task
+- `/sdd:tasks-status` - Check task completion status
+- `/sdd:create-tasks` - Generate tasks from plan
+- [SKILL.md](../skills/project-workflow/SKILL.md) - Full documentation
+- [delegation-patterns.md](../skills/project-workflow/references/delegation-patterns.md) - Parallel execution details

@@ -643,3 +643,61 @@ If any phase fails:
 - DO NOT skip verification
 - DO NOT implement code yourself
 - DO NOT commit without verification
+
+---
+
+## Help / Quick Reference
+
+### Usage
+
+```bash
+/sdd:do-task TASK_ID
+```
+
+**Example:**
+```bash
+/sdd:do-task AUTH.1001
+```
+
+### What This Command Does
+
+1. **Locates the task** - Finds task file by ID pattern
+2. **Checks dependencies** - Blocks if dependent tasks are incomplete
+3. **Delegates implementation** - Spawns specialized or general-purpose subagent
+4. **Runs tests** - unit-test-runner verifies coverage
+5. **Verifies completion** - verify-task agent checks acceptance criteria
+6. **Commits changes** - commit-task creates atomic commit
+
+### Tasks API Integration
+
+When enabled (default), this command:
+- Marks task as `in_progress` in Tasks API (visible in Ctrl+T)
+- Updates status to `completed` when done
+- Syncs completion back to task file checkbox
+
+**Disable Tasks API:**
+```bash
+export SDD_TASKS_API_ENABLED=false
+```
+
+### Feature Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SDD_TASKS_API_ENABLED` | `true` | Enable Tasks API tracking |
+| `CLAUDE_TASK_LIST_ID` | Auto-set | Scopes to ticket (set by /sdd:do-all-tasks) |
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Task not found | Check TASK_ID format (TICKET_ID.NNNN) |
+| Dependency blocked | Complete dependent tasks first |
+| Verification fails | Review acceptance criteria, fix implementation |
+| Tasks API unavailable | Automatic file-only fallback |
+
+### See Also
+
+- `/sdd:do-all-tasks` - Execute all tasks for a ticket
+- `/sdd:tasks-status` - Check task completion status
+- [SKILL.md](../skills/project-workflow/SKILL.md) - Full documentation
