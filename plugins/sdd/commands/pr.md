@@ -360,19 +360,21 @@ echo "Ticket: $TICKET_ID"
 if [[ "$DRAFT_MODE" == "true" ]]; then
   echo "Status: Draft"
 fi
-echo ""
-echo "Next Steps:"
-if [[ "$DRAFT_MODE" == "true" ]]; then
-  echo "  1. Review PR and mark as ready when complete"
-  echo "  2. Request reviews and address feedback"
-  echo "  3. Merge PR when approved"
-  echo "  4. Archive ticket: /sdd:archive $TICKET_ID"
-else
-  echo "  1. Review PR and address any feedback"
-  echo "  2. Merge PR when approved"
-  echo "  3. Archive ticket: /sdd:archive $TICKET_ID"
-fi
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:archive {TICKET_ID}" | Description: "Archive ticket after successful PR"
+- Label: "/sdd:fix-pr-feedback {TICKET_ID}" | Description: "Address PR review feedback"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Next Steps
 
