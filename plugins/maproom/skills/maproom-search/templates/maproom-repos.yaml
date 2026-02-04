@@ -1,0 +1,76 @@
+# Maproom Multi-Repo Configuration
+# Copy this file to your workspace root and customize.
+# Agents read this file to discover available repos and decide which to search.
+#
+# --- Environment Variables ---
+# Set these so paths work across machines:
+#   MAPROOM_REPOS_ROOT  - root directory for code repositories
+#   MAPROOM_SPECS_ROOT  - root directory for spec/design repositories
+#
+# Devcontainer defaults:  MAPROOM_REPOS_ROOT=/workspace/repos
+#                         MAPROOM_SPECS_ROOT=/workspace/_SPECS
+# Laptop examples:        MAPROOM_REPOS_ROOT=~/git
+#                         MAPROOM_SPECS_ROOT=~/_SPECS
+#
+# --- Token Efficiency ---
+# Keep this file under 100 lines. Agents load the entire config into context,
+# so concise descriptions save tokens. Focus descriptions on *what* is in the
+# repo and guidance on *when* to search it.
+#
+# --- Adding a New Repo ---
+# 1. Pick a short key (used with --repo in CLI commands).
+# 2. Set type to "code" (source) or "docs" (specs/design/docs).
+# 3. Set path using ${MAPROOM_REPOS_ROOT} or ${MAPROOM_SPECS_ROOT}.
+# 4. Write a description telling agents what the repo contains.
+# 5. Optionally add search_guidance and default_search_type.
+#    Only type, path, and description are required.
+
+repos:
+  # --- Rich example: source code repository ---
+  crewchief:
+    # type: "code" for source repos, "docs" for spec/design repos
+    type: code
+    # path: use env vars for portability
+    #   resolves to /workspace/repos/crewchief/crewchief (devcontainer)
+    #   or ~/git/crewchief/crewchief (laptop)
+    path: "${MAPROOM_REPOS_ROOT}/crewchief/crewchief"
+    # description: tells agents *what* this repo contains (keep concise)
+    description: >
+      CrewChief CLI source code. TypeScript/Node.js application providing
+      worktree management, maproom indexing, agent spawning, and plugin
+      infrastructure for Claude Code.
+    # search_guidance: tells agents *when* and *how* to search this repo
+    search_guidance: >
+      Search here for: implementation details, function signatures, API
+      interfaces, error handling patterns, configuration parsing logic.
+      Prefer FTS for known function/class names. Use vector-search for
+      conceptual queries like "how does embedding generation work".
+      Use context command to trace call graphs.
+    # default_search_type: auto | fts | vector-search
+    default_search_type: auto
+
+  # --- Rich example: specifications / design docs repository ---
+  crewchief-specs:
+    type: docs
+    # resolves to /workspace/_SPECS/crewchief (devcontainer)
+    # or ~/_SPECS/crewchief (laptop)
+    path: "${MAPROOM_SPECS_ROOT}/crewchief"
+    description: >
+      Design specifications and development history for CrewChief CLI.
+      Contains epic definitions, ticket planning documents, architecture
+      decisions, task breakdowns, analysis reports, and review findings.
+    search_guidance: >
+      Search here for: design rationale, architecture decisions, why
+      features were built a certain way, ticket history, planning context.
+      Prefer vector-search for intent-based queries like "why was the
+      plugin system designed this way". Use FTS for ticket IDs (e.g.,
+      "MPRSKL") or specific document terms.
+    default_search_type: vector-search
+
+  # --- Minimal example (only required fields: type, path, description) ---
+  my-project:
+    type: code
+    path: "${MAPROOM_REPOS_ROOT}/my-project"
+    description: >
+      My project source code. Replace this with a brief summary of what
+      the repo contains so agents know when to search it.

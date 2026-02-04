@@ -152,6 +152,60 @@ crewchief-maproom context --chunk-id <id> --callees
 ```
 _(FTS because configuration keywords are known terms.)_
 
+## Multi-Repo Search
+
+> All workflows above use `--repo <repo>` placeholders. This section explains how to choose which repo to use.
+
+### Choosing the Right Repo
+
+| Question Type | Search In | Why |
+|---|---|---|
+| "How does X work?" | Code repo | Implementation details live in source code |
+| "Why was X built this way?" | Specs repo | Design rationale in planning documents |
+| "What was the plan for X?" | Specs repo | Tickets, epics, and architecture docs |
+| "Where is X implemented?" | Code repo | Function and class locations |
+| "What are the requirements for X?" | Specs repo | Ticket acceptance criteria and epic goals |
+| "What changed in X?" | Code repo | Recent modifications and git history |
+
+### Reading the Config File
+
+The workspace config file `maproom-repos.yaml` (in the workspace root) lists all available repos and their roles. Check it to find repo names and paths:
+```bash
+cat maproom-repos.yaml
+```
+
+A template is available at `./templates/maproom-repos.yaml` for reference.
+
+### No-Config Fallback
+
+If `maproom-repos.yaml` is not found, discover indexed repos directly:
+```bash
+crewchief-maproom status
+```
+This lists all repos that have been scanned and are available for search.
+
+### Cross-Repo Search Workflow
+
+When a question spans both design and implementation, search across repos sequentially.
+
+**Example: Understanding why and how authentication works**
+
+1. Check the specs repo for design rationale:
+```bash
+crewchief-maproom vector-search --repo specs --query "authentication design decisions"
+```
+2. Then check the code repo for implementation:
+```bash
+crewchief-maproom vector-search --repo code --query "authentication login flow"
+```
+3. Expand context on a relevant code result:
+```bash
+crewchief-maproom context --chunk-id <id> --callers --callees
+```
+_(Vector search across repos: specs for "why", code for "how".)_
+
+For detailed multi-repo strategies, cross-repo patterns, and chunk kind information, see [multi-repo-guide.md](./references/multi-repo-guide.md).
+
 ## Troubleshooting
 
 For detailed error recovery steps, see [troubleshooting.md](./references/troubleshooting.md).
