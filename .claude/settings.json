@@ -1,7 +1,9 @@
 {
   "env": {
     "SDD_ROOT_DIR": "/workspace/_SPECS/claude-code-plugins",
-    "MAPROOM_DB_ROOT": "/home/vscode/.maproom/claude-code-plugins/maproom.db"
+    "MAPROOM_DB_ROOT": "/home/vscode/.maproom",
+    "MAPROOM_EMBEDDING_PROVIDER": "google",
+    "GOOGLE_PROJECT_ID": "crewchief-476600"
   },
   "statusLine": {
     "type": "command",
@@ -13,13 +15,41 @@
       "/workspace/_SPECS/claude-code-plugins/"
     ]
   },
+  "extraKnownMarketplaces": {
+    "crewchief": {
+      "source": {
+        "source": "directory",
+        "path": "/workspace/repos/claude-code-plugins/claude-code-plugins"
+      }
+    }
+  },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/workspace/.devcontainer/scripts/maproom-sync start || true"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "ssh -i ~/.ssh/id_ed25519 danielbushman@host.docker.internal 'afplay /Users/danielbushman/git/manifoldlogic/home/.claude/audio/scale-e6-14577.mp3'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '{\"systemMessage\": \"💬 %s\"}' \"$(TZ='America/Denver' date '+%Y-%m-%d %H:%M:%S %Z')\""
           }
         ]
       }
