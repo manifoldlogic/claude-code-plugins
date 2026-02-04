@@ -19,7 +19,7 @@ The Maproom plugin provides semantic code search capabilities powered by the cre
 Before using the Maproom plugin, ensure you have:
 
 1. **crewchief-maproom CLI installed**: The plugin requires the `crewchief-maproom` command-line tool to be available in your system PATH
-2. **Indexed database**: Your codebase must be indexed using `crewchief-maproom index` before searching
+2. **Indexed database**: Your codebase must be scanned using `crewchief-maproom scan` before searching
 3. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
 
 To verify your setup:
@@ -28,7 +28,7 @@ To verify your setup:
 crewchief-maproom --version
 
 # Index your repository
-crewchief-maproom index /path/to/repo
+crewchief-maproom scan
 
 # Verify indexing succeeded
 crewchief-maproom status
@@ -82,7 +82,7 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Problem**: Plugin reports `crewchief-maproom: command not found`
 
 **Solution**:
-- Verify the CLI is installed: `which crewchief-maproom`
+- Verify the CLI is installed: `command -v crewchief-maproom`
 - Ensure it's in your PATH
 - If using a development build, run `pnpm build` in the crewchief repository
 
@@ -90,7 +90,7 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Problem**: Search returns "no repositories indexed" or empty results
 
 **Solution**:
-- Run `crewchief-maproom index /path/to/repo` to index your codebase
+- Run `crewchief-maproom scan` to index your codebase
 - Check indexing status: `crewchief-maproom status`
 - Verify database exists: `ls -la ~/.maproom/maproom.db`
 
@@ -103,13 +103,13 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Check if the repository is actually indexed: `crewchief-maproom status`
 - Verify file types are indexed (use `--file-type` filter if needed)
 - Try different search modes: hybrid (default), fts, or vector
-- For very recent code changes, re-index: `crewchief-maproom index /path/to/repo --force`
+- For very recent code changes, re-index: `crewchief-maproom scan --force`
 
 ### Stale Results
 **Problem**: Search results don't reflect recent code changes
 
 **Solution**:
-- Re-index the repository: `crewchief-maproom index /path/to/repo`
+- Re-index the repository: `crewchief-maproom scan`
 - The daemon auto-refreshes but may need manual reindexing for major changes
 
 ### Performance Issues

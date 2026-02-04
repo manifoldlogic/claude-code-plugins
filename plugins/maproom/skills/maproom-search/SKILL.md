@@ -152,16 +152,24 @@ crewchief-maproom context --chunk-id <id> --callees
 ```
 _(FTS because configuration keywords are known terms.)_
 
-## Configuration & Troubleshooting
-For config, flags, and troubleshooting:
-```bash
-crewchief-maproom --help
-```
+## Troubleshooting
 
-Consult --help when:
-- Binary not found errors
-- Configuration issues
-- First time using a command
+For detailed error recovery steps, see [troubleshooting.md](./references/troubleshooting.md).
+
+**Token limit exceeded** (`input token count is ... but the model supports up to 20000`):
+Re-run with smaller batches: `crewchief-maproom generate-embeddings --embedding-batch-size 25`
+
+**Vector search returns no results** (search completes but returns empty):
+Verify embeddings exist: `crewchief-maproom status` — if missing, run `crewchief-maproom generate-embeddings`
+
+**No repositories indexed** (status shows no repositories):
+Run First-Time Setup above to scan and index your repository.
+
+**Stale results after code changes** (results reference old or deleted code):
+Re-scan the repository: `crewchief-maproom scan`
+
+**Irrelevant results** (results don't match intent):
+Check Choosing Search Type above — FTS for exact terms, vector for concepts. Use 2-3 core terms.
 
 ## Query Tips
 Extract 2-3 terms from questions. See [search-best-practices.md](./references/search-best-practices.md).
