@@ -70,17 +70,87 @@ Requires embeddings (see First-Time Setup step 2).
 
 For query optimization, see [search-best-practices.md](./references/search-best-practices.md).
 
-## Workflow
+## Context Command Reference
 
-### 1. Search
+Explore a chunk's relationships after finding it via search:
 ```bash
-crewchief-maproom search --repo <repo> --query "<query>"
+crewchief-maproom context --chunk-id <id> [flags]
 ```
 
-### 2. Explore Context
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--callers` | Include functions that call this chunk | `--callers` |
+| `--callees` | Include functions called by this chunk | `--callees` |
+| `--max-depth` | Traversal depth (default: 2) | `--max-depth 3` |
+| `--budget` | Token limit for context bundle (default: 6000) | `--budget 4000` |
+
+Flags combine freely: `context --chunk-id <id> --callers --callees --max-depth 3`
+
+## Common Workflows
+
+### Understand a Feature's Implementation
+Find a feature and trace its call relationships (depth-first).
+1. Search by concept:
+```bash
+crewchief-maproom vector-search --repo <repo> --query "authentication login flow"
+```
+2. Expand context around a relevant result:
+```bash
+crewchief-maproom context --chunk-id <id> --callers --callees
+```
+_(Vector search because we know the concept but not exact function names.)_
+
+### Find All Error Handlers
+Locate error handling patterns across the codebase.
+1. Search for error-related terms:
+```bash
+crewchief-maproom search --repo <repo> --query "error exception handler"
+```
+2. Get context with a constrained budget:
+```bash
+crewchief-maproom context --chunk-id <id> --budget 4000
+```
+_(FTS appropriate since "error" and "exception" are known keywords.)_
+
+### Trace Call Chains
+Follow a function's callers up the call stack to find entry points.
+1. Find the function:
+```bash
+crewchief-maproom search --repo <repo> --query "process_payment"
+```
+2. Trace callers with increased depth:
+```bash
+crewchief-maproom context --chunk-id <id> --callers --max-depth 3
+```
+_(FTS used to locate an exact function name.)_
+
+### Onboard to Unfamiliar Code
+Explore iteratively (breadth-first) when you don't know the terminology yet.
+1. Broad concept search:
+```bash
+crewchief-maproom vector-search --repo <repo> --query "data processing pipeline"
+```
+2. Read context on an interesting result:
 ```bash
 crewchief-maproom context --chunk-id <id>
 ```
+3. Refine using terms discovered in step 2:
+```bash
+crewchief-maproom vector-search --repo <repo> --query "transform stage batch worker"
+```
+_(Vector search for exploring concepts when terminology is unknown.)_
+
+### Find Configuration and Settings
+Locate where configuration values are defined and how they're consumed.
+1. Search for config terms:
+```bash
+crewchief-maproom search --repo <repo> --query "config settings env"
+```
+2. See what the config drives:
+```bash
+crewchief-maproom context --chunk-id <id> --callees
+```
+_(FTS because configuration keywords are known terms.)_
 
 ## Configuration & Troubleshooting
 For config, flags, and troubleshooting:
