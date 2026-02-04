@@ -218,12 +218,15 @@ fi
 
 4. **If TaskCreate fails for any task:**
    - Log warning with task ID and error details
+   - Format: `Warning: TaskCreate failed for {task_id}: {error_message}`
    - Continue creating remaining tasks (do not abort)
-   - Count successful vs. failed hydrations
+   - Increment `failure_count` counter
 
 5. **After processing all tasks, report summary:**
-   - Count total tasks created
-   - Report: "Hydrated {N} tasks to Tasks API"
+   - **Before the task processing loop:** Initialize counters: `success_count = 0`, `failure_count = 0`, `total_count = length of task array`
+   - **Within the task processing loop:** Increment `success_count` on successful TaskCreate
+   - **After all tasks processed:** Report: "Hydrated {success_count}/{total_count} tasks to Tasks API"
+   - Note: `success_count + failure_count = total_count`
 
 6. **Verify hydration with TaskList query:**
    After reporting the summary, confirm task creation by querying the Tasks API:
