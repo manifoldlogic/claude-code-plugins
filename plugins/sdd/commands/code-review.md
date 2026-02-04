@@ -266,50 +266,37 @@ Top Issues:
 
 Full report: {TICKET_PATH}/deliverables/code-review-report.md
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NEXT STEPS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{Context-appropriate next steps based on findings:}
-
-{If CRITICAL count > 0:}
-❌ HOLD: Address CRITICAL issues before proceeding
-
-Critical issues must be fixed before merge:
-1. Review each CRITICAL item in the report
-2. Fix security vulnerabilities and data loss risks
-3. Re-run code review after fixes: /sdd:code-review {TICKET_ID}
-
-{Else if HIGH count > 0:}
-⚠️  PROCEED WITH CAUTION: Consider fixing HIGH issues
-
-HIGH priority items should be addressed:
-1. Review HIGH recommendations in the report
-2. Fix critical bugs and performance issues
-3. Future: Use /sdd:extend {TICKET_ID} to create follow-up tasks (planned feature)
-
-When ready:
-- Create PR: /sdd:pr {TICKET_ID}
-
-{Else if MEDIUM count > 5:}
-✅ PROCEED: Ready for PR, defer MEDIUM items to follow-up
-
-Quality improvements identified but not blocking:
-1. Review MEDIUM recommendations for follow-up work
-2. Track improvements in backlog
-
-Create PR:
-- /sdd:pr {TICKET_ID}
-
-{Else:}
-✅ PROCEED: Ready for PR
-
-High-quality implementation, ready for production:
-
-Create PR:
-- /sdd:pr {TICKET_ID}
-
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps based on issue severity:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**If CRITICAL issues found (count > 0):**
+**Options:**
+- Label: "Fix CRITICAL issues before proceeding" | Description: "Address blocking issues first"
+- Label: "/sdd:code-review {TICKET_ID}" | Description: "Re-run code review after fixes"
+
+**If HIGH issues found (count > 0, no CRITICAL issues):**
+**Options:**
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request (HIGH issues documented in PR description)"
+- Label: "/sdd:code-review {TICKET_ID}" | Description: "Re-run after addressing HIGH issues"
+
+**If only MEDIUM or lower severity issues (no HIGH or CRITICAL):**
+**Options:**
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request"
+- Label: "/sdd:archive {TICKET_ID}" | Description: "Archive ticket if no PR needed"
+
+**If clean (no significant issues):**
+**Options:**
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request"
+- Label: "/sdd:archive {TICKET_ID}" | Description: "Archive ticket"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text. Determine which severity path to use based on the CRITICAL, HIGH, and MEDIUM issue counts from the report above.
 
 ## Error Handling
 
