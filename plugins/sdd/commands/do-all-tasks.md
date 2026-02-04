@@ -225,6 +225,16 @@ fi
    - Count total tasks created
    - Report: "Hydrated {N} tasks to Tasks API"
 
+6. **Verify hydration with TaskList query:**
+   After reporting the summary, confirm task creation by querying the Tasks API:
+   - Invoke the TaskList tool (no parameters required)
+   - Count the number of tasks returned
+   - Compare with the expected count (total tasks in JSON array)
+   - If counts match: Log "Verified {N} tasks created in Tasks API"
+   - If counts differ: Log warning "Expected {N} tasks, found {M} tasks in Tasks API"
+   - If TaskList fails: Log warning "Could not verify task creation: {error details}"
+   - Continue workflow regardless of verification outcome (do not abort)
+
 ### JSON Parsing Note
 
 Claude can parse JSON natively without requiring `jq` or other external tools. The `HYDRATION_OUTPUT` variable contains a JSON array - extract each object and access its fields directly.
