@@ -150,6 +150,19 @@ Proceeding with execution...
 
 **DO NOT PROCEED if validation fails. Address all requirements before executing.**
 
+### Execution Strategy Prompt
+
+Before starting task execution, use the **AskUserQuestion** tool to determine execution approach:
+
+**Question:** "How would you like to execute tasks?"
+**Header:** "Strategy"
+**multiSelect:** false
+
+**Options:**
+- Label: "Complete all tasks" | Description: "Run all tasks without stopping (recommended)"
+- Label: "Stop at phase boundaries" | Description: "Pause after each phase for review"
+- Label: "Phase 1 only" | Description: "Execute only Phase 1 tasks"
+
 ---
 
 ## Step 1.5: Tasks API Hydration (Optional)
@@ -458,14 +471,27 @@ Follow-up Tasks Created:
 Git Status:
 {run git status to confirm no uncommitted changes}
 
----
-RECOMMENDED NEXT STEP:
-If all tasks verified:
-  - Code review (recommended): /sdd:code-review {TICKET_ID}
-  - Create PR directly: /sdd:pr {TICKET_ID}
-If tasks have failures: /sdd:do-task {TICKET_ID}.{failed_task_id}
-If review needed: /sdd:review {TICKET_ID}
 ```
+
+### Next Step Prompt
+
+After displaying the final execution report above, use the **AskUserQuestion** tool to present next steps based on task execution results:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**If all tasks verified successfully:**
+**Options:**
+- Label: "/sdd:code-review {TICKET_ID}" | Description: "Run code review before creating PR (recommended)"
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request immediately"
+
+**If some tasks failed or need additional review:**
+**Options:**
+- Label: "/sdd:do-task {FAILED_TASK_ID}" | Description: "Retry first failed task"
+- Label: "/sdd:code-review {TICKET_ID}" | Description: "Proceed to code review despite failures"
+
+Where {TICKET_ID} is the actual ticket ID and {FAILED_TASK_ID} is the actual ID of the first failed task from the execution report.
 
 ### Step 7: Clear Session State on Completion
 
