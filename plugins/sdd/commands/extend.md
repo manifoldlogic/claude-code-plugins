@@ -872,29 +872,41 @@ if [[ ${#FAILED_TASKS[@]} -gt 0 ]]; then
   echo ""
 fi
 
-# Next steps
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "NEXT STEPS"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
+# Next steps - presented via AskUserQuestion after the report
+```
 
-if [[ "$DRY_RUN" = true ]]; then
-  echo "This was a dry run. To create tasks, remove --dry-run flag:"
-  echo "  /sdd:extend $TICKET_ID --from-review"
-elif [[ ${#CREATED_TASKS[@]} -gt 0 ]]; then
-  echo "Execute new tasks:"
-  echo "  /sdd:do-task ${CREATED_TASKS[0]%%:*}"
-  echo ""
-  echo "Or execute all tasks:"
-  echo "  /sdd:do-all-tasks $TICKET_ID"
-fi
+### Next Step Prompt
 
-if [[ ${#FAILED_TASKS[@]} -gt 0 ]]; then
-  echo ""
-  echo "Retry failed tasks:"
-  echo "  Review error messages above"
-  echo "  Fix issues and re-run /sdd:extend"
-fi
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user. The options depend on the run mode:
+
+**If this was a dry run (`DRY_RUN = true`):**
+
+**Question:** "This was a dry run. What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:extend {TICKET_ID} --from-review" | Description: "Re-run without --dry-run to create the tasks"
+- Label: "/sdd:status" | Description: "Check current ticket and task status"
+
+**Else if tasks were successfully created (`CREATED_TASKS > 0`):**
+
+**Question:** "Tasks created. What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:do-task {first_task_id}" | Description: "Execute the first new task"
+- Label: "/sdd:do-all-tasks {TICKET_ID}" | Description: "Execute all tasks for this ticket"
+- Label: "/sdd:status" | Description: "Check current ticket and task status"
+
+Where `{first_task_id}` is the ID of the first created task.
+
+**If there were failed tasks (`FAILED_TASKS > 0`), add this additional option to whichever set above applies:**
+- Label: "/sdd:extend {TICKET_ID}" | Description: "Retry - review errors above and re-run extend"
+
+```bash
+# (report display ends here)
 ```
 
 ## Error Handling

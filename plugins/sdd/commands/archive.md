@@ -674,27 +674,18 @@ RECOMMENDATIONS:
 References Updated: {count} files
 ```
 
-## Next Steps
+### Next Step Prompt
 
-After archiving completed tickets:
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
 
-1. **Check remaining work:**
-   - Run `/sdd:tasks-status` to see other active tickets
-   - Review epic progress if this was part of an epic
-   - Identify next priority ticket
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
 
-2. **Continue epic work (if applicable):**
-   - Run `/sdd:start-epic {EPIC_ID}` to review epic decomposition
-   - Create next tickets with `/sdd:plan-ticket`
-
-3. **Start new work:**
-   - Create new ticket with `/sdd:plan-ticket [description]`
-   - Import from Jira with `/sdd:import-jira-ticket [JIRA_KEY]`
-   - Create new epic with `/sdd:start-epic [description]`
-
-4. **Review metrics:**
-   - Metrics logged to `${SDD_ROOT}/logs/metrics.log`
-   - Track velocity and quality trends over time
+**Options:**
+- Label: "/sdd:plan-ticket" | Description: "Create a new ticket"
+- Label: "/sdd:status" | Description: "Check current status across tickets and epics"
+- Label: "/sdd:start-epic" | Description: "Start working on an epic"
 
 ## Archive Criteria
 
