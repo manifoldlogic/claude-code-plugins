@@ -11,8 +11,22 @@ The Maproom plugin provides semantic code search capabilities powered by the cre
 - **Hybrid Search**: Combines FTS and vector search for optimal relevance ranking
 - **Context Expansion**: Automatically retrieve related code including imports, callers, callees, and tests
 - **Graph Relationships**: Navigate code relationships through call graphs and dependency analysis
-- **Multi-Repository Support**: Search across multiple repositories and worktrees simultaneously
+- **Multi-Repository Support**: Configuration template and agent guidance for searching across code and documentation repositories with repo-specific search strategies
 - **Language Aware**: Leverages tree-sitter for syntax-aware indexing and search
+
+## Multi-Repo Setup
+
+Search across multiple repositories by configuring repo-specific search strategies and agent guidance.
+
+1. Copy the configuration template to your workspace root:
+   ```bash
+   cp plugins/maproom/skills/maproom-search/templates/maproom-repos.yaml ./maproom-repos.yaml
+   ```
+2. Customize repo entries for your workspace (paths, descriptions, search guidance)
+3. Set environment variables for path portability (`MAPROOM_REPOS_ROOT`, `MAPROOM_SPECS_ROOT`)
+4. Index each repo with `crewchief-maproom scan`
+
+See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) for detailed setup instructions, search strategies by repo type, and cross-repo search patterns.
 
 ## Prerequisites
 
