@@ -156,6 +156,16 @@ Proceeding with execution...
 
 **This step enables real-time progress tracking via Claude Code's Tasks API (Ctrl+T view).**
 
+### Performance Note
+
+Hydration timing scales linearly with task count (~500ms per task):
+
+- **Small tickets (10 tasks):** ~5 seconds
+- **Medium tickets (50 tasks):** ~25 seconds
+- **Large tickets (100+ tasks):** 1-2 minutes
+
+The process will show progress for each task created. This is normal behavior—do not interrupt.
+
 ### Feature Flag Check
 
 If `SDD_TASKS_API_ENABLED` is explicitly set to `'false'`, skip all Tasks API operations and proceed directly to the workflow.
