@@ -42,6 +42,34 @@ crewchief-maproom status
 ```
 FTS search works immediately after scan. Vector search requires embeddings to complete.
 
+## Choosing Search Type
+
+| You Have | Use | Example |
+|----------|-----|---------|
+| Exact function/variable name | `search` | `--query "validate_state_file_schema"` |
+| Known terminology | `search` | `--query "autogate ready block"` |
+| Conceptual question | `vector-search` | `--query "how to pause automated work"` |
+| Exploring unfamiliar code | `vector-search` | `--query "authentication flow"` |
+| Finding code patterns | `search` | `--query "try except json"` |
+
+**Rule of thumb:** Know the words? Use `search`. Know the concept? Use `vector-search`.
+
+### Vector Search Syntax
+```bash
+crewchief-maproom vector-search --repo <repo> --query "<query>"
+```
+Requires embeddings (see First-Time Setup step 2).
+
+### Evidence from Testing
+
+| Query | FTS (`search`) | Vector (`vector-search`) |
+|-------|----------------|--------------------------|
+| `"autogate gate ready"` | Found exact function | Related concepts, less precise |
+| `"mechanism to pause automated work"` | Poor results | Found relevant documentation |
+| `"validate schema json"` | Found exact functions | Found related validation concepts |
+
+For query optimization, see [search-best-practices.md](./references/search-best-practices.md).
+
 ## Workflow
 
 ### 1. Search
