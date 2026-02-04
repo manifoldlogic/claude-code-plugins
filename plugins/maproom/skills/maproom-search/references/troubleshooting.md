@@ -14,14 +14,14 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 **Fix:**
 1. Re-run embedding generation with a smaller batch size:
    ```bash
-   crewchief-maproom generate-embeddings --embedding-batch-size 25
+   crewchief-maproom generate-embeddings --batch-size 25
    ```
 2. Verify embeddings completed:
    ```bash
    crewchief-maproom status
    ```
 
-**Prevention:** Use `--embedding-batch-size 25` when generating embeddings for repositories with large files or code chunks.
+**Prevention:** Use `--batch-size 25` when generating embeddings for repositories with large files or code chunks.
 
 ### Vector Search Returns No Results
 

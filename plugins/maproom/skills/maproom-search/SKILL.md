@@ -157,7 +157,7 @@ _(FTS because configuration keywords are known terms.)_
 For detailed error recovery steps, see [troubleshooting.md](./references/troubleshooting.md).
 
 **Token limit exceeded** (`input token count is ... but the model supports up to 20000`):
-Re-run with smaller batches: `crewchief-maproom generate-embeddings --embedding-batch-size 25`
+Re-run with smaller batches: `crewchief-maproom generate-embeddings --batch-size 25`
 
 **Vector search returns no results** (search completes but returns empty):
 Verify embeddings exist: `crewchief-maproom status` — if missing, run `crewchief-maproom generate-embeddings`
