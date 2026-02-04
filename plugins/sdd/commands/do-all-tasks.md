@@ -184,11 +184,15 @@ if [ "$TASKS_API_ENABLED" = "true" ]; then
   echo "Set CLAUDE_TASK_LIST_ID=${ARGUMENTS}"
 
   # Call hydration module
-  HYDRATION_OUTPUT=$(python ${CLAUDE_PLUGIN_ROOT}/hooks/hydrate-tasks.py "$TICKET_PATH" "${ARGUMENTS}" 2>&1)
+  HYDRATION_OUTPUT=$(timeout 30s python ${CLAUDE_PLUGIN_ROOT}/hooks/hydrate-tasks.py "$TICKET_PATH" "${ARGUMENTS}" 2>&1)
   HYDRATION_STATUS=$?
 
   if [ $HYDRATION_STATUS -eq 0 ]; then
     echo "Hydration script executed successfully"
+    echo ""
+  elif [ $HYDRATION_STATUS -eq 124 ]; then
+    echo "Warning: Tasks API hydration timed out after 30 seconds, continuing in file-only mode"
+    TASKS_API_ENABLED=false
     echo ""
   else
     echo "Warning: Tasks API hydration failed, continuing in file-only mode"
