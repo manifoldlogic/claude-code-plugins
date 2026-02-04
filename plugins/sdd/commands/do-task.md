@@ -665,11 +665,6 @@ Changes:
 - {file2}: {brief description}
 
 Commit: {type}({scope}): {TASK_ID} {message}
-
----
-RECOMMENDED NEXT STEP:
-{If more tasks: Next task in sequence}
-{If ticket complete: /sdd:code-review {TICKET_ID} (recommended) or /sdd:pr {TICKET_ID}}
 ```
 
 ## Failure Handling
