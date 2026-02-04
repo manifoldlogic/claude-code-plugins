@@ -205,8 +205,18 @@ fi
 
 **After running the hydration script successfully:**
 
-1. **Parse the JSON output from HYDRATION_OUTPUT:**
-   The output contains a JSON array of task objects. Parse this array natively (Claude can parse JSON without external tools).
+1. **Validate and parse the JSON output from HYDRATION_OUTPUT:**
+
+   a. **First, validate that HYDRATION_OUTPUT contains well-formed JSON:**
+      - Attempt to parse HYDRATION_OUTPUT as JSON
+      - If parsing fails or the output is not valid JSON:
+        * Log warning: "Warning: Hydration output is not valid JSON, continuing in file-only mode"
+        * Set TASKS_API_ENABLED=false
+        * Skip remaining TaskCreate invocation steps
+        * Continue to the main workflow
+
+   b. **If JSON is valid, parse the array:**
+      The output contains a JSON array of task objects. Parse this array natively (Claude can parse JSON without external tools).
 
 2. **For each task object in the JSON array, invoke the TaskCreate tool:**
    - Call TaskCreate with parameter `subject` set to the task object's `subject` field
