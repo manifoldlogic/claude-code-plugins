@@ -218,6 +218,13 @@ fi
    b. **If JSON is valid, parse the array:**
       The output contains a JSON array of task objects. Parse this array natively (Claude can parse JSON without external tools).
 
+   c. **Check task count and apply limit:**
+      - Count the total number of tasks in the JSON array
+      - If count exceeds 500:
+        * Log warning: "Warning: Ticket has {count} tasks (limit: 500). Hydrating first 500 only."
+        * Truncate the JSON array to the first 500 elements
+      - If count is 500 or less, proceed with full array (no warning needed)
+
 2. **For each task object in the JSON array, invoke the TaskCreate tool:**
    - Call TaskCreate with parameter `subject` set to the task object's `subject` field
    - Set `description` to the task object's `description` field
