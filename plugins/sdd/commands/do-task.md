@@ -163,13 +163,13 @@ fi
    ```
 
 3. **Set task status to 'in_progress':**
-   - Call TaskUpdate to mark work has begun:
-   ```
-   TaskUpdate:
-     taskId: "{ARGUMENTS}"
-     status: "in_progress"
-   ```
-   - This enables Ctrl+T real-time visibility showing the task is active
+
+   Before beginning implementation, **invoke the TaskUpdate tool** to mark the task as active:
+   - Call TaskUpdate with parameter `taskId` set to "{ARGUMENTS}" (the task ID from command arguments, e.g., "TICKET.1001")
+   - Set `status` to "in_progress"
+   - Optionally set `activeForm` to "Implementing {task title}" (extracted from task file Summary)
+
+   This makes the task visible in Ctrl+T as actively being worked on, enabling real-time progress tracking.
 
 **Error Handling with Retry Logic:**
 
@@ -587,13 +587,12 @@ If `TASKS_API_ACTIVE` was set to `false` in Step 1.6 (due to API unavailability)
 **Tasks API Completion Flow:**
 
 1. **Update task status to 'completed' in Tasks API:**
-   ```
-   TaskUpdate:
-     taskId: "{ARGUMENTS}"
-     status: "completed"
-   ```
-   - This updates Ctrl+T view to show task completion
-   - Unblocks any dependent tasks waiting on this one
+
+   After successful commit, **invoke the TaskUpdate tool** to mark the task complete:
+   - Call TaskUpdate with parameter `taskId` set to "{ARGUMENTS}" (the task ID from command arguments)
+   - Set `status` to "completed"
+
+   This updates the Ctrl+T view to show task completion and unblocks any dependent tasks waiting on this one.
 
 2. **Sync completion to task file (bidirectional sync):**
    - Call sync-task-status.sh with retry logic to update the file checkbox:

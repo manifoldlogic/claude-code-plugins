@@ -156,6 +156,16 @@ Proceeding with execution...
 
 **This step enables real-time progress tracking via Claude Code's Tasks API (Ctrl+T view).**
 
+### Performance Note
+
+Hydration timing scales linearly with task count (~500ms per task):
+
+- **Small tickets (10 tasks):** ~5 seconds
+- **Medium tickets (50 tasks):** ~25 seconds
+- **Large tickets (100+ tasks):** 1-2 minutes
+
+The process will show progress for each task created. This is normal behavior—do not interrupt.
+
 ### Feature Flag Check
 
 If `SDD_TASKS_API_ENABLED` is explicitly set to `'false'`, skip all Tasks API operations and proceed directly to the workflow.
@@ -184,13 +194,15 @@ if [ "$TASKS_API_ENABLED" = "true" ]; then
   echo "Set CLAUDE_TASK_LIST_ID=${ARGUMENTS}"
 
   # Call hydration module
-  HYDRATION_OUTPUT=$(python ${CLAUDE_PLUGIN_ROOT}/hooks/hydrate-tasks.py "$TICKET_PATH" "${ARGUMENTS}" 2>&1)
+  HYDRATION_OUTPUT=$(timeout 30s python ${CLAUDE_PLUGIN_ROOT}/hooks/hydrate-tasks.py "$TICKET_PATH" "${ARGUMENTS}" 2>&1)
   HYDRATION_STATUS=$?
 
   if [ $HYDRATION_STATUS -eq 0 ]; then
-    # Extract task count from hydration output
-    HYDRATED_COUNT=$(echo "$HYDRATION_OUTPUT" | grep -oE 'Hydrated [0-9]+ tasks' | grep -oE '[0-9]+' || echo "0")
-    echo "Hydrated $HYDRATED_COUNT tasks to Tasks API"
+    echo "Hydration script executed successfully"
+    echo ""
+  elif [ $HYDRATION_STATUS -eq 124 ]; then
+    echo "Warning: Tasks API hydration timed out after 30 seconds, continuing in file-only mode"
+    TASKS_API_ENABLED=false
     echo ""
   else
     echo "Warning: Tasks API hydration failed, continuing in file-only mode"
@@ -201,22 +213,87 @@ if [ "$TASKS_API_ENABLED" = "true" ]; then
 fi
 ```
 
-### Hydration Summary Output
+**After running the hydration script successfully:**
 
-```
-=== TASKS API HYDRATION ===
-Set CLAUDE_TASK_LIST_ID={TICKET_ID}
-Hydrated {N} tasks to Tasks API
+1. **Validate and parse the JSON output from HYDRATION_OUTPUT:**
 
-{If hydration failed:}
-Warning: Tasks API hydration failed, continuing in file-only mode
-```
+   a. **First, validate that HYDRATION_OUTPUT contains well-formed JSON:**
+      - Attempt to parse HYDRATION_OUTPUT as JSON
+      - If parsing fails or the output is not valid JSON:
+        * Log warning: "Warning: Hydration output is not valid JSON, continuing in file-only mode"
+        * Set TASKS_API_ENABLED=false
+        * Skip remaining TaskCreate invocation steps
+        * Continue to the main workflow
+
+   b. **If JSON is valid, parse the array:**
+      The output contains a JSON array of task objects. Parse this array natively (Claude can parse JSON without external tools).
+
+   c. **Check task count and apply limit:**
+      - Count the total number of tasks in the JSON array
+      - If count exceeds 500:
+        * Log warning: "Warning: Ticket has {count} tasks (limit: 500). Hydrating first 500 only."
+        * Truncate the JSON array to the first 500 elements
+      - If count is 500 or less, proceed with full array (no warning needed)
+
+2. **Query existing tasks from Tasks API:**
+   - Invoke the TaskList tool to get all current tasks
+   - Extract the `metadata` field from each task in the results
+   - Look for the `task_id` field within metadata to identify existing tasks
+   - Build a set of existing task IDs for comparison
+   - If TaskList fails: Log warning "Warning: TaskList query failed, unable to check for duplicates" and proceed with creating all tasks (no skip logic)
+
+3. **For each task object in the JSON array, check and create tasks:**
+   - Check if this task's `task_id` is in the existing tasks set
+   - If task already exists:
+     * Log: "Task {task_id} already exists, skipping"
+     * Increment `skipped_count` counter
+     * Continue to next task (do not invoke TaskCreate)
+   - If task does not exist:
+     * Log: "Creating task {task_id}"
+     * Call TaskCreate with parameter `subject` set to the task object's `subject` field
+     * Set `description` to the task object's `description` field
+     * Set `status` to the task object's `status` field ("pending" or "completed")
+     * Set `activeForm` to the task object's `activeForm` field
+     * Include `metadata` object with the task's `file_path`, `phase`, `source`, and `task_id` fields
+     * Increment `new_count` counter
+
+4. **For tasks with dependencies (non-empty blockedBy array):**
+   After creating the task, invoke TaskUpdate to set dependencies:
+   - Call TaskUpdate with parameter `taskId` set to the task's `task_id`
+   - Set `addBlockedBy` to the task's `blockedBy` array
+
+5. **If TaskCreate fails for any task:**
+   - Log warning with task ID and error details
+   - Format: `Warning: TaskCreate failed for {task_id}: {error_message}`
+   - Continue creating remaining tasks (do not abort)
+   - Increment `failure_count` counter
+
+6. **After processing all tasks, report summary:**
+   - **Before the task processing loop:** Initialize counters: `new_count = 0`, `skipped_count = 0`, `failure_count = 0`, `total_count = length of task array`
+   - **Within the task processing loop:** Increment appropriate counter based on outcome
+   - **After all tasks processed:** Report: "Created {new_count} new tasks, skipped {skipped_count} existing tasks"
+   - If any failures: Also report: "Failed to create {failure_count} tasks"
+
+7. **Verify hydration with TaskList query:**
+   After reporting the summary, confirm task creation by querying the Tasks API:
+   - Invoke the TaskList tool (no parameters required)
+   - Count the number of tasks returned
+   - Compare with the expected count (total tasks in JSON array)
+   - If counts match: Log "Verified {N} tasks created in Tasks API"
+   - If counts differ: Log warning "Expected {N} tasks, found {M} tasks in Tasks API"
+   - If TaskList fails: Log warning "Could not verify task creation: {error details}"
+   - Continue workflow regardless of verification outcome (do not abort)
+
+### JSON Parsing Note
+
+Claude can parse JSON natively without requiring `jq` or other external tools. The `HYDRATION_OUTPUT` variable contains a JSON array - extract each object and access its fields directly.
 
 ### Graceful Degradation
 
 | Error | Behavior |
 |-------|----------|
 | Hydration script fails | Log warning, continue with file-only mode |
+| TaskCreate fails for task | Log warning, continue with remaining tasks |
 | Tasks API unavailable | Skip API operations, proceed with existing workflow |
 | Feature flag disabled | Skip hydration entirely, use file-only mode |
 
