@@ -5,10 +5,6 @@
     "MAPROOM_EMBEDDING_PROVIDER": "google",
     "GOOGLE_PROJECT_ID": "crewchief-476600"
   },
-  "statusLine": {
-    "type": "command",
-    "command": "jq -r '.cwd'"
-  },
   "permissions": {
     "defaultMode": "bypassPermissions",
     "additionalDirectories": [
