@@ -96,10 +96,21 @@ Files Updated:
 New Document:
 - {TICKET_PATH}/planning/agent-assignments.md
 
----
-RECOMMENDED NEXT STEP: /sdd:do-all-tasks {TICKET_ID}
-Begin work now that agents are assigned.
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:do-all-tasks {TICKET_ID}" | Description: "Execute all tasks with assigned agents"
+- Label: "/sdd:review {TICKET_ID}" | Description: "Review ticket before executing"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Key Constraints
 

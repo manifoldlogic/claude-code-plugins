@@ -99,10 +99,21 @@ Ticket: {TICKET_ID}_{name}
 
 Document: {TICKET_PATH}/planning/agent-recommendations.md
 
----
-RECOMMENDED NEXT STEP: Create custom agents from agent-recommendations.md
-Review recommendations, then use /agents UI to create each agent, or run /sdd:assign-agents {TICKET_ID} after creation.
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:assign-agents {TICKET_ID}" | Description: "Assign recommended agents to tasks"
+- Label: "/sdd:do-all-tasks {TICKET_ID}" | Description: "Execute without custom agents"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Key Constraints
 
