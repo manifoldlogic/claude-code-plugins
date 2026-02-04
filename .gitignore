@@ -1,3 +1,4 @@
 *.pyc
 
+.crewchief-meta.json
 .crewchief/runs/.crewchief-meta.json
