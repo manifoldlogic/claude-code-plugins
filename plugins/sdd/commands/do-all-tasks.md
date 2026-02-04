@@ -225,31 +225,46 @@ fi
         * Truncate the JSON array to the first 500 elements
       - If count is 500 or less, proceed with full array (no warning needed)
 
-2. **For each task object in the JSON array, invoke the TaskCreate tool:**
-   - Call TaskCreate with parameter `subject` set to the task object's `subject` field
-   - Set `description` to the task object's `description` field
-   - Set `status` to the task object's `status` field ("pending" or "completed")
-   - Set `activeForm` to the task object's `activeForm` field
-   - Include `metadata` object with the task's `file_path`, `phase`, and `source` fields
+2. **Query existing tasks from Tasks API:**
+   - Invoke the TaskList tool to get all current tasks
+   - Extract the `metadata` field from each task in the results
+   - Look for the `task_id` field within metadata to identify existing tasks
+   - Build a set of existing task IDs for comparison
+   - If TaskList fails: Log warning "Warning: TaskList query failed, unable to check for duplicates" and proceed with creating all tasks (no skip logic)
 
-3. **For tasks with dependencies (non-empty blockedBy array):**
+3. **For each task object in the JSON array, check and create tasks:**
+   - Check if this task's `task_id` is in the existing tasks set
+   - If task already exists:
+     * Log: "Task {task_id} already exists, skipping"
+     * Increment `skipped_count` counter
+     * Continue to next task (do not invoke TaskCreate)
+   - If task does not exist:
+     * Log: "Creating task {task_id}"
+     * Call TaskCreate with parameter `subject` set to the task object's `subject` field
+     * Set `description` to the task object's `description` field
+     * Set `status` to the task object's `status` field ("pending" or "completed")
+     * Set `activeForm` to the task object's `activeForm` field
+     * Include `metadata` object with the task's `file_path`, `phase`, `source`, and `task_id` fields
+     * Increment `new_count` counter
+
+4. **For tasks with dependencies (non-empty blockedBy array):**
    After creating the task, invoke TaskUpdate to set dependencies:
    - Call TaskUpdate with parameter `taskId` set to the task's `task_id`
    - Set `addBlockedBy` to the task's `blockedBy` array
 
-4. **If TaskCreate fails for any task:**
+5. **If TaskCreate fails for any task:**
    - Log warning with task ID and error details
    - Format: `Warning: TaskCreate failed for {task_id}: {error_message}`
    - Continue creating remaining tasks (do not abort)
    - Increment `failure_count` counter
 
-5. **After processing all tasks, report summary:**
-   - **Before the task processing loop:** Initialize counters: `success_count = 0`, `failure_count = 0`, `total_count = length of task array`
-   - **Within the task processing loop:** Increment `success_count` on successful TaskCreate
-   - **After all tasks processed:** Report: "Hydrated {success_count}/{total_count} tasks to Tasks API"
-   - Note: `success_count + failure_count = total_count`
+6. **After processing all tasks, report summary:**
+   - **Before the task processing loop:** Initialize counters: `new_count = 0`, `skipped_count = 0`, `failure_count = 0`, `total_count = length of task array`
+   - **Within the task processing loop:** Increment appropriate counter based on outcome
+   - **After all tasks processed:** Report: "Created {new_count} new tasks, skipped {skipped_count} existing tasks"
+   - If any failures: Also report: "Failed to create {failure_count} tasks"
 
-6. **Verify hydration with TaskList query:**
+7. **Verify hydration with TaskList query:**
    After reporting the summary, confirm task creation by querying the Tasks API:
    - Invoke the TaskList tool (no parameters required)
    - Count the number of tasks returned
