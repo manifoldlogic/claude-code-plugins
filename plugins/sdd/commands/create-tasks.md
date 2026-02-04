@@ -335,12 +335,21 @@ Total: {total_count} tasks
 
 Task Index: {ticket_path}/tasks/{TICKET_ID}_TASK_INDEX.md
 
----
-RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
-Verify task quality before execution.
-
-After review passes: /sdd:do-all-tasks {TICKET_ID}
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:review {TICKET_ID}" | Description: "Verify task quality before execution"
+- Label: "/sdd:do-all-tasks {TICKET_ID}" | Description: "Execute all tasks immediately"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Error Recovery
 
