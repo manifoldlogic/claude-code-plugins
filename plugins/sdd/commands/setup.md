@@ -108,32 +108,17 @@ Overall Status: [READY | NEEDS INITIALIZATION]
 Run: /sdd:setup force
 ```
 
-## Next Steps
+### Next Step Prompt
 
-After verifying SDD environment is ready:
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
 
-1. **Check existing work:**
-   - Run `/sdd:tasks-status` to see active tickets and epics
-   - Review what's already in progress
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
 
-2. **Start new work:**
-   - **Create an epic** (for large multi-ticket initiatives or research):
-     - `/sdd:start-epic "Epic name or description"`
-     - Use epics when scope is uncertain or spans multiple tickets
-
-   - **Create a ticket** (for standalone features or well-defined work):
-     - `/sdd:plan-ticket "Ticket description"`
-     - Use tickets for focused, deliverable work
-
-   - **Import from Jira** (if using Jira for tracking):
-     - `/sdd:import-jira-ticket JIRA-KEY`
-     - Imports ticket metadata and description
-
-3. **When to re-run setup:**
-   - After SDD plugin updates (to verify structure still valid)
-   - When reference templates are updated
-   - If you suspect directory structure corruption
-   - Setup is safe to run multiple times (idempotent)
+**Options:**
+- Label: "/sdd:plan-ticket" | Description: "Create your first ticket"
+- Label: "/sdd:start-epic" | Description: "Start with an epic for research and discovery"
 
 ## Decision Points
 

@@ -515,10 +515,21 @@ Import Details:
 - Derived identifiers: TICKET_ID={TICKET_ID}, name={name}
 - Task IDs will be: {TICKET_ID}.1001, {TICKET_ID}.2001, etc.
 
----
-RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
-Verify imported planning quality before proceeding.
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:review {TICKET_ID}" | Description: "Review imported plan quality"
+- Label: "/sdd:create-tasks {TICKET_ID}" | Description: "Skip review and create tasks directly"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Key Constraints
 

@@ -800,18 +800,21 @@ if [[ -n "$TICKET_ID" ]]; then
   echo ""
 fi
 
-echo "Next Steps:"
-if [[ $simple_count -gt 0 ]]; then
-  echo "  ✓ Address ${simple_count} SIMPLE comment(s) in current session"
-fi
-if [[ $complex_count -gt 0 ]]; then
-  echo "  ✓ Review ${complex_count} COMPLEX comment(s) and create follow-up tasks"
-fi
-if [[ -n "$TICKET_ID" ]]; then
-  echo "  ✓ Review complete analysis in deliverables/pr-comments-analysis.md"
-fi
-echo ""
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:fix-pr-feedback {TICKET_ID}" | Description: "Address PR review comments"
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Check PR status after updates"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Error Handling Summary
 

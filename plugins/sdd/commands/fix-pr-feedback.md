@@ -302,6 +302,20 @@ git push
 {pr_url}
 ```
 
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Check PR status after fixes"
+- Label: "/sdd:code-review {TICKET_ID}" | Description: "Verify fixes with code review"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
+
 ## Issue Type Decision Tree
 
 ```

@@ -146,10 +146,21 @@ Documents Updated: {count}
 
 Full update log: {ticket_path}/planning/review-updates.md
 
----
-RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
-Verify update quality before proceeding.
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:review {TICKET_ID}" | Description: "Verify updates addressed review findings"
+- Label: "/sdd:create-tasks {TICKET_ID}" | Description: "Create tasks if planning is ready"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 **If tasks exist:**
 ```
@@ -187,10 +198,21 @@ Tasks Updated: {count}/{total}
 
 Full update log: {ticket_path}/planning/review-updates.md
 
----
-RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
-Verify update quality before proceeding.
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:review {TICKET_ID}" | Description: "Verify updates addressed review findings"
+- Label: "/sdd:create-tasks {TICKET_ID}" | Description: "Create tasks if planning is ready"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## Example Usage
 

@@ -130,13 +130,21 @@ ${SDD_ROOT_DIR}/epics/{FOLDER_NAME}/
 └── backlog.md
 
 Status: {Scaffolded | Scaffolded and filled}
-
-Next Steps:
-1. Add reference materials to reference/
-2. {Complete analysis documents | Review filled documents}
-3. Run decomposition to identify tickets
-4. Use /sdd:plan-ticket for each identified ticket
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:plan-ticket" | Description: "Create the first ticket from this epic's plan"
+- Label: "/sdd:status" | Description: "Check epic and ticket status"
+
+Where the plan-ticket option should reference the epic ID if available in the command context.
 
 ## Decision Points
 

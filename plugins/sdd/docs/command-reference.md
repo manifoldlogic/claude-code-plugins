@@ -136,9 +136,8 @@ Created structure:
     ├── analysis/
     └── tickets/
 
----
-RECOMMENDED NEXT STEP: /sdd:plan-ticket {TICKET_ID} {name}
-Research and analyze findings, then create tickets from epic discoveries
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:plan-ticket {TICKET_ID} {name}, or other actions
 ```
 
 **Related Commands**:
@@ -194,9 +193,8 @@ Created structure:
     │   └── analysis.md
     └── tasks/
 
----
-RECOMMENDED NEXT STEP: /sdd:review AUTH
-Complete planning documents (plan.md, architecture.md), then run review
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:review AUTH, /sdd:tasks-status AUTH, ...
 ```
 
 **Common Errors**:
@@ -269,9 +267,8 @@ Ticket scaffolded: UIT-3670_implement-user-profile-caching
 
 Planning documents pre-populated from Jira content.
 
----
-RECOMMENDED NEXT STEP: /sdd:review UIT-3670
-Review and enhance auto-populated planning, then run ticket review
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:review UIT-3670, /sdd:tasks-status UIT-3670, ...
 ```
 
 **Common Errors**:
@@ -337,9 +334,8 @@ Risk Assessment:
 
 Decision: PASS - Ready for decomposition
 
----
-RECOMMENDED NEXT STEP: /sdd:create-tasks AUTH
-Ticket planning is complete and approved for task decomposition
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:create-tasks AUTH, /sdd:update AUTH, ...
 ```
 
 **Expected Output (FAIL)**:
@@ -410,9 +406,8 @@ Issues Addressed:
 ✓ Added integration points section
 ✓ Clarified API design
 
----
-RECOMMENDED NEXT STEP: /sdd:review AUTH
-Re-run review to verify all issues have been addressed
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:review AUTH, /sdd:tasks-status AUTH, ...
 ```
 
 **Related Commands**:
@@ -471,9 +466,8 @@ Tasks created:
 
 4 tasks created in 2 phases
 
----
-RECOMMENDED NEXT STEP: /sdd:do-all-tasks AUTH
-Execute all tasks systematically through the full workflow
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:do-all-tasks AUTH, /sdd:review AUTH, ...
 ```
 
 **Common Errors**:
@@ -631,9 +625,8 @@ Running commit-task...
 
 TASK COMPLETE: AUTH.1001
 
----
-RECOMMENDED NEXT STEP: /sdd:do-task AUTH.1002
-Continue with next task in sequence (or use /sdd:do-all-tasks AUTH)
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:do-task AUTH.1002, /sdd:tasks-status AUTH, ...
 ```
 
 **Common Errors**:
@@ -703,9 +696,8 @@ Recommended Agents:
 
 Recommendation saved to: planning/agent-recommendations.md
 
----
-RECOMMENDED NEXT STEP: /sdd:assign-agents AUTH
-Create recommended agents, then assign them to ticket tasks
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:assign-agents AUTH, /sdd:tasks-status AUTH, ...
 ```
 
 **Related Commands**:
@@ -792,7 +784,7 @@ Task files updated with agent assignments.
 3. Generates PR title and description using template
 4. Creates PR via GitHub CLI
 5. Logs PR creation event
-6. Reports PR URL and next steps
+6. Reports PR URL and presents interactive prompt with next steps
 
 **Prerequisites**:
 - GitHub CLI (gh) installed and authenticated
@@ -838,9 +830,8 @@ PR: https://github.com/org/repo/pull/123
 Title: [AUTH] Implement user authentication OAuth
 Ticket: AUTH
 
----
-RECOMMENDED NEXT STEP: /sdd:archive AUTH
-After PR is merged, archive the completed ticket
+Interactive prompt: "What would you like to do next?"
+Options: /sdd:archive AUTH, /sdd:tasks-status AUTH, ...
 ```
 
 **Common Errors**:

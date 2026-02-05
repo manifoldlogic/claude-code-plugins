@@ -146,10 +146,22 @@ Planning Summary:
 - Solution: {one-line from architecture}
 - Phases: {count} phases planned
 
----
-RECOMMENDED NEXT STEP: /sdd:review {TICKET_ID}
-Verify planning quality before proceeding.
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**Options:**
+- Label: "/sdd:review {TICKET_ID}" | Description: "Verify planning quality before creating tasks"
+- Label: "/sdd:create-tasks {TICKET_ID}" | Description: "Skip review and create tasks directly"
+- Label: "/sdd:status" | Description: "Check current ticket and task status"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context (e.g., "APIV2", "AUTH"), NOT the literal placeholder text.
 
 ## Example Usage
 

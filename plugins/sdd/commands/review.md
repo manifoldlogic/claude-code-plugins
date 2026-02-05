@@ -120,11 +120,27 @@ Top Actions Before Proceeding:
 
 Full review: {ticket_path}/planning/ticket-review.md
 
----
-RECOMMENDED NEXT STEP:
-If Ready/Proceed: /sdd:create-tasks {TICKET_ID}
-If Needs Work: /sdd:update {TICKET_ID} - address findings first
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user based on review outcome:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**If review status is Ready/Proceed:**
+**Options:**
+- Label: "/sdd:create-tasks {TICKET_ID}" | Description: "Generate tasks from the approved plan"
+- Label: "/sdd:review {TICKET_ID}" | Description: "Run another review iteration"
+
+**If review status is Needs Work/Not Ready:**
+**Options:**
+- Label: "/sdd:update {TICKET_ID}" | Description: "Address review findings and update planning docs"
+- Label: "/sdd:review {TICKET_ID}" | Description: "Run another review with different focus"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 **If tasks exist:**
 ```
@@ -171,11 +187,27 @@ Top Actions:
 
 Full review: {ticket_path}/planning/ticket-review.md
 
----
-RECOMMENDED NEXT STEP:
-If Ready: /sdd:do-all-tasks {TICKET_ID}
-If Needs Work: /sdd:update {TICKET_ID} - address findings first
 ```
+
+### Next Step Prompt
+
+After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user based on review outcome:
+
+**Question:** "What would you like to do next?"
+**Header:** "Next step"
+**multiSelect:** false
+
+**If review status is Ready/Proceed:**
+**Options:**
+- Label: "/sdd:do-all-tasks {TICKET_ID}" | Description: "Execute all tasks systematically"
+- Label: "/sdd:review {TICKET_ID}" | Description: "Run another review iteration"
+
+**If review status is Needs Work/Not Ready:**
+**Options:**
+- Label: "/sdd:update {TICKET_ID}" | Description: "Address review findings"
+- Label: "/sdd:review {TICKET_ID}" | Description: "Run another review"
+
+Where {TICKET_ID} is the actual ticket ID from the command execution context, NOT the literal placeholder text.
 
 ## When to Re-run Review
 
