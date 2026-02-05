@@ -36,6 +36,11 @@ To regenerate embeddings separately (e.g., after model changes):
 crewchief-maproom generate-embeddings
 ```
 
+**Always run embedding generation in the background** — it makes API calls per chunk and can take minutes for large repos. Use the Bash tool's `run_in_background` parameter or `nohup`:
+```bash
+nohup crewchief-maproom generate-embeddings > /tmp/maproom-embeddings.log 2>&1 &
+```
+
 ### 3. Verify
 ```bash
 crewchief-maproom status
