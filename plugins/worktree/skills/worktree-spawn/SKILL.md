@@ -5,7 +5,7 @@ description: Orchestration script for spawning git worktrees in devcontainer env
 
 # Worktree Spawn Skill
 
-**Last Updated:** 2025-12-23
+**Last Updated:** 2026-02-07
 **Script Source:** `/workspace/.devcontainer/scripts/spawn-worktree.sh`
 
 ## Overview
@@ -25,6 +25,10 @@ Unlike the basic `ccwt` command which only creates worktrees, spawn-worktree.sh 
 - VS Code workspace files for editor integration
 
 The script automatically detects whether it's running on the host or inside the container and adjusts its execution strategy accordingly.
+
+**Tab Naming Convention**: Tabs are named using the format `"<repo> <worktree>"` (e.g., `"crewchief MAPR-0001"`). This provides clear context when working with multiple repositories.
+
+**Breaking Change**: Prior versions used the format `"worktree: <name>"`. If you have external scripts that match tab names, update your patterns to use the new `"<repo> <worktree>"` format.
 
 ## Decision Tree
 
@@ -151,62 +155,64 @@ All environment variables can be overridden by CLI flags (flags take precedence)
 ### 1. Basic Usage - Create worktree with all defaults
 
 ```bash
-spawn-worktree.sh feature-auth --repo myproject
+spawn-worktree.sh feature-auth --repo crewchief
 ```
 
 **Output:**
 ```
-[INFO] Creating worktree 'feature-auth' for repository 'myproject' from branch 'main'...
-[OK] Worktree created: /workspace/repos/myproject/feature-auth
-[INFO] Opening iTerm tab for worktree...
+[INFO] Creating worktree 'feature-auth' for repository 'crewchief' from branch 'main'...
+[OK] Worktree created: /workspace/repos/crewchief/feature-auth
+[INFO] Opening iTerm tab 'crewchief feature-auth' for worktree...
 [OK] iTerm tab opened
 [INFO] Adding worktree to VS Code workspace...
 [OK] Workspace updated
 ```
 
-**Use case:** Standard workflow for starting new feature development. Creates the worktree from main branch, opens it in iTerm2 with default profile, and adds it to your workspace file for easy navigation in VS Code.
+**Use case:** Standard workflow for starting new feature development. Creates the worktree from main branch, opens it in an iTerm2 tab named `"crewchief feature-auth"`, and adds it to your workspace file for easy navigation in VS Code.
 
 ### 2. Custom Options - Custom base branch and iTerm profile
 
 ```bash
-spawn-worktree.sh bugfix-login --repo myproject -b develop -p Development
+spawn-worktree.sh bugfix-login --repo crewchief -b develop -p Development
 ```
 
 **Output:**
 ```
-[INFO] Creating worktree 'bugfix-login' for repository 'myproject' from branch 'develop'...
-[OK] Worktree created: /workspace/repos/myproject/bugfix-login
-[INFO] Opening iTerm tab for worktree...
+[INFO] Creating worktree 'bugfix-login' for repository 'crewchief' from branch 'develop'...
+[OK] Worktree created: /workspace/repos/crewchief/bugfix-login
+[INFO] Opening iTerm tab 'crewchief bugfix-login' for worktree...
 [OK] iTerm tab opened
 ```
 
-**Use case:** Working on a bugfix that needs to branch from develop instead of main, using a custom iTerm2 profile (e.g., "Development") that might have different colors or settings to visually distinguish development work.
+**Use case:** Working on a bugfix that needs to branch from develop instead of main, using a custom iTerm2 profile (e.g., "Development") that might have different colors or settings to visually distinguish development work. The iTerm tab will be named `"crewchief bugfix-login"`.
 
 ### 3. Custom Display Name - Different display name in workspace
 
 ```bash
-spawn-worktree.sh feat-user-auth-system --repo myproject -n "Feature: User Authentication"
+spawn-worktree.sh feat-user-auth-system --repo claude-code-plugins -n "Feature: User Authentication"
 ```
 
 **Output:**
 ```
-[INFO] Creating worktree 'feat-user-auth-system' for repository 'myproject'...
-[OK] Worktree created: /workspace/repos/myproject/feat-user-auth-system
+[INFO] Creating worktree 'feat-user-auth-system' for repository 'claude-code-plugins'...
+[OK] Worktree created: /workspace/repos/claude-code-plugins/feat-user-auth-system
+[INFO] Opening iTerm tab 'claude-code-plugins feat-user-auth-system' for worktree...
+[OK] iTerm tab opened
 [OK] Workspace updated
 ```
 
-**Use case:** Technical branch names can be long or unclear. Custom display names make workspace folders easier to identify in VS Code's file explorer while keeping git branch names concise and following naming conventions.
+**Use case:** Technical branch names can be long or unclear. Custom display names make workspace folders easier to identify in VS Code's file explorer while keeping git branch names concise and following naming conventions. The iTerm tab will still be named `"claude-code-plugins feat-user-auth-system"` regardless of the workspace display name.
 
 ### 4. Skip Flags - Create worktree only, skip convenience features
 
 ```bash
-spawn-worktree.sh quick-test --repo myproject --skip-tab --skip-workspace
+spawn-worktree.sh quick-test --repo crewchief --skip-tab --skip-workspace
 ```
 
 **Output:**
 ```
-[INFO] Creating worktree 'quick-test' for repository 'myproject' from branch 'main'...
-[OK] Worktree created: /workspace/repos/myproject/quick-test
+[INFO] Creating worktree 'quick-test' for repository 'crewchief' from branch 'main'...
+[OK] Worktree created: /workspace/repos/crewchief/quick-test
 [INFO] iTerm tab: Skipped (--skip-tab)
 [INFO] Workspace: Skipped (--skip-workspace)
 ```
@@ -216,7 +222,7 @@ spawn-worktree.sh quick-test --repo myproject --skip-tab --skip-workspace
 ### 5. Dry-Run - Preview planned actions without making changes
 
 ```bash
-spawn-worktree.sh feature-test --repo myproject --dry-run
+spawn-worktree.sh feature-test --repo crewchief --dry-run
 ```
 
 **Output:**
@@ -226,25 +232,26 @@ spawn-worktree.sh feature-test --repo myproject --dry-run
 ==========================================
 
 Would execute with resolved parameters:
-  Repository: myproject
+  Repository: crewchief
   Worktree name: feature-test
   Base branch: main (default)
   iTerm profile: Default (default)
   Workspace file: /workspace/.vscode/workspace.code-workspace
-  Display name: myproject (feature-test) (default)
+  Display name: crewchief (feature-test) (default)
+  Tab name: crewchief feature-test
 
 Commands that would run:
 
   1. Create worktree:
      docker compose -f ~/.devcontainer/docker-compose.yml exec -T devcontainer \
-       crewchief worktree create feature-test --repo myproject --branch main
-     Expected path: /workspace/repos/myproject/feature-test
+       crewchief worktree create feature-test --repo crewchief --branch main
+     Expected path: /workspace/repos/crewchief/feature-test
 
-  2. Open iTerm tab:
-     ~/.devcontainer/scripts/open-devcontainer.sh -d /workspace/repos/myproject/feature-test -p "Default"
+  2. Open iTerm tab (named "crewchief feature-test"):
+     ~/.devcontainer/scripts/open-devcontainer.sh -d /workspace/repos/crewchief/feature-test -p "Default"
 
   3. Update workspace:
-     ~/.devcontainer/scripts/workspace-folder.sh add repos/myproject/feature-test --name "myproject (feature-test)"
+     ~/.devcontainer/scripts/workspace-folder.sh add repos/crewchief/feature-test --name "crewchief (feature-test)"
 ```
 
 **Use case:** Verify configuration and preview all actions before executing. Helpful for understanding what the script will do, debugging issues, or confirming environment variable resolution and default values.
@@ -252,9 +259,9 @@ Commands that would run:
 ### 6. Script Integration - Use from another script with exit code checking
 
 ```bash
-#!/bin/bash
+#!/bin/zsh
 # Example: Automated worktree creation with error handling
-if output=$(spawn-worktree.sh feature-branch --repo myproject 2>&1); then
+if output=$(spawn-worktree.sh feature-branch --repo crewchief 2>&1); then
     # Extract worktree path from output
     path=$(echo "$output" | grep "Worktree created:" | awk '{print $4}')
     echo "Success! Created worktree at: $path"
@@ -359,7 +366,7 @@ cd .devcontainer && docker compose up -d
 ```bash
 brew install jq
 # OR
-spawn-worktree.sh myworktree --repo myproject --skip-workspace
+spawn-worktree.sh myworktree --repo crewchief --skip-workspace
 ```
 
 **iTerm2 is required for tab creation**
@@ -372,7 +379,7 @@ spawn-worktree.sh myworktree --repo myproject --skip-workspace
 ```bash
 # Install from https://iterm2.com
 # OR
-spawn-worktree.sh myworktree --repo myproject --skip-tab
+spawn-worktree.sh myworktree --repo crewchief --skip-tab
 ```
 
 **HOST_USER not set - cannot open iTerm tab remotely**
@@ -399,7 +406,7 @@ These warnings don't cause the script to fail (exit code 0) but indicate optiona
 ```
 **Solution:** Verify workspace file exists at expected location, or specify with `-w`:
 ```bash
-spawn-worktree.sh myworktree --repo myproject -w /path/to/workspace.code-workspace
+spawn-worktree.sh myworktree --repo crewchief -w /path/to/workspace.code-workspace
 ```
 If file doesn't exist, create it in VS Code first (File → Save Workspace As).
 
@@ -410,9 +417,27 @@ If file doesn't exist, create it in VS Code first (File → Save Workspace As).
 ```
 **Solution:** The worktree was created successfully. Open manually:
 ```bash
-open-devcontainer.sh -d /workspace/repos/myproject/myworktree
+open-devcontainer.sh -d /workspace/repos/crewchief/myworktree
 ```
 Or check if iTerm2 is running and responding to AppleScript.
+
+## SDD Workflow Integration
+
+When working with the SDD (Spec-Driven Development) plugin, use worktree names that match ticket IDs for traceability:
+
+```bash
+# Start work on ticket MAPR-0001
+spawn-worktree.sh MAPR-0001 --repo crewchief
+```
+
+This creates a worktree named `MAPR-0001` with an iTerm tab titled `"crewchief MAPR-0001"`, making it easy to identify which worktree corresponds to which ticket.
+
+**Benefits:**
+- Worktree name matches ticket ID in the SDD system
+- iTerm tab clearly shows both repository and ticket
+- Easy to track work across multiple tickets and repositories
+
+**Tip**: The SDD plugin's `do-task` and `do-all-tasks` commands may suggest creating worktrees with ticket IDs automatically.
 
 ## Related
 
