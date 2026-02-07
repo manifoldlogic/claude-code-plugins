@@ -53,6 +53,41 @@ This creates:
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/planning/` with template files
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/tasks/`
 
+### Step 2.5: Check Existing Skills
+
+Before planning, surface any existing repo-local skills that may be relevant to this ticket.
+
+**Discover skills:**
+1. Run list-skills.sh to enumerate repo-local skills:
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-curation/scripts/list-skills.sh
+   ```
+
+2. **If skills exist (count > 0):**
+   - Format skills for ticket-planner context:
+   ```
+   ## Available Repo-Local Skills
+
+   The following repo-local skills are available for reference. If any are relevant to this ticket, reference them in your planning documents.
+
+   {for each skill}
+   - **{skill.name}**: {skill.description}
+     - Origin: {skill.origin}
+     - Path: {skill.path}
+     - Tags: {skill.tags}
+   ```
+   - Include this context block in the ticket-planner agent invocation
+   - Instruct ticket-planner: "If any of these skills are relevant to the new ticket, reference them in the planning documents"
+
+3. **If no skills exist (count == 0):**
+   - Proceed normally (no additional context needed)
+   - No message to user (silence is fine)
+
+4. **Error handling:**
+   - If list-skills.sh fails, log warning to stderr
+   - Proceed with planning without skills context (non-blocking)
+   - Do not show error to user (graceful degradation)
+
 ### Step 3: Fill Planning Documents
 
 **Option A: Delegate to ticket-planner agent (Sonnet) - Preferred:**
