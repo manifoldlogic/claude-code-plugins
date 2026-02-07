@@ -35,7 +35,7 @@ This automates the common workflow of opening tabs for all active worktrees when
 - You need VS Code workspace integration alongside tab creation
 
 ### Consider before running:
-- The script does not check for existing tabs. Running it twice will create duplicate tabs for the same worktrees.
+- By default, the script does not check for existing tabs. Running it twice will create duplicate tabs for the same worktrees. Use `--skip-existing` to avoid duplicates.
 - Only non-main worktrees are opened. If your repository has no worktrees beyond main, nothing will be opened.
 - Each tab takes a moment to create. With many worktrees, expect a brief wait.
 
@@ -79,6 +79,7 @@ open-all-worktrees.sh --repo <repository> [OPTIONS]
 - `-f, --filter PATTERN` - Only open worktrees matching the given pattern (uses `grep -E` extended regex). Non-matching worktrees are skipped with an info message. Useful for focusing on a subset of worktrees by ticket prefix, feature name, or other naming convention.
 - `-p, --profile PROFILE` - iTerm2 profile name (default: from `ITERM_PROFILE` or `"Devcontainer"`)
 - `-m, --max-tabs N` - Maximum number of tabs to open (default: unlimited). Useful for repositories with many worktrees to prevent overwhelming iTerm2.
+- `--skip-existing` - Skip worktrees that already have open iTerm tabs. Checks existing tab names using the iTerm plugin's `iterm-list-tabs.sh` script. If the list-tabs script is unavailable, a warning is displayed and all tabs are opened normally (graceful fallback).
 - `--dry-run` - Show planned operations without executing
 - `-h, --help` - Show help message and exit
 
@@ -276,7 +277,64 @@ Delay between tabs: 200ms (sleep 0.2)
 
 **Use case:** Preview which worktrees will match the filter pattern before actually opening tabs. Combine `--filter` with `--dry-run` to verify the pattern selects the right worktrees.
 
-### 7. No Worktrees Found
+### 7. Skip Existing Tabs - Avoid duplicates on repeated runs
+
+```bash
+open-all-worktrees.sh --repo crewchief --skip-existing
+```
+
+**Output:**
+```
+[INFO] Enumerating worktrees for repository 'crewchief'...
+[INFO] Found 3 worktree(s) to open
+[INFO] Skipping worktree (tab already exists): MAPR-0001
+[OK] Opened tab: crewchief FEAT-auth
+[OK] Opened tab: crewchief bugfix-login
+
+==========================================
+  Worktree Tab Opening Complete
+==========================================
+
+[INFO] Repository: crewchief
+[INFO] Worktrees processed: 2
+[INFO] Tabs skipped (already exist): 1
+==========================================
+```
+
+**Use case:** When resuming a session or running the script multiple times, `--skip-existing` prevents duplicate tabs. The script queries iTerm2 for currently open tabs and skips any worktree whose tab is already open. This makes the script safe to run repeatedly (idempotent behavior).
+
+### 8. Skip Existing with Dry Run - Preview skip behavior
+
+```bash
+open-all-worktrees.sh --repo crewchief --skip-existing --dry-run
+```
+
+**Output:**
+```
+==========================================
+  DRY RUN - No changes will be made
+==========================================
+
+Repository: crewchief
+Repo path:  /workspace/repos/crewchief/crewchief
+Profile:    Devcontainer
+Skip existing: yes
+
+Would open tabs for the following worktrees:
+
+  [SKIP] MAPR-0001 (tab already exists)
+  1. Tab name: "crewchief FEAT-auth"
+     Directory: /workspace/repos/crewchief/FEAT-auth
+     Command: /path/to/iterm-open-tab.sh --name "crewchief FEAT-auth" --directory "/workspace/repos/crewchief/FEAT-auth" --profile "Devcontainer"
+
+Delay between tabs: 200ms (sleep 0.2)
+
+==========================================
+```
+
+**Use case:** Preview which tabs would be opened and which would be skipped before actually executing. Combine `--skip-existing` with `--dry-run` to verify the skip detection is working as expected.
+
+### 9. No Worktrees Found
 
 ```bash
 open-all-worktrees.sh --repo new-project
@@ -365,9 +423,13 @@ Common causes include the repository not being a valid git repository or CrewChi
 
 ### Duplicate tabs opened
 
-**Cause:** The script does not check for existing tabs. Running it multiple times creates duplicate tabs for the same worktrees.
+**Cause:** The script was run without `--skip-existing`, so it does not check for existing tabs. Running it multiple times creates duplicate tabs for the same worktrees.
 
-**Solution:** Close duplicate tabs manually, or use the iTerm plugin's close-tab functionality. To avoid duplicates, run the script only once per session, or use `--dry-run` first to check what will be opened.
+**Solution:** Use `--skip-existing` to prevent duplicates:
+```bash
+open-all-worktrees.sh --repo crewchief --skip-existing
+```
+This checks existing iTerm tabs by name and skips any worktree whose tab is already open. If duplicate tabs already exist, close them manually or use the iTerm plugin's close-tab functionality.
 
 ### Some tabs failed to open
 
