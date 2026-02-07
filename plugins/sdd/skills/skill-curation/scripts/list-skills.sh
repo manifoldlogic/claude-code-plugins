@@ -1,9 +1,43 @@
 #!/bin/sh
 # list-skills.sh - Enumerate repo-local skills under ${SDD_ROOT_DIR}/skills/
 #
+# Usage:
+#   SDD_ROOT_DIR=/path/to/.sdd bash list-skills.sh
+#
 # Outputs JSON to stdout: {"skills": [...], "count": N}
 # Warnings/errors to stderr.
 # Always exits 0 to avoid blocking downstream commands.
+#
+# Output JSON Schema (v1):
+# {
+#   "skills": [              array (required) - list of discovered skill objects
+#     {
+#       "name":        string (required) - kebab-case skill name, matches directory name
+#       "description": string (required) - one-line description from SKILL.md frontmatter
+#       "origin":      string (optional) - ticket ID where skill was created (e.g., "APITEST")
+#       "tags":        string (optional) - comma-separated or JSON array from frontmatter
+#       "path":        string (required) - absolute path to skill directory (trailing slash)
+#     }
+#   ],
+#   "count": integer (required) - number of skills in array (for convenience)
+# }
+#
+# Example (empty state):
+#   {"skills": [], "count": 0}
+#
+# Example (with skills):
+#   {"skills": [{"name": "api-testing-patterns", "description": "REST API testing with bearer auth", "origin": "APITEST", "tags": "[api, testing]", "path": "/app/.sdd/skills/api-testing-patterns/"}], "count": 1}
+#
+# Schema Stability:
+#   - This is schema version 1 (implicit - no version field in output yet)
+#   - Breaking changes (field removal, type changes) will increment version
+#   - Additive changes (new optional fields) are non-breaking
+#   - Consumers should handle missing optional fields gracefully
+#   - When modifying output format, update this schema documentation
+#
+# Consumers: archive.md, plan-ticket.md, skill-curator.md
+#
+# Dependencies: SDD_ROOT_DIR environment variable must be set.
 #
 # POSIX-compatible (no bash-only features).
 
