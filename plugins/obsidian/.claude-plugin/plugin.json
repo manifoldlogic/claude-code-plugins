@@ -1,6 +1,6 @@
 {
   "name": "obsidian",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Obsidian vault management using obsidian-cli. Create, search, and manage notes from the devcontainer.",
   "author": {
     "name": "Daniel Bushman",

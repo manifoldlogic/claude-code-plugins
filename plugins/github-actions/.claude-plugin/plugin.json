@@ -1,6 +1,6 @@
 {
   "name": "github-actions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GitHub Actions workflow management with specialized agent and gh CLI skill. Provides tools for creating, optimizing, and troubleshooting CI/CD pipelines, including workflow YAML configuration, matrix builds, secrets management, and performance optimization.",
   "author": {
     "name": "Daniel Bushman",
