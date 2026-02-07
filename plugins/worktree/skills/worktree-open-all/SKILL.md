@@ -76,6 +76,7 @@ open-all-worktrees.sh --repo <repository> [OPTIONS]
 
 ### Optional Arguments
 
+- `-f, --filter PATTERN` - Only open worktrees matching the given pattern (uses `grep -E` extended regex). Non-matching worktrees are skipped with an info message. Useful for focusing on a subset of worktrees by ticket prefix, feature name, or other naming convention.
 - `-p, --profile PROFILE` - iTerm2 profile name (default: from `ITERM_PROFILE` or `"Devcontainer"`)
 - `-m, --max-tabs N` - Maximum number of tabs to open (default: unlimited). Useful for repositories with many worktrees to prevent overwhelming iTerm2.
 - `--dry-run` - Show planned operations without executing
@@ -212,7 +213,70 @@ open-all-worktrees.sh --repo crewchief --max-tabs 5
 
 **Use case:** When a repository has many worktrees (e.g., 20+), use `--max-tabs` to limit how many tabs are opened at once. This prevents overwhelming iTerm2 and keeps the terminal manageable. Combine with `--dry-run` to preview which worktrees will be included.
 
-### 5. No Worktrees Found
+### 5. Filter by Pattern - Open only matching worktrees
+
+```bash
+open-all-worktrees.sh --repo crewchief --filter "MAPR-"
+```
+
+**Output:**
+```
+[INFO] Enumerating worktrees for repository 'crewchief'...
+[INFO] Found 5 worktree(s) to open
+[INFO] Skipping worktree (does not match filter): FEAT-auth
+[INFO] Skipping worktree (does not match filter): bugfix-login
+[OK] Opened tab: crewchief MAPR-0001
+[OK] Opened tab: crewchief MAPR-0002
+[OK] Opened tab: crewchief MAPR-0003
+
+==========================================
+  Worktree Tab Opening Complete
+==========================================
+
+[INFO] Repository: crewchief
+[INFO] Worktrees processed: 3
+==========================================
+```
+
+**Use case:** When you only want to open tabs for a specific set of worktrees. Common patterns:
+- `--filter "MAPR-"` - Open only MapRoom-related worktrees
+- `--filter "^feature-"` - Open worktrees starting with "feature-"
+- `--filter "auth|login"` - Open worktrees containing "auth" or "login"
+- `--filter ".*-[0-9]+$"` - Open worktrees ending with a number
+
+### 6. Filter with Dry Run - Preview filtered results
+
+```bash
+open-all-worktrees.sh --repo crewchief --filter "MAPR-" --dry-run
+```
+
+**Output:**
+```
+==========================================
+  DRY RUN - No changes will be made
+==========================================
+
+Repository: crewchief
+Repo path:  /workspace/repos/crewchief/crewchief
+Profile:    Devcontainer
+Filter:     MAPR-
+
+Would open tabs for the following worktrees:
+
+  [SKIP] FEAT-auth (does not match filter)
+  [SKIP] bugfix-login (does not match filter)
+  1. Tab name: "crewchief MAPR-0001"
+     Directory: /workspace/repos/crewchief/MAPR-0001
+     Command: /path/to/iterm-open-tab.sh --name "crewchief MAPR-0001" --directory "/workspace/repos/crewchief/MAPR-0001" --profile "Devcontainer"
+
+Delay between tabs: 200ms (sleep 0.2)
+
+==========================================
+```
+
+**Use case:** Preview which worktrees will match the filter pattern before actually opening tabs. Combine `--filter` with `--dry-run` to verify the pattern selects the right worktrees.
+
+### 7. No Worktrees Found
 
 ```bash
 open-all-worktrees.sh --repo new-project
