@@ -20,14 +20,14 @@ The skill name must conform to these rules:
 
 - **Format:** Lowercase letters, digits, and hyphens only
 - **Pattern:** `^[a-z][a-z0-9-]*$` (must start with a letter)
-- **Length:** Maximum 40 characters
+- **Length:** Maximum 40 characters (enforced -- names exceeding this limit are rejected during skill creation)
 - **No path separators:** Must not contain `/`, `\`, or `..`
 - **Descriptive:** The name should indicate what the skill covers
 
 **Validation steps:**
 
 1. Check the proposed name matches the pattern `^[a-z][a-z0-9-]*$`
-2. Check the name is 40 characters or fewer
+2. Check the name is 40 characters or fewer. This limit is enforced during skill creation; names that exceed it will be rejected with the error: `"Skill name exceeds 40-character limit: {name} ({length} characters)"`
 3. Check for conflicts with existing skills:
    ```bash
    bash scripts/list-skills.sh
@@ -156,7 +156,7 @@ After creating the skill, verify it meets all requirements:
 
 | Field | Type | Validation |
 |-------|------|------------|
-| `name` | string | Must match `^[a-z][a-z0-9-]*$`, max 40 chars |
+| `name` | string | Must match `^[a-z][a-z0-9-]*$`, max 40 chars (enforced) |
 | `description` | string | Non-empty, max 200 characters |
 
 ### Optional Fields

@@ -185,11 +185,29 @@ For each candidate with decision CREATE:
 
 The skill name must satisfy:
 - **Format:** Matches `^[a-z][a-z0-9-]*$` (lowercase, hyphens, digits, starts with letter)
-- **Length:** Maximum 40 characters
+- **Length:** Maximum 40 characters (enforced)
 - **No path separators:** Must not contain `/`, `\`, or `..`
 - **No conflicts:** Must not match any existing skill name (from Step 1)
 
-If the name does not satisfy these rules, adjust it before proceeding.
+**Length validation (enforced):**
+
+Before creating the skill directory or SKILL.md, validate the name length:
+
+```bash
+skill_name="{proposed-skill-name}"
+name_length=$(printf '%s' "${skill_name}" | wc -c | tr -d ' ')
+if [ "${name_length}" -gt 40 ]; then
+  printf 'ERROR: Skill name exceeds 40-character limit: %s (%d characters)\n' "${skill_name}" "${name_length}" >&2
+fi
+```
+
+If the skill name exceeds 40 characters:
+1. Log the error: `"Skill name exceeds 40-character limit: {name} ({length} characters)"`
+2. **Skip creation** of that skill entirely (do not create directory or SKILL.md)
+3. Continue evaluating remaining skill candidates
+4. Include the validation failure in the evaluation report and final summary under "Skipped" with reason "name exceeds 40-character limit"
+
+If the name does not satisfy the format or conflict rules, adjust it before proceeding. Length violations are **not** auto-corrected; the candidate is skipped.
 
 #### 6b: Create Skill Directory and SKILL.md
 
