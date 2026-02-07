@@ -615,6 +615,41 @@ echo "Archive may proceed."
 | Invalid path characters | Rejected with specific error message |
 | Path traversal attempt | Rejected: "Path traversal not allowed" |
 
+### Step 5.6: Skill Curation Opportunity
+
+After reviewing deliverables, consider whether this ticket produced reusable patterns worth capturing as repo-local skills.
+
+**Check for skill candidates:**
+1. Run list-skills.sh to see existing skills:
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-curation/scripts/list-skills.sh
+   ```
+   If list-skills.sh fails, log a warning and continue (non-blocking).
+
+2. Prompt the user using AskUserQuestion:
+   > This ticket has been completed and reviewed. Would you like to curate repo-local skills from this ticket's learnings?
+   >
+   > Repo-local skills help future tickets by capturing repo-specific patterns, conventions, and procedures.
+   >
+   > **Options:**
+   > - `yes` - Analyze this ticket for skill candidates (delegated to skill-curator agent)
+   > - `no` - Skip skill curation and proceed to archive
+   > - `defer` - Curate later with `/sdd:curate-skills TICKET_ID`
+
+3. **If user responds "yes":**
+   - Delegate to skill-curator agent
+   - Agent analyzes ticket artifacts and creates skills
+   - Agent reports created/updated skills
+   - Continue to Step 6
+
+4. **If user responds "no" or "defer":**
+   - Continue to Step 6 (no curation)
+   - If "defer", remind user they can run `/sdd:curate-skills TICKET_ID` later
+
+5. **Error handling:**
+   - If list-skills.sh fails, log warning and continue (non-blocking)
+   - If skill-curator agent fails, log error and continue (curation is optional)
+
 ### Step 6: Archive
 
 For each fully verified ticket:
