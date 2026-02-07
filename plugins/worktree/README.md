@@ -211,3 +211,8 @@ The worktree plugin integrates with helper scripts in the devcontainer environme
 - **open-all-worktrees.sh** - Opens iTerm tabs for all non-main worktrees of a repository in a single command
 - **cleanup-worktree.sh** - Orchestrates worktree cleanup with ticket status checking and automatic tab closing
 - **workspace-folder.sh** - Manages VS Code workspace file folder entries
+- **worktree-common.sh** - Shared library with common logging, validation, and utility functions used by all worktree scripts
+
+### SSH Connection Performance
+
+The devcontainer is configured with SSH multiplexing (ControlMaster) for connections to `host.docker.internal`. This reduces the ~100ms overhead per SSH call by reusing connections, significantly improving script performance when opening multiple iTerm tabs or running bulk worktree operations. The configuration is applied automatically during container setup via `post-create.sh`.
