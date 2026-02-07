@@ -13,6 +13,31 @@ The Worktree plugin provides Git worktree management capabilities powered by the
 - **Branch Management**: Create, list, and manage git worktrees with simple commands
 - **Status Tracking**: View all active worktrees and their current state
 - **VS Code Integration**: Automatic workspace file updates when spawning or cleaning up worktrees
+- **Bulk Tab Opening**: Open iTerm tabs for all worktrees of a repository in a single command
+- **Repository-Aware Tab Names**: Tabs use `"<repo> <worktree>"` format (e.g., `"crewchief MAPR-0001"`) for clear multi-repo context
+
+## Breaking Changes
+
+### Tab Naming Format (v0.2.0)
+
+**Change**: Tab naming format changed from `"worktree: <name>"` to `"<repo> <worktree>"`.
+
+**Impact**: External scripts or automation that match iTerm tab names by pattern will need updates.
+
+**Migration**:
+- Old pattern: `"worktree: feature-test"`
+- New pattern: `"crewchief feature-test"`
+
+If you have external scripts using the old pattern, update your tab name matching logic:
+```bash
+# Old
+iterm-close-tab.sh "worktree: feature-test"
+
+# New
+iterm-close-tab.sh "crewchief feature-test"
+```
+
+**Benefit**: The new format includes the repository name, making it easier to work with multiple repositories simultaneously. When you have worktrees across different repos, tab names like `"crewchief MAPR-0001"` and `"claude-code-plugins FEAT-auth"` are immediately distinguishable.
 
 ## Prerequisites
 
@@ -82,6 +107,22 @@ Show me what would happen if I cleaned up the feature-auth worktree
 ```
 Preview cleanup operations without making changes using dry-run mode.
 
+### Opening All Worktree Tabs at Once
+```bash
+open-all-worktrees.sh --repo crewchief
+```
+Opens iTerm tabs for all non-main worktrees of a repository. Each tab is named with the `"<repo> <worktree>"` format (e.g., `"crewchief MAPR-0001"`, `"crewchief FEAT-auth"`). Useful when starting a development session and you need to restore tabs for all active worktrees.
+
+### Using Tab Names for Custom Automation
+```bash
+# Close a specific worktree tab by its name
+iterm-close-tab.sh "crewchief feature-auth"
+
+# Open a tab for a specific worktree
+iterm-open-tab.sh --name "crewchief MAPR-0001" --directory "/workspace/repos/crewchief/MAPR-0001"
+```
+Tab names follow the `"<repo> <worktree>"` convention, enabling reliable tab management in external scripts.
+
 ## Troubleshooting
 
 ### CLI Not Found
@@ -140,6 +181,7 @@ This plugin provides the following skills with detailed documentation:
 | Skill | Description | Documentation |
 |-------|-------------|---------------|
 | worktree-spawn | Create new worktrees with iTerm and VS Code workspace integration | [SKILL.md](skills/worktree-spawn/SKILL.md) |
+| worktree-open-all | Open iTerm tabs for all worktrees of a repository | [SKILL.md](skills/worktree-open-all/SKILL.md) |
 | worktree-management | Core git worktree operations (create, use, merge, clean) | [SKILL.md](skills/worktree-management/SKILL.md) |
 | worktree-cleanup | Remove worktrees with SDD ticket status awareness | [SKILL.md](skills/worktree-cleanup/SKILL.md) |
 
@@ -152,6 +194,8 @@ plugins/worktree/
 ├── skills/
 │   ├── worktree-spawn/
 │   │   └── SKILL.md
+│   ├── worktree-open-all/
+│   │   └── SKILL.md
 │   ├── worktree-management/
 │   │   └── SKILL.md
 │   └── worktree-cleanup/
@@ -163,6 +207,7 @@ plugins/worktree/
 
 The worktree plugin integrates with helper scripts in the devcontainer environment:
 
-- **spawn-worktree.sh** - Orchestrates worktree creation with iTerm tab and workspace integration
-- **cleanup-worktree.sh** - Orchestrates worktree cleanup with ticket status checking
+- **spawn-worktree.sh** - Orchestrates worktree creation with iTerm tab (named `"<repo> <worktree>"`) and workspace integration
+- **open-all-worktrees.sh** - Opens iTerm tabs for all non-main worktrees of a repository in a single command
+- **cleanup-worktree.sh** - Orchestrates worktree cleanup with ticket status checking and automatic tab closing
 - **workspace-folder.sh** - Manages VS Code workspace file folder entries
