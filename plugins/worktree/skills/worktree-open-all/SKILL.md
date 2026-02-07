@@ -77,6 +77,7 @@ open-all-worktrees.sh --repo <repository> [OPTIONS]
 ### Optional Arguments
 
 - `-p, --profile PROFILE` - iTerm2 profile name (default: from `ITERM_PROFILE` or `"Devcontainer"`)
+- `-m, --max-tabs N` - Maximum number of tabs to open (default: unlimited). Useful for repositories with many worktrees to prevent overwhelming iTerm2.
 - `--dry-run` - Show planned operations without executing
 - `-h, --help` - Show help message and exit
 
@@ -182,7 +183,36 @@ Delay between tabs: 200ms (sleep 0.2)
 
 **Use case:** Verify which worktrees will be opened before actually opening tabs. Helpful for confirming the correct repository and checking which worktrees are detected.
 
-### 4. No Worktrees Found
+### 4. Limit Tabs - Open only the first N worktrees
+
+```bash
+open-all-worktrees.sh --repo crewchief --max-tabs 5
+```
+
+**Output:**
+```
+[INFO] Enumerating worktrees for repository 'crewchief'...
+[INFO] Found 8 worktree(s) to open
+[OK] Opened tab: crewchief MAPR-0001
+[OK] Opened tab: crewchief FEAT-auth
+[OK] Opened tab: crewchief bugfix-login
+[OK] Opened tab: crewchief FEAT-dashboard
+[OK] Opened tab: crewchief FEAT-api
+[WARN] Reached maximum tab limit (5). Skipped 3 worktree(s).
+
+==========================================
+  Worktree Tab Opening Complete
+==========================================
+
+[INFO] Repository: crewchief
+[INFO] Worktrees processed: 5
+[INFO] Max tabs limit: 5
+==========================================
+```
+
+**Use case:** When a repository has many worktrees (e.g., 20+), use `--max-tabs` to limit how many tabs are opened at once. This prevents overwhelming iTerm2 and keeps the terminal manageable. Combine with `--dry-run` to preview which worktrees will be included.
+
+### 5. No Worktrees Found
 
 ```bash
 open-all-worktrees.sh --repo new-project
