@@ -110,6 +110,20 @@ Overall Status: [READY | NEEDS INITIALIZATION]
 Run: /sdd:setup force
 ```
 
+**Important: Version Control**
+
+Repo-local skills are intended to remain local to your development environment and
+should not be committed to version control. Ensure `${SDD_ROOT_DIR}` is in your
+repository's `.gitignore` file.
+
+Example `.gitignore` entry:
+```
+.sdd/
+```
+
+If `SDD_ROOT_DIR` is located outside your repository (e.g., `/app/.sdd/`),
+no action is needed.
+
 ### Next Step Prompt
 
 After displaying the report above, use the **AskUserQuestion** tool to present next steps to the user:

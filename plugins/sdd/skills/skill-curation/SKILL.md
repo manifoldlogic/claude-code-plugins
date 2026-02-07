@@ -63,6 +63,10 @@ Skills are stored at `${SDD_ROOT_DIR}/skills/{skill-name}/SKILL.md`. Each skill 
 - `scripts/` - Automation scripts
 - `assets/` - Output files
 
+## Important Notes
+
+**Version Control:** Repo-local skills are intended to remain local to your development environment and should not be committed to version control. If `${SDD_ROOT_DIR}` is located inside a git repository, ensure it is included in your `.gitignore` file (e.g., add `.sdd/` to `.gitignore`). If `SDD_ROOT_DIR` is outside your repository, no action is needed.
+
 ## Quick Start
 
 1. **List existing skills:**
