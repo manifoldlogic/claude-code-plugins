@@ -220,4 +220,38 @@ done
 
 # --- Output JSON ---
 printf '{"skills": [%s], "count": %d}\n' "${json_entries}" "${skill_count}"
+
+# --- Migration detection: check old skills location ---
+# After primary output, check if skills exist in the legacy SDD_ROOT_DIR/skills/ path.
+# If valid skills are found there, emit a warning to stderr with migration instructions.
+# This does NOT affect the JSON output on stdout.
+if [ -n "${SDD_ROOT_DIR}" ] && [ -d "${SDD_ROOT_DIR}/skills" ] && [ -r "${SDD_ROOT_DIR}/skills" ]; then
+  _old_skills_dir="${SDD_ROOT_DIR}/skills"
+  _old_skill_found=0
+
+  for _old_entry in "${_old_skills_dir}"/*; do
+    # Handle empty directory (glob returns literal pattern)
+    if [ "${_old_entry}" = "${_old_skills_dir}/*" ]; then
+      break
+    fi
+
+    # Skip non-directories
+    if [ ! -d "${_old_entry}" ]; then
+      continue
+    fi
+
+    # Check for valid SKILL.md
+    if [ -f "${_old_entry}/SKILL.md" ]; then
+      _old_skill_found=1
+      break
+    fi
+  done
+
+  if [ "${_old_skill_found}" -eq 1 ]; then
+    echo "Warning: Skills found in old location (${SDD_ROOT_DIR}/skills/)." >&2
+    echo "To migrate: mkdir -p .claude/skills && cp -r \"${SDD_ROOT_DIR}/skills/\"* .claude/skills/" >&2
+    echo "After migrating, commit the skills with: /sdd:commit" >&2
+  fi
+fi
+
 exit 0

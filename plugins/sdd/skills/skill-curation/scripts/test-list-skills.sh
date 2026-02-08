@@ -732,6 +732,193 @@ else
 fi
 
 # ============================================================================
+# MIGRATION DETECTION TESTS
+# ============================================================================
+
+printf '\n%s\n' "--- Migration Detection ---"
+
+# Test 19: No warning when SDD_ROOT_DIR is unset
+run_test "No migration warning when SDD_ROOT_DIR is unset"
+TMPDIR_19=$(make_temp_dir)
+setup_test_git_repo "${TMPDIR_19}"
+
+STDERR=$(cd "${TMPDIR_19}" && unset SDD_ROOT_DIR && sh "${LIST_SKILLS}" 2>&1 1>/dev/null)
+cd "${ORIG_DIR}"
+
+case "${STDERR}" in
+  *"old location"*)
+    fail "No migration warning when SDD_ROOT_DIR unset" "no migration warning" "${STDERR}"
+    ;;
+  *)
+    pass "No migration warning when SDD_ROOT_DIR unset"
+    ;;
+esac
+
+# Test 20: No warning when old location does not exist
+run_test "No migration warning when old skills directory does not exist"
+TMPDIR_20=$(make_temp_dir)
+setup_test_git_repo "${TMPDIR_20}"
+
+STDERR=$(cd "${TMPDIR_20}" && SDD_ROOT_DIR="${TMPDIR_20}/nonexistent-sdd" sh "${LIST_SKILLS}" 2>&1 1>/dev/null)
+cd "${ORIG_DIR}"
+
+case "${STDERR}" in
+  *"old location"*)
+    fail "No migration warning when old dir missing" "no migration warning" "${STDERR}"
+    ;;
+  *)
+    pass "No migration warning when old dir missing"
+    ;;
+esac
+
+# Test 21: No warning when old skills directory is empty
+run_test "No migration warning when old skills directory is empty"
+TMPDIR_21=$(make_temp_dir)
+setup_test_git_repo "${TMPDIR_21}"
+_OLD_SDD_21="${TMPDIR_21}/old-sdd"
+mkdir -p "${_OLD_SDD_21}/skills"
+
+STDERR=$(cd "${TMPDIR_21}" && SDD_ROOT_DIR="${_OLD_SDD_21}" sh "${LIST_SKILLS}" 2>&1 1>/dev/null)
+cd "${ORIG_DIR}"
+
+case "${STDERR}" in
+  *"old location"*)
+    fail "No migration warning for empty old dir" "no migration warning" "${STDERR}"
+    ;;
+  *)
+    pass "No migration warning for empty old dir"
+    ;;
+esac
+
+# Test 22: No warning when old location has non-skill content (no SKILL.md)
+run_test "No migration warning when old location has non-skill content"
+TMPDIR_22=$(make_temp_dir)
+setup_test_git_repo "${TMPDIR_22}"
+_OLD_SDD_22="${TMPDIR_22}/old-sdd"
+mkdir -p "${_OLD_SDD_22}/skills/random-dir"
+printf "not a skill\n" > "${_OLD_SDD_22}/skills/random-dir/README.md"
+printf "also not a skill\n" > "${_OLD_SDD_22}/skills/loose-file.txt"
+
+STDERR=$(cd "${TMPDIR_22}" && SDD_ROOT_DIR="${_OLD_SDD_22}" sh "${LIST_SKILLS}" 2>&1 1>/dev/null)
+cd "${ORIG_DIR}"
+
+case "${STDERR}" in
+  *"old location"*)
+    fail "No migration warning for non-skill content" "no migration warning" "${STDERR}"
+    ;;
+  *)
+    pass "No migration warning for non-skill content"
+    ;;
+esac
+
+# Test 23: Warning when old location has valid skills
+run_test "Migration warning when old location has valid skills"
+TMPDIR_23=$(make_temp_dir)
+setup_test_git_repo "${TMPDIR_23}"
+_OLD_SDD_23="${TMPDIR_23}/old-sdd"
+mkdir -p "${_OLD_SDD_23}/skills/old-skill"
+cat > "${_OLD_SDD_23}/skills/old-skill/SKILL.md" << 'SKILLEOF'
+---
+name: old-skill
+description: A skill in the old location
+---
+
+# Old Skill
+SKILLEOF
+
+STDERR=$(cd "${TMPDIR_23}" && SDD_ROOT_DIR="${_OLD_SDD_23}" sh "${LIST_SKILLS}" 2>&1 1>/dev/null)
+cd "${ORIG_DIR}"
+
+case "${STDERR}" in
+  *"Warning: Skills found in old location"*)
+    pass "Migration warning shown for valid old skills"
+    ;;
+  *)
+    fail "Migration warning shown for valid old skills" "Warning: Skills found in old location" "${STDERR}"
+    ;;
+esac
+
+# Verify warning includes migration command
+case "${STDERR}" in
+  *"mkdir -p .claude/skills"*"cp -r"*)
+    pass "Migration warning includes migration command"
+    ;;
+  *)
+    fail "Migration warning includes migration command" "mkdir -p .claude/skills && cp -r ..." "${STDERR}"
+    ;;
+esac
+
+# Verify warning includes commit instruction
+case "${STDERR}" in
+  *"/sdd:commit"*)
+    pass "Migration warning includes commit instruction"
+    ;;
+  *)
+    fail "Migration warning includes commit instruction" "/sdd:commit" "${STDERR}"
+    ;;
+esac
+
+# Test 24: JSON stdout unaffected when migration warning is shown
+run_test "JSON stdout unaffected by migration warning"
+TMPDIR_24=$(make_temp_dir)
+setup_test_git_repo "${TMPDIR_24}"
+mkdir -p "${TMPDIR_24}/.claude/skills/new-skill"
+cat > "${TMPDIR_24}/.claude/skills/new-skill/SKILL.md" << 'SKILLEOF'
+---
+name: new-skill
+description: A skill in the new location
+---
+
+# New Skill
+SKILLEOF
+
+_OLD_SDD_24="${TMPDIR_24}/old-sdd"
+mkdir -p "${_OLD_SDD_24}/skills/old-skill"
+cat > "${_OLD_SDD_24}/skills/old-skill/SKILL.md" << 'SKILLEOF'
+---
+name: old-skill
+description: A skill in the old location
+---
+
+# Old Skill
+SKILLEOF
+
+OUTPUT=$(cd "${TMPDIR_24}" && SDD_ROOT_DIR="${_OLD_SDD_24}" sh "${LIST_SKILLS}" 2>/dev/null)
+cd "${ORIG_DIR}"
+
+# Stdout should have new-skill only (count: 1), not old-skill
+case "${OUTPUT}" in
+  *'"name": "new-skill"'*'"count": 1'*)
+    pass "JSON stdout only contains new-location skills"
+    ;;
+  *)
+    fail "JSON stdout only contains new-location skills" "count: 1, new-skill" "${OUTPUT}"
+    ;;
+esac
+
+# Verify old-skill is NOT in stdout
+case "${OUTPUT}" in
+  *"old-skill"*)
+    fail "Old skill must NOT appear in stdout JSON" "no old-skill in stdout" "${OUTPUT}"
+    ;;
+  *)
+    pass "Old skill does NOT appear in stdout JSON"
+    ;;
+esac
+
+# Verify stderr has warning
+STDERR=$(cd "${TMPDIR_24}" && SDD_ROOT_DIR="${_OLD_SDD_24}" sh "${LIST_SKILLS}" 2>&1 1>/dev/null)
+cd "${ORIG_DIR}"
+case "${STDERR}" in
+  *"Warning: Skills found in old location"*)
+    pass "Migration warning still appears on stderr"
+    ;;
+  *)
+    fail "Migration warning still appears on stderr" "Warning on stderr" "${STDERR}"
+    ;;
+esac
+
+# ============================================================================
 # SUMMARY
 # ============================================================================
 
