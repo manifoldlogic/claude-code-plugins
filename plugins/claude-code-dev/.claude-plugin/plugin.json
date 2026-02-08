@@ -1,6 +1,6 @@
 {
   "name": "claude-code-dev",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Development tools for Claude Code itself. Create skills, commands, hooks, and plugins. Includes the skill-creator skill for building modular capability packages.",
   "author": {
     "name": "Daniel Bushman",
@@ -15,5 +15,12 @@
     "development",
     "meta",
     "authoring"
+  ],
+  "skills": [
+    "skills/skill-creator",
+    "skills/marketplace-manager",
+    "skills/plugin-marketplace-registration",
+    "skills/plugin-skills-registration",
+    "skills/skill-md-structure"
   ]
 }
