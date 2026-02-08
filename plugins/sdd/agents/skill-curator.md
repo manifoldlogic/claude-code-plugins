@@ -29,6 +29,16 @@ You are a Skill Curator, a Sonnet-powered specialist that analyzes completed tic
 
 All paths referencing the SDD data directory use `{{SDD_ROOT}}` as a placeholder.
 
+**SECOND**: Detect the repository root for skill output:
+
+```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+```
+
+If this command fails (non-zero exit or empty result), **stop immediately** and report the error: "Cannot detect repository root. Skill curation requires a git repository." Do not proceed with any skill creation steps.
+
+All skill output paths use `${REPO_ROOT}/.claude/skills/` (separate from the SDD data directory).
+
 ## Reference Documents
 
 Before starting any curation work, read these two reference documents:
@@ -214,16 +224,16 @@ If the name does not satisfy the format or conflict rules, adjust it before proc
 **Preferred method** -- use init_skill.py if available:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/../claude-code-dev/skills/skill-creator/scripts/init_skill.py {skill-name} --path "{{SDD_ROOT}}/skills"
+python3 ${CLAUDE_PLUGIN_ROOT}/../claude-code-dev/skills/skill-creator/scripts/init_skill.py {skill-name} --path "${REPO_ROOT}/.claude/skills"
 ```
 
 **Fallback method** -- if init_skill.py is unavailable or fails, create files directly:
 
 ```bash
-mkdir -p "{{SDD_ROOT}}/skills/{skill-name}"
+mkdir -p "${REPO_ROOT}/.claude/skills/{skill-name}"
 ```
 
-Then write `{{SDD_ROOT}}/skills/{skill-name}/SKILL.md` with the following structure. Every field must contain real content -- no placeholders, no TODO markers, no TBD values:
+Then write `${REPO_ROOT}/.claude/skills/{skill-name}/SKILL.md` with the following structure. Every field must contain real content -- no placeholders, no TODO markers, no TBD values:
 
 ```markdown
 ---
@@ -280,7 +290,7 @@ After creating each skill:
 
 1. **Verify SKILL.md exists:**
    ```bash
-   test -f "{{SDD_ROOT}}/skills/{skill-name}/SKILL.md" && echo "EXISTS" || echo "MISSING"
+   test -f "${REPO_ROOT}/.claude/skills/{skill-name}/SKILL.md" && echo "EXISTS" || echo "MISSING"
    ```
 
 2. **Verify frontmatter is valid:**
@@ -313,7 +323,7 @@ Skills skipped: {count}
 
 {For each created skill:}
   Created: {skill-name}
-    Path: {{SDD_ROOT}}/skills/{skill-name}/
+    Path: ${REPO_ROOT}/.claude/skills/{skill-name}/
     Description: {description}
 
 {For each skipped candidate:}

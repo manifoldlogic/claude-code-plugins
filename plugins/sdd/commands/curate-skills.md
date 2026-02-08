@@ -65,7 +65,7 @@ Context:
 - Task files: {TICKET_PATH}/tasks/
 - Deliverables: {TICKET_PATH}/deliverables/
 - Existing skills: {count from Step 2} skills already exist
-- Skills directory: ${SDD_ROOT_DIR:-/app/.sdd}/skills/
+- Skills directory: .claude/skills/
 
 Instructions:
 1. Read reference documents (skill-quality-criteria.md and skill-creation-workflow.md)
@@ -149,7 +149,7 @@ Examples:
   /sdd:curate-skills AUTH
   /sdd:curate-skills CACHE
 
-Skills are created under: ${SDD_ROOT_DIR:-/app/.sdd}/skills/
+Skills are created under: .claude/skills/
 ```
 
 Then use the **AskUserQuestion** tool:

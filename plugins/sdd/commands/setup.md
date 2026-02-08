@@ -31,7 +31,6 @@ Verify the required directories exist:
 required_dirs=(
   "${SDD_ROOT}/epics"
   "${SDD_ROOT}/tickets"
-  "${SDD_ROOT}/skills"
   "${SDD_ROOT}/archive/tickets"
   "${SDD_ROOT}/archive/epics"
   "${SDD_ROOT}/reference"
@@ -72,7 +71,7 @@ If user passes "force" argument AND there are missing components:
 
 ```bash
 # Recreate directory structure
-mkdir -p "${SDD_ROOT}"/{epics,tickets,skills,archive/tickets,archive/epics,reference,research,scratchpad,logs}
+mkdir -p "${SDD_ROOT}"/{epics,tickets,archive/tickets,archive/epics,reference,research,scratchpad,logs}
 
 # Copy reference template from plugin
 if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]]; then
@@ -93,7 +92,6 @@ Root Directory: ${SDD_ROOT}
 Directory Structure:
   epics/           [EXISTS | MISSING]
   tickets/              [EXISTS | MISSING]
-  skills/               [EXISTS | MISSING]
   archive/tickets/      [EXISTS | MISSING]
   archive/epics/   [EXISTS | MISSING]
   reference/             [EXISTS | MISSING]
@@ -109,20 +107,6 @@ Overall Status: [READY | NEEDS INITIALIZATION]
 {If NEEDS INITIALIZATION}
 Run: /sdd:setup force
 ```
-
-**Important: Version Control**
-
-Repo-local skills are intended to remain local to your development environment and
-should not be committed to version control. Ensure `${SDD_ROOT_DIR}` is in your
-repository's `.gitignore` file.
-
-Example `.gitignore` entry:
-```
-.sdd/
-```
-
-If `SDD_ROOT_DIR` is located outside your repository (e.g., `/app/.sdd/`),
-no action is needed.
 
 ### Next Step Prompt
 
