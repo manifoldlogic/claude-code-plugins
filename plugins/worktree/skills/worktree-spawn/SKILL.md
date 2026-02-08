@@ -30,6 +30,28 @@ The script automatically detects whether it's running on the host or inside the 
 
 **Breaking Change**: Prior versions used the format `"worktree: <name>"`. If you have external scripts that match tab names, update your patterns to use the new `"<repo> <worktree>"` format.
 
+## Naming Rules
+
+**CRITICAL: Use the user's exact input as the worktree name.**
+
+When a user asks to create a worktree with a specific name:
+- The worktree name MUST be the user's exact input, unchanged
+- Do NOT add prefixes (e.g., "feature-", "bugfix-")
+- Do NOT add suffixes (e.g., "-dev", "-wip")
+- Do NOT convert case or reformat the name
+- The branch name equals the worktree name
+- The folder name equals the worktree name
+
+Examples of correct behavior:
+| User says | Worktree name | Branch name | Folder name |
+|-----------|---------------|-------------|-------------|
+| "create worktree PANE-001" | PANE-001 | PANE-001 | PANE-001 |
+| "worktree for UIT-9819" | UIT-9819 | UIT-9819 | UIT-9819 |
+| "create worktree my-feature" | my-feature | my-feature | my-feature |
+| "worktree called bugfix-auth" | bugfix-auth | bugfix-auth | bugfix-auth |
+
+The only transformation applied is validation: names must match [a-zA-Z0-9_-]+ and cannot start with a hyphen.
+
 ## Decision Tree
 
 ### Use spawn-worktree.sh when:
