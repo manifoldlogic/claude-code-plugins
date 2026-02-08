@@ -1,8 +1,11 @@
 #!/bin/sh
-# list-skills.sh - Enumerate repo-local skills under ${SDD_ROOT_DIR}/skills/
+# list-skills.sh - Enumerate repo-local skills under <repo-root>/.claude/skills/
 #
 # Usage:
-#   SDD_ROOT_DIR=/path/to/.sdd bash list-skills.sh
+#   bash list-skills.sh
+#
+# The script auto-detects the repository root via `git rev-parse --show-toplevel`
+# and reads skills from <repo-root>/.claude/skills/.
 #
 # Outputs JSON to stdout: {"skills": [...], "count": N}
 # Warnings/errors to stderr.
@@ -26,7 +29,7 @@
 #   {"skills": [], "count": 0}
 #
 # Example (with skills):
-#   {"skills": [{"name": "api-testing-patterns", "description": "REST API testing with bearer auth", "origin": "APITEST", "tags": "[api, testing]", "path": "/app/.sdd/skills/api-testing-patterns/"}], "count": 1}
+#   {"skills": [{"name": "api-testing-patterns", "description": "REST API testing with bearer auth", "origin": "APITEST", "tags": "[api, testing]", "path": "/repo/.claude/skills/api-testing-patterns/"}], "count": 1}
 #
 # Schema Stability:
 #   - This is schema version 1 (implicit - no version field in output yet)
@@ -37,7 +40,7 @@
 #
 # Consumers: archive.md, plan-ticket.md, skill-curator.md
 #
-# Dependencies: SDD_ROOT_DIR environment variable must be set.
+# Dependencies: Must be run inside a git repository.
 #
 # POSIX-compatible (no bash-only features).
 
@@ -49,13 +52,14 @@ empty_result() {
   exit 0
 }
 
-# --- Validate SDD_ROOT_DIR ---
-if [ -z "${SDD_ROOT_DIR}" ]; then
-  echo "Warning: SDD_ROOT_DIR is not set" >&2
-  empty_result
+# --- Detect repository root via git ---
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || true
+if [ -z "${REPO_ROOT}" ]; then
+  echo "Error: Cannot detect repository root. Skill curation requires a git repository." >&2
+  echo '{"skills": [], "count": 0}'
+  exit 0
 fi
-
-SKILLS_DIR="${SDD_ROOT_DIR}/skills"
+SKILLS_DIR="${REPO_ROOT}/.claude/skills"
 
 # --- Validate skills directory ---
 if [ ! -e "${SKILLS_DIR}" ]; then
