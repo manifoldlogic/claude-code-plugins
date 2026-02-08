@@ -18,7 +18,6 @@ const SDD_ROOT = process.env.SDD_ROOT_DIR || '/app/.sdd';
 const directories = [
   'epics',
   'tickets',
-  'skills',
   'archive/tickets',
   'archive/epics',
   'reference',

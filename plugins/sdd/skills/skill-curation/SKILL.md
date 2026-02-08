@@ -7,7 +7,7 @@ description: Curate, evaluate, and manage repo-local skills extracted from compl
 
 ## Overview
 
-The skill curation system adds a self-reinforcing learning loop to the SDD workflow. It captures reusable patterns from completed tickets as repo-local skills stored under `${SDD_ROOT_DIR}/skills/`, making them discoverable during future planning.
+The skill curation system adds a self-reinforcing learning loop to the SDD workflow. It captures reusable patterns from completed tickets as repo-local skills stored under `.claude/skills/`, making them discoverable during future planning.
 
 Repo-local skills follow the same SKILL.md format used by marketplace plugin skills. This consistency means skills can later be promoted to the marketplace without format conversion.
 
@@ -26,7 +26,7 @@ Repo-local skills follow the same SKILL.md format used by marketplace plugin ski
 
 ### list-skills.sh
 
-Enumerates all skills under `${SDD_ROOT_DIR}/skills/` and outputs JSON:
+Enumerates all skills under `.claude/skills/` and outputs JSON:
 
 ```bash
 bash scripts/list-skills.sh
@@ -41,7 +41,7 @@ Output format:
       "description": "REST API testing conventions for this project",
       "origin": "APIV2",
       "tags": "[testing, api]",
-      "path": "/app/.sdd/skills/api-testing-patterns/"
+      "path": ".claude/skills/api-testing-patterns/"
     }
   ],
   "count": 1
@@ -57,7 +57,7 @@ Output format:
 
 ## Skill Storage
 
-Skills are stored at `${SDD_ROOT_DIR}/skills/{skill-name}/SKILL.md`. Each skill directory may also contain:
+Skills are stored at `.claude/skills/{skill-name}/SKILL.md`. Each skill directory may also contain:
 
 - `references/` - Detailed reference documentation
 - `scripts/` - Automation scripts
@@ -65,7 +65,13 @@ Skills are stored at `${SDD_ROOT_DIR}/skills/{skill-name}/SKILL.md`. Each skill 
 
 ## Important Notes
 
-**Version Control:** Repo-local skills are intended to remain local to your development environment and should not be committed to version control. If `${SDD_ROOT_DIR}` is located inside a git repository, ensure it is included in your `.gitignore` file (e.g., add `.sdd/` to `.gitignore`). If `SDD_ROOT_DIR` is outside your repository, no action is needed.
+**Version Control**: Skills created at `.claude/skills/` in the repository SHOULD be committed to version control. This allows:
+- Sharing captured patterns with your team
+- Version history of skill evolution
+- Code review of skills in pull requests
+- Skills travel with branches and are available to all developers
+
+Commit skills using the standard `/sdd:commit` workflow after curation.
 
 ## Quick Start
 

@@ -26,6 +26,7 @@ TESTS_FAILED=0
 
 # --- Cleanup tracking ---
 CLEANUP_DIRS=""
+ORIG_DIR=$(pwd)
 
 # --- Helpers ---
 pass() {
@@ -56,8 +57,22 @@ make_temp_dir() {
   printf '%s' "${_tmpdir}"
 }
 
+# Initialize a git repo in a temp directory with config isolation
+setup_test_git_repo() {
+  _setup_dir="$1"
+  cd "${_setup_dir}"
+  export GIT_CONFIG_NOSYSTEM=1
+  export GIT_AUTHOR_NAME=test
+  export GIT_AUTHOR_EMAIL=test@test.com
+  export GIT_COMMITTER_NAME=test
+  export GIT_COMMITTER_EMAIL=test@test.com
+  git init
+  mkdir -p .claude/skills
+}
+
 # Cleanup all temporary directories
 cleanup() {
+  cd "${ORIG_DIR}" 2>/dev/null || true
   for _dir in ${CLEANUP_DIRS}; do
     if [ -d "${_dir}" ]; then
       rm -rf "${_dir}"
@@ -208,8 +223,8 @@ SKILL_NAME="api-authentication-patterns"
 SKILL_LEN=$(printf '%s' "${SKILL_NAME}" | wc -c | tr -d ' ')
 
 if validate_skill_name_length "${SKILL_NAME}" 2>/dev/null; then
-  mkdir -p "${TMPDIR_5}/skills/${SKILL_NAME}"
-  if [ -d "${TMPDIR_5}/skills/${SKILL_NAME}" ]; then
+  mkdir -p "${TMPDIR_5}/.claude/skills/${SKILL_NAME}"
+  if [ -d "${TMPDIR_5}/.claude/skills/${SKILL_NAME}" ]; then
     pass "Directory created for valid skill name (${SKILL_LEN} chars)"
   else
     fail "Directory created for valid skill name" "directory exists" "directory missing"
@@ -225,11 +240,11 @@ LONG_NAME="abcdefghij-klmnopqrst-uvwxyz-abcdefghijkl"
 LONG_LEN=$(printf '%s' "${LONG_NAME}" | wc -c | tr -d ' ')
 
 if validate_skill_name_length "${LONG_NAME}" 2>/dev/null; then
-  mkdir -p "${TMPDIR_6}/skills/${LONG_NAME}"
+  mkdir -p "${TMPDIR_6}/.claude/skills/${LONG_NAME}"
   fail "Over-limit skill name should be rejected" "validation failure" "validation passed"
 else
   # Skill directory should NOT be created
-  if [ ! -d "${TMPDIR_6}/skills/${LONG_NAME}" ]; then
+  if [ ! -d "${TMPDIR_6}/.claude/skills/${LONG_NAME}" ]; then
     pass "Directory NOT created for over-limit skill name (${LONG_LEN} chars)"
   else
     fail "Directory NOT created for over-limit skill name" "no directory" "directory exists"
@@ -246,8 +261,8 @@ if [ "${BOUNDARY_LEN}" -ne 40 ]; then
   fail "Test fixture is exactly 40 chars" "40" "${BOUNDARY_LEN}"
 else
   if validate_skill_name_length "${BOUNDARY_NAME}" 2>/dev/null; then
-    mkdir -p "${TMPDIR_7}/skills/${BOUNDARY_NAME}"
-    if [ -d "${TMPDIR_7}/skills/${BOUNDARY_NAME}" ]; then
+    mkdir -p "${TMPDIR_7}/.claude/skills/${BOUNDARY_NAME}"
+    if [ -d "${TMPDIR_7}/.claude/skills/${BOUNDARY_NAME}" ]; then
       pass "Directory created for boundary skill name (40 chars)"
     else
       fail "Directory created for boundary skill name" "directory exists" "directory missing"
@@ -345,7 +360,7 @@ It was created via the fallback path when init_skill.py was unavailable.
 ## Examples
 
 Example fallback creation:
-  mkdir -p skills/${_fb_skill_name}
+  mkdir -p .claude/skills/${_fb_skill_name}
   # Write SKILL.md with frontmatter and body content
 
 ## References
@@ -370,7 +385,7 @@ fi
 run_test "Fallback creates SKILL.md when init_skill.py is unavailable"
 TMPDIR_9=$(make_temp_dir)
 FB_SKILL_NAME="fallback-test-skill"
-FB_SKILLS_DIR="${TMPDIR_9}/skills"
+FB_SKILLS_DIR="${TMPDIR_9}/.claude/skills"
 mkdir -p "${FB_SKILLS_DIR}"
 
 create_skill_fallback "${FB_SKILL_NAME}" "${FB_SKILLS_DIR}"
@@ -438,9 +453,13 @@ fi
 # Test 13: Fallback SKILL.md passes list-skills.sh parsing
 run_test "Fallback SKILL.md passes list-skills.sh parsing"
 if [ -f "${LIST_SKILLS_SH}" ]; then
-  # Set SDD_ROOT_DIR to our temp dir so list-skills.sh finds the test skill
-  LIST_OUTPUT=$(SDD_ROOT_DIR="${TMPDIR_9}" sh "${LIST_SKILLS_SH}" 2>/dev/null)
+  # Create an isolated git repo and copy the fallback skill into .claude/skills/
+  TMPDIR_13=$(make_temp_dir)
+  setup_test_git_repo "${TMPDIR_13}"
+  cp -r "${FB_SKILLS_DIR}/${FB_SKILL_NAME}" "${TMPDIR_13}/.claude/skills/"
+  LIST_OUTPUT=$(cd "${TMPDIR_13}" && sh "${LIST_SKILLS_SH}" 2>/dev/null)
   LIST_EXIT=$?
+  cd "${ORIG_DIR}"
 
   if [ "${LIST_EXIT}" -eq 0 ]; then
     pass "list-skills.sh exits 0 with fallback skill"
@@ -495,16 +514,20 @@ if [ -f "${INIT_SKILL_PY}" ]; then
     create_skill_fallback "${INIT_SKILL_NAME}" "${FB_SKILLS_DIR_14}"
 
     # Functional comparison: both should be parseable by list-skills.sh
-    INIT_LIST=$(SDD_ROOT_DIR="${TMPDIR_14}/init-root" sh -c "
-      mkdir -p \"${TMPDIR_14}/init-root/skills\"
-      cp -r \"${INIT_SKILLS_DIR}/${INIT_SKILL_NAME}\" \"${TMPDIR_14}/init-root/skills/\"
-      SDD_ROOT_DIR=\"${TMPDIR_14}/init-root\" sh \"${LIST_SKILLS_SH}\" 2>/dev/null
-    ")
-    FB_LIST=$(SDD_ROOT_DIR="${TMPDIR_14}/fb-root" sh -c "
-      mkdir -p \"${TMPDIR_14}/fb-root/skills\"
-      cp -r \"${FB_SKILLS_DIR_14}/${INIT_SKILL_NAME}\" \"${TMPDIR_14}/fb-root/skills/\"
-      SDD_ROOT_DIR=\"${TMPDIR_14}/fb-root\" sh \"${LIST_SKILLS_SH}\" 2>/dev/null
-    ")
+    # Create isolated git repos for each comparison
+    INIT_REPO="${TMPDIR_14}/init-root"
+    mkdir -p "${INIT_REPO}"
+    setup_test_git_repo "${INIT_REPO}"
+    cp -r "${INIT_SKILLS_DIR}/${INIT_SKILL_NAME}" "${INIT_REPO}/.claude/skills/"
+    INIT_LIST=$(cd "${INIT_REPO}" && sh "${LIST_SKILLS_SH}" 2>/dev/null)
+    cd "${ORIG_DIR}"
+
+    FB_REPO="${TMPDIR_14}/fb-root"
+    mkdir -p "${FB_REPO}"
+    setup_test_git_repo "${FB_REPO}"
+    cp -r "${FB_SKILLS_DIR_14}/${INIT_SKILL_NAME}" "${FB_REPO}/.claude/skills/"
+    FB_LIST=$(cd "${FB_REPO}" && sh "${LIST_SKILLS_SH}" 2>/dev/null)
+    cd "${ORIG_DIR}"
 
     # Both should contain the skill name
     INIT_HAS_NAME=0
@@ -574,7 +597,7 @@ if [ -f "${INIT_SKILL_PY}" ]; then
 
     # Fallback should still work while init_skill.py is hidden
     TMPDIR_15=$(make_temp_dir)
-    FB_SKILLS_DIR_15="${TMPDIR_15}/skills"
+    FB_SKILLS_DIR_15="${TMPDIR_15}/.claude/skills"
     mkdir -p "${FB_SKILLS_DIR_15}"
     create_skill_fallback "rename-test-skill" "${FB_SKILLS_DIR_15}"
 
