@@ -56,38 +56,40 @@ scan_epic() {
     local tickets_created="false"
 
     # Check if overview.md exists
-    if [[ ! -f "$overview_file" ]]; then
-        echo "Warning: Missing overview.md in $epic_name" >&2
+    if [ ! -f "$overview_file" ]; then
+        echo "Warning: Missing overview.md in $epic_path" >&2
         return 1
     fi
 
-    # Check checkbox states using grep - match checkbox lines
-    # Handle both [x] and [X] as checked
-    local research_count=$(grep -c '^-[[:space:]]*\[x\][[:space:]]*Research complete\|^-[[:space:]]*\[X\][[:space:]]*Research complete' "$overview_file" 2>/dev/null || true)
-    local analysis_count=$(grep -c '^-[[:space:]]*\[x\][[:space:]]*Analysis complete\|^-[[:space:]]*\[X\][[:space:]]*Analysis complete' "$overview_file" 2>/dev/null || true)
-    local decomposition_count=$(grep -c '^-[[:space:]]*\[x\][[:space:]]*Decomposition complete\|^-[[:space:]]*\[X\][[:space:]]*Decomposition complete' "$overview_file" 2>/dev/null || true)
-    local tickets_count=$(grep -c '^-[[:space:]]*\[x\][[:space:]]*Tickets created\|^-[[:space:]]*\[X\][[:space:]]*Tickets created' "$overview_file" 2>/dev/null || true)
+    # Detect status via content existence (not checkbox parsing)
+    # Research complete: research-synthesis.md must be substantive (>500 bytes)
+    if check_file_substantive "$epic_path/analysis/research-synthesis.md"; then
+        research_complete=true
+    fi
 
-    # Convert counts to boolean
-    if [[ -n "$research_count" ]] && [[ $research_count -gt 0 ]]; then
-        research_complete="true"
+    # Analysis complete: both opportunity-map.md AND domain-model.md must be substantive
+    if check_file_substantive "$epic_path/analysis/opportunity-map.md" && \
+       check_file_substantive "$epic_path/analysis/domain-model.md"; then
+        analysis_complete=true
     fi
-    if [[ -n "$analysis_count" ]] && [[ $analysis_count -gt 0 ]]; then
-        analysis_complete="true"
+
+    # Decomposition complete: multi-ticket-overview.md substantive AND ticket-summaries has .md files
+    if check_file_substantive "$epic_path/decomposition/multi-ticket-overview.md" && \
+       check_dir_has_md_files "$epic_path/decomposition/ticket-summaries"; then
+        decomposition_complete=true
     fi
-    if [[ -n "$decomposition_count" ]] && [[ $decomposition_count -gt 0 ]]; then
-        decomposition_complete="true"
-    fi
-    if [[ -n "$tickets_count" ]] && [[ $tickets_count -gt 0 ]]; then
-        tickets_created="true"
+
+    # Tickets created: ticket-summaries directory has .md files
+    if check_dir_has_md_files "$epic_path/decomposition/ticket-summaries"; then
+        tickets_created=true
     fi
 
     # Calculate progress
     local checked=0
-    [[ "$research_complete" == "true" ]] && ((checked++))
-    [[ "$analysis_complete" == "true" ]] && ((checked++))
-    [[ "$decomposition_complete" == "true" ]] && ((checked++))
-    [[ "$tickets_created" == "true" ]] && ((checked++))
+    [ "$research_complete" = "true" ] && checked=$((checked + 1))
+    [ "$analysis_complete" = "true" ] && checked=$((checked + 1))
+    [ "$decomposition_complete" = "true" ] && checked=$((checked + 1))
+    [ "$tickets_created" = "true" ] && checked=$((checked + 1))
     local progress="$checked/4"
 
     # Output JSON object
