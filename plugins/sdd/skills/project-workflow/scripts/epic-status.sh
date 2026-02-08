@@ -15,6 +15,35 @@ set -euo pipefail
 
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 
+# Check if a file has substantive content (exceeds byte threshold)
+# Args: $1 = file path, $2 = threshold in bytes (default: 500)
+# Returns: 0 if file exists and exceeds threshold, 1 otherwise
+check_file_substantive() {
+    local file="$1"
+    local threshold="${2:-500}"
+    if [ -f "$file" ]; then
+        local size
+        size=$(stat -c%s "$file" 2>/dev/null || echo "0")
+        [ "$size" -gt "$threshold" ]
+    else
+        return 1
+    fi
+}
+
+# Check if a directory contains any .md files
+# Args: $1 = directory path
+# Returns: 0 if directory exists and contains .md files, 1 otherwise
+check_dir_has_md_files() {
+    local dir="$1"
+    if [ -d "$dir" ]; then
+        local count
+        count=$(find "$dir" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+        [ "$count" -gt 0 ]
+    else
+        return 1
+    fi
+}
+
 # Extract epic info from overview.md file
 scan_epic() {
     local epic_path="$1"
