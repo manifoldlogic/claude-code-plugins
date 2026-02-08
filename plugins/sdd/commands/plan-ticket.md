@@ -194,6 +194,7 @@ After displaying the report above, use the **AskUserQuestion** tool to present n
 **Options:**
 - Label: "/sdd:review {TICKET_ID}" | Description: "Verify planning quality before creating tasks"
 - Label: "/sdd:create-tasks {TICKET_ID}" | Description: "Skip review and create tasks directly"
+- Label: "Create a worktree for {TICKET_ID}" | Description: "Create an isolated development environment: spawn-worktree.sh {TICKET_ID} --repo <repo-name>"
 - Label: "/sdd:status" | Description: "Check current ticket and task status"
 
 Where {TICKET_ID} is the actual ticket ID from the command execution context (e.g., "APIV2", "AUTH"), NOT the literal placeholder text.
