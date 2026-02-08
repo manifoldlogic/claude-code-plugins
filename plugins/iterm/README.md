@@ -2,15 +2,17 @@
 
 ## Overview
 
-The iTerm plugin provides iTerm2 tab management capabilities for Claude Code, enabling automated terminal tab creation and management from both macOS host environments and Linux containers. This plugin is designed for developers who work in devcontainer-based workflows and need seamless terminal integration.
+The iTerm plugin provides iTerm2 tab and pane management capabilities for Claude Code, enabling automated terminal tab creation, pane splitting, and management from both macOS host environments and Linux containers. This plugin is designed for developers who work in devcontainer-based workflows and need seamless terminal integration. It includes both executable scripts and pattern documentation for development reference.
 
 ### Key Features
 
 - **Tab Creation**: Open new iTerm2 tabs programmatically with specified profiles
-- **Directory Navigation**: Create tabs pre-navigated to specific directories
-- **Command Execution**: Open tabs and execute commands automatically
+- **Pane Splitting**: Split existing tabs into horizontal or vertical panes
+- **Directory Navigation**: Create tabs or panes pre-navigated to specific directories
+- **Command Execution**: Open tabs or panes and execute commands automatically
 - **Dual-Mode Support**: Works from both macOS host and Linux containers
 - **Profile Integration**: Use custom iTerm2 profiles for different contexts (e.g., "Devcontainer" profile)
+- **Pattern Documentation**: Reference skills documenting reusable development patterns
 
 ## Requirements
 
@@ -268,11 +270,27 @@ Then rebuild the container: F1 > "Dev Containers: Rebuild Container"
 
 ## Skills Reference
 
-This plugin provides the following skill:
+This plugin provides the following skills:
+
+### Executable Skills
+
+These skills contain scripts that perform actions in iTerm2.
 
 | Skill | Description | Documentation |
 |-------|-------------|---------------|
-| tab-management | Core iTerm2 tab operations (open, navigate, execute) | [SKILL.md](skills/tab-management/SKILL.md) |
+| tab-management | iTerm2 tab management for opening, listing, and closing terminal tabs | [SKILL.md](skills/tab-management/SKILL.md) |
+| pane-management | iTerm2 pane splitting for creating new panes within existing tabs | [SKILL.md](skills/pane-management/SKILL.md) |
+
+### Pattern/Reference Skills
+
+These skills document reusable patterns and conventions used across the plugin. They serve as reference documentation rather than executable tools.
+
+| Skill | Description | Documentation |
+|-------|-------------|---------------|
+| eleven-category-test-structure | Pattern for organizing comprehensive test suites (reference) | [SKILL.md](skills/eleven-category-test-structure/SKILL.md) |
+| iterm-applescript-generation | Pattern for building dynamic AppleScript from shell (reference) | [SKILL.md](skills/iterm-applescript-generation/SKILL.md) |
+| iterm-cross-skill-sourcing | Pattern for sourcing shared utilities across skill directories (reference) | [SKILL.md](skills/iterm-cross-skill-sourcing/SKILL.md) |
+| iterm-nine-section-structure | Pattern for standardized script organization (reference) | [SKILL.md](skills/iterm-nine-section-structure/SKILL.md) |
 
 ## Directory Structure
 
@@ -281,10 +299,21 @@ plugins/iterm/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── skills/
-│   └── tab-management/
-│       ├── SKILL.md
-│       ├── scripts/
-│       └── references/
+│   ├── tab-management/                    # Executable: tab open/list/close
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   └── references/
+│   ├── pane-management/                   # Executable: pane splitting
+│   │   ├── SKILL.md
+│   │   └── scripts/
+│   ├── eleven-category-test-structure/    # Pattern: test suite organization
+│   │   └── SKILL.md
+│   ├── iterm-applescript-generation/      # Pattern: AppleScript from shell
+│   │   └── SKILL.md
+│   ├── iterm-cross-skill-sourcing/        # Pattern: shared utility sourcing
+│   │   └── SKILL.md
+│   └── iterm-nine-section-structure/      # Pattern: script organization
+│       └── SKILL.md
 └── README.md
 ```
 

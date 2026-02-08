@@ -45,6 +45,11 @@
       "name": "vscode",
       "source": "./plugins/vscode",
       "description": "VS Code and Cursor workspace configuration management - create and modify .code-workspace files, manage folders, settings, extensions, and more"
+    },
+    {
+      "name": "iterm",
+      "source": "./plugins/iterm",
+      "description": "iTerm2 tab and pane management for macOS host and Linux container environments"
     }
   ]
 }
