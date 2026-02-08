@@ -38,6 +38,8 @@ The worktree workflow consists of five phases:
 ### 1. Create
 Create a new worktree with a dedicated branch:
 
+**Naming:** Always use the user's exact input as the worktree/branch name. Do not add prefixes, suffixes, or modify the name in any way. If the user says "create worktree PANE-001", the name is `PANE-001`.
+
 ```bash
 crewchief worktree create feature-x
 ```
