@@ -1,6 +1,6 @@
 # Skill Creation Workflow
 
-This document provides step-by-step instructions for creating a new repo-local skill under `${SDD_ROOT_DIR}/skills/`. Follow these steps in order.
+This document provides step-by-step instructions for creating a new repo-local skill under `.claude/skills/`. Follow these steps in order.
 
 ## Step 1: Detect Skill Candidate
 
@@ -40,22 +40,22 @@ The skill name must conform to these rules:
 
 ## Step 3: Create Skill Directory
 
-Create the skill directory under `${SDD_ROOT_DIR}/skills/`:
+Create the skill directory under `.claude/skills/`:
 
 ```bash
-mkdir -p "${SDD_ROOT_DIR}/skills/{skill-name}"
+mkdir -p ".claude/skills/{skill-name}"
 ```
 
 Optionally create subdirectories if the skill needs them:
 
 ```bash
-mkdir -p "${SDD_ROOT_DIR}/skills/{skill-name}/references"
-mkdir -p "${SDD_ROOT_DIR}/skills/{skill-name}/scripts"
+mkdir -p ".claude/skills/{skill-name}/references"
+mkdir -p ".claude/skills/{skill-name}/scripts"
 ```
 
 ## Step 4: Create SKILL.md
 
-Create `${SDD_ROOT_DIR}/skills/{skill-name}/SKILL.md` using the template below. Replace all `{placeholder}` values with actual content. The final SKILL.md must have no placeholders or TODO markers.
+Create `.claude/skills/{skill-name}/SKILL.md` using the template below. Replace all `{placeholder}` values with actual content. The final SKILL.md must have no placeholders or TODO markers.
 
 ### SKILL.md Template
 
@@ -117,7 +117,7 @@ After creating the skill, verify it meets all requirements:
 
 1. **SKILL.md exists:**
    ```bash
-   test -f "${SDD_ROOT_DIR}/skills/{skill-name}/SKILL.md"
+   test -f ".claude/skills/{skill-name}/SKILL.md"
    ```
 
 2. **Frontmatter is valid:**
@@ -172,7 +172,7 @@ After creating the skill, verify it meets all requirements:
 
 ## Validation Rules
 
-1. **Skill name must match directory name:** The `name` field in frontmatter must exactly match the directory name under `${SDD_ROOT_DIR}/skills/`.
+1. **Skill name must match directory name:** The `name` field in frontmatter must exactly match the directory name under `.claude/skills/`.
 
 2. **No path traversal:** Skill names must not contain `/`, `\`, or `..`. These are rejected to prevent directory traversal attacks.
 

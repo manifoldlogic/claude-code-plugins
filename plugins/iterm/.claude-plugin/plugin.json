@@ -1,8 +1,13 @@
 {
   "name": "iterm",
-  "version": "0.2.0",
-  "description": "iTerm2 tab management for macOS host and Linux container environments",
+  "version": "0.3.0",
+  "description": "iTerm2 tab and pane management for macOS host and Linux container environments",
   "skills": [
-    "skills/tab-management"
+    "skills/tab-management",
+    "skills/pane-management",
+    "skills/eleven-category-test-structure",
+    "skills/iterm-applescript-generation",
+    "skills/iterm-cross-skill-sourcing",
+    "skills/iterm-nine-section-structure"
   ]
 }
