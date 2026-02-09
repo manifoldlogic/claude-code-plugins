@@ -67,36 +67,36 @@ This skill sources `iterm-utils.sh` from the tab-management skill directory. If 
 
 ## Skills Overview
 
-| Skill | Script | Purpose |
-|-------|--------|---------|
-| `iterm:split-pane` | `iterm-split-pane.sh` | Split current session into a new pane with direction, profile, command, and name options |
+| Skill | Description | Key Flags |
+|-------|-------------|-----------|
+| `iterm:split-pane` | Split current session into a new pane with direction, profile, command, and name options | `-d` direction, `-p` profile, `-c` command, `-n` name |
+| `iterm:list-panes` | List all panes across windows and tabs in table or JSON format with optional filtering | `-f` format (table/json), `-w` window filter, `-t` tab filter, `--dry-run` |
+| `iterm:close-pane` | Close panes by substring pattern matching on session names with confirmation prompts | `<pattern>` argument, `--force`, `-w` window filter, `-t` tab filter |
 
 ## Decision Tree
 
 ```
-What do you need to do?
-    |
-    +-- Need a new pane alongside current work?
-    |       |
-    |       +-- Side-by-side comparison or editing?
-    |       |       --> Use iterm:split-pane -d vertical
-    |       |
-    |       +-- Stacked layout (code above, output below)?
-    |       |       --> Use iterm:split-pane -d horizontal
-    |       |
-    |       +-- Need to run a command in the new pane?
-    |       |       --> Add -c "your command here"
-    |       |
-    |       +-- Need to navigate to a directory?
-    |               --> Use -c "cd /path/to/directory"
-    |               (NOT -d, which sets split direction)
-    |
-    +-- Need a completely separate workspace?
-    |       --> Use tab-management skill (iterm:open-tab) instead
-    |
-    +-- No iTerm2 windows exist?
-            --> Use tab-management skill to create a window first
-            (iterm:split-pane requires an existing window)
+User Request
+├─ Need a separate workspace or full-width terminal?
+│   └─ Yes → Use tab-management skill (iterm:open-tab)
+├─ Need to create a window first (none exist)?
+│   └─ Yes → Use tab-management skill (iterm:open-tab)
+│       (pane-management requires an existing window)
+└─ Want side-by-side panes in the current tab?
+    └─ Yes → Use pane-management skill
+        ├─ Create a new pane?
+        │   └─ Use iterm:split-pane — which direction?
+        │       ├─ "right", "side by side", "beside" → -d vertical
+        │       └─ "below", "under", "stacked", "bottom" → -d horizontal
+        ├─ See current pane layout?
+        │   └─ Use iterm:list-panes
+        │       ├─ Quick visual check → default table format
+        │       └─ Programmatic parsing → -f json
+        └─ Remove a pane?
+            └─ Use iterm:close-pane <pattern>
+                ├─ Preview first → --dry-run "pattern"
+                ├─ With confirmation → "pattern"
+                └─ Automated (no prompts) → --force "pattern"
 ```
 
 ## Common Scenarios
@@ -239,8 +239,7 @@ All exit codes are defined in `iterm-utils.sh` and shared across iterm skills:
 | 1 | EXIT_CONNECTION_FAIL | SSH/connection failure | SSH key issues, HOST_USER not set, network problems, AppleScript execution failure |
 | 2 | EXIT_ITERM_UNAVAILABLE | iTerm2 not available | iTerm2 not installed, not at expected path |
 | 3 | EXIT_INVALID_ARGS | Invalid arguments | Unknown flags, missing required values, invalid direction, iterm-utils.sh not found |
-
-**Note:** Unlike tab-management which also defines exit code 4 (EXIT_NO_MATCH for close-tab), pane-management only uses codes 0-3.
+| 4 | EXIT_NO_MATCH | Pattern matches no panes | (close-pane only) No panes match the provided pattern |
 
 **Example Error Handling:**
 ```bash
@@ -253,6 +252,7 @@ else
         1) echo "Connection failed - check SSH config" ;;
         2) echo "iTerm2 not available" ;;
         3) echo "Invalid arguments" ;;
+        4) echo "No panes matched pattern" ;;
         *) echo "Unknown error: $exit_code" ;;
     esac
     exit $exit_code
