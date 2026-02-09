@@ -174,71 +174,146 @@ This table maps common user requests to exact script invocations. Every command 
 
 ## Common Scenarios
 
-### Scenario 1: Vertical Split for Side-by-Side Work
+### Scenario 1: Split for Agent Work
 
-Split the current session vertically to work on code side-by-side:
+**Goal:** Spawn a Claude agent in an adjacent pane so you can continue working in your current session while the agent handles a separate task.
 
-```bash
-# Split vertically (default direction) with Devcontainer profile
-iterm-split-pane.sh
+**Steps:**
 
-# Explicitly specify vertical direction
-iterm-split-pane.sh -d vertical
-```
+1. Split the current session vertically to create a side-by-side layout:
+   ```bash
+   iterm-split-pane.sh -d vertical -n "Agent: auth fix"
+   ```
 
-**What happens:**
-1. Script detects execution context (host/container)
-2. Builds AppleScript targeting the current session of the first window
-3. Splits the current session vertically with the specified profile
-4. New pane appears to the right and receives focus
+2. In the new pane, start a Claude agent with a task:
+   ```bash
+   iterm-split-pane.sh -d vertical -c "cd /workspace/repos/my-project && echo 'investigate the auth timeout in src/auth.ts' | claude --dangerously-skip-permissions" -n "Agent: auth fix"
+   ```
 
-### Scenario 2: Horizontal Split for Log Monitoring
+**Outcome:** The agent runs in the right pane working on the auth investigation while you continue editing in the left pane. The pane title "Agent: auth fix" makes it easy to identify later.
 
-Split horizontally to monitor logs or output below your working pane:
+### Scenario 2: Split for Test Monitoring
 
-```bash
-# Split horizontally for stacked layout
-iterm-split-pane.sh -d horizontal -n "Logs"
-```
+**Goal:** See test output continuously in a split pane while editing code in the main pane.
 
-**What happens:**
-1. Current session splits horizontally
-2. New pane appears below and receives focus
-3. Pane title is set to "Logs" for identification
+**Steps:**
 
-### Scenario 3: Split with Command Execution
+1. Split horizontally to create a stacked layout with tests running below:
+   ```bash
+   iterm-split-pane.sh -d horizontal -c "cd /workspace/repos/my-project && npm test -- --watch" -n "Tests"
+   ```
 
-Open a new pane and immediately run a command:
+2. The test watcher starts immediately in the bottom pane. As you save files in the top pane, test results update automatically below.
 
-```bash
-# Split and run git status
-iterm-split-pane.sh -c "git status"
+**Outcome:** Tests run in the bottom pane in watch mode. The top pane remains your primary editing workspace. The pane title "Tests" identifies the pane in listings.
 
-# Split and start a dev server
-iterm-split-pane.sh -d horizontal -c "npm run dev" -n "Dev Server"
+### Scenario 3: Multi-Pane Development Layout
 
-# Split and run tests
-iterm-split-pane.sh -d vertical -c "npm test -- --watch" -n "Tests"
-```
+**Goal:** Create a 3-pane layout in a single tab with editing space, test output, and log tailing.
 
-**What happens:**
-1. Pane splits in the specified direction
-2. The command is written to the new pane's session
-3. Command executes in the context of the pane's profile/shell
+**Steps:**
 
-### Scenario 4: Navigate to Directory in New Pane
+1. Split vertically to create a right-side pane for test output:
+   ```bash
+   iterm-split-pane.sh -d vertical -c "cd /workspace/repos/my-project && npm test -- --watch" -n "Tests"
+   ```
 
-Open a pane in a specific directory (use `-c` for navigation, not `-d`):
+2. Split the new pane horizontally to add a log tail below it:
+   ```bash
+   iterm-split-pane.sh -d horizontal -c "tail -f /workspace/repos/my-project/logs/app.log" -n "Logs"
+   ```
 
-```bash
-# Navigate to a project directory in the new pane
-iterm-split-pane.sh -c "cd /workspace/repos/my-project"
+3. Verify the layout by listing panes in the current tab:
+   ```bash
+   iterm-list-panes.sh -t 1
+   ```
 
-# Navigate and then run a command
-iterm-split-pane.sh -c "cd /workspace/repos/my-project && git log --oneline -10"
-```
+**Outcome:** Three panes in one tab: the original editing pane on the left, tests in the top-right, and logs in the bottom-right. Each pane has a descriptive title visible in the listing.
 
-**Important:** The `-d` flag sets split **direction** (vertical/horizontal), not directory. Use `-c` with a `cd` command for navigation.
+### Scenario 4: List and Inspect Pane Layout
+
+**Goal:** See the current pane organization across all windows and tabs to understand what is running where.
+
+**Steps:**
+
+1. List all panes in table format for a quick visual overview:
+   ```bash
+   iterm-list-panes.sh
+   ```
+   Output:
+   ```
+   Window  Tab  Pane  Name
+   1       1    1     Devcontainer
+   1       1    2     Tests
+   1       1    3     Logs
+   1       2    1     claude-code-plugins
+   ```
+
+2. List panes in the current tab as JSON for programmatic use:
+   ```bash
+   iterm-list-panes.sh -w 1 -t 1 -f json
+   ```
+
+3. Filter to a specific window to see only its panes:
+   ```bash
+   iterm-list-panes.sh -w 1
+   ```
+
+**Outcome:** You can see every pane's window index, tab index, pane index, and session name. JSON output is useful for scripting; table output gives a quick visual check. Filters narrow the view to specific windows or tabs.
+
+### Scenario 5: Pane Cleanup After Agents Complete
+
+**Goal:** Close multiple agent panes that have finished their work, keeping only the main development pane.
+
+**Steps:**
+
+1. List panes to see which ones match the agent naming pattern:
+   ```bash
+   iterm-list-panes.sh
+   ```
+   Output:
+   ```
+   Window  Tab  Pane  Name
+   1       1    1     Devcontainer
+   1       1    2     Agent: auth fix
+   1       1    3     Agent: test refactor
+   1       2    1     claude-code-plugins
+   ```
+
+2. Preview which panes would be closed using dry-run:
+   ```bash
+   iterm-close-pane.sh --dry-run "Agent:"
+   ```
+
+3. Close all agent panes (skip confirmation since you already previewed):
+   ```bash
+   iterm-close-pane.sh --force "Agent:"
+   ```
+
+**Outcome:** Both "Agent: auth fix" and "Agent: test refactor" panes are closed. The main "Devcontainer" pane and the "claude-code-plugins" tab remain open. Panes are closed in reverse order to prevent index shifting issues.
+
+### Scenario 6: Spawn Agent in Pane via spawn-agent.sh
+
+**Goal:** Use the `spawn-agent.sh` wrapper to spawn a Claude agent in a split pane with a single command, instead of manually building the split and agent command.
+
+**Steps:**
+
+1. Spawn an agent in a vertical split pane with a task description:
+   ```bash
+   spawn-agent.sh --pane --direction vertical /workspace/repos/my-project "investigate the failing CI pipeline"
+   ```
+
+2. Or spawn an agent in a horizontal split for a stacked layout:
+   ```bash
+   spawn-agent.sh --pane --direction horizontal /workspace/repos/my-project "refactor the database connection pool"
+   ```
+
+3. Spawn an agent in a pane using defaults (vertical direction, current directory):
+   ```bash
+   spawn-agent.sh --pane
+   ```
+
+**Outcome:** The wrapper delegates to `iterm-split-pane.sh` with the correct flags, builds the Claude command with the task description piped in, and sets the pane name from the task. The agent starts running in the new pane immediately. If the plugin script is unavailable, spawn-agent.sh falls back to its built-in AppleScript implementation.
 
 ## Script Reference
 
