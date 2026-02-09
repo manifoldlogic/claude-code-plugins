@@ -44,66 +44,26 @@ The pane-management skill provides iTerm2 pane management capabilities for Claud
 
 - **macOS Host System**: iTerm2 is macOS-only; these scripts require a macOS host
 - **iTerm2 Installed**: Must be installed at `/Applications/iTerm.app`
-  - Install from: https://iterm2.com
-- **Existing iTerm2 Window**: At least one window must be open (the script does not create windows)
+- **Existing iTerm2 Window**: At least one window must be open. Unlike tab-management, pane-management will **not** create a new window if none exists. Use `iterm:open-tab` first if no window is available.
 
-### Container Mode Requirements
+### Container Mode
 
-When running from inside a devcontainer:
+- SSH access to `host.docker.internal` with mounted SSH keys
+- `HOST_USER` environment variable set in `devcontainer.json`
+- iTerm2 "Devcontainer" profile configured
 
-- **SSH Access to Host**: Container must be able to SSH to `host.docker.internal`
-  - Configured via post-start.sh in devcontainer setup
-  - SSH keys mounted at `~/.ssh/id_ed25519`
+See the tab-management SKILL.md section "Container Mode Requirements" for full SSH setup, HOST_USER configuration, and profile details.
 
-- **HOST_USER Environment Variable**: Required for SSH connection
-  - Set in devcontainer.json:
-    ```json
-    {
-      "remoteEnv": {
-        "HOST_USER": "your-macos-username"
-      }
-    }
-    ```
+### Host Mode
 
-- **iTerm2 Profiles Configured**: Especially the "Devcontainer" profile
-  - Profile should have startup script that connects to the container
-  - Configured in iTerm2 Preferences > Profiles > Command
+- iTerm2 running with at least one window open
+- AppleScript permissions granted (System Preferences > Privacy & Security > Automation)
 
-### Host Mode Requirements
-
-When running directly on macOS:
-
-- **iTerm2 Running**: At least one window must exist
-- **AppleScript Permissions**: System Preferences > Privacy & Security > Automation
-  - Terminal (or calling app) must have permission to control iTerm2
+See the tab-management SKILL.md section "Host Mode Requirements" for details.
 
 ### Shared Utilities
 
-This skill sources `iterm-utils.sh` from the sibling tab-management skill directory:
-
-```
-plugins/iterm/skills/
-  tab-management/scripts/iterm-utils.sh   <-- shared utilities
-  pane-management/scripts/iterm-split-pane.sh  <-- sources from above
-```
-
-This cross-skill sourcing pattern provides shared functions for context detection, AppleScript execution, SSH transport, and validation. If `iterm-utils.sh` cannot be sourced, the script exits with code 3.
-
-### Verification Commands
-
-```bash
-# Check if running in container vs host
-uname -s  # Darwin = host, Linux = container
-
-# Verify iTerm2 (host only)
-ls /Applications/iTerm.app
-
-# Test SSH connectivity (container only)
-ssh -o BatchMode=yes -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal "echo OK"
-
-# Check HOST_USER is set (container only)
-echo "HOST_USER=${HOST_USER:-NOT SET}"
-```
+This skill sources `iterm-utils.sh` from the tab-management skill directory. If `iterm-utils.sh` cannot be sourced, the script exits with code 3. See the tab-management SKILL.md for verification commands and utility details.
 
 ## Skills Overview
 
@@ -262,65 +222,12 @@ iterm-split-pane.sh -d vertical -p "Development" -c "npm test" -n "Test Runner"
 
 The script automatically detects whether it is running on the macOS host or inside a container and adapts its execution strategy. This detection uses the shared `iterm-utils.sh` from the tab-management skill.
 
-### Detection Logic
+- **Host mode**: AppleScript executed directly via `osascript` (~100ms latency)
+- **Container mode**: AppleScript base64-encoded and sent via SSH to `host.docker.internal` (~500ms latency)
 
-```
-Start
-  |
-  v
-Check: /.dockerenv exists?
-  |
-  +-- Yes --> CONTAINER MODE
-  |
-  v
-Check: /proc/1/cgroup contains "docker"?
-  |
-  +-- Yes --> CONTAINER MODE
-  |
-  v
-Check: uname != "Darwin"?
-  |
-  +-- Yes --> CONTAINER MODE (Linux implies container)
-  |
-  v
-HOST MODE
-```
+**Pane-specific difference:** Pane operations require an existing window and will not create one. In both modes, the script targets the `first window` in its AppleScript. If no window exists, the script returns "NO_WINDOWS" (exit code 2). Use `iterm:open-tab` to create a window first.
 
-### Host Mode
-
-**How it works:**
-- AppleScript executed directly via `osascript`
-- No SSH required
-- Immediate execution
-
-**Requirements:**
-- iTerm2 installed at `/Applications/iTerm.app`
-- AppleScript permissions granted
-- At least one iTerm2 window open
-
-### Container Mode
-
-**How it works:**
-1. AppleScript is base64-encoded (avoids shell escaping issues)
-2. Encoded script sent via SSH to `host.docker.internal`
-3. Decoded and written to temporary file on host
-4. Executed via `osascript` on host
-5. Temporary file cleaned up via trap handlers
-
-**Requirements:**
-- SSH access to `host.docker.internal`
-- `HOST_USER` environment variable set
-- SSH keys mounted in container
-
-### Behavior Comparison
-
-| Aspect | Host Mode | Container Mode |
-|--------|-----------|----------------|
-| AppleScript Execution | Direct osascript | SSH + osascript |
-| Latency | ~100ms | ~500ms (SSH overhead) |
-| Environment Variable | Not required | HOST_USER required |
-| Prerequisites | iTerm2, permissions | SSH config, HOST_USER |
-| Debug Output | Direct | Via SSH tunnel |
+See the tab-management SKILL.md section "Execution Contexts" for the complete detection logic diagram, host/container mode details, and behavior comparison table.
 
 ## Exit Codes
 
