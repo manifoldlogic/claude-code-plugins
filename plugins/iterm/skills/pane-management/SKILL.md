@@ -1,6 +1,6 @@
 ---
 name: pane-management
-description: iTerm2 pane splitting for opening new panes within existing tabs from macOS host or Linux container environments.
+description: iTerm2 pane management for splitting, listing, and closing panes within existing tabs from macOS host or Linux container environments.
 ---
 
 # Pane Management Skill
@@ -11,13 +11,17 @@ description: iTerm2 pane splitting for opening new panes within existing tabs fr
 
 ## Overview
 
-The pane-management skill provides iTerm2 pane splitting capabilities for Claude Code, enabling automated creation of new panes within existing terminal tabs from both macOS host environments and Linux containers (via SSH tunneling).
+The pane-management skill provides iTerm2 pane management capabilities for Claude Code, enabling automated splitting, listing, and closing of panes within existing terminal tabs from both macOS host environments and Linux containers (via SSH tunneling).
 
 **Key Capabilities:**
 - Split the current iTerm2 session vertically or horizontally
 - Specify iTerm2 profiles for new panes
 - Execute commands in newly created panes
 - Set pane titles for identification
+- List all panes across windows and tabs with window/tab filtering
+- Close panes by substring pattern matching with confirmation prompts
+- JSON and table output formats for automation
+- Dry-run mode for all operations (split, list, close)
 - Automatic context detection (host vs container mode)
 
 **Important:** This skill splits panes within an existing iTerm2 window. It will not create a new window if none exists. Use the tab-management skill to create new tabs or windows first.
@@ -31,6 +35,8 @@ The pane-management skill provides iTerm2 pane splitting capabilities for Claude
 | Running tests while editing | Opening new worktree environments |
 | Quick reference pane (docs, git log) | Need full-width terminal workspace |
 | Comparing output from two commands | Creating new windows |
+| Batch close related panes by name pattern | Close tabs by name pattern |
+| Inventory panes across windows/tabs (JSON) | List tabs across windows (JSON) |
 
 ## Prerequisites
 
