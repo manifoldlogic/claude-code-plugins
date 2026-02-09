@@ -99,6 +99,79 @@ User Request
                 └─ Automated (no prompts) → --force "pattern"
 ```
 
+## Direction Terminology
+
+The `-d` flag for `iterm-split-pane.sh` accepts only two values: `vertical` and `horizontal`. The terminology follows iTerm2 convention where **vertical** means the divider is vertical (panes appear side by side, left/right) and **horizontal** means the divider is horizontal (panes appear stacked, top/bottom).
+
+| Natural Language | Flag Value | Visual Result |
+|------------------|------------|---------------|
+| "right", "to the right" | `vertical` | New pane appears to the right |
+| "left", "to the left" | `vertical` | New pane appears to the right (splits always add right/below) |
+| "below", "under", "underneath" | `horizontal` | New pane appears below |
+| "above", "over", "on top" | `horizontal` | New pane appears below (splits always add below) |
+| "side by side", "alongside", "beside" | `vertical` | Panes arranged left and right |
+| "stacked", "top and bottom", "one above the other" | `horizontal` | Panes arranged top and bottom |
+
+**Important clarifications:**
+- iTerm2 splits always place the new pane to the **right** (vertical) or **below** (horizontal). You cannot split to create a pane to the left or above.
+- If a user says "left" or "above", use the corresponding direction but note that the new pane still appears right/below. The existing content shifts.
+
+## Natural Language Mapping
+
+This table maps common user requests to exact script invocations. Every command listed has been verified against the script source.
+
+### Split Scenarios
+
+| User Says | Mapped To | Notes |
+|-----------|-----------|-------|
+| "split right" | `iterm-split-pane.sh -d vertical` | Default direction is already vertical; `-d vertical` is explicit |
+| "split below" | `iterm-split-pane.sh -d horizontal` | Horizontal divider creates top/bottom layout |
+| "split and run my tests" | `iterm-split-pane.sh -c "npm test"` | Uses default vertical direction; adjust command as needed |
+| "split right and run tests in watch mode" | `iterm-split-pane.sh -d vertical -c "npm test -- --watch"` | Combine direction and command |
+| "split below and start the dev server" | `iterm-split-pane.sh -d horizontal -c "npm run dev"` | Horizontal split with command execution |
+| "split with the ZSH profile" | `iterm-split-pane.sh -p ZSH` | Profile name must match an iTerm2 profile exactly |
+| "split and name it Logs" | `iterm-split-pane.sh -n Logs` | Sets the pane title for identification |
+| "open a pane below with Devcontainer profile running build" | `iterm-split-pane.sh -d horizontal -p Devcontainer -c "npm run build" -n "Build"` | All flags combined |
+| "split right and navigate to my project" | `iterm-split-pane.sh -d vertical -c "cd /workspace/repos/my-project"` | Use `-c` with `cd` for directory navigation, not `-d` |
+| "preview the split without doing it" | `iterm-split-pane.sh --dry-run -d vertical` | Dry-run shows generated AppleScript |
+
+### List Scenarios
+
+| User Says | Mapped To | Notes |
+|-----------|-----------|-------|
+| "show me all panes" | `iterm-list-panes.sh` | Default table format; shows Window, Tab, Pane, Name columns |
+| "list panes in window 1" | `iterm-list-panes.sh -w 1` | Window index is 1-based |
+| "list panes as JSON" | `iterm-list-panes.sh -f json` | JSON output for programmatic parsing |
+| "show panes in window 1, tab 2 as JSON" | `iterm-list-panes.sh -w 1 -t 2 -f json` | Filters combine with AND logic |
+| "what panes are in tab 3" | `iterm-list-panes.sh -t 3` | Tab filter across all windows |
+
+### Close Scenarios
+
+| User Says | Mapped To | Notes |
+|-----------|-----------|-------|
+| "close the test pane" | `iterm-close-pane.sh "test"` | Substring match on session name (case-sensitive) |
+| "force close all agent panes" | `iterm-close-pane.sh --force "agent"` | Skips confirmation prompt for multiple matches |
+| "close panes matching 'worker' in window 2" | `iterm-close-pane.sh -w 2 "worker"` | Pattern is a positional argument after options |
+| "preview which panes would be closed for 'dev'" | `iterm-close-pane.sh --dry-run "dev"` | Dry-run shows AppleScripts without executing |
+| "close the Logs pane in window 1, tab 1" | `iterm-close-pane.sh -w 1 -t 1 "Logs"` | Combined window and tab filter with pattern |
+
+### Agent Spawn Scenarios
+
+| User Says | Mapped To | Notes |
+|-----------|-----------|-------|
+| "spawn an agent in a new pane" | `spawn-agent.sh --pane` | Uses default vertical direction and current directory |
+| "spawn agent to the right to investigate auth" | `spawn-agent.sh --pane --direction vertical /workspace/repos/project "investigate auth"` | Positional args: worktree path then task description |
+| "spawn agent below in a horizontal split" | `spawn-agent.sh --pane --direction horizontal` | Direction only applies when `--pane` is set |
+
+### Ambiguous Cases
+
+| User Says | Resolution | Notes |
+|-----------|------------|-------|
+| "open a terminal" | Use **tab-management** skill (`iterm-open-tab.sh`) | Creates a separate workspace in a new tab; pane-management splits within existing tab |
+| "run something on the side" | Use **pane-management** skill (`iterm-split-pane.sh -d vertical`) | "On the side" implies side-by-side layout within the current tab |
+| "I need another shell" | Depends on context: tab-management for isolated workspace, pane-management for quick side panel | Ask the user whether they want an independent tab or a split pane |
+| "put the logs somewhere I can see them" | Use **pane-management** skill (`iterm-split-pane.sh -d horizontal -c "tail -f logs"`) | "Somewhere I can see" suggests visible alongside current work, i.e., a pane |
+
 ## Common Scenarios
 
 ### Scenario 1: Vertical Split for Side-by-Side Work
