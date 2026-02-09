@@ -525,21 +525,21 @@ See the tab-management SKILL.md section "Execution Contexts" for the complete de
 
 ## Exit Codes
 
-All exit codes are defined in `iterm-utils.sh` and shared across iterm skills:
+Codes 0-3 are defined in `iterm-utils.sh` (shared across all iterm skills). Code 4 is defined in `iterm-close-pane.sh`.
 
-| Exit Code | Constant | Meaning | Common Causes |
-|-----------|----------|---------|---------------|
-| 0 | EXIT_SUCCESS | Success | Pane split completed successfully |
-| 1 | EXIT_CONNECTION_FAIL | SSH/connection failure | SSH key issues, HOST_USER not set, network problems, AppleScript execution failure |
-| 2 | EXIT_ITERM_UNAVAILABLE | iTerm2 not available | iTerm2 not installed, not at expected path |
-| 3 | EXIT_INVALID_ARGS | Invalid arguments | Unknown flags, missing required values, invalid direction, iterm-utils.sh not found |
-| 4 | EXIT_NO_MATCH | Pattern matches no panes | (close-pane only) No panes match the provided pattern |
+| Code | Constant | Description | Used By |
+|------|----------|-------------|---------|
+| 0 | EXIT_SUCCESS | Operation completed successfully | All scripts |
+| 1 | EXIT_CONNECTION_FAIL | SSH connection to host failed | All scripts (container mode) |
+| 2 | EXIT_ITERM_UNAVAILABLE | iTerm2 not running or not accessible | All scripts |
+| 3 | EXIT_INVALID_ARGS | Invalid arguments or configuration | All scripts |
+| 4 | EXIT_NO_MATCH | No panes matched the specified pattern | iterm-close-pane.sh |
 
 **Example Error Handling:**
 ```bash
 #!/bin/bash
-if iterm-split-pane.sh -d vertical -c "npm test"; then
-    echo "Pane split successfully"
+if iterm-close-pane.sh --force "agent:"; then
+    echo "Panes closed successfully"
 else
     exit_code=$?
     case $exit_code in
@@ -555,13 +555,13 @@ fi
 
 ## Troubleshooting
 
-### Issue: "NO_WINDOWS" returned
+### Split-Specific Issues
 
-**Symptom:** The script returns "NO_WINDOWS" instead of splitting a pane.
+**"NO_WINDOWS" returned**
 
-**Cause:** No iTerm2 windows are open. Unlike tab-management (which can create new windows), pane-management requires an existing window to split within.
+The script returns "NO_WINDOWS" instead of splitting a pane. No iTerm2 windows are open. Unlike tab-management (which can create new windows), pane-management requires an existing window to split within.
 
-**Solution:**
+Solution:
 1. Open iTerm2 and ensure at least one window exists
 2. Or use the tab-management skill first to create a tab/window:
    ```bash
@@ -572,33 +572,11 @@ fi
    iterm-split-pane.sh -d vertical
    ```
 
-### Issue: "Failed to source iterm-utils.sh"
+**"Invalid direction" (exit code 3)**
 
-**Error Message:**
-```
-[ERROR] Failed to source iterm-utils.sh from /path/to/tab-management/scripts
-```
+The `-d` flag received a value other than `vertical` or `horizontal`. A common mistake is passing a directory path to `-d` (which sets direction, not directory).
 
-**Cause:** The shared utility file `iterm-utils.sh` in the tab-management skill directory cannot be found or sourced. The pane-management script depends on this file via cross-skill sourcing.
-
-**Solution:**
-1. Verify the tab-management skill directory exists:
-   ```bash
-   ls plugins/iterm/skills/tab-management/scripts/iterm-utils.sh
-   ```
-2. Ensure both skills are installed together (they share utilities)
-3. Check file permissions allow reading
-
-### Issue: "Invalid direction"
-
-**Error Message:**
-```
-[ERROR] Invalid direction: <value> (must be horizontal or vertical)
-```
-
-**Cause:** The `-d` flag received a value other than `vertical` or `horizontal`. A common mistake is passing a directory path to `-d` (which sets direction, not directory).
-
-**Solution:**
+Solution:
 - Use only `vertical` or `horizontal` with `-d`:
   ```bash
   iterm-split-pane.sh -d vertical
@@ -609,81 +587,98 @@ fi
   iterm-split-pane.sh -c "cd /workspace/repos/my-project"
   ```
 
-### Issue: "SSH connection failed"
+**"Profile not found" / AppleScript execution failed (exit code 1)**
 
-**Error Message:**
-```
-[ERROR] SSH connection to host.docker.internal failed
-[ERROR] Verify SSH is configured (see post-start.sh setup)
-```
+The profile specified with `-p` does not exist in iTerm2, or AppleScript permissions have not been granted.
 
-**Causes:**
-- SSH keys not mounted in container
-- SSH not configured for host.docker.internal
-- Docker Desktop networking issue
-
-**Solutions:**
-1. Verify SSH keys are mounted:
-   ```bash
-   ls -la ~/.ssh/id_ed25519
-   ```
-2. Check devcontainer.json includes SSH mount:
-   ```json
-   "mounts": [
-     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly"
-   ]
-   ```
-3. Test SSH manually:
-   ```bash
-   ssh -o BatchMode=yes -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal "echo OK"
-   ```
-4. Rebuild container after adding SSH configuration
-
-### Issue: "HOST_USER environment variable not set"
-
-**Error Message:**
-```
-[ERROR] HOST_USER environment variable not set
-[ERROR] Set HOST_USER in devcontainer.json remoteEnv
-```
-
-**Cause:** HOST_USER is required for SSH from container but not configured.
-
-**Solution:**
-Add to devcontainer.json:
-```json
-{
-  "remoteEnv": {
-    "HOST_USER": "your-macos-username"
-  }
-}
-```
-Then rebuild the container.
-
-### Issue: "AppleScript execution failed"
-
-**Error Message:**
-```
-[ERROR] Failed to split iTerm2 pane
-```
-
-**Causes:**
-- iTerm2 not running
-- AppleScript permissions not granted
-- Profile specified with `-p` does not exist in iTerm2
-
-**Solutions:**
-1. Launch iTerm2 manually first
-2. Grant permissions in System Preferences > Privacy & Security > Automation
-3. Use `--dry-run` to inspect generated AppleScript:
+Solution:
+1. Use `--dry-run` to inspect generated AppleScript:
    ```bash
    iterm-split-pane.sh --dry-run -d vertical -p "Devcontainer"
    ```
-4. Verify the profile exists in iTerm2 Preferences > Profiles
-5. Test AppleScript directly:
+2. Verify the profile exists in iTerm2 Preferences > Profiles
+3. Grant permissions in System Preferences > Privacy & Security > Automation
+
+### List-Specific Issues
+
+**Empty output / No panes found**
+
+The list command returns no rows or an empty table. This occurs when no iTerm2 windows are open, or when the applied filters exclude all panes.
+
+Solution:
+1. Verify iTerm2 has at least one window open
+2. Run without filters first to see all panes:
    ```bash
-   osascript -e 'tell application "iTerm2" to activate'
+   iterm-list-panes.sh
    ```
+3. Then apply specific window or tab filters once you know the correct indices
+
+**Filter not matching expected panes**
+
+The `-w` or `-t` filter returns fewer panes than expected or none at all. Window and tab indices are 1-based. Using a 0-based index or an index that exceeds the window/tab count returns no results.
+
+Solution:
+1. List all panes without filters to see the actual indices:
+   ```bash
+   iterm-list-panes.sh
+   ```
+2. Use the exact window and tab indices from the output
+3. Remember filters combine with AND logic: `-w 1 -t 2` shows only panes in window 1 AND tab 2
+
+**JSON output issues**
+
+If JSON output appears malformed or truncated, the most likely cause is an iTerm2 session name containing special characters that interfere with the delimiter parsing.
+
+Solution:
+1. Compare table and JSON output for the same filter to verify data consistency:
+   ```bash
+   iterm-list-panes.sh -f table
+   iterm-list-panes.sh -f json
+   ```
+2. If the issue persists, report it as a bug with the output of both commands
+
+### Close-Specific Issues
+
+**Exit code 4: No panes matched pattern**
+
+The pattern provided to `iterm-close-pane.sh` does not match any pane session names. Pattern matching is case-sensitive substring match, not regex.
+
+Solution:
+1. List panes first to verify the exact session names:
+   ```bash
+   iterm-list-panes.sh
+   ```
+2. Check case-sensitivity: `"Agent"` does not match `"agent"`
+3. Use `--dry-run` to preview what would be matched:
+   ```bash
+   iterm-close-pane.sh --dry-run "your-pattern"
+   ```
+
+**Last pane closes the entire tab**
+
+When the last pane in a tab is closed, the tab itself closes. If it is the last tab in a window, the window closes. This is expected iTerm2 behavior, not a bug.
+
+Solution:
+1. List panes before closing to check the pane count in the target tab:
+   ```bash
+   iterm-list-panes.sh -w 1 -t 1
+   ```
+2. If the tab should remain open, ensure at least one pane will survive the close operation
+
+**Confirmation prompt blocks automation**
+
+When multiple panes match the pattern, the script prompts for confirmation interactively. This blocks non-interactive scripts and automation pipelines.
+
+Solution:
+- Use the `--force` flag to bypass the confirmation prompt:
+  ```bash
+  iterm-close-pane.sh --force "agent:"
+  ```
+- Single-match closures proceed without prompting regardless of `--force`
+
+### Infrastructure Issues
+
+For SSH connectivity, HOST_USER configuration, `iterm-utils.sh` sourcing failures, and AppleScript permission issues, see the tab-management SKILL.md Troubleshooting section. These infrastructure issues are shared across tab and pane management skills and are documented in detail there.
 
 ## Performance Considerations
 
