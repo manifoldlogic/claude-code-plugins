@@ -431,6 +431,234 @@ test_applescript_preserved() {
 }
 
 ##############################################################################
+# Pane Mode Tests: Function Existence
+##############################################################################
+
+test_pane_wrapper_function_exists() {
+    if ! grep -q "spawn_agent_pane()" "$SPAWN_AGENT_SCRIPT"; then
+        debug "spawn_agent_pane() wrapper not found"
+        return 1
+    fi
+
+    debug "spawn_agent_pane() wrapper found"
+    return 0
+}
+
+test_pane_remote_original_exists() {
+    if ! grep -q "spawn_agent_pane_remote_original()" "$SPAWN_AGENT_SCRIPT"; then
+        debug "spawn_agent_pane_remote_original() not found"
+        return 1
+    fi
+
+    debug "spawn_agent_pane_remote_original() found"
+    return 0
+}
+
+test_pane_local_original_exists() {
+    if ! grep -q "spawn_agent_pane_local_original()" "$SPAWN_AGENT_SCRIPT"; then
+        debug "spawn_agent_pane_local_original() not found"
+        return 1
+    fi
+
+    debug "spawn_agent_pane_local_original() found"
+    return 0
+}
+
+test_pane_build_claude_cmd_exists() {
+    if ! grep -q "build_claude_cmd()" "$SPAWN_AGENT_SCRIPT"; then
+        debug "build_claude_cmd() not found"
+        return 1
+    fi
+
+    debug "build_claude_cmd() found"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Variable Existence
+##############################################################################
+
+test_pane_split_pane_script_variable() {
+    if ! grep -q "ITERM_SPLIT_PANE_SCRIPT=" "$SPAWN_AGENT_SCRIPT"; then
+        debug "ITERM_SPLIT_PANE_SCRIPT variable not found"
+        return 1
+    fi
+
+    debug "ITERM_SPLIT_PANE_SCRIPT variable found"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Flag Parsing
+##############################################################################
+
+test_pane_flag_handling() {
+    if ! grep -q "\-\-pane)" "$SPAWN_AGENT_SCRIPT"; then
+        debug "--pane case statement not found"
+        return 1
+    fi
+
+    debug "--pane flag handling found"
+    return 0
+}
+
+test_pane_direction_flag_handling() {
+    if ! grep -q "\-\-direction)" "$SPAWN_AGENT_SCRIPT"; then
+        debug "--direction case statement not found"
+        return 1
+    fi
+
+    debug "--direction flag handling found"
+    return 0
+}
+
+test_pane_mode_default() {
+    if ! grep -q 'PANE_MODE=false' "$SPAWN_AGENT_SCRIPT"; then
+        debug "PANE_MODE default not found"
+        return 1
+    fi
+
+    debug "PANE_MODE defaults to false"
+    return 0
+}
+
+test_pane_direction_default() {
+    if ! grep -q 'DIRECTION="vertical"' "$SPAWN_AGENT_SCRIPT"; then
+        debug "DIRECTION default not found"
+        return 1
+    fi
+
+    debug "DIRECTION defaults to vertical"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Fallback AppleScript Patterns
+##############################################################################
+
+test_pane_fallback_uses_split() {
+    # Check that split direction variable is set for both directions
+    if ! grep -q 'split_direction="vertically"' "$SPAWN_AGENT_SCRIPT"; then
+        debug "split_direction vertically default not found"
+        return 1
+    fi
+
+    if ! grep -q 'split_direction="horizontally"' "$SPAWN_AGENT_SCRIPT"; then
+        debug "split_direction horizontally assignment not found"
+        return 1
+    fi
+
+    # Check that AppleScript uses split with the direction variable
+    if ! grep -q 'split \${split_direction}' "$SPAWN_AGENT_SCRIPT"; then
+        debug "split with direction variable not found in AppleScript"
+        return 1
+    fi
+
+    debug "Pane fallback uses split commands"
+    return 0
+}
+
+test_pane_fallback_window_check() {
+    if ! grep -q "count of windows" "$SPAWN_AGENT_SCRIPT"; then
+        debug "Window count check not found in pane fallback"
+        return 1
+    fi
+
+    debug "Window count check found in pane fallback"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Plugin Delegation
+##############################################################################
+
+test_pane_plugin_delegation() {
+    if ! grep -q 'ITERM_SPLIT_PANE_SCRIPT' "$SPAWN_AGENT_SCRIPT"; then
+        debug "ITERM_SPLIT_PANE_SCRIPT reference not found in spawn_agent_pane"
+        return 1
+    fi
+
+    debug "Pane plugin delegation found"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Dispatch Logic
+##############################################################################
+
+test_pane_mode_dispatch() {
+    if ! grep -q 'PANE_MODE.*true' "$SPAWN_AGENT_SCRIPT"; then
+        debug "PANE_MODE dispatch check not found"
+        return 1
+    fi
+
+    debug "PANE_MODE dispatch found at entry point"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Backward Compatibility
+##############################################################################
+
+test_pane_backward_compatibility() {
+    # spawn_agent_tab still exists and used when PANE_MODE=false
+    if ! grep -q "spawn_agent_tab()" "$SPAWN_AGENT_SCRIPT"; then
+        debug "spawn_agent_tab() not found - backward compatibility broken"
+        return 1
+    fi
+
+    if ! grep -q 'spawn_agent_tab "\$WORKTREE_PATH" "\$TASK"' "$SPAWN_AGENT_SCRIPT"; then
+        debug "spawn_agent_tab call in else branch not found"
+        return 1
+    fi
+
+    debug "Backward compatibility preserved"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Shared Builder
+##############################################################################
+
+test_pane_shared_builder_escape_mode() {
+    if ! grep -q 'escape_mode' "$SPAWN_AGENT_SCRIPT"; then
+        debug "escape_mode parameter not found in build_claude_cmd"
+        return 1
+    fi
+
+    debug "Shared builder escape_mode parameter found"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Documentation
+##############################################################################
+
+test_pane_documented_in_header() {
+    if ! grep -q '\-\-pane' "$SPAWN_AGENT_SCRIPT"; then
+        debug "--pane not documented in script header"
+        return 1
+    fi
+
+    debug "--pane documented in script header"
+    return 0
+}
+
+##############################################################################
+# Pane Mode Tests: Pane Name Default
+##############################################################################
+
+test_pane_name_default() {
+    if ! grep -q 'pane_name="\${task:-Claude Agent}"' "$SPAWN_AGENT_SCRIPT"; then
+        debug "Pane name default not found"
+        return 1
+    fi
+
+    debug "Pane name defaults to Claude Agent"
+    return 0
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -481,6 +709,53 @@ main() {
     echo ""
     echo "--- Documentation Tests ---"
     run_test "Documentation updated" test_documentation_updated || true
+
+    echo ""
+    echo "=== Pane Mode Tests ==="
+    echo ""
+
+    echo "--- Pane Function Existence Tests ---"
+    run_test "Pane wrapper function exists" test_pane_wrapper_function_exists || true
+    run_test "Pane remote original function exists" test_pane_remote_original_exists || true
+    run_test "Pane local original function exists" test_pane_local_original_exists || true
+    run_test "Shared command builder exists" test_pane_build_claude_cmd_exists || true
+
+    echo ""
+    echo "--- Pane Variable Tests ---"
+    run_test "ITERM_SPLIT_PANE_SCRIPT variable defined" test_pane_split_pane_script_variable || true
+
+    echo ""
+    echo "--- Pane Flag Parsing Tests ---"
+    run_test "--pane flag handling in parser" test_pane_flag_handling || true
+    run_test "--direction flag handling in parser" test_pane_direction_flag_handling || true
+    run_test "PANE_MODE defaults to false" test_pane_mode_default || true
+    run_test "DIRECTION defaults to vertical" test_pane_direction_default || true
+
+    echo ""
+    echo "--- Pane Fallback Tests ---"
+    run_test "Pane fallback uses split commands" test_pane_fallback_uses_split || true
+    run_test "Pane fallback checks window count" test_pane_fallback_window_check || true
+
+    echo ""
+    echo "--- Pane Plugin Delegation Tests ---"
+    run_test "Pane plugin delegation structure" test_pane_plugin_delegation || true
+
+    echo ""
+    echo "--- Pane Dispatch Tests ---"
+    run_test "Main entry point PANE_MODE dispatch" test_pane_mode_dispatch || true
+    run_test "Backward compatibility preserved" test_pane_backward_compatibility || true
+
+    echo ""
+    echo "--- Pane Shared Builder Tests ---"
+    run_test "Shared builder escape_mode parameter" test_pane_shared_builder_escape_mode || true
+
+    echo ""
+    echo "--- Pane Documentation Tests ---"
+    run_test "--pane documented in header" test_pane_documented_in_header || true
+
+    echo ""
+    echo "--- Pane Edge Case Tests ---"
+    run_test "Pane name defaults to Claude Agent" test_pane_name_default || true
 
     # Teardown
     teardown
