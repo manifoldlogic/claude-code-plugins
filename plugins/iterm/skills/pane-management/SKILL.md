@@ -710,8 +710,72 @@ The script always targets `first window` in its AppleScript for multi-window saf
 - Predictable behavior when multiple windows exist
 - No risk of splitting in the wrong window
 
+## Recommended Pane Limits
+
+For agent workflows and concurrent task monitoring:
+- **Optimal:** 2-3 panes per tab
+  - Example: Main pane + agent pane
+  - Example: Editor + test output + logs
+- **Maximum:** 3 panes recommended
+  - Beyond 3 panes, readability decreases
+  - Window size becomes constraining factor
+
+**When to Use Tabs Instead:**
+- Need 4+ separate views
+- Need full-width terminal for each task
+- Need workspace isolation (different repos)
+- Spawning multiple Claude agents (use tabs for better isolation)
+
+Use the tab-management skill to create additional tabs when pane limits are reached.
+
+## Integration
+
+### spawn-agent.sh Pane Mode
+
+The devcontainer `spawn-agent.sh` script supports spawning Claude agents directly in panes:
+
+**Flags:**
+- `--pane`: Spawn agent in a new pane instead of a new tab
+- `--direction <vertical|horizontal>`: Specify split direction (requires --pane)
+
+**Example:**
+```bash
+# Spawn agent in vertical pane (right side)
+spawn-agent.sh --pane --direction vertical
+```
+
+**Behavior:**
+- `spawn-agent.sh` detects the iterm plugin and delegates to `iterm-split-pane.sh`
+- If plugin not available, falls back to original tab-based behavior
+- Inherits profile and context from current pane
+
+### Combining Pane and Tab Operations
+
+You can mix pane and tab management in workflows:
+
+**Example: Multi-Agent Workflow**
+1. Create new tab for agent workspace: `iterm-open-tab.sh -n "Agents"`
+2. Split pane for first agent: `spawn-agent.sh --pane --direction vertical`
+3. Split again for second agent: `iterm-split-pane.sh -d horizontal`
+
+### Cleanup Workflows
+
+After completing agent work:
+1. List panes to verify layout: `iterm-list-panes.sh`
+2. Close agent panes by pattern: `iterm-close-pane.sh "Agent:"`
+3. Close entire tab if no longer needed: `iterm-close-tab.sh "Agents"`
+
 ## Related
 
-- **tab-management** - Tab creation, listing, and closing (shares `iterm-utils.sh` utilities)
-- **iterm-cross-skill-sourcing** - Pattern for sharing `iterm-utils.sh` across pane-management and tab-management skills
-- **iterm-utils.sh** - Shared utility library providing context detection, AppleScript execution, SSH transport, and validation functions (`plugins/iterm/skills/tab-management/scripts/iterm-utils.sh`)
+**Skills:**
+- [tab-management](../tab-management/SKILL.md) - Opening, listing, and closing iTerm2 tabs
+- [iterm-utils](../tab-management/scripts/iterm-utils.sh) - Shared utilities for context detection and AppleScript execution
+
+**Scripts:**
+- [spawn-agent.sh](/workspace/.devcontainer/scripts/spawn-agent.sh) - Spawn Claude agents with pane/tab mode
+- [iterm-split-pane.sh](./scripts/iterm-split-pane.sh) - Split pane script
+- [iterm-list-panes.sh](./scripts/iterm-list-panes.sh) - List panes script
+- [iterm-close-pane.sh](./scripts/iterm-close-pane.sh) - Close panes script
+
+**References:**
+- [AppleScript Reference](../tab-management/references/applescript-reference.md) - iTerm2 AppleScript patterns (includes split pane operations after Phase 2 completion)
