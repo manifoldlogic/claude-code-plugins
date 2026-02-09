@@ -366,6 +366,152 @@ iterm-split-pane.sh --dry-run -d horizontal -n "Test Pane"
 iterm-split-pane.sh -d vertical -p "Development" -c "npm test" -n "Test Runner"
 ```
 
+### iterm-list-panes.sh
+
+**Purpose:** List all panes across windows and tabs with optional filtering.
+
+**Usage:**
+```bash
+iterm-list-panes.sh [OPTIONS]
+```
+
+**Flags:**
+
+| Flag | Long Form | Description | Default |
+|------|-----------|-------------|---------|
+| `-f` | `--format FORMAT` | Output format: `table` or `json` | `table` |
+| `-w` | `--window INDEX` | Filter to specific window (1-based) | (all windows) |
+| `-t` | `--tab INDEX` | Filter to specific tab (1-based) | (all tabs) |
+| | `--dry-run` | Show AppleScript without executing | (false) |
+| `-h` | `--help` | Show help message | |
+
+**Output Formats:**
+
+- **table** (default): ASCII table with columns `Window`, `Tab`, `Pane`, `Name`. Names longer than 30 characters are truncated with `...`.
+
+  ```
+  Window  Tab  Pane  Name
+  1       1    1     Devcontainer
+  1       1    2     Tests
+  1       2    1     claude-code-plugins
+  2       1    1     System Monitor
+  ```
+
+- **json**: Nested JSON object with `windows` array containing `tabs` arrays containing `panes` arrays. Each pane has `index` and `name` fields.
+
+  ```json
+  {
+    "windows": [
+      {
+        "index": 1,
+        "tabs": [
+          {
+            "index": 1,
+            "panes": [
+              {"index": 1, "name": "Devcontainer"},
+              {"index": 2, "name": "Tests"}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+**Examples:**
+
+```bash
+# List all panes in default table format
+iterm-list-panes.sh
+
+# List panes in window 1 only
+iterm-list-panes.sh -w 1
+
+# List panes as JSON for programmatic parsing
+iterm-list-panes.sh -f json
+
+# List panes in window 1, tab 2 (filters combine with AND logic)
+iterm-list-panes.sh -w 1 -t 2
+
+# List panes in tab 3 across all windows
+iterm-list-panes.sh -t 3
+
+# JSON output filtered to a specific window
+iterm-list-panes.sh --format json --window 1
+
+# Preview AppleScript without executing
+iterm-list-panes.sh --dry-run
+```
+
+**Exit Codes:**
+
+See the [Exit Codes](#exit-codes) section below. This script uses codes 0 (success), 1 (connection failure), 2 (iTerm2 unavailable), and 3 (invalid arguments).
+
+### iterm-close-pane.sh
+
+**Purpose:** Close panes matching a pattern in their session name.
+
+**Usage:**
+```bash
+iterm-close-pane.sh [OPTIONS] <pattern>
+```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `pattern` | Yes | String to match in pane session name (case-sensitive, substring match) |
+
+**Flags:**
+
+| Flag | Long Form | Description | Default |
+|------|-----------|-------------|---------|
+| `-w` | `--window INDEX` | Limit to specific window (1-based) | (all windows) |
+| `-t` | `--tab INDEX` | Limit to specific tab (1-based) | (all tabs) |
+| | `--force` | Skip confirmation prompt for multiple matches | (interactive) |
+| | `--dry-run` | Show what would be closed without executing | (false) |
+| `-h` | `--help` | Show help message | |
+
+**Confirmation Flow:**
+
+- When multiple panes match the pattern, the user is prompted to confirm before closing: `Found N matching panes. Close them all? [y/N]:`
+- Use `--force` to bypass the confirmation prompt (useful for automation and scripting)
+- Single-match closures proceed without prompting
+
+**Behavior:**
+
+- Pattern matching is **case-sensitive substring match**, not regex. The pattern `"agent"` matches `"Agent: auth"` only if the casing matches exactly.
+- Use quotes for patterns containing spaces: `iterm-close-pane.sh "worktree: feature"`
+- Panes are closed in reverse order to prevent index shifting bugs
+- Closing the last pane in a tab closes the tab. Closing the last tab in a window closes the window.
+- Exit code 4 (`EXIT_NO_MATCH`) is returned when no panes match the provided pattern
+
+**Examples:**
+
+```bash
+# Close panes with "agent:" in session name
+iterm-close-pane.sh "agent:"
+
+# Force close without confirmation prompt
+iterm-close-pane.sh --force "cleanup"
+
+# Close panes matching "test" in window 1 only
+iterm-close-pane.sh -w 1 "test"
+
+# Close panes matching "worker" in tab 2 only
+iterm-close-pane.sh -t 2 "worker"
+
+# Close panes in window 2, tab 1 with pattern
+iterm-close-pane.sh --force -w 2 -t 1 "worktree: feature"
+
+# Preview which panes would be closed (dry-run)
+iterm-close-pane.sh --dry-run "feature-branch"
+```
+
+**Exit Codes:**
+
+See the [Exit Codes](#exit-codes) section below. This script uses codes 0 (success), 1 (connection failure), 2 (iTerm2 unavailable), 3 (invalid arguments), and 4 (no panes match pattern).
+
 ## Execution Contexts
 
 The script automatically detects whether it is running on the macOS host or inside a container and adapts its execution strategy. This detection uses the shared `iterm-utils.sh` from the tab-management skill.
