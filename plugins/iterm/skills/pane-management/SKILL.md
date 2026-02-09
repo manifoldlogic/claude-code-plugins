@@ -525,7 +525,7 @@ See the tab-management SKILL.md section "Execution Contexts" for the complete de
 
 ## Exit Codes
 
-Codes 0-3 are defined in `iterm-utils.sh` (shared across all iterm skills). Code 4 is defined in `iterm-close-pane.sh`.
+Codes 0-4 are defined in `iterm-utils.sh` (shared across all iterm skills). Code 4 is used exclusively by `iterm-close-pane.sh`.
 
 | Code | Constant | Description | Used By |
 |------|----------|-------------|---------|
