@@ -1218,4 +1218,4 @@ The plugin uses ASCII control characters as safe delimiters:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2025-01-15 | 1.0.0 | Initial documentation created |
-| 2025-01-15 | 1.1.0 | Added Split Pane Operations section (splitting, enumerating, closing, split-and-configure) |
+| 2026-02-10 | 1.1.0 | Added Split Pane Operations section documenting pane management AppleScript patterns: splitting sessions (vertical/horizontal), enumerating sessions within tabs, closing individual sessions, and split-and-configure pattern. Supports PANE-005 ticket for comprehensive pane-management SKILL.md documentation. |
