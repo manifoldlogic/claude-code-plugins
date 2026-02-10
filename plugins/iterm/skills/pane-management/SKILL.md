@@ -746,7 +746,7 @@ spawn-agent.sh --pane --direction vertical
 
 **Behavior:**
 - `spawn-agent.sh` detects the iterm plugin and delegates to `iterm-split-pane.sh`
-- If plugin not available, falls back to original tab-based behavior
+- If plugin not available, falls back to built-in AppleScript pane-splitting implementation
 - Inherits profile and context from current pane
 
 ### Combining Pane and Tab Operations
