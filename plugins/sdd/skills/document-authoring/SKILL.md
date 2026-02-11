@@ -233,12 +233,14 @@ On success the script exits 0 and prints an `OK` confirmation. On failure it exi
 
 ### Input Validation
 
-Before passing the filled prompt to `spawn-agent.sh`, the prompt text must pass input validation. The `spawn-agent.sh` script (lines 108-132) rejects task descriptions containing:
+Before passing the filled prompt to `spawn-agent.sh`, the prompt text must pass input validation. The `spawn-agent.sh` script's Input Validation section rejects task descriptions containing:
 
-- **Newlines** (line 110): Task descriptions cannot contain literal newline characters
-- **Backticks** (line 116): No backtick characters allowed (prevents command injection)
-- **Command substitution** (line 122): No `$(...)` patterns allowed
-- **Variable expansion** (line 128): No `${...}` patterns allowed
+- **Newlines**: Task descriptions cannot contain literal newline characters
+- **Backticks**: No backtick characters allowed (prevents command injection)
+- **Command substitution**: No `$(...)` patterns allowed
+- **Variable expansion**: No `${...}` patterns allowed
+
+See spawn-agent.sh for current implementation.
 
 After placeholder substitution, verify that `{TICKET_ID}`, `{TICKET_PATH}`, and `{PLUGIN_ROOT}` values do not introduce any of these forbidden patterns. In practice, standard ticket IDs and file paths will not trigger these validations.
 
@@ -303,7 +305,7 @@ plugins/iterm/skills/pane-management/scripts/iterm-split-pane.sh \
 
 ### Command Escaping
 
-The `spawn-agent.sh` script's `build_claude_cmd()` function (lines 143-164) handles escaping for the transport layer:
+The `spawn-agent.sh` script's `build_claude_cmd()` function handles escaping for the transport layer. See spawn-agent.sh for current implementation.
 
 ```sh
 build_claude_cmd() {
@@ -629,7 +631,7 @@ plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh --force "Review:"
 
 **Symptoms:** spawn-agent.sh exits with error code 1 when spawning an agent. Error message references newlines, backticks, or command substitution.
 
-**Cause:** The filled prompt text contains characters that fail input validation (spawn-agent.sh lines 108-132).
+**Cause:** The filled prompt text contains characters that fail the Input Validation section in spawn-agent.sh.
 
 **Solution:**
 1. Collapse the prompt to a single line (replace newlines with spaces)
@@ -759,10 +761,10 @@ No new iTerm scripts are required. All agent spawning delegates to these existin
 
 The `spawn-agent.sh` script at `/workspace/.devcontainer/scripts/spawn-agent.sh` is the primary spawning wrapper. Key integration points:
 
-- **Input validation** (lines 108-132): Validates task descriptions before spawning
-- **build_claude_cmd** (lines 143-164): Builds the Claude CLI command with appropriate escaping
-- **Tab mode** (lines 391-435): spawn_agent_tab() delegates to iterm-open-tab.sh or falls back to original AppleScript
-- **Pane mode** (lines 440-475): spawn_agent_pane() delegates to iterm-split-pane.sh or falls back to original AppleScript
+- **Input validation** (Input Validation section): Validates task descriptions before spawning
+- **build_claude_cmd** (build_claude_cmd function): Builds the Claude CLI command with appropriate escaping
+- **Tab mode** (spawn_agent_tab function): Delegates to iterm-open-tab.sh or falls back to original AppleScript
+- **Pane mode** (spawn_agent_pane function): Delegates to iterm-split-pane.sh or falls back to original AppleScript
 
 ## Related
 
