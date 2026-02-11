@@ -339,6 +339,59 @@ build_claude_cmd() {
 
 When using `spawn-agent.sh`, escaping is handled automatically based on the execution context (container vs host). When using iTerm plugin scripts directly, pass the command with appropriate escaping for the context.
 
+## Preventing Duplicate Agents
+
+### The Problem
+
+If two agents are spawned for the same document simultaneously, both will write to the same output file (e.g., `{TICKET_PATH}/planning/analysis.md`). Because both agents independently read, generate, and write the document, their file writes interleave unpredictably. The result is a corrupted document containing mixed content from both agents. This is a race condition -- the final file contents depend on which agent writes last, and partial writes from one agent can be overwritten mid-sentence by the other.
+
+**Always ensure only one agent is active per document at any given time.**
+
+### Checking for Existing Tabs
+
+Before spawning a new document agent, check whether a tab for that document already exists using `iterm-list-tabs.sh`:
+
+```sh
+# List all active document agent tabs
+iterm-list-tabs.sh | grep "Doc:"
+
+# Check for a specific document (e.g., analysis.md)
+iterm-list-tabs.sh | grep "Doc: analysis"
+```
+
+If either command produces output, a document agent tab is already open. Do not spawn another agent for the same document until the existing tab is closed.
+
+### Resolution: Close Then Respawn
+
+If a duplicate is detected, close the existing tab before spawning a new agent. The complete workflow is: check, close if found, then spawn.
+
+```sh
+# 1. Check for an existing agent tab
+existing=$(iterm-list-tabs.sh | grep "Doc: analysis")
+
+# 2. If found, close it first
+if [ -n "$existing" ]; then
+  echo "Closing existing Doc: analysis agent tab..."
+  plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh --force "Doc: analysis"
+fi
+
+# 3. Now it is safe to spawn a new agent
+/workspace/.devcontainer/scripts/spawn-agent.sh \
+  /workspace/repos/my-project \
+  "Doc: analysis - You are a document creation agent..."
+```
+
+This pattern applies to both manual power-user workflows and orchestrating agents. Orchestrating agents should perform this check programmatically before every spawn call.
+
+### Quick Reference
+
+| Step | Command | Purpose |
+|------|---------|---------|
+| Check all doc tabs | `iterm-list-tabs.sh \| grep "Doc:"` | See all active document agents |
+| Check specific tab | `iterm-list-tabs.sh \| grep "Doc: analysis"` | See if a specific agent is running |
+| Close existing tab | `iterm-close-tab.sh --force "Doc: analysis"` | Remove the duplicate before respawning |
+| Spawn new agent | `spawn-agent.sh /path/to/worktree "prompt"` | Start a fresh agent for the document |
+
 ## Linear Execution Workflow
 
 ### Document Creation Order
