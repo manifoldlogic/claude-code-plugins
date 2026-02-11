@@ -143,10 +143,11 @@ set -euo pipefail
 # Section 1: Load Shared Functions
 ##############################################################################
 
-# Locate worktree-common.sh: try script's own directory first, then canonical path
+# Locate worktree-common.sh: try script's own directory first, then devcontainer path
 _WC_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 _WC_COMMON="$_WC_SCRIPT_DIR/worktree-common.sh"
 if [ ! -f "$_WC_COMMON" ]; then
+    # When packaged under plugins/, fall back to the devcontainer shared library
     _WC_COMMON="/workspace/.devcontainer/scripts/worktree-common.sh"
 fi
 . "$_WC_COMMON" || {

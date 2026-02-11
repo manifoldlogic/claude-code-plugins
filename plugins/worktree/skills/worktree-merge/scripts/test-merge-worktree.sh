@@ -265,12 +265,12 @@ run_prerequisite_tests() {
         fail "merge-worktree.sh is executable" "file is not executable"
     fi
 
-    # Test: worktree-common.sh exists
+    # Test: worktree-common.sh exists (co-located or at devcontainer fallback path)
     TESTS_RUN=$((TESTS_RUN + 1))
-    if [ -f "$SCRIPT_DIR/worktree-common.sh" ]; then
+    if [ -f "$SCRIPT_DIR/worktree-common.sh" ] || [ -f "/workspace/.devcontainer/scripts/worktree-common.sh" ]; then
         pass "worktree-common.sh exists (dependency)"
     else
-        fail "worktree-common.sh exists (dependency)" "file not found"
+        fail "worktree-common.sh exists (dependency)" "not found in $SCRIPT_DIR or /workspace/.devcontainer/scripts/"
     fi
 }
 

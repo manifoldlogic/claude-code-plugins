@@ -213,7 +213,10 @@ plugins/worktree/
 │   ├── worktree-management/
 │   │   └── SKILL.md
 │   ├── worktree-merge/
-│   │   └── SKILL.md
+│   │   ├── SKILL.md
+│   │   └── scripts/
+│   │       ├── merge-worktree.sh
+│   │       └── test-merge-worktree.sh
 │   └── worktree-cleanup/
 │       └── SKILL.md
 └── README.md
@@ -225,7 +228,7 @@ The worktree plugin integrates with helper scripts in the devcontainer environme
 
 - **spawn-worktree.sh** - Orchestrates worktree creation with iTerm tab (named `"<repo> <worktree>"`) and workspace integration
 - **open-all-worktrees.sh** - Opens iTerm tabs for all non-main worktrees of a repository in a single command
-- **merge-worktree.sh** - Orchestrates worktree merge-and-teardown with PR check, main sync, crewchief merge, workspace cleanup, and tab close
+- **merge-worktree.sh** - Orchestrates worktree merge-and-teardown with PR check, main sync, crewchief merge, workspace cleanup, and tab close (packaged at `skills/worktree-merge/scripts/`)
 - **cleanup-worktree.sh** - Orchestrates worktree cleanup with ticket status checking and automatic tab closing
 - **workspace-folder.sh** - Manages VS Code workspace file folder entries
 - **worktree-common.sh** - Shared library with common logging, validation, and utility functions used by all worktree scripts

@@ -32,32 +32,36 @@ For detailed usage, examples, exit codes, and troubleshooting, read `plugins/wor
 
 ### Step 2: Construct and run merge-worktree.sh
 
-**Script path:** `/workspace/.devcontainer/scripts/merge-worktree.sh`
+**Script path:** Resolve relative to the plugin installation:
+```
+${PLUGIN_DIR}/skills/worktree-merge/scripts/merge-worktree.sh
+```
+Where `${PLUGIN_DIR}` is the worktree plugin directory (e.g., `plugins/worktree`).
 
 **Command construction:**
 
 - User provided worktree name (e.g., `/worktree:merge PANE-001`):
   ```bash
-  /workspace/.devcontainer/scripts/merge-worktree.sh PANE-001 --yes
+  ${PLUGIN_DIR}/skills/worktree-merge/scripts/merge-worktree.sh PANE-001 --yes
   ```
   If the repo cannot be auto-detected from the current directory, add `--repo <repo>`:
   ```bash
-  /workspace/.devcontainer/scripts/merge-worktree.sh PANE-001 --repo crewchief --yes
+  ${PLUGIN_DIR}/skills/worktree-merge/scripts/merge-worktree.sh PANE-001 --repo crewchief --yes
   ```
 
 - Auto-detect (e.g., `/worktree:merge` with no arguments, run from inside the worktree):
   ```bash
-  /workspace/.devcontainer/scripts/merge-worktree.sh --yes
+  ${PLUGIN_DIR}/skills/worktree-merge/scripts/merge-worktree.sh --yes
   ```
 
 - Dry-run preview:
   ```bash
-  /workspace/.devcontainer/scripts/merge-worktree.sh PANE-001 --repo crewchief --dry-run
+  ${PLUGIN_DIR}/skills/worktree-merge/scripts/merge-worktree.sh PANE-001 --repo crewchief --dry-run
   ```
 
 - With merge strategy:
   ```bash
-  /workspace/.devcontainer/scripts/merge-worktree.sh PANE-001 --repo crewchief --strategy squash --yes
+  ${PLUGIN_DIR}/skills/worktree-merge/scripts/merge-worktree.sh PANE-001 --repo crewchief --strategy squash --yes
   ```
 
 Run the constructed command and capture the exit code.

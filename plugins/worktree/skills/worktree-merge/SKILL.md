@@ -6,7 +6,7 @@ description: Merge a worktree back to main and clean up environment
 # Worktree Merge Skill
 
 **Last Updated:** 2026-02-11
-**Script Source:** `.devcontainer/scripts/merge-worktree.sh`
+**Script Source:** `plugins/worktree/skills/worktree-merge/scripts/merge-worktree.sh`
 
 ## Overview
 
