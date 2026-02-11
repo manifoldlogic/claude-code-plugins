@@ -215,6 +215,22 @@ When complete, follow the approval workflow in
 /workspace/repos/claude-code-plugins/plugins/sdd/skills/document-authoring/references/approval-workflow.md
 ```
 
+### Placeholder Validation
+
+Before filling placeholders, validate that `TICKET_ID`, `TICKET_PATH`, and `PLUGIN_ROOT` values are well-formed using the centralized validation script:
+
+```sh
+plugins/sdd/skills/document-authoring/scripts/validate-prompt-placeholders.sh \
+  "$TICKET_ID" "$TICKET_PATH" "$PLUGIN_ROOT"
+```
+
+The script validates:
+- **TICKET_ID**: Non-empty, matches `^[A-Z0-9_-]+$` (e.g., `DOCAGENT`, `UIT-9819`)
+- **TICKET_PATH**: Non-empty, absolute path (starts with `/`), directory exists
+- **PLUGIN_ROOT**: Non-empty, absolute path (starts with `/`), directory exists
+
+On success the script exits 0 and prints an `OK` confirmation. On failure it exits 1 and prints clear error messages to stderr describing which value failed and what was expected. Always run this validation before proceeding with placeholder substitution and agent spawning.
+
 ### Input Validation
 
 Before passing the filled prompt to `spawn-agent.sh`, the prompt text must pass input validation. The `spawn-agent.sh` script (lines 108-132) rejects task descriptions containing:
