@@ -95,6 +95,17 @@ Merge the authentication worktree back to main
 ```
 Safely merges the completed feature back to the main branch with automatic cleanup of the worktree.
 
+```bash
+# Merge with explicit arguments
+/worktree:merge feature-auth
+
+# Auto-detect from current worktree directory
+/worktree:merge
+
+# Preview merge operations first
+merge-worktree.sh feature-auth --repo myproject --dry-run
+```
+
 ### Cleaning Up with Ticket Awareness
 ```
 Remove the experimental-refactor worktree
@@ -183,6 +194,7 @@ This plugin provides the following skills with detailed documentation:
 | worktree-spawn | Create new worktrees with iTerm and VS Code workspace integration | [SKILL.md](skills/worktree-spawn/SKILL.md) |
 | worktree-open-all | Open iTerm tabs for all worktrees of a repository | [SKILL.md](skills/worktree-open-all/SKILL.md) |
 | worktree-management | Core git worktree operations (create, use, merge, clean) | [SKILL.md](skills/worktree-management/SKILL.md) |
+| worktree-merge | Merge a worktree back to main and clean up environment (PR check, sync, merge, workspace cleanup, tab close) | [SKILL.md](skills/worktree-merge/SKILL.md) |
 | worktree-cleanup | Remove worktrees with SDD ticket status awareness | [SKILL.md](skills/worktree-cleanup/SKILL.md) |
 
 ## Directory Structure
@@ -191,6 +203,8 @@ This plugin provides the following skills with detailed documentation:
 plugins/worktree/
 ├── .claude-plugin/
 │   └── plugin.json
+├── commands/
+│   └── merge.md
 ├── skills/
 │   ├── worktree-spawn/
 │   │   └── SKILL.md
@@ -198,6 +212,11 @@ plugins/worktree/
 │   │   └── SKILL.md
 │   ├── worktree-management/
 │   │   └── SKILL.md
+│   ├── worktree-merge/
+│   │   ├── SKILL.md
+│   │   └── scripts/
+│   │       ├── merge-worktree.sh
+│   │       └── test-merge-worktree.sh
 │   └── worktree-cleanup/
 │       └── SKILL.md
 └── README.md
@@ -209,6 +228,7 @@ The worktree plugin integrates with helper scripts in the devcontainer environme
 
 - **spawn-worktree.sh** - Orchestrates worktree creation with iTerm tab (named `"<repo> <worktree>"`) and workspace integration
 - **open-all-worktrees.sh** - Opens iTerm tabs for all non-main worktrees of a repository in a single command
+- **merge-worktree.sh** - Orchestrates worktree merge-and-teardown with PR check, main sync, crewchief merge, workspace cleanup, and tab close (packaged at `skills/worktree-merge/scripts/`)
 - **cleanup-worktree.sh** - Orchestrates worktree cleanup with ticket status checking and automatic tab closing
 - **workspace-folder.sh** - Manages VS Code workspace file folder entries
 - **worktree-common.sh** - Shared library with common logging, validation, and utility functions used by all worktree scripts
