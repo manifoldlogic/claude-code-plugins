@@ -889,6 +889,45 @@ Write output to /path/to/ticket/planning/analysis.md
 
 For best results with the Task tool fallback, create documents one at a time and keep the prompts focused. If context becomes exhausted, start a new session and continue with the next document.
 
+### Handling Paths with Spaces
+
+**Problem:** Paths with spaces in `TICKET_PATH` or `PLUGIN_ROOT` placeholder values can break agent spawning if not properly quoted. When a variable containing spaces is used unquoted, the shell splits it into multiple arguments, causing commands to fail or behave unexpectedly.
+
+**Incorrect usage** (unquoted):
+
+```sh
+TICKET_PATH=/workspace/_SPECS/My Ticket Name
+spawn-agent.sh --ticket-path $TICKET_PATH ...
+# Error: $TICKET_PATH splits into multiple arguments
+# The shell sees: spawn-agent.sh --ticket-path /workspace/_SPECS/My Ticket Name
+# "Ticket" and "Name" are treated as separate arguments
+```
+
+**Correct usage** (quoted):
+
+```sh
+TICKET_PATH="/workspace/_SPECS/My Ticket Name"
+spawn-agent.sh --ticket-path "$TICKET_PATH" ...
+# Success: Path preserved as single argument
+# The shell sees: spawn-agent.sh --ticket-path "/workspace/_SPECS/My Ticket Name"
+```
+
+**Key quoting rules:**
+
+- Always quote variables containing paths: `"$TICKET_PATH"`, `"$PLUGIN_ROOT"`
+- Use double quotes, not single quotes, so that variable expansion still works
+- This applies to all three placeholders (`TICKET_ID`, `TICKET_PATH`, `PLUGIN_ROOT`) but is most critical for path values where spaces are possible
+
+**Best practice -- avoid spaces in directory names:**
+
+| Convention | Example | Recommended |
+|------------|---------|-------------|
+| Hyphens | `DOCAGENT_sdd-document-agents` | Yes |
+| Underscores | `DOCAGENT_sdd_document_agents` | Yes |
+| Spaces | `DOCAGENT sdd document agents` | Avoid |
+
+Using hyphens or underscores in ticket and directory names eliminates the quoting issue entirely. If you control the naming convention, prefer hyphen-separated or underscore-separated names over spaces.
+
 ## Future Enhancements
 
 ### Parallel Execution
