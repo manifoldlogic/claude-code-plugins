@@ -894,6 +894,94 @@ plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh --force "Review:"
 2. Verify all prerequisite documents exist and are approved
 3. Re-spawn the failing agent after all prerequisites are complete
 
+### Wrong PLUGIN_ROOT Path
+
+**Problem:** A wrong `PLUGIN_ROOT` value causes agents to fail when accessing prompt files, reference documents, or the approval workflow. The agent reports "file not found" errors for paths under `PLUGIN_ROOT`, or silently produces low-quality output because it could not read the creation guide or template reference.
+
+This is one of the most common configuration issues, especially for users who switch between host and container environments.
+
+#### Verifying PLUGIN_ROOT
+
+Run this command to test whether `PLUGIN_ROOT` points to the correct location:
+
+```sh
+# Test if PLUGIN_ROOT is correct
+ls "$PLUGIN_ROOT/skills/document-authoring/SKILL.md"
+
+# Expected: File exists (path printed, no error)
+# Failure: "No such file or directory"
+```
+
+You can also verify additional files that agents depend on:
+
+```sh
+# Check that reference documents are accessible
+ls "$PLUGIN_ROOT/skills/document-authoring/references/approval-workflow.md"
+ls "$PLUGIN_ROOT/skills/document-authoring/references/doc-analysis.md"
+
+# Check that prompt files are accessible
+ls "$PLUGIN_ROOT/skills/document-authoring/prompts/create/analysis.md"
+```
+
+If any of these commands print "No such file or directory", `PLUGIN_ROOT` is wrong.
+
+#### Common Wrong Values
+
+| Scenario | Wrong Value Example | Why It Fails |
+|----------|-------------------|--------------|
+| Host path used inside a container | `/Users/username/projects/claude-code-plugins/plugins/sdd` | The `/Users/` directory does not exist inside the container. Container filesystems are isolated from the host. |
+| Container path used on the host | `/workspace/repos/claude-code-plugins/plugins/sdd` | The `/workspace/` directory does not exist on macOS. This path only exists inside the devcontainer. |
+| Relative path instead of absolute | `plugins/sdd` | Breaks when the working directory changes. Agents may `cd` to a different directory before resolving the path, causing "No such file or directory" errors. |
+
+#### Determining the Correct Value
+
+**Host mode** (running directly on macOS, not in a container):
+
+```sh
+# Check if the environment variable is already set
+echo "$CLAUDE_PLUGIN_ROOT"
+
+# If not set, locate the plugin directory manually
+find ~ -path "*/plugins/sdd/skills/document-authoring/SKILL.md" -type f 2>/dev/null
+
+# Typical host path:
+# /Users/username/.crewchief/plugins/claude-code-plugins/plugins/sdd
+```
+
+**Container mode** (running inside a devcontainer):
+
+```sh
+# Check if the environment variable is already set
+echo "$CLAUDE_PLUGIN_ROOT"
+
+# If not set, search common container mount points
+ls -d /workspace/repos/*/plugins/sdd 2>/dev/null
+
+# Typical container path:
+# /workspace/repos/claude-code-plugins/plugins/sdd
+```
+
+#### Correct Path Examples
+
+| Environment | Correct PLUGIN_ROOT | Notes |
+|-------------|-------------------|-------|
+| macOS host | `/Users/username/.crewchief/plugins/claude-code-plugins/plugins/sdd` | Path under the user's home directory |
+| Devcontainer | `/workspace/repos/claude-code-plugins/plugins/sdd` | Path under the container workspace mount |
+
+#### Final Verification
+
+After determining the correct value, verify it resolves to a real directory containing the expected files:
+
+```sh
+# Set the corrected value
+export PLUGIN_ROOT="/workspace/repos/claude-code-plugins/plugins/sdd"
+
+# Verify the path is correct
+ls "$PLUGIN_ROOT/skills/document-authoring/SKILL.md" && echo "PLUGIN_ROOT is correct"
+```
+
+If the `ls` command succeeds and prints the file path followed by "PLUGIN_ROOT is correct", the value is valid. Use this value when filling the `{PLUGIN_ROOT}` placeholder in agent prompts.
+
 ### SSH Connectivity Issues (Container Mode)
 
 When running inside a devcontainer, agent spawning relies on SSH to reach the macOS host (where iTerm2 runs). If SSH is misconfigured, all `spawn-agent.sh` and iTerm plugin calls will fail. Use the steps below to diagnose and resolve SSH issues.
