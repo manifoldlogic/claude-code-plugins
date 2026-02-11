@@ -50,6 +50,11 @@
       "name": "iterm",
       "source": "./plugins/iterm",
       "description": "iTerm2 tab and pane management for macOS host and Linux container environments"
+    },
+    {
+      "name": "analysis",
+      "source": "./plugins/analysis",
+      "description": "Deep analytical thinking and problem-solving tools for complex technical and strategic decisions"
     }
   ]
 }

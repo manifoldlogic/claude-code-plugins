@@ -2,6 +2,7 @@
   "env": {
     "SDD_ROOT_DIR": "/workspace/_SPECS/claude-code-plugins",
     "MAPROOM_DB_ROOT": "/home/vscode/.maproom",
+    "MAPROOM_DATABASE_URL": "sqlite:///home/vscode/.maproom/claude-code-plugins/maproom.db",
     "MAPROOM_EMBEDDING_PROVIDER": "google",
     "GOOGLE_PROJECT_ID": "crewchief-476600"
   },
