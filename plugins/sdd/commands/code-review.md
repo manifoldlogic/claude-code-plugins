@@ -341,8 +341,10 @@ Comprehensive error handling for all failure scenarios:
 **Recommended workflow position**:
 1. Complete all ticket tasks: `/sdd:do-all-tasks {TICKET_ID}`
 2. Run code review: `/sdd:code-review {TICKET_ID}`
-3. Address CRITICAL/HIGH issues (if any)
-4. Create PR: `/sdd:pr {TICKET_ID}`
+3. Create follow-up tasks from findings: `/sdd:extend {TICKET_ID} --from-review`
+4. Execute follow-up tasks: `/sdd:do-all-tasks {TICKET_ID}`
+5. (Optional) Re-run code review: `/sdd:code-review {TICKET_ID}`
+6. Create PR: `/sdd:pr {TICKET_ID}`
 
 **Use cases**:
 
