@@ -384,6 +384,201 @@ end tell
 
 ---
 
+## Split Pane Operations
+
+### Splitting a Session
+
+Split the current session to create a new pane within the same tab.
+
+**Split vertically (creates pane on right):**
+
+```applescript
+tell application "iTerm2"
+    activate
+    if (count of windows) is 0 then
+        return "NO_WINDOWS"
+    end if
+    tell current session of current tab of first window
+        split vertically with profile "Devcontainer"
+    end tell
+end tell
+```
+
+**Split horizontally (creates pane below):**
+
+```applescript
+tell application "iTerm2"
+    activate
+    if (count of windows) is 0 then
+        return "NO_WINDOWS"
+    end if
+    tell current session of current tab of first window
+        split horizontally with profile "Devcontainer"
+    end tell
+end tell
+```
+
+**Notes:**
+
+- Splitting creates a new session within the existing tab
+- Profile name must match an existing iTerm2 profile exactly (case-sensitive)
+- "Vertically" creates side-by-side panes (left/right split)
+- "Horizontally" creates stacked panes (top/bottom split)
+- Uses `first window` (frontmost) rather than `current window` for multi-window safety
+- Requires at least one existing window (the script checks for `NO_WINDOWS`)
+
+### Enumerating Sessions Within Tabs
+
+List all sessions (panes) across windows and tabs using a triple-nested loop.
+
+**Pattern:**
+
+```applescript
+tell application "iTerm2"
+    if not running then
+        return "ITERM_NOT_RUNNING"
+    end if
+    set windowCount to count of windows
+    if windowCount is 0 then
+        return "NO_WINDOWS"
+    end if
+    set output to ""
+    set US to ASCII character 31
+    set LF to ASCII character 10
+    repeat with w from 1 to windowCount
+        tell window w
+            set tabCount to count of tabs
+            repeat with t from 1 to tabCount
+                tell tab t
+                    set sessionCount to count of sessions
+                    repeat with s from 1 to sessionCount
+                        try
+                            set sessionName to name of session s
+                        on error
+                            set sessionName to ""
+                        end try
+                        set output to output & w & US & t & US & s & US & sessionName & LF
+                    end repeat
+                end tell
+            end repeat
+        end tell
+    end repeat
+    return output
+end tell
+```
+
+**Session Properties:**
+
+- `name of session s` - Session title/name (string)
+- Session index within tab is 1-based (first session is `session 1`)
+- The `try...on error` block handles sessions in transient states
+
+**Output Format:**
+
+The `iterm-list-panes.sh` script uses ASCII unit separator (character 31) as the field delimiter and line feed (character 10) as the record separator:
+
+```
+window_index<US>tab_index<US>session_index<US>session_name<LF>
+```
+
+This ensures safe parsing even when session names contain spaces, quotes, or other special characters.
+
+### Closing Individual Sessions
+
+Close specific sessions (panes) without closing the entire tab. Uses reverse iteration to prevent index shifting.
+
+**Close sessions by pattern (single tab):**
+
+```applescript
+tell application "iTerm2"
+    tell window 1
+        tell tab 1
+            repeat with s from (count of sessions) to 1 by -1
+                try
+                    if name of session s contains "pattern" then
+                        tell session s to close
+                    end if
+                on error
+                    -- Skip sessions that can't be accessed
+                end try
+            end repeat
+        end tell
+    end tell
+end tell
+```
+
+**Close sessions by pattern (all windows and tabs):**
+
+```applescript
+tell application "iTerm2"
+    if not running then
+        return "ITERM_NOT_RUNNING"
+    end if
+    set closedCount to 0
+    repeat with w from (count of windows) to 1 by -1
+        tell window w
+            repeat with t from (count of tabs) to 1 by -1
+                tell tab t
+                    repeat with s from (count of sessions) to 1 by -1
+                        try
+                            if name of session s contains "pattern" then
+                                tell session s to close
+                                set closedCount to closedCount + 1
+                            end if
+                        on error
+                            -- Skip sessions that can't be accessed
+                        end try
+                    end repeat
+                end tell
+            end repeat
+        end tell
+    end repeat
+    return closedCount
+end tell
+```
+
+**Important:**
+
+- Closing the last session in a tab will close the tab; closing the last tab in a window will close the window
+- Always use reverse iteration (`to 1 by -1`) when closing multiple sessions to prevent index shifting (same principle as [closing tabs](#why-reverse-iteration-is-critical))
+- Session indices are 1-based (first session is `session 1`, not `session 0`)
+- The close command uses `tell session s to close` syntax rather than `close session s`
+- Pattern matching is substring-based (`contains`), not regex
+
+### Split and Configure Pattern
+
+Split a session, then configure the new pane in a separate step.
+
+**Two-step approach (from `iterm-split-pane.sh`):**
+
+```applescript
+tell application "iTerm2"
+    activate
+    if (count of windows) is 0 then
+        return "NO_WINDOWS"
+    end if
+    -- Step 1: Split the current session
+    tell current session of current tab of first window
+        split vertically with profile "Devcontainer"
+    end tell
+    -- Step 2: Configure the new session (now the current session)
+    tell current session of current tab of first window
+        set name to "Test Runner"
+        write text "npm test"
+    end tell
+end tell
+```
+
+**Why two steps:**
+
+- After a split, the newly created session becomes the `current session` of the tab
+- The split command itself does not return a reference to the new session
+- A second `tell current session` block targets the newly created pane
+- `set name` assigns the session title; `write text` executes a command in the new pane
+- Both steps use `first window` for consistent window targeting
+
+---
+
 ## Base64 Encoding Technique
 
 ### The Problem
@@ -1023,3 +1218,4 @@ The plugin uses ASCII control characters as safe delimiters:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2025-01-15 | 1.0.0 | Initial documentation created |
+| 2026-02-10 | 1.1.0 | Added Split Pane Operations section documenting pane management AppleScript patterns: splitting sessions (vertical/horizontal), enumerating sessions within tabs, closing individual sessions, and split-and-configure pattern. Supports PANE-005 ticket for comprehensive pane-management SKILL.md documentation. |
