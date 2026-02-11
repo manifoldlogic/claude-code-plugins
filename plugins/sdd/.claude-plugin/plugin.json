@@ -20,6 +20,11 @@
     "verification",
     "delegation"
   ],
+  "skills": [
+    "skills/project-workflow",
+    "skills/skill-curation",
+    "skills/document-authoring"
+  ],
   "hooks": {
     "SessionStart": [
       {
