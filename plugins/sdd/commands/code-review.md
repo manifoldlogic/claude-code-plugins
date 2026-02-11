@@ -278,17 +278,20 @@ After displaying the report above, use the **AskUserQuestion** tool to present n
 
 **If CRITICAL issues found (count > 0):**
 **Options:**
-- Label: "Fix CRITICAL issues before proceeding" | Description: "Address blocking issues first"
+- Label: "/sdd:extend {TICKET_ID} --from-review --min-severity CRITICAL" | Description: "Create follow-up tasks from CRITICAL findings"
+- Label: "Fix CRITICAL issues before proceeding" | Description: "Address blocking issues manually"
 - Label: "/sdd:code-review {TICKET_ID}" | Description: "Re-run code review after fixes"
 
 **If HIGH issues found (count > 0, no CRITICAL issues):**
 **Options:**
-- Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request (HIGH issues documented in PR description)"
+- Label: "/sdd:extend {TICKET_ID} --from-review" | Description: "Create follow-up tasks from review findings"
+- Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request (issues documented in PR description)"
 - Label: "/sdd:code-review {TICKET_ID}" | Description: "Re-run after addressing HIGH issues"
 
 **If only MEDIUM or lower severity issues (no HIGH or CRITICAL):**
 **Options:**
 - Label: "/sdd:pr {TICKET_ID}" | Description: "Create pull request"
+- Label: "/sdd:extend {TICKET_ID} --from-review" | Description: "Create follow-up tasks from review findings"
 - Label: "/sdd:archive {TICKET_ID}" | Description: "Archive ticket if no PR needed"
 
 **If clean (no significant issues):**
