@@ -65,6 +65,27 @@ The user wants to provide feedback and have the agent revise the document.
 
 The revision loop continues until the user selects "Approve and close tab/pane" or "Approve". There is no limit on the number of revision cycles.
 
+#### Context Exhaustion Guidance
+
+After 3-5 revision rounds, agent quality may degrade due to context window exhaustion. Watch for these symptoms:
+
+- **Repetitive errors** -- the agent makes the same mistake despite prior corrections
+- **Declining response quality** -- revisions become less precise or thorough
+- **Forgetting earlier instructions** -- the agent loses track of feedback given in earlier rounds
+- **Inconsistent changes** -- edits conflict with each other or with established content
+
+These symptoms indicate the agent's context window is saturated with revision history, leaving insufficient room for coherent reasoning.
+
+**Recommended resolution:** If symptoms appear after 3-5 rounds, approve the current document (even if imperfect) and respawn a fresh agent for final refinements. The fresh agent workflow is:
+
+1. Approve the document in its current state (choose "Approve" or "Approve and close tab/pane")
+2. Close the existing agent session
+3. Spawn a new agent with the same document prompt
+4. The fresh agent reads the partial document and applies targeted improvements without the accumulated context burden
+5. Approve the final version through the normal approval flow
+
+The 3-5 round guideline is not a hard limit. Evaluate based on output quality, not round count alone. If the agent is still producing high-quality revisions after 5 rounds, continue. If quality degrades after 2 rounds, approve and respawn sooner.
+
 ## Completion Signal Format
 
 When the user approves a document (either choice 1 or choice 2), the agent outputs a standardized completion signal. This signal allows an orchestrating agent to detect that the document work is finished.
