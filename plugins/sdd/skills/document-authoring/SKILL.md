@@ -628,6 +628,152 @@ An orchestrating agent monitors spawned agents by watching for the `DOCUMENT_AGE
 | 1 | Input validation failure or general error | Fix the prompt text and retry |
 | 2 | No iTerm windows open (pane mode only) | Open an iTerm window first, then retry |
 
+### Detecting Crashed Agents
+
+A document agent can crash or become unresponsive during execution, leaving a partial document and an orphaned iTerm tab. Detecting the crash quickly prevents wasted time and enables recovery.
+
+**Symptoms of a crashed agent:**
+
+| Symptom | Description |
+|---------|-------------|
+| Tab frozen | The iTerm tab shows no new output. The cursor is not moving and no text is being written. |
+| No response | Typing in the tab produces no reaction. The Claude CLI is not accepting input. |
+| Stuck output | The last visible output is mid-sentence or mid-section, with no progress for several minutes. |
+| Tab title unchanged | The tab title has not updated to reflect completion or approval prompt. |
+
+**Detection procedure:**
+
+1. Observe the agent tab for at least 2-3 minutes. Agents sometimes pause while researching large codebases or generating lengthy content. Do not assume a crash before this waiting period.
+2. Check whether the tab is still producing output. Even slow progress (one line every 30 seconds) indicates the agent is alive.
+3. If no new output appears for 2-3 minutes, the agent is likely crashed or stuck.
+4. Optionally, list active tabs to confirm the tab still exists:
+   ```sh
+   iterm-list-tabs.sh | grep "Doc:"
+   ```
+
+### Force-Closing Crashed Tabs
+
+Once you have confirmed that an agent is crashed (no output for 2-3 minutes), force-close the tab to free resources and prevent duplicate agent conflicts.
+
+**Force-close a specific agent tab:**
+
+```sh
+# Close the crashed agent tab by its title
+plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh --force "Doc: analysis.md"
+```
+
+**Find the exact tab title first:**
+
+```sh
+# List all document agent tabs to identify the exact title
+iterm-list-tabs.sh | grep "Doc:"
+```
+
+**Why use `--force`:**
+
+- A standard close may hang if the agent process is frozen.
+- The `--force` flag ensures the tab closes immediately regardless of the agent state.
+- Always close the crashed tab before respawning to avoid duplicate agents writing to the same file.
+
+### Checking for Partial Documents
+
+After force-closing a crashed agent, check whether the agent wrote a partial document before it crashed. This determines your recovery strategy.
+
+**Check if the document file exists:**
+
+```sh
+# Check if a partial document was created (substitute your ticket path)
+ls -lh /path/to/ticket/planning/analysis.md
+```
+
+**Inspect the partial content:**
+
+```sh
+# View the first 50 lines to assess structure and completeness
+head -50 /path/to/ticket/planning/analysis.md
+
+# Count total lines to estimate completeness
+wc -l /path/to/ticket/planning/analysis.md
+
+# Check if key sections are present (look for markdown headers)
+grep "^##" /path/to/ticket/planning/analysis.md
+```
+
+**What to look for:**
+
+- Does the file exist at all? If not, the agent crashed before writing anything.
+- Are the markdown headers (section headings) intact and well-formed?
+- Is the content cut off mid-sentence or mid-section?
+- Approximately what percentage of the expected sections are present?
+
+### Recovery Decision Criteria
+
+After inspecting the partial document (or confirming none exists), decide how to proceed. There are three strategies:
+
+| Strategy | When to Use | Action |
+|----------|-------------|--------|
+| **Resume from partial** | Document is more than 50% complete and structurally valid (markdown headers intact, no corruption). Most sections are present with substantive content. | Spawn a new agent with a modified prompt that instructs it to read the existing partial document, identify incomplete sections, and finish them. |
+| **Start fresh** | Document is less than 50% complete, is missing critical sections, or contains corrupted/garbled content. | Remove the partial document, then respawn the agent with the original prompt. The new agent creates the document from scratch. |
+| **Hybrid** | Some sections are high quality but others are missing or incomplete. Starting fresh would waste the good content. | Extract the good sections from the partial document into a temporary file, remove the partial, respawn the agent, and provide the extracted content as context for the new agent to incorporate. |
+
+**Detailed decision criteria:**
+
+- **Resume from partial** is appropriate when:
+  - The document has well-formed markdown structure (headers, lists, code blocks properly closed)
+  - More than half of the expected sections contain substantive content
+  - The content is accurate and well-researched (not placeholder or generic text)
+  - Only the final sections are missing (the agent crashed near the end)
+
+- **Start fresh** is appropriate when:
+  - The document has fewer than half its sections filled in
+  - The content is corrupted, garbled, or contains repeated text
+  - The markdown structure is broken (unclosed code blocks, malformed headers)
+  - The document contains only boilerplate or template text without research
+
+- **Hybrid** is appropriate when:
+  - Several early sections are thoroughly researched and high quality
+  - Later sections are missing or incomplete
+  - The good sections represent significant research effort that would be costly to redo
+  - The partial document is structurally valid up to the point where content stops
+
+### Recovery Workflow
+
+Follow these steps in order to recover from a crashed agent:
+
+1. **Detect the crash** -- Wait 2-3 minutes with no output before concluding the agent is unresponsive.
+
+2. **Force-close the tab** -- Remove the crashed agent to prevent duplicate conflicts:
+   ```sh
+   plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh --force "Doc: analysis.md"
+   ```
+
+3. **Check for a partial document** -- Inspect what the agent wrote before crashing:
+   ```sh
+   ls -lh /path/to/ticket/planning/analysis.md
+   head -50 /path/to/ticket/planning/analysis.md
+   grep "^##" /path/to/ticket/planning/analysis.md
+   ```
+
+4. **Decide: resume, start fresh, or hybrid** -- Use the decision criteria above to choose a strategy.
+
+5. **If starting fresh** -- Remove the partial document before respawning so the new agent does not encounter a corrupted file:
+   ```sh
+   rm /path/to/ticket/planning/analysis.md
+   ```
+
+6. **Respawn the agent** -- Use the same prompt and spawning procedure as the original attempt:
+   ```sh
+   /workspace/.devcontainer/scripts/spawn-agent.sh \
+     /workspace/repos/my-project \
+     "Doc: analysis - You are a document creation agent..."
+   ```
+
+**Important considerations:**
+
+- Always force-close the crashed tab before respawning. Two agents writing to the same document file causes corruption (see the Preventing Duplicate Agents section).
+- If the same agent crashes repeatedly on the same document, check whether the document prompt is triggering an edge case in the CLI. Try simplifying the prompt or using the Task tool fallback (see the SSH Connectivity Issues section).
+- After recovery, continue with the normal workflow: wait for the agent to complete, approve the document, then proceed to the next document in dependency order.
+
 ## Cleanup
 
 ### Manual Cleanup
