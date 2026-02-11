@@ -695,6 +695,147 @@ plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh --force "Review:"
 2. Verify all prerequisite documents exist and are approved
 3. Re-spawn the failing agent after all prerequisites are complete
 
+### SSH Connectivity Issues (Container Mode)
+
+When running inside a devcontainer, agent spawning relies on SSH to reach the macOS host (where iTerm2 runs). If SSH is misconfigured, all `spawn-agent.sh` and iTerm plugin calls will fail. Use the steps below to diagnose and resolve SSH issues.
+
+#### Testing SSH Connectivity
+
+Run the following command from inside the container to verify basic connectivity:
+
+```sh
+ssh host.docker.internal
+```
+
+**Expected results:**
+- **Success:** You are connected to the macOS host shell (or prompted for a password).
+- **Failure indicators:** `Connection refused`, `No route to host`, `Connection timed out`, or `Permission denied (publickey)`.
+
+For a more targeted test that exits immediately:
+
+```sh
+ssh -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal echo ok
+```
+
+If this prints `ok`, SSH is working. Any other output indicates a problem -- continue with the diagnostic steps below.
+
+#### Common SSH Failure Modes
+
+| Failure Mode | Error Message | Likely Cause |
+|--------------|---------------|--------------|
+| SSH keys not configured in container | `Permission denied (publickey)` | Private key is missing from the container's `~/.ssh/` directory, or the corresponding public key is not in the host's `~/.ssh/authorized_keys`. |
+| host.docker.internal unreachable | `No route to host` or `Could not resolve hostname` | Docker Desktop networking is misconfigured, or `host.docker.internal` DNS is not available (common on older Docker versions or Linux hosts without Docker Desktop). |
+| SSH daemon not running on host | `Connection refused` on port 22 | The macOS host does not have Remote Login enabled. Enable it in System Settings > General > Sharing > Remote Login. |
+| Firewall blocking SSH port 22 | `Connection timed out` | A firewall on the host or between the container and host is blocking port 22. Check macOS firewall settings and any network-level firewalls. |
+| Docker Desktop SSH forwarding not enabled | `Connection refused` or timeout | Docker Desktop may need explicit configuration to allow SSH from containers to the host. Verify Docker Desktop settings under Resources > Network. |
+| Wrong HOST_USER value | `Permission denied` or connection to wrong account | The `HOST_USER` environment variable does not match the macOS username. Verify with `echo $HOST_USER` in the container and `whoami` on the host. |
+
+#### Verification Steps
+
+Work through these steps in order. Each step builds on the previous one.
+
+**Step 1: Verify HOST_USER is set**
+
+```sh
+echo $HOST_USER
+```
+
+If empty, set it in `devcontainer.json` under `remoteEnv` or export it manually:
+
+```sh
+export HOST_USER="your-macos-username"
+```
+
+**Step 2: Verify host.docker.internal resolves**
+
+```sh
+ping -c 1 host.docker.internal
+```
+
+Expected: A response from an IP address (typically `192.168.65.254` or similar). If this fails, Docker Desktop networking is not providing the `host.docker.internal` DNS entry. Restart Docker Desktop or check its network configuration.
+
+**Step 3: Check SSH key exists and has correct permissions**
+
+```sh
+ls -la ~/.ssh/id_rsa ~/.ssh/id_ed25519 2>/dev/null
+```
+
+At least one private key file should exist. Verify permissions:
+
+```sh
+# Private key must be 600 (owner read/write only)
+stat -c '%a %n' ~/.ssh/id_rsa 2>/dev/null || stat -c '%a %n' ~/.ssh/id_ed25519 2>/dev/null
+```
+
+If permissions are wrong, fix them:
+
+```sh
+chmod 600 ~/.ssh/id_rsa 2>/dev/null
+chmod 600 ~/.ssh/id_ed25519 2>/dev/null
+```
+
+**Step 4: Check SSH config for host.docker.internal entry**
+
+```sh
+grep -A 3 "host.docker.internal" ~/.ssh/config 2>/dev/null
+```
+
+If no entry exists, SSH will use defaults. For explicit configuration, add to `~/.ssh/config`:
+
+```
+Host host.docker.internal
+    User your-macos-username
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking no
+```
+
+**Step 5: Run verbose SSH test**
+
+```sh
+ssh -v host.docker.internal 2>&1 | grep -E "(connect|auth|identity|Offering)"
+```
+
+This shows the connection and authentication flow. Look for:
+- `Connection established` -- network connectivity is working
+- `Offering public key` -- SSH is attempting key authentication
+- `Authentication succeeded` -- login was successful
+
+If authentication fails, verify the public key is in the host's `~/.ssh/authorized_keys`.
+
+**Step 6: Test the full spawn chain**
+
+```sh
+ssh ${HOST_USER}@host.docker.internal "osascript -e 'tell application \"iTerm\" to get name of current window'"
+```
+
+This confirms SSH works, `osascript` is accessible, and iTerm2 is running. If this succeeds, agent spawning should work.
+
+#### Fallback: Use Task Tool When SSH Is Unavailable
+
+If SSH cannot be established (for example, on a remote server without Docker Desktop, or in a CI environment), you can still create planning documents by using the Task tool instead of spawning iTerm agents. The Task tool runs a sub-agent inline within the current session -- no SSH or iTerm required.
+
+**When to use the Task tool fallback:**
+- SSH connectivity cannot be restored after following the verification steps above
+- Running in an environment where iTerm2 is not available (Linux host, CI/CD, remote server)
+- Temporary workaround while SSH issues are being resolved
+
+**Example Task tool usage for document creation:**
+
+```
+Task: Create analysis.md for ticket DOCAGENT
+Use the initiation prompt from prompts/create/analysis.md
+Fill placeholders: TICKET_ID=DOCAGENT, TICKET_PATH=/path/to/ticket, PLUGIN_ROOT=/path/to/plugin
+Write output to /path/to/ticket/planning/analysis.md
+```
+
+**Differences from iTerm agent spawning:**
+- The Task tool runs within the current session's context budget, not in a fresh session
+- There is no separate tab/pane to manage (no cleanup needed)
+- The approval workflow still applies -- the sub-agent presents the same approval choices
+- Multiple documents consume cumulative context, similar to the monolithic ticket-planner approach
+
+For best results with the Task tool fallback, create documents one at a time and keep the prompts focused. If context becomes exhausted, start a new session and continue with the next document.
+
 ## Future Enhancements
 
 ### Parallel Execution
