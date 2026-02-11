@@ -142,6 +142,10 @@ Plugins are registered in `.claude-plugin/marketplace.json`. The marketplace nam
 5. Add commands in `commands/` (markdown with workflow instructions)
 6. Add skills in `skills/{skill-name}/` with SKILL.md
 
+## Skill Documentation Guidelines
+
+When writing SKILL.md for executable skills, cross-verify all documented flags, defaults, and exit codes against source code. Use cross-references to authoritative SKILL.md docs (e.g., tab-management) instead of duplicating shared prerequisites or execution context content. For CLI tools with multiple operations, include decision trees and natural-language-to-command mapping tables.
+
 ## Key Files
 
 | File | Purpose |

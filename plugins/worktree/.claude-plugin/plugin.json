@@ -15,5 +15,15 @@
     "parallel-development",
     "parallel",
     "isolation"
+  ],
+  "skills": [
+    "skills/worktree-management",
+    "skills/worktree-spawn",
+    "skills/worktree-cleanup",
+    "skills/worktree-merge",
+    "skills/worktree-open-all",
+    "skills/worktree-cwd-auto-detection",
+    "skills/tab-close-race-mitigation",
+    "skills/shell-test-mock-path-pattern"
   ]
 }
