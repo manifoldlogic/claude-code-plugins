@@ -471,4 +471,4 @@ Creating a new skill?
   - `plugins/iterm/skills/iterm-cross-skill-sourcing/SKILL.md` (reference pattern, 139 lines)
   - `plugins/iterm/skills/eleven-category-test-structure/SKILL.md` (reference pattern, 436 lines)
 - Related skills:
-  - plugin-skills-registration (how skills are registered in plugin.json)
+  - plugin-marketplace-registration (how plugins are registered in marketplace)

@@ -133,7 +133,7 @@ def init_plugin(plugin_name, path):
     print("3. Add agents/, commands/, or skills/ as needed")
     print("4. Register in marketplace.json")
     print("5. Update main README.md")
-    print("6. Remember: version bump required after modifications (see plugin-skills-registration skill)")
+    print("6. Remember: version bump required after modifications (see CLAUDE.md)")
 
     return plugin_dir
 

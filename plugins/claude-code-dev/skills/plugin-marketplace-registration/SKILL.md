@@ -214,4 +214,4 @@ jq '.plugins[] | select(.name == "iterm")' .claude-plugin/marketplace.json
   - `.claude-plugin/marketplace.json` (marketplace configuration)
   - `plugins/{name}/.claude-plugin/plugin.json` (plugin metadata)
 - Related skills:
-  - plugin-skills-registration (registering skills within a plugin)
+  - skill-md-structure (SKILL.md documentation structure)

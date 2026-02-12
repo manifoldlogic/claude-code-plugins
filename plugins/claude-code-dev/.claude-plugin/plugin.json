@@ -15,12 +15,5 @@
     "development",
     "meta",
     "authoring"
-  ],
-  "skills": [
-    "skills/skill-creator",
-    "skills/marketplace-manager",
-    "skills/plugin-marketplace-registration",
-    "skills/plugin-skills-registration",
-    "skills/skill-md-structure"
   ]
 }

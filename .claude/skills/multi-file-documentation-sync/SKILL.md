@@ -94,10 +94,7 @@ Use this pattern when:
 **Canonical content defined in:** `architecture.md` lines 68-126 (Variant A and Variant B)
 
 **Files updated:**
-- `plugins/claude-code-dev/skills/plugin-skills-registration/SKILL.md` (Variant A)
-- `.claude/skills/plugin-skills-registration/SKILL.md` (Variant A)
 - `plugins/claude-code-dev/skills/plugin-marketplace-registration/SKILL.md` (Variant B)
-- `.claude/skills/plugin-marketplace-registration/SKILL.md` (Variant B)
 - `plugins/claude-code-dev/skills/marketplace-manager/SKILL.md` (both variants)
 - `plugins/claude-code-dev/skills/skill-creator/SKILL.md` (note reference)
 - `plugins/sdd/skills/skill-curation/references/promotion-guide.md` (both variants)
@@ -111,14 +108,7 @@ Use this pattern when:
    ```
    Result: All 8 files matched (7 with full blocks, 1 with reminder message).
 
-2. **Copy consistency verification** (VERBUMP.2002):
-   ```bash
-   diff plugins/claude-code-dev/skills/plugin-skills-registration/SKILL.md \
-        .claude/skills/plugin-skills-registration/SKILL.md
-   diff plugins/claude-code-dev/skills/plugin-marketplace-registration/SKILL.md \
-        .claude/skills/plugin-marketplace-registration/SKILL.md
-   ```
-   Result: Both diffs returned empty (byte-for-byte identical).
+2. **Content consistency verification** across remaining files.
 
 3. **Content consistency verification** (VERBUMP.2003):
    - Confirmed all Variant A tables have 3 rows (PATCH, MINOR, MAJOR)
