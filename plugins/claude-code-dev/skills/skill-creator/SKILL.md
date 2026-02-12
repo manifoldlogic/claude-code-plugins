@@ -198,6 +198,8 @@ The packaging script will:
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 
+**Note on Version Bumping:** If you plan to register this skill in a plugin's `plugin.json` (via the `plugin-skills-registration` skill), you must bump the plugin version after registration. See the `plugin-skills-registration` skill for detailed version bump instructions including semver classification and verification commands.
+
 ### Step 6: Iterate
 
 After testing the skill, users may request improvements. Often this happens right after using the skill, with fresh context of how the skill performed.

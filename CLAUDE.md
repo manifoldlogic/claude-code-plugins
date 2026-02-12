@@ -133,6 +133,23 @@ Plugins are registered in `.claude-plugin/marketplace.json`. The marketplace nam
 {"ready": true, "stop_at_phase": 1} // Stop after Phase 1
 ```
 
+## Version Bumping (Required After Plugin Changes)
+
+After modifying plugin files, bump the version in `.claude-plugin/plugin.json` using semver:
+- **PATCH**: Bug fixes, docs, refactoring (e.g., 0.2.0 → 0.2.1)
+- **MINOR**: New skill, command, agent, or hook (e.g., 0.2.0 → 0.3.0)
+- **MAJOR**: Breaking changes to existing interfaces (e.g., 0.2.0 → 1.0.0)
+
+Verify with: `jq -r '.version' plugins/{name}/.claude-plugin/plugin.json`
+
+## Repo-Local Skills
+
+Curated skills in `.claude/skills/` capture repo-specific patterns:
+- `multi-file-documentation-sync` - Verify identical content blocks across multiple files
+- `shell-script-input-validation` - Validate and reject dangerous input patterns in shell scripts
+- `skill-md-structure` - Two SKILL.md documentation patterns (executable vs reference)
+- `wrapper-with-fallback-pattern` - Plugin delegation with graceful fallback
+
 ## Adding a New Plugin
 
 1. Create directory: `plugins/{name}/`
