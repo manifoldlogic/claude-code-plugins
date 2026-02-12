@@ -53,6 +53,8 @@ This creates:
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/planning/` with template files
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/tasks/`
 
+<!-- Step 2.5 (Check Existing Skills) removed in RMSKILL ticket -->
+
 ### Step 3: Fill Planning Documents
 
 **Option A: Delegate to ticket-planner agent (Sonnet) - Preferred:**

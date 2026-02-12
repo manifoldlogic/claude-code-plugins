@@ -615,6 +615,8 @@ echo "Archive may proceed."
 | Invalid path characters | Rejected with specific error message |
 | Path traversal attempt | Rejected: "Path traversal not allowed" |
 
+<!-- Step 5.6 (Skill Curation Opportunity) removed in RMSKILL ticket -->
+
 ### Step 6: Archive
 
 For each fully verified ticket:
