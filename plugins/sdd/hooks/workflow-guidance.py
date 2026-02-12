@@ -84,7 +84,6 @@ PLANNING_COMMANDS = TICKET_INIT_COMMANDS | REVIEW_COMMANDS | UPDATE_COMMANDS | T
 IMPLEMENTATION_COMMANDS = {'/sdd:do-task', '/sdd:do-all-tasks'}
 VERIFICATION_COMMANDS = {'/sdd:code-review', '/sdd:pr'}
 ARCHIVE_COMMANDS = {'/sdd:archive'}
-CURATION_COMMANDS = {'/sdd:curate-skills'}
 
 # Minimum indicators required to trigger guidance (avoids false positives)
 MIN_INDICATORS = 2
@@ -1117,7 +1116,6 @@ def detect_sdd_context(entries: list[dict]) -> dict:
         'has_update': False,
         'has_create_tasks': False,
         'has_archive': False,
-        'has_curate_skills': False,
     }
 
     if not entries:
@@ -1172,15 +1170,6 @@ def detect_sdd_context(entries: list[dict]) -> dict:
     result['has_update'] = bool(command_set.intersection(UPDATE_COMMANDS))
     result['has_create_tasks'] = bool(command_set.intersection(TASK_CREATION_COMMANDS))
     result['has_archive'] = bool(command_set.intersection(ARCHIVE_COMMANDS))
-    result['has_curate_skills'] = bool(command_set.intersection(CURATION_COMMANDS))
-
-    # Check for skill-curator agent invocation in transcript text
-    if not result['has_curate_skills']:
-        for entry in entries:
-            display = entry.get('display', '')
-            if isinstance(display, str) and 'skill-curator' in display:
-                result['has_curate_skills'] = True
-                break
 
     # Check if we have enough indicators to proceed
     if len(result['indicators']) < MIN_INDICATORS:
@@ -1297,17 +1286,6 @@ def generate_guidance(context: dict) -> Optional[str]:
         Guidance message string, or None if no guidance needed.
     """
     workflow = context.get('workflow', 'none')
-
-    # Post-archive skill curation suggestion (low priority, non-intrusive)
-    # When archive was run and skill curation was not already invoked,
-    # suggest /sdd:curate-skills as an optional follow-up.
-    if context.get('has_archive') and not context.get('has_curate_skills'):
-        ticket_id = context.get('ticket_id')
-        ticket_arg = f" {ticket_id}" if ticket_id else ""
-        return (
-            f"Consider running /sdd:curate-skills{ticket_arg} to capture "
-            "repo-local skills from this completed ticket."
-        )
 
     if workflow == 'none':
         return None
