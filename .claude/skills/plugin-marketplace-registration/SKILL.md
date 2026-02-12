@@ -88,6 +88,32 @@ Each plugin entry in `.claude-plugin/marketplace.json` follows this JSON structu
    test -f "plugins/your-plugin/.claude-plugin/plugin.json" && echo "plugin.json exists" || echo "plugin.json missing"
    ```
 
+6. **Marketplace Version Bump (Required)**
+
+   After modifying marketplace.json, bump the marketplace version:
+
+   **Determine the bump type:**
+
+   | Change Type | Bump | Example |
+   |-------------|------|---------|
+   | Description update, metadata fix | PATCH (0.0.x) | 0.2.0 -> 0.2.1 |
+   | New plugin registered | MINOR (0.x.0) | 0.2.1 -> 0.3.0 |
+   | Breaking structural change | MAJOR (x.0.0) | 0.3.0 -> 1.0.0 |
+
+   **Default to PATCH** unless a new plugin is being added (MINOR) or the marketplace structure changes (MAJOR).
+
+   **Edit the version field in `.claude-plugin/marketplace.json`:**
+   ```json
+   {
+     "version": "0.2.1"  // <-- bump this
+   }
+   ```
+
+   **Verify the bump:**
+   ```bash
+   jq -r '.version' .claude-plugin/marketplace.json
+   ```
+
 ### Complete Example
 
 From ISKIM ticket (adding iTerm plugin):
@@ -138,6 +164,7 @@ Before committing marketplace.json changes:
 - [ ] Plugin directory exists at specified source path
 - [ ] Plugin.json exists at `{source}/.claude-plugin/plugin.json`
 - [ ] No trailing commas or syntax errors in array
+- [ ] Marketplace version bumped per Marketplace Version Bump step above
 
 ## Examples
 
