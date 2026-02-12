@@ -86,7 +86,33 @@ plugins/{plugin-name}/skills/{skill-name}/
    # Add "skills/{skill-name}" to skills array
    ```
 
-4. **Validate registration:**
+4. **Version Bump (Required):**
+
+   After modifying plugin content, bump the version in `plugins/{plugin-name}/.claude-plugin/plugin.json`:
+
+   **Determine the bump type:**
+
+   | Change Type | Bump | Example |
+   |-------------|------|---------|
+   | Bug fix, documentation update, internal refactoring | PATCH (0.0.x) | 0.2.0 -> 0.2.1 |
+   | New skill, command, agent, or hook added | MINOR (0.x.0) | 0.2.1 -> 0.3.0 |
+   | Breaking change (renamed/removed public interface) | MAJOR (x.0.0) | 0.3.0 -> 1.0.0 |
+
+   **Default to PATCH** unless the change adds new capabilities (MINOR) or breaks existing interfaces (MAJOR).
+
+   **Edit the version field:**
+   ```json
+   {
+     "version": "0.2.1"  // <-- bump this
+   }
+   ```
+
+   **Verify the bump:**
+   ```bash
+   jq -r '.version' plugins/{plugin-name}/.claude-plugin/plugin.json
+   ```
+
+5. **Validate registration:**
    ```bash
    # Check all registered skills have SKILL.md
    plugin_dir="plugins/{plugin-name}"
@@ -268,7 +294,7 @@ Before committing plugin.json changes:
 - [ ] No duplicate entries in skills array
 - [ ] Skill names follow kebab-case convention
 - [ ] Executable skills are listed before reference skills (optional convention)
-- [ ] Plugin version bumped if adding new skills (semantic versioning)
+- [ ] Plugin version bumped per Version Bump step above
 
 ## References
 
