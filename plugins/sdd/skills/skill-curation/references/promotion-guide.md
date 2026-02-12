@@ -84,7 +84,63 @@ Clone the marketplace skill into a fresh repository that has never used the skil
 - Run through all documented examples
 - Confirm the skill produces expected results without any repo-specific context
 
-### Step 4: Submit to marketplace
+### Step 4: Version Bumps (Required)
+
+After registering the skill in the plugin and marketplace, bump the relevant version numbers.
+
+#### Plugin Version Bump
+
+After modifying plugin content, bump the version in `plugins/{plugin-name}/.claude-plugin/plugin.json`:
+
+**Determine the bump type:**
+
+| Change Type | Bump | Example |
+|-------------|------|---------|
+| Bug fix, documentation update, internal refactoring | PATCH (0.0.x) | 0.2.0 -> 0.2.1 |
+| New skill, command, agent, or hook added | MINOR (0.x.0) | 0.2.1 -> 0.3.0 |
+| Breaking change (renamed/removed public interface) | MAJOR (x.0.0) | 0.3.0 -> 1.0.0 |
+
+**Default to PATCH** unless the change adds new capabilities (MINOR) or breaks existing interfaces (MAJOR).
+
+**Edit the version field:**
+```json
+{
+  "version": "0.2.1"  // <-- bump this
+}
+```
+
+**Verify the bump:**
+```bash
+jq -r '.version' plugins/{plugin-name}/.claude-plugin/plugin.json
+```
+
+#### Marketplace Version Bump
+
+After modifying marketplace.json, bump the marketplace version:
+
+**Determine the bump type:**
+
+| Change Type | Bump | Example |
+|-------------|------|---------|
+| Description update, metadata fix | PATCH (0.0.x) | 0.2.0 -> 0.2.1 |
+| New plugin registered | MINOR (0.x.0) | 0.2.1 -> 0.3.0 |
+| Breaking structural change | MAJOR (x.0.0) | 0.3.0 -> 1.0.0 |
+
+**Default to PATCH** unless a new plugin is being added (MINOR) or the marketplace structure changes (MAJOR).
+
+**Edit the version field in `.claude-plugin/marketplace.json`:**
+```json
+{
+  "version": "0.2.1"  // <-- bump this
+}
+```
+
+**Verify the bump:**
+```bash
+jq -r '.version' .claude-plugin/marketplace.json
+```
+
+### Step 5: Submit to marketplace
 
 Submit the skill to the marketplace via pull request:
 
