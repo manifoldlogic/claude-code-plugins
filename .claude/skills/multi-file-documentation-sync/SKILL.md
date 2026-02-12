@@ -97,7 +97,6 @@ Use this pattern when:
 - `plugins/claude-code-dev/skills/plugin-marketplace-registration/SKILL.md` (Variant B)
 - `plugins/claude-code-dev/skills/marketplace-manager/SKILL.md` (both variants)
 - `plugins/claude-code-dev/skills/skill-creator/SKILL.md` (note reference)
-- `plugins/sdd/skills/skill-curation/references/promotion-guide.md` (both variants)
 - `plugins/claude-code-dev/skills/marketplace-manager/scripts/init_plugin.py` (print reminder)
 
 **Verification approach:**
