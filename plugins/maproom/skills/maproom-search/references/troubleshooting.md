@@ -165,6 +165,61 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 
 **Prevention:** Use lowercase values for all filter flags. See the Filtering and Tuning section in [SKILL.md](../SKILL.md) for the complete valid value tables.
 
+### Unexpected Results from Special Characters in Query
+
+**Symptom:** Search fails, returns no results, or returns unexpected results when `--query` contains special characters such as `#`, `$`, `!`, or `|`. The command may also behave differently than expected when `--query` is passed an empty string (`""`).
+
+**Root Cause:** Shell metacharacters in the query value are interpreted by the shell before reaching the CLI. For example:
+- `#` starts an inline comment in zsh/bash — everything after it is silently dropped
+- `$` triggers variable expansion — `$name` becomes the value of the `name` variable (often empty)
+- `!` triggers history expansion in interactive shells — `!test` tries to expand the last command starting with "test"
+- `|` creates a pipe — `auth|login` pipes the output of `crewchief-maproom search ... auth` into a `login` command
+
+An empty string query (`--query ""`) causes an FTS5 SQL syntax error (`Error: fts5: syntax error near ""`) and exits with code 1.
+
+**Fix:**
+1. Always wrap `--query` values in quotes. Double quotes protect against most metacharacters:
+   ```bash
+   # Correct - double quotes protect # and |
+   crewchief-maproom search --repo <repo> --query "function#handler" --format agent
+   crewchief-maproom search --repo <repo> --query "auth|login" --format agent
+   ```
+2. For queries containing `$` or `!`, use single quotes to prevent all shell expansion:
+   ```bash
+   # Correct - single quotes protect $ from variable expansion
+   crewchief-maproom search --repo <repo> --query '$variable_name' --format agent
+
+   # Correct - single quotes protect ! from history expansion
+   crewchief-maproom search --repo <repo> --query '!important_function' --format agent
+   ```
+3. Alternatively, escape individual characters with a backslash inside double quotes:
+   ```bash
+   # Correct - backslash escapes $ inside double quotes
+   crewchief-maproom search --repo <repo> --query "\$variable_name" --format agent
+   ```
+4. Never pass an empty query. Empty strings cause an FTS5 SQL error (`fts5: syntax error near ""`):
+   ```bash
+   # Wrong - empty query causes SQL error (exit code 1)
+   crewchief-maproom search --repo <repo> --query "" --format agent
+
+   # Correct - always provide at least one search term
+   crewchief-maproom search --repo <repo> --query "config" --format agent
+   ```
+
+**Common incorrect patterns:**
+```bash
+# Wrong - unquoted query; | creates a pipe
+crewchief-maproom search --repo <repo> --query auth|login --format agent
+
+# Wrong - unquoted query; # starts a comment, everything after is dropped
+crewchief-maproom search --repo <repo> --query test#handler --format agent
+
+# Wrong - double quotes with bare $; shell expands $name to empty string
+crewchief-maproom search --repo <repo> --query "$name_pattern" --format agent
+```
+
+**Prevention:** When constructing `--query` values programmatically, always wrap the value in single quotes to prevent all shell interpretation. If the query itself must contain single quotes, use double quotes with backslash escaping for `$` and `!`. Before executing a search, validate that the query string is non-empty.
+
 ### Unexpected Results or Scores
 
 **Symptom:** Search returns results but they seem poorly ranked, irrelevant to the query intent, or the scores don't match expectations.
