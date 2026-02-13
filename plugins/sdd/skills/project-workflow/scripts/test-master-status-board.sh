@@ -107,6 +107,25 @@ assert_contains() {
 }
 
 #######################################
+# Assert that string does NOT contain substring
+# Arguments:
+#   $1 - Haystack (full string)
+#   $2 - Needle (substring that should NOT be present)
+#   $3 - Test name
+#######################################
+assert_not_contains() {
+    local haystack="$1"
+    local needle="$2"
+    local test_name="$3"
+
+    if [[ "$haystack" == *"$needle"* ]]; then
+        log_result "$test_name" "fail" "String should not contain: '$needle'"
+    else
+        log_result "$test_name" "pass"
+    fi
+}
+
+#######################################
 # Assert exit code
 # Arguments:
 #   $1 - Expected exit code
@@ -3440,6 +3459,330 @@ TASKMD
 }
 
 # =============================================================================
+# JSON Log Format Tests (SDDLOOP-6.5004)
+# =============================================================================
+
+#######################################
+# Test: --log-format json produces JSON log output
+# Validates that JSON format contains timestamp, level, message fields
+#######################################
+test_log_format_json_flag() {
+    echo "--- Test: --log-format json flag ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-test-specs"
+    local repos_dir="$TEST_TMP_DIR/json-test-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "--log-format json exits with code 0"
+    # JSON format should contain timestamp field
+    assert_contains "$output" '"timestamp"' "--log-format json contains timestamp field"
+    # JSON format should contain level field
+    assert_contains "$output" '"level"' "--log-format json contains level field"
+    # JSON format should contain message field
+    assert_contains "$output" '"message"' "--log-format json contains message field"
+    # Should NOT have text [INFO] prefix
+    assert_not_contains "$output" "[INFO]" "--log-format json does not have [INFO] prefix"
+}
+
+#######################################
+# Test: LOG_FORMAT=json environment variable produces JSON log output
+# Validates that environment variable sets format
+#######################################
+test_log_format_json_env_var() {
+    echo "--- Test: LOG_FORMAT=json environment variable ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-env-specs"
+    local repos_dir="$TEST_TMP_DIR/json-env-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local output
+    local exit_code=0
+    output=$(LOG_FORMAT=json bash "$MASTER_SCRIPT" --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "LOG_FORMAT=json exits with code 0"
+    assert_contains "$output" '"timestamp"' "LOG_FORMAT=json produces JSON format"
+    assert_not_contains "$output" "[INFO]" "LOG_FORMAT=json format is not text"
+}
+
+#######################################
+# Test: JSON log lines are valid JSON (parseable by jq)
+# Validates that each JSON log line is valid JSON
+#######################################
+test_log_format_json_valid_json() {
+    echo "--- Test: JSON log lines are valid JSON ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-valid-specs"
+    local repos_dir="$TEST_TMP_DIR/json-valid-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    local exit_code=0
+    # Capture stderr only (JSON logs go to stderr, JSON data goes to stdout)
+    stderr_output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Check that we got at least one JSON log line
+    local json_line_count=0
+    local invalid_lines=0
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        json_line_count=$((json_line_count + 1))
+        if ! echo "$line" | jq empty 2>/dev/null; then
+            invalid_lines=$((invalid_lines + 1))
+        fi
+    done <<< "$stderr_output"
+
+    if [ "$json_line_count" -gt 0 ]; then
+        log_result "At least one JSON log line produced" "pass"
+    else
+        log_result "At least one JSON log line produced" "fail" "No JSON log lines found in stderr"
+    fi
+
+    if [ "$invalid_lines" -eq 0 ]; then
+        log_result "All JSON log lines are valid JSON" "pass"
+    else
+        log_result "All JSON log lines are valid JSON" "fail" "$invalid_lines invalid JSON lines found"
+    fi
+}
+
+#######################################
+# Test: JSON log contains ISO 8601 timestamp
+# Validates timestamp format is UTC ISO 8601
+#######################################
+test_log_format_json_timestamp() {
+    echo "--- Test: JSON log contains ISO 8601 timestamp ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-ts-specs"
+    local repos_dir="$TEST_TMP_DIR/json-ts-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    local exit_code=0
+    stderr_output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Extract timestamp from first JSON log line and validate format
+    local first_line
+    first_line=$(echo "$stderr_output" | head -1)
+    local timestamp
+    timestamp=$(echo "$first_line" | jq -r '.timestamp' 2>/dev/null)
+
+    # Validate ISO 8601 UTC format: YYYY-MM-DDTHH:MM:SSZ
+    if echo "$timestamp" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+        log_result "JSON timestamp is ISO 8601 UTC format" "pass"
+    else
+        log_result "JSON timestamp is ISO 8601 UTC format" "fail" "Got: $timestamp"
+    fi
+}
+
+#######################################
+# Test: JSON log has correct level field
+# Validates the level field matches expected values
+#######################################
+test_log_format_json_level() {
+    echo "--- Test: JSON log has correct level field ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-level-specs"
+    local repos_dir="$TEST_TMP_DIR/json-level-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    local exit_code=0
+    stderr_output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Extract level from first JSON log line
+    local first_line
+    first_line=$(echo "$stderr_output" | head -1)
+    local level
+    level=$(echo "$first_line" | jq -r '.level' 2>/dev/null)
+
+    if [ "$level" = "INFO" ]; then
+        log_result "JSON level field is INFO for log_info output" "pass"
+    else
+        log_result "JSON level field is INFO for log_info output" "fail" "Got: $level"
+    fi
+}
+
+#######################################
+# Test: CLI --log-format overrides LOG_FORMAT environment variable
+# Validates CLI flag takes precedence over environment variable
+#######################################
+test_log_format_cli_overrides_env() {
+    echo "--- Test: CLI --log-format overrides LOG_FORMAT env var ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-override-specs"
+    local repos_dir="$TEST_TMP_DIR/json-override-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    # Capture stderr separately to check log format (stdout has JSON data with "timestamp")
+    local stderr_output
+    local exit_code=0
+    # Set env to json but CLI to text - CLI should win
+    stderr_output=$(LOG_FORMAT=json bash "$MASTER_SCRIPT" --log-format text --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "CLI override exits with code 0"
+    # Should be text format (CLI override) - stderr should have [INFO] prefix
+    assert_contains "$stderr_output" "[INFO]" "CLI --log-format text overrides LOG_FORMAT=json"
+    # stderr should NOT have JSON log lines (no {"timestamp":...)
+    assert_not_contains "$stderr_output" '{"timestamp"' "CLI override - no JSON log lines in stderr"
+}
+
+#######################################
+# Test: Default log format is text
+# Validates that without --log-format or LOG_FORMAT, text format is used
+#######################################
+test_log_format_default_text() {
+    echo "--- Test: Default log format is text ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-default-specs"
+    local repos_dir="$TEST_TMP_DIR/json-default-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Default format exits with code 0"
+    assert_contains "$output" "[INFO]" "Default format uses text [INFO] prefix"
+}
+
+#######################################
+# Test: --log-format appears in help text
+# Validates that help text documents the new option
+#######################################
+test_log_format_in_help() {
+    echo "--- Test: --log-format in help text ---"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help exits with code 0"
+    assert_contains "$output" "--log-format" "Help documents --log-format option"
+    assert_contains "$output" "LOG_FORMAT" "Help documents LOG_FORMAT env var"
+    assert_contains "$output" "json" "Help mentions json format"
+}
+
+#######################################
+# Test: format_json_log function produces valid JSON structure
+# Sources the script and tests format_json_log directly
+#######################################
+test_format_json_log_function() {
+    echo "--- Test: format_json_log function ---"
+
+    # Source the script to access the function
+    local json_output
+    json_output=$(source "$MASTER_SCRIPT" && format_json_log "INFO" "test message" 2>&1)
+
+    # Validate it parses as JSON
+    local jq_exit=0
+    echo "$json_output" | jq empty 2>/dev/null || jq_exit=$?
+
+    if [ "$jq_exit" -eq 0 ]; then
+        log_result "format_json_log produces valid JSON" "pass"
+    else
+        log_result "format_json_log produces valid JSON" "fail" "jq failed to parse: $json_output"
+    fi
+
+    # Validate fields
+    local ts level msg
+    ts=$(echo "$json_output" | jq -r '.timestamp' 2>/dev/null)
+    level=$(echo "$json_output" | jq -r '.level' 2>/dev/null)
+    msg=$(echo "$json_output" | jq -r '.message' 2>/dev/null)
+
+    assert_equals "INFO" "$level" "format_json_log level field is correct"
+    assert_equals "test message" "$msg" "format_json_log message field is correct"
+
+    # Validate timestamp format
+    if echo "$ts" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+        log_result "format_json_log timestamp is ISO 8601 UTC" "pass"
+    else
+        log_result "format_json_log timestamp is ISO 8601 UTC" "fail" "Got: $ts"
+    fi
+}
+
+#######################################
+# Test: format_json_log handles special characters in messages
+# Validates that jq properly escapes quotes and backslashes
+#######################################
+test_format_json_log_special_chars() {
+    echo "--- Test: format_json_log special characters ---"
+
+    # Source the script and test with special characters
+    local json_output
+    json_output=$(source "$MASTER_SCRIPT" && format_json_log "WARN" 'Message with "quotes" and \backslash' 2>&1)
+
+    # Validate it parses as JSON (special chars properly escaped)
+    local jq_exit=0
+    echo "$json_output" | jq empty 2>/dev/null || jq_exit=$?
+
+    if [ "$jq_exit" -eq 0 ]; then
+        log_result "format_json_log escapes special characters" "pass"
+    else
+        log_result "format_json_log escapes special characters" "fail" "jq failed to parse: $json_output"
+    fi
+
+    # Validate the message round-trips correctly
+    local msg
+    msg=$(echo "$json_output" | jq -r '.message' 2>/dev/null)
+    if [[ "$msg" == *'"quotes"'* ]] && [[ "$msg" == *'\backslash'* ]]; then
+        log_result "format_json_log message preserves special chars" "pass"
+    else
+        log_result "format_json_log message preserves special chars" "fail" "Got: $msg"
+    fi
+}
+
+# =============================================================================
 # Shellcheck Static Analysis (SDDLOOP-6.5002)
 # =============================================================================
 
@@ -3764,6 +4107,32 @@ main() {
     test_scan_repo_timeout_handling
     echo ""
     test_scan_repo_normal_with_timeout
+    echo ""
+
+    # Run JSON log format tests
+    echo "====================================="
+    echo "JSON Log Format Tests (SDDLOOP-6.5004)"
+    echo "====================================="
+    echo ""
+    test_log_format_json_flag
+    echo ""
+    test_log_format_json_env_var
+    echo ""
+    test_log_format_json_valid_json
+    echo ""
+    test_log_format_json_timestamp
+    echo ""
+    test_log_format_json_level
+    echo ""
+    test_log_format_cli_overrides_env
+    echo ""
+    test_log_format_default_text
+    echo ""
+    test_log_format_in_help
+    echo ""
+    test_format_json_log_function
+    echo ""
+    test_format_json_log_special_chars
     echo ""
 
     # Run shellcheck static analysis tests

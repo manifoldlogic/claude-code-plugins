@@ -29,6 +29,8 @@
 #   --repos-root PATH   Root directory containing code repositories
 #                        Priority: --repos-root > REPOS_ROOT env var > default
 #                        Default: /workspace/repos/
+#   --log-format FORMAT Log output format: 'text' (default) or 'json'
+#                        Priority: --log-format > LOG_FORMAT env var > default
 #   --json              Output JSON format (default, explicit specification)
 #   --debug             Enable debug output to stderr
 #
@@ -36,6 +38,7 @@
 #   SPECS_ROOT        Alternative to passing --specs-root option
 #   REPOS_ROOT        Alternative to passing --repos-root option
 #   WORKSPACE_ROOT    Deprecated: maps to REPOS_ROOT with warning
+#   LOG_FORMAT        Log output format: 'text' (default) or 'json'
 #   DEBUG             Set to "true" to enable debug output
 #
 # Output (JSON):
@@ -118,6 +121,7 @@ DEBUG="${DEBUG:-false}"
 SUMMARY_ONLY="${SUMMARY_ONLY:-false}"
 VERBOSE="${VERBOSE:-false}"
 QUIET="${QUIET:-false}"
+LOG_FORMAT="${LOG_FORMAT:-text}"
 
 #######################################
 # Print debug message to stderr
@@ -133,6 +137,37 @@ debug_log() {
 }
 
 #######################################
+# Format a log message as a single-line JSON object
+#
+# Arguments:
+#   $1 - Log level (INFO, ERROR, WARN, DEBUG)
+#   $2 - Log message
+#
+# Outputs:
+#   Single-line JSON to stderr with format:
+#   {"timestamp":"ISO8601","level":"LEVEL","message":"..."}
+#
+# Notes:
+#   - Uses jq for safe JSON string escaping
+#   - Timestamp is UTC in ISO 8601 format
+#######################################
+format_json_log() {
+    local level="$1"
+    local message="$2"
+
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Use jq to safely escape the message string
+    local msg_json
+    msg_json=$(jq -n --arg msg "$message" '$msg')
+
+    # Construct JSON log entry
+    printf '{"timestamp":"%s","level":"%s","message":%s}\n' \
+        "$timestamp" "$level" "$msg_json" >&2
+}
+
+#######################################
 # Print info message to stderr (suppressed by --quiet)
 # Arguments:
 #   $@ - Message to print
@@ -141,7 +176,11 @@ debug_log() {
 #######################################
 log_info() {
     if [ "$QUIET" != "true" ]; then
-        echo "[INFO] $*" >&2
+        if [ "$LOG_FORMAT" = "json" ]; then
+            format_json_log "INFO" "$*"
+        else
+            echo "[INFO] $*" >&2
+        fi
     fi
 }
 
@@ -691,6 +730,8 @@ Options:
   --repos-root PATH   Root directory containing code repositories
                        Priority: --repos-root > REPOS_ROOT env var > default
                        Default: /workspace/repos/
+  --log-format FORMAT Log output format: 'text' (default) or 'json'
+                       Priority: --log-format > LOG_FORMAT env var > default
   --json              Output JSON format (default, explicit specification)
   --debug             Enable debug output to stderr
 
@@ -698,6 +739,7 @@ Environment Variables:
   SPECS_ROOT        Root directory containing SDD spec directories
   REPOS_ROOT        Root directory containing code repositories
   WORKSPACE_ROOT    Deprecated: maps to REPOS_ROOT with warning
+  LOG_FORMAT        Log output format: 'text' (default) or 'json'
   DEBUG             Set to "true" to enable debug output
 
 Timing Output (with --verbose):
@@ -900,6 +942,14 @@ main() {
                     echo "Error: --repos-root cannot be empty" >&2
                     exit 1
                 fi
+                shift 2
+                ;;
+            --log-format)
+                if [ $# -lt 2 ]; then
+                    echo "Error: --log-format requires a FORMAT argument" >&2
+                    exit 2
+                fi
+                LOG_FORMAT="$2"
                 shift 2
                 ;;
             --json)
