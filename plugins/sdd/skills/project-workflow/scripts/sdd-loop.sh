@@ -822,13 +822,16 @@ CACHE_MISSES=0
 
 #######################################
 # PURPOSE: Counter for cache invalidations. Tracks when cached entries
-#   are cleared during cleanup. Unlike hits/misses, this counter only
-#   increments in the parent shell (cleanup_git_root_cache), so an
-#   in-memory variable is sufficient.
+#   are cleared during cleanup or when proactive validation detects a
+#   stale cached path. Cleanup invalidations increment the in-memory
+#   counter directly (parent shell). Proactive invalidations write "I"
+#   to CACHE_METRICS_FILE (subshell-safe) and are read by
+#   read_cache_metrics().
 #
 # Lifecycle:
 #   - Initialized: At script load (0)
-#   - Modified: Incremented by cleanup_git_root_cache() when entries exist
+#   - Modified: Incremented by cleanup_git_root_cache() when entries exist;
+#     set by read_cache_metrics() from file-based "I" lines
 #   - Cleared: Never (reported in session summary and metrics)
 #
 # Type: integer
@@ -1312,14 +1315,24 @@ cleanup_git_root_cache() {
 }
 
 #######################################
-# Read cache hit/miss counts from the file-based metrics log.
-# Sets CACHE_HITS and CACHE_MISSES variables by counting H and M lines
-# in CACHE_METRICS_FILE. These variables are set in the calling shell
-# scope for use by print_cache_metrics() and write_metrics().
+# Read cache hit/miss/invalidation counts from the file-based metrics log.
+# Sets CACHE_HITS and CACHE_MISSES by counting H and M lines in
+# CACHE_METRICS_FILE. Also counts I (invalidation) lines from proactive
+# cache validation and adds them to CACHE_INVALIDATIONS. These variables
+# are set in the calling shell scope for use by print_cache_metrics()
+# and write_metrics().
+#
+# Note: CACHE_INVALIDATIONS accumulates from two sources:
+#   1. In-memory increments from cleanup_git_root_cache() (parent shell)
+#   2. File-based "I" lines from proactive validation in find_git_root_cached()
+#   This function adds the file-based count to the existing in-memory value,
+#   then clears the file-based entries to prevent double-counting on
+#   subsequent calls.
 #
 # Globals Set:
-#   CACHE_HITS - Number of cache hits (from file)
-#   CACHE_MISSES - Number of cache misses (from file)
+#   CACHE_HITS - Number of cache hits (from file, reset each call)
+#   CACHE_MISSES - Number of cache misses (from file, reset each call)
+#   CACHE_INVALIDATIONS - Adds file-based invalidation count to existing value
 #
 # Returns:
 #   0 - Always succeeds
@@ -1330,6 +1343,13 @@ read_cache_metrics() {
     if [ -n "$CACHE_METRICS_FILE" ] && [ -f "$CACHE_METRICS_FILE" ]; then
         CACHE_HITS=$(grep -c "^H$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
         CACHE_MISSES=$(grep -c "^M$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        local file_invalidations
+        file_invalidations=$(grep -c "^I$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        if [ "$file_invalidations" -gt 0 ] 2>/dev/null; then
+            CACHE_INVALIDATIONS=$((CACHE_INVALIDATIONS + file_invalidations))
+            # Remove I lines to prevent double-counting on subsequent calls
+            sed -i '/^I$/d' "$CACHE_METRICS_FILE" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -1365,16 +1385,23 @@ print_cache_metrics() {
 # Caches successful find_git_root() results in a temp file to avoid
 # redundant filesystem operations when multiple tasks share a repo.
 #
+# Proactive cache validation: Before returning a cached result, verifies
+# the cached path still exists on disk. If the path is stale (deleted or
+# moved), clears the cache entry, logs a warning, records an "I"
+# (invalidation) event to CACHE_METRICS_FILE, and falls through to
+# re-lookup via find_git_root().
+#
 # Arguments:
 #   $1 - repos_root: Root directory for repositories
 #   $2 - repo_name: Name of the repository
 #
 # Outputs:
 #   Path to the git root directory on stdout (cached if available)
+#   Warning to stderr if stale cache detected
 #
 # Returns:
 #   0 - Found a git root (from cache or fresh lookup)
-#   1 - No git root found
+#   1 - No git root found (including after stale cache re-lookup)
 #######################################
 find_git_root_cached() {
     local repos_root="$1"
@@ -1386,13 +1413,25 @@ find_git_root_cached() {
     local cached
     cached=$(grep "^${repo_name}=" "$GIT_ROOT_CACHE_FILE" 2>/dev/null | head -1 | cut -d= -f2-)
     if [ -n "$cached" ]; then
-        echo "H" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
-        log_debug "find_git_root_cached: Cache hit for repo: $repo_name"
-        echo "$cached"
-        return 0
+        # Proactive validation: verify cached path still exists
+        if [ -d "$cached" ]; then
+            echo "H" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
+            log_debug "find_git_root_cached: Cache hit for repo: $repo_name"
+            echo "$cached"
+            return 0
+        else
+            # Stale cache detected - clear entry and log warning
+            log_warn "Cached git root no longer exists: $cached"
+            echo "I" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
+            # Remove stale entry from cache file
+            local tmp_cache="${GIT_ROOT_CACHE_FILE}.tmp"
+            grep -v "^${repo_name}=" "$GIT_ROOT_CACHE_FILE" > "$tmp_cache" 2>/dev/null || true
+            mv -f "$tmp_cache" "$GIT_ROOT_CACHE_FILE" 2>/dev/null || true
+            # Fall through to cache miss logic for re-lookup
+        fi
     fi
 
-    # Cache miss - call original function
+    # Cache miss or stale cache - call original function
     echo "M" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
     local result
     if result=$(find_git_root "$repos_root" "$repo_name"); then

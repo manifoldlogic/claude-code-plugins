@@ -3818,6 +3818,209 @@ test_cleanup_git_root_cache() {
 }
 
 # =============================================================================
+# PRIORITY 13c TESTS (Proactive Cache Validation - SDDLOOP-6.4010)
+# =============================================================================
+
+#######################################
+# Test: Stale cache detected when cached directory is deleted
+# Verifies that find_git_root_cached() detects a stale cached path,
+# clears the entry, logs a warning, and fails gracefully when the
+# repo directory no longer exists.
+#######################################
+test_stale_cache_detection() {
+    echo "--- Test: stale cache detection ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics to test-specific files
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/stale_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/stale_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/stale/repos"
+    mkdir -p "$test_repos/myproject/myproject/.git"
+
+    # First call - cache miss, populates cache
+    local git_root
+    git_root=$(find_git_root_cached "$test_repos/" "myproject") || true
+    assert_equals "$test_repos/myproject/myproject" "$git_root" \
+        "Stale: initial lookup returns correct path"
+
+    # Verify cache is populated
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        assert_contains "$cache_content" "myproject=" \
+            "Stale: cache populated after initial lookup"
+    else
+        log_result "Stale: cache populated after initial lookup" "fail" "Cache file not found"
+    fi
+
+    # Delete the repo directory (simulate external change)
+    rm -rf "$test_repos/myproject/myproject"
+
+    # Re-lookup should detect stale cache, clear entry, and fail gracefully
+    local output exit_code=0
+    output=$(find_git_root_cached "$test_repos/" "myproject" 2>&1) || exit_code=$?
+
+    # Should fail because repo is gone (re-lookup also fails)
+    if [ "$exit_code" -ne 0 ]; then
+        log_result "Stale: re-lookup fails when repo deleted" "pass"
+    else
+        log_result "Stale: re-lookup fails when repo deleted" "fail" \
+            "Expected non-zero exit, got 0"
+    fi
+
+    # Warning should be logged
+    assert_contains "$output" "Cached git root no longer exists" \
+        "Stale: warning logged for stale cache"
+
+    # Cache entry should be cleared (no myproject= line)
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local remaining
+        remaining=$(cat "$GIT_ROOT_CACHE_FILE")
+        if [ -z "$remaining" ] || ! echo "$remaining" | grep -q "^myproject="; then
+            log_result "Stale: cache entry cleared after invalidation" "pass"
+        else
+            log_result "Stale: cache entry cleared after invalidation" "fail" \
+                "Cache still contains: $remaining"
+        fi
+    else
+        log_result "Stale: cache entry cleared after invalidation" "pass"
+    fi
+
+    # Metrics file should contain an I (invalidation) entry
+    if [ -f "$CACHE_METRICS_FILE" ]; then
+        local i_count
+        i_count=$(grep -c "^I$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        assert_equals "1" "$i_count" "Stale: invalidation recorded in metrics file"
+    else
+        log_result "Stale: invalidation recorded in metrics file" "fail" \
+            "Metrics file not found"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: Stale cache self-heals when directory is recreated
+# Verifies that after a stale cache is detected and cleared, a new
+# lookup rediscovers the recreated directory and re-caches it.
+#######################################
+test_stale_cache_self_healing() {
+    echo "--- Test: stale cache self-healing ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/heal_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/heal_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/heal/repos"
+    mkdir -p "$test_repos/healer/healer/.git"
+
+    # Populate cache
+    local result1
+    result1=$(find_git_root_cached "$test_repos/" "healer") || true
+    assert_equals "$test_repos/healer/healer" "$result1" \
+        "Heal: initial lookup correct"
+
+    # Delete and recreate the repo
+    rm -rf "$test_repos/healer/healer"
+    mkdir -p "$test_repos/healer/healer/.git"
+
+    # Re-lookup should detect stale (directory was deleted then recreated,
+    # but since we rm -rf and mkdir, the directory exists again)
+    # Actually the directory exists again, so cache validation passes
+    local result2 exit_code=0
+    result2=$(find_git_root_cached "$test_repos/" "healer" 2>&1) || exit_code=1
+
+    # The recreated directory exists, so the cached path is still valid
+    assert_equals 0 "$exit_code" "Heal: lookup succeeds with recreated dir"
+
+    # Now truly break it: delete, DON'T recreate, then recreate at different path
+    rm -rf "$test_repos/healer/healer"
+
+    # Create it at a different sub-path (simulating a moved repo)
+    mkdir -p "$test_repos/healer/main/.git"
+
+    # Re-lookup: cached path is stale, re-lookup should find new path
+    local result3 exit_code3=0
+    result3=$(find_git_root_cached "$test_repos/" "healer" 2>&1) || exit_code3=$?
+
+    # The re-lookup via find_git_root should find the new path
+    # Stderr (warning) mixed with stdout in $(), so check just that it works
+    # Note: output may contain the warning on stderr; actual path on stdout
+    local stdout_result
+    stdout_result=$(find_git_root_cached "$test_repos/" "healer" 2>/dev/null) || true
+    assert_equals "$test_repos/healer/main" "$stdout_result" \
+        "Heal: self-healed to new path after stale cache"
+
+    # Verify new path is now cached
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        assert_contains "$cache_content" "healer=$test_repos/healer/main" \
+            "Heal: new path cached after self-healing"
+    else
+        log_result "Heal: new path cached after self-healing" "fail" "Cache file not found"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: read_cache_metrics counts invalidation entries from metrics file
+# Verifies that "I" lines in the metrics file are counted as invalidations.
+#######################################
+test_cache_metrics_invalidation_counting() {
+    echo "--- Test: cache metrics invalidation counting ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/inval_count_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/inval_count_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/inval_count/repos"
+    mkdir -p "$test_repos/ic1/ic1/.git"
+
+    # Populate cache
+    find_git_root_cached "$test_repos/" "ic1" >/dev/null || true
+
+    # Delete the directory to trigger stale cache
+    rm -rf "$test_repos/ic1/ic1"
+
+    # Re-lookup triggers invalidation (capture stderr to suppress warning)
+    find_git_root_cached "$test_repos/" "ic1" >/dev/null 2>&1 || true
+
+    # Read metrics - should show 1 invalidation from the I line
+    read_cache_metrics
+    assert_equals "1" "$CACHE_INVALIDATIONS" \
+        "Invalidation counting: 1 invalidation from proactive validation"
+
+    # Verify metrics also show correct miss count (initial miss + re-lookup miss)
+    assert_equals "2" "$CACHE_MISSES" \
+        "Invalidation counting: 2 misses (initial + re-lookup after invalidation)"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+# =============================================================================
 # PRIORITY 13b TESTS (Cache Metrics - SDDLOOP-6.4009)
 # =============================================================================
 
@@ -4760,6 +4963,21 @@ main() {
     test_find_git_root_cached_multiple_repos
     echo ""
     test_cleanup_git_root_cache
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 13c TESTS (Proactive Cache Validation - SDDLOOP-6.4010)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 13c Tests (Proactive Cache Validation)"
+    echo "====================================="
+    echo ""
+
+    test_stale_cache_detection
+    echo ""
+    test_stale_cache_self_healing
+    echo ""
+    test_cache_metrics_invalidation_counting
     echo ""
 
     # ==========================================================================
