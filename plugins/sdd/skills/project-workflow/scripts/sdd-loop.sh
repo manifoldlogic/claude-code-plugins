@@ -1338,6 +1338,12 @@ cleanup() {
     # Clean up git root cache
     cleanup_git_root_cache
 
+    # Clean up lock file (if we created it)
+    if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        rm -f "$SDD_LOOP_LOCKFILE"
+        log_debug "Removed lock file: $SDD_LOOP_LOCKFILE"
+    fi
+
     # Write metrics file if configured
     write_metrics "$EXIT_CODE"
 
@@ -1354,6 +1360,10 @@ handle_sigint() {
     log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
     cleanup_claude_process
     cleanup_git_root_cache
+    # Clean up lock file
+    if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        rm -f "$SDD_LOOP_LOCKFILE"
+    fi
     write_metrics "$EXIT_CODE"
     exit 130
 }
@@ -1368,6 +1378,10 @@ handle_sigterm() {
     log_info "Received SIGTERM, shutting down gracefully..."
     cleanup_claude_process
     cleanup_git_root_cache
+    # Clean up lock file
+    if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        rm -f "$SDD_LOOP_LOCKFILE"
+    fi
     write_metrics "$EXIT_CODE"
     exit 143
 }
@@ -1986,17 +2000,64 @@ main() {
     fi
 
     # ==========================================================================
-    # Concurrent Invocation Protection (flock-based)
+    # Concurrent Invocation Protection (atomic lock file creation)
     # Prevents multiple sdd-loop instances from running against the same
     # specs root, which could cause race conditions (e.g., executing the
     # same task twice or concurrent git modifications).
+    #
+    # Uses two-layer protection:
+    #   1. Atomic file creation via `set -o noclobber` in a subshell
+    #      (prevents race where two processes both see no lock and both create one)
+    #   2. flock(2) advisory lock on the lock file descriptor
+    #      (kernel-level lock that auto-releases when process dies)
+    #
+    # Stale lock detection handles the case where a previous process was
+    # killed with SIGKILL (cannot be trapped, lock file left behind).
     # ==========================================================================
     readonly SDD_LOOP_LOCKFILE="/tmp/sdd-loop-${SDD_LOOP_SPECS_ROOT//\//_}.lock"
 
-    exec 200>"$SDD_LOOP_LOCKFILE"
+    # Check for stale lock file before attempting atomic creation.
+    # A stale lock file is one whose PID no longer refers to a running process.
+    if [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        local stale_pid
+        stale_pid=$(cat "$SDD_LOOP_LOCKFILE" 2>/dev/null) || stale_pid=""
+        if [ -n "$stale_pid" ] && ! kill -0 "$stale_pid" 2>/dev/null; then
+            log_warn "Removing stale lock file (PID $stale_pid no longer running): $SDD_LOOP_LOCKFILE"
+            rm -f "$SDD_LOOP_LOCKFILE"
+        fi
+    fi
+
+    # Atomic lock file creation using noclobber.
+    # The subshell isolates `set -o noclobber` so it does not affect the parent shell.
+    # If the file already exists, the redirection fails atomically (no race window).
+    if ( set -o noclobber; echo "$$" > "$SDD_LOOP_LOCKFILE" ) 2>/dev/null; then
+        log_debug "Lock file created successfully: $SDD_LOOP_LOCKFILE"
+    else
+        log_error "Failed to create lock file (already exists or disk full): $SDD_LOOP_LOCKFILE"
+        log_error "Another sdd-loop instance is already running for specs-root: $SDD_LOOP_SPECS_ROOT"
+        log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        exit 1
+    fi
+
+    # Validate that the lock file was actually written with our PID.
+    # Guards against silent write failures (e.g., disk full after file creation).
+    local written_pid
+    written_pid=$(cat "$SDD_LOOP_LOCKFILE" 2>/dev/null) || written_pid=""
+    if [ "$written_pid" != "$$" ]; then
+        log_error "Lock file validation failed: expected PID $$, found '$written_pid'"
+        log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        exit 1
+    fi
+
+    # Second layer: acquire flock on the lock file descriptor.
+    # This provides kernel-level locking that auto-releases when the process
+    # exits (even on SIGKILL), complementing the noclobber atomic creation.
+    # Uses append mode (>>) to preserve the PID content written by noclobber.
+    exec 200>>"$SDD_LOOP_LOCKFILE"
     if ! flock -n 200; then
         log_error "Another sdd-loop instance is already running for specs-root: $SDD_LOOP_SPECS_ROOT"
         log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        rm -f "$SDD_LOOP_LOCKFILE"
         exit 1
     fi
     log_debug "Acquired exclusive lock: $SDD_LOOP_LOCKFILE"

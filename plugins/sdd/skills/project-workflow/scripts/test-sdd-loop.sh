@@ -3251,8 +3251,9 @@ test_concurrent_invocation_blocked() {
     local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
 
     # Hold the lock externally using a background bash process.
+    # Creates the lock file with PID (noclobber layer) and acquires flock (flock layer).
     # Uses exec to replace the shell with sleep so killing the PID stops it.
-    bash -c "exec 200>\"$lockfile\"; flock -n 200; exec sleep 10" &
+    bash -c "echo \$\$ > \"$lockfile\"; exec 200>\"$lockfile\"; flock -n 200; exec sleep 10" &
     local holder_pid=$!
 
     # Brief pause to let the holder acquire the lock
@@ -3266,6 +3267,7 @@ test_concurrent_invocation_blocked() {
     # Clean up lock holder
     kill "$holder_pid" 2>/dev/null || true
     wait "$holder_pid" 2>/dev/null || true
+    rm -f "$lockfile"
 
     assert_exit_code 1 "$exit_code" "Second instance exits with code 1"
     assert_contains "$output" "Another sdd-loop instance is already running" "Error message mentions another instance"
@@ -3304,7 +3306,7 @@ test_lockfile_cleanup_on_normal_exit() {
 #######################################
 # Test: Lockfile cleanup on SIGTERM
 # After sdd-loop.sh is killed with SIGTERM, the lock is released
-# (fd closed by OS when process dies, next invocation can acquire lock)
+# (lock file cleaned up by signal handler, or stale lock detected on next startup)
 #######################################
 test_lockfile_cleanup_on_sigterm() {
     echo "--- Test: Lockfile cleanup on SIGTERM ---"
@@ -3318,8 +3320,9 @@ test_lockfile_cleanup_on_sigterm() {
     local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
 
     # Hold the lock in a background bash process (simulates running sdd-loop).
+    # Creates lock file with PID and acquires flock.
     # Uses exec to replace the shell with sleep so killing the PID stops it.
-    bash -c "exec 200>\"$lockfile\"; flock -n 200; exec sleep 30" &
+    bash -c "echo \$\$ > \"$lockfile\"; exec 200>\"$lockfile\"; flock -n 200; exec sleep 30" &
     local holder_pid=$!
 
     # Brief pause to let the holder acquire the lock
@@ -3340,7 +3343,10 @@ test_lockfile_cleanup_on_sigterm() {
     # Brief pause for OS to release file descriptor
     sleep 0.5
 
-    # Next invocation should succeed (lock released by OS when process died)
+    # Remove stale lock file if still present (SIGTERM on bash -c does not run traps)
+    rm -f "$lockfile"
+
+    # Next invocation should succeed (lock released)
     local output
     local exit_code=0
     create_mock_status_board "none" "" "" "No work"
@@ -3348,6 +3354,126 @@ test_lockfile_cleanup_on_sigterm() {
 
     assert_exit_code 0 "$exit_code" "Instance runs after SIGTERM kills previous"
     assert_not_contains "$output" "Another sdd-loop instance is already running" "No stale lock after SIGTERM"
+}
+
+#######################################
+# Test: Stale lock file is detected and removed
+# When a lock file exists but its PID is no longer running (e.g., process was
+# killed with SIGKILL), sdd-loop detects the stale lock and removes it.
+#######################################
+test_stale_lock_detection() {
+    echo "--- Test: Stale lock detection ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Create a stale lock file with a PID that does not exist.
+    # PID 999999 is almost certainly not running.
+    echo "999999" > "$lockfile"
+
+    # Start sdd-loop - should detect stale lock, remove it, and proceed
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Instance succeeds after stale lock removal"
+    assert_contains "$output" "stale lock" "Warns about stale lock file"
+}
+
+#######################################
+# Test: Concurrent startup race condition
+# Two sdd-loop instances launched simultaneously - only one should succeed.
+# The atomic noclobber lock creation prevents both from acquiring the lock.
+#######################################
+test_concurrent_startup_race() {
+    echo "--- Test: Concurrent startup race condition ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Ensure no stale lock file exists
+    rm -f "$lockfile"
+
+    # Launch two sdd-loop instances simultaneously in background.
+    # Both will attempt to create the lock file atomically.
+    local output_file_1="$TEST_TMP_DIR/race_output_1"
+    local output_file_2="$TEST_TMP_DIR/race_output_2"
+    local exit_file_1="$TEST_TMP_DIR/race_exit_1"
+    local exit_file_2="$TEST_TMP_DIR/race_exit_2"
+
+    # Launch process 1
+    bash -c "bash \"$SDD_LOOP\" --dry-run --max-iterations 1 --specs-root \"$TEST_TMP_DIR/specs\" --repos-root \"$TEST_TMP_DIR/repos\" >\"$output_file_1\" 2>&1; echo \$? > \"$exit_file_1\"" &
+    local pid1=$!
+
+    # Launch process 2 simultaneously (no sleep between)
+    bash -c "bash \"$SDD_LOOP\" --dry-run --max-iterations 1 --specs-root \"$TEST_TMP_DIR/specs\" --repos-root \"$TEST_TMP_DIR/repos\" >\"$output_file_2\" 2>&1; echo \$? > \"$exit_file_2\"" &
+    local pid2=$!
+
+    # Wait for both to complete
+    wait "$pid1" 2>/dev/null || true
+    wait "$pid2" 2>/dev/null || true
+
+    # Read exit codes
+    local exit1
+    local exit2
+    exit1=$(cat "$exit_file_1" 2>/dev/null) || exit1="unknown"
+    exit2=$(cat "$exit_file_2" 2>/dev/null) || exit2="unknown"
+
+    # Read outputs
+    local output1
+    local output2
+    output1=$(cat "$output_file_1" 2>/dev/null) || output1=""
+    output2=$(cat "$output_file_2" 2>/dev/null) || output2=""
+
+    # Exactly one should succeed (exit 0) and one should fail (exit 1)
+    local success_count=0
+    local fail_count=0
+
+    if [ "$exit1" = "0" ]; then
+        success_count=$((success_count + 1))
+    elif [ "$exit1" = "1" ]; then
+        fail_count=$((fail_count + 1))
+    fi
+
+    if [ "$exit2" = "0" ]; then
+        success_count=$((success_count + 1))
+    elif [ "$exit2" = "1" ]; then
+        fail_count=$((fail_count + 1))
+    fi
+
+    # Clean up lock file
+    rm -f "$lockfile"
+
+    # Assert exactly one succeeded and one failed
+    if [ "$success_count" -eq 1 ] && [ "$fail_count" -eq 1 ]; then
+        log_result "Exactly one instance succeeds in race" "pass"
+    else
+        log_result "Exactly one instance succeeds in race" "fail" "Expected 1 success + 1 failure, got $success_count successes + $fail_count failures (exit1=$exit1, exit2=$exit2)"
+    fi
+
+    # The failing instance should mention the lock conflict
+    local failed_output=""
+    if [ "$exit1" = "1" ]; then
+        failed_output="$output1"
+    elif [ "$exit2" = "1" ]; then
+        failed_output="$output2"
+    fi
+
+    if [ -n "$failed_output" ]; then
+        assert_contains "$failed_output" "lock file" "Failed instance mentions lock file"
+    fi
 }
 
 # =============================================================================
@@ -4203,6 +4329,10 @@ main() {
     test_lockfile_cleanup_on_normal_exit
     echo ""
     test_lockfile_cleanup_on_sigterm
+    echo ""
+    test_stale_lock_detection
+    echo ""
+    test_concurrent_startup_race
     echo ""
 
     # ==========================================================================
