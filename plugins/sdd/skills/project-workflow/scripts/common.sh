@@ -33,11 +33,11 @@ fi
 MIN_TICKET_ID_LENGTH=2
 MAX_TICKET_ID_LENGTH=12
 
-# Print error message to stderr in red
-error() { printf "${RED}[ERROR]${NC} %s\n" "$1" >&2; }
+# Print error message to stderr in red (with timestamp)
+error() { printf "[$(date +"%T")] ${RED}[ERROR]${NC} %s\n" "$1" >&2; }
 
-# Print warning message to stderr in yellow
-warn() { printf "${YELLOW}[WARN]${NC} %s\n" "$1" >&2; }
+# Print warning message to stderr in yellow (with timestamp)
+warn() { printf "[$(date +"%T")] ${YELLOW}[WARN]${NC} %s\n" "$1" >&2; }
 
-# Print info message to stderr in green
-info() { printf "${GREEN}[INFO]${NC} %s\n" "$1" >&2; }
+# Print info message to stderr in green (with timestamp)
+info() { printf "[$(date +"%T")] ${GREEN}[INFO]${NC} %s\n" "$1" >&2; }

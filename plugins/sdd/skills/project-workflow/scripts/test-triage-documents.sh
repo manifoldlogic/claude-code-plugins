@@ -36,6 +36,7 @@
 #  33. NO_COLOR env var disables ANSI codes in stderr output
 #  34. --debug flag enables verbose tracing (set -x output on stderr)
 #  35. DEBUG=1 env var enables verbose tracing (set -x output on stderr)
+#  36. Stderr messages include [HH:MM:SS] timestamp prefix
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -1223,6 +1224,48 @@ if $test_ok; then
         fi
     else
         log_fail "$test_name" "stderr does not contain set -x trace lines (expected '+ ' prefix)"
+    fi
+fi
+
+# =============================================
+# Test 36: Timestamp format in stderr output
+# Run triage with empty description (forces error on stderr)
+# Capture stderr; verify it contains [HH:MM:SS] timestamp pattern
+# =============================================
+
+printf -- "\n${CYAN}--- Timestamp Tests ---${NC}\n\n"
+
+stderr_file_36=$(mktemp)
+set +e
+bash "$TRIAGE_SCRIPT" "" 2>"$stderr_file_36" >/dev/null
+TIMESTAMP_EXIT=$?
+set -e
+TIMESTAMP_STDERR=$(cat "$stderr_file_36")
+rm -f "$stderr_file_36"
+
+test_name="Stderr messages include [HH:MM:SS] timestamp prefix"
+test_ok=true
+
+# Script should exit non-zero for empty description (error output expected)
+if [ "$TIMESTAMP_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "script exited 0, expected non-zero (no stderr output to check)"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # Verify stderr is not empty
+    if [ -z "$TIMESTAMP_STDERR" ]; then
+        log_fail "$test_name" "stderr is empty (expected error messages with timestamps)"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    # Verify at least one line matches [HH:MM:SS] pattern
+    if printf '%s' "$TIMESTAMP_STDERR" | grep -qE '\[([0-9]{2}:){2}[0-9]{2}\]'; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "no [HH:MM:SS] timestamp found in stderr (got: $TIMESTAMP_STDERR)"
     fi
 fi
 
