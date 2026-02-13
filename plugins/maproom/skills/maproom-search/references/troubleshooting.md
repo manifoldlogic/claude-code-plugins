@@ -99,3 +99,27 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
    ```
 
 **Prevention:** Consult the Choosing Search Type section in SKILL.md to pick the right search mode. Review [search-best-practices.md](./search-best-practices.md) for query optimization techniques, especially anti-patterns 4 and 5.
+
+### Zero Results with Valid Query
+
+**Symptom:** Search returns empty results despite matching code existing in the repository.
+
+**Root Cause:** Filter values passed to `--kind` or `--lang` use incorrect case. All filter values are case-sensitive — uppercase or mixed-case values silently match nothing.
+
+**Incorrect examples:**
+- `--kind Func` (should be `func`)
+- `--kind Function` (should be `func`)
+- `--lang PY` (should be `py`)
+
+**Correct examples:**
+- `--kind func` (lowercase)
+- `--kind class` (lowercase)
+- `--lang py` (lowercase extension)
+
+**Fix:**
+1. Check your `--kind` and `--lang` values for uppercase characters.
+2. Replace with the exact lowercase values from the tables below:
+   - **Kind values:** `func`, `class`, `method`, `heading_2`, `heading_3`, `code_block`, `markdown_section`, `json_key`
+   - **Lang values:** `py`, `ts`, `rs`, `go`, `md`, `json`
+
+**Prevention:** Use lowercase values for all filter flags. See the Filtering and Tuning section in [SKILL.md](../SKILL.md) for the complete valid value tables.
