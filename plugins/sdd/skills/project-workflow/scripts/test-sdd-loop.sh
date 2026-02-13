@@ -190,7 +190,7 @@ create_mock_status_board() {
     # Create in scripts directory where sdd-loop.sh lives
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"$action","task":"$task","ticket":"$ticket","sdd_root":"$sdd_root","reason":"$reason"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"$action","task":"$task","ticket":"$ticket","sdd_root":"$sdd_root","reason":"$reason"}}'
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 }
@@ -215,9 +215,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le $iterations ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -248,7 +248,7 @@ create_mock_status_board_with_phase() {
 
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.${phase}001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase $phase"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.${phase}001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase $phase"}}'
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 }
@@ -455,7 +455,7 @@ EOF
     # The ticket ID in the JSON must match the prefix of the ticket directory (PHASE)
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"PHASE.2001","ticket":"PHASE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase 2"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"PHASE.2001","ticket":"PHASE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase 2"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -494,9 +494,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task 1"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task 1"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -567,9 +567,9 @@ fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 4 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -851,9 +851,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 2 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -890,9 +890,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 3 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1029,9 +1029,9 @@ test_timeout_zero() {
     local exit_code=0
     output=$(bash "$SDD_LOOP_ORIGINAL" --timeout 0 2>&1) || exit_code=$?
 
-    assert_exit_code 2 "$exit_code" "Zero --timeout exits with code 2"
-    assert_contains "$output" "positive integer greater than zero" "Shows zero error message"
-    assert_contains "$output" "got: 0" "Error message includes the invalid value"
+    assert_exit_code 1 "$exit_code" "Zero --timeout exits with code 1"
+    assert_contains "$output" "must be a positive integer" "Shows zero error message"
+    assert_contains "$output" "Error:" "Zero timeout error has Error prefix"
 }
 
 #######################################
@@ -1044,9 +1044,80 @@ test_timeout_non_numeric() {
     local exit_code=0
     output=$(bash "$SDD_LOOP_ORIGINAL" --timeout 10s 2>&1) || exit_code=$?
 
-    assert_exit_code 2 "$exit_code" "Non-numeric --timeout exits with code 2"
-    assert_contains "$output" "positive integer" "Shows non-numeric error message"
-    assert_contains "$output" "10s" "Error message includes the invalid value"
+    assert_exit_code 1 "$exit_code" "Non-numeric --timeout exits with code 1"
+    assert_contains "$output" "must be a positive integer" "Shows non-numeric error message"
+    assert_contains "$output" "Error:" "Non-numeric timeout error has Error prefix"
+}
+
+#######################################
+# Test: --timeout with negative value
+#######################################
+test_timeout_negative() {
+    echo "--- Test: --timeout with negative value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --timeout -1 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Negative --timeout exits with code 1"
+    assert_contains "$output" "must be a positive integer" "Shows negative timeout error message"
+}
+
+#######################################
+# Test: Default timeout is 600 seconds
+# Verifies the default timeout (no --timeout flag) is 600
+#######################################
+test_default_timeout_600() {
+    echo "--- Test: Default timeout is 600 seconds ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    # Run without --timeout flag; the safety limits log line shows the default
+    output=$(bash "$SDD_LOOP" --dry-run --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Default timeout run exits with code 0"
+    assert_contains "$output" "timeout=600s" "Safety limits log shows default timeout=600s"
+}
+
+#######################################
+# Test: Help text shows 600 as default timeout
+# Verifies --help output references the new default
+#######################################
+test_help_shows_default_timeout_600() {
+    echo "--- Test: Help text shows 600 as default timeout ---"
+
+    local output
+    output=$(bash "$SDD_LOOP_ORIGINAL" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help exits with code 0"
+    assert_contains "$output" "Default: 600" "Help text shows Default: 600"
+    assert_contains "$output" "10 minutes" "Help text mentions 10 minutes"
+}
+
+#######################################
+# Test: --timeout flag overrides default
+# Verifies custom timeout via --timeout still works
+#######################################
+test_timeout_override() {
+    echo "--- Test: --timeout flag overrides default ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --timeout 3600 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Custom timeout run exits with code 0"
+    assert_contains "$output" "timeout=3600s" "Safety limits log shows overridden timeout=3600s"
 }
 
 #######################################
@@ -1135,9 +1206,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid path test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid path test"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1168,7 +1239,7 @@ test_path_bounds_outside_workspace() {
     # Create mock status board returning sdd_root outside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/test-repo","reason":"Outside specs root test"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/test-repo","reason":"Outside specs root test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1198,7 +1269,7 @@ test_path_bounds_traversal_attack() {
     # Path: specs/../outside-target/test-repo canonicalizes to outside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/../outside-target/test-repo","reason":"Traversal attack test"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/../outside-target/test-repo","reason":"Traversal attack test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1226,7 +1297,7 @@ test_path_bounds_equals_workspace() {
     # which doesn't exist, causing a failure before path bounds check
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs","reason":"Equals specs root test"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs","reason":"Equals specs root test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1263,9 +1334,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs-link/test-repo","reason":"Symlink test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs-link/test-repo","reason":"Symlink test"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1298,9 +1369,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Debug test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Debug test"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1333,7 +1404,7 @@ test_version_matching() {
     # Create mock status board that returns correct version 1.0.0
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1360,7 +1431,7 @@ test_version_mismatch() {
     # Create mock status board that returns different version 2.0.0
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"version":"2.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+echo '{"version":"2.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1375,11 +1446,11 @@ MOCK_EOF
 }
 
 #######################################
-# Test 45: Version missing - warning logged with "unknown"
-# Validates that missing version field logs warning with "unknown"
+# Test 45: Version missing - schema validation error
+# Validates that missing version field causes validation error
 #######################################
 test_version_missing() {
-    echo "--- Test: Version missing - warning with unknown ---"
+    echo "--- Test: Version missing - schema validation error ---"
 
     setup_test_env
     reset_counters
@@ -1388,7 +1459,7 @@ test_version_missing() {
     # Create mock status board that returns JSON without version field
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+echo '{"repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1396,10 +1467,119 @@ MOCK_EOF
     local exit_code=0
     output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
-    assert_exit_code 0 "$exit_code" "Missing version still exits with code 0 (backward compatible)"
-    assert_contains "$output" "version mismatch" "Shows version mismatch warning for missing version"
-    assert_contains "$output" "unknown" "Warning shows 'unknown' for missing version"
-    assert_contains "$output" "expected 1.0.0" "Warning includes expected version"
+    assert_exit_code 1 "$exit_code" "Missing version exits with code 1 (schema validation failure)"
+    assert_contains "$output" "missing .version field" "Shows missing .version field error"
+    assert_contains "$output" "old version or returned corrupted output" "Shows actionable guidance"
+}
+
+# =============================================================================
+# PRIORITY 5b TESTS (JSON Schema Validation - SDDLOOP-6.3004)
+# =============================================================================
+
+#######################################
+# Test 45b: Schema validation - missing .version field
+# Validates that missing .version field causes clear error
+#######################################
+test_schema_missing_version() {
+    echo "--- Test: Schema validation - missing .version field ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON without .version field
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Missing .version exits with code 1"
+    assert_contains "$output" "missing .version field" "Shows missing .version field error"
+    assert_contains "$output" "old version or returned corrupted output" "Shows actionable guidance"
+}
+
+#######################################
+# Test 45c: Schema validation - missing .repos field
+# Validates that missing .repos field causes clear error
+#######################################
+test_schema_missing_repos() {
+    echo "--- Test: Schema validation - missing .repos field ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON without .repos field
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Missing .repos exits with code 1"
+    assert_contains "$output" ".repos field is not an array" "Shows .repos not an array error"
+}
+
+#######################################
+# Test 45d: Schema validation - .repos is not an array
+# Validates that .repos being a non-array type causes clear error
+#######################################
+test_schema_repos_not_array() {
+    echo "--- Test: Schema validation - .repos is not an array ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON with .repos as a string
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"version":"1.0.0","repos":"invalid","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Non-array .repos exits with code 1"
+    assert_contains "$output" ".repos field is not an array" "Shows .repos not an array error"
+}
+
+#######################################
+# Test 45e: Schema validation - non-JSON output
+# Validates that non-JSON output from status board is handled gracefully
+# (caught by the existing jq empty check, before schema validation)
+#######################################
+test_schema_non_json_output() {
+    echo "--- Test: Schema validation - non-JSON output ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns non-JSON output
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << 'MOCK_EOF'
+#!/usr/bin/env bash
+echo 'ERROR: something went wrong with the status board'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Non-JSON output exits with code 1"
+    assert_contains "$output" "invalid JSON" "Shows invalid JSON error"
 }
 
 # =============================================================================
@@ -1432,9 +1612,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Autogate test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Autogate test"}}'
 else
-    echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1487,9 +1667,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid autogate test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid autogate test"}}'
 else
-    echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1754,7 +1934,7 @@ test_log_format_json_special_chars() {
     # Create a mock that returns a task with special characters in reason
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << 'MOCK_EOF'
 #!/usr/bin/env bash
-echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Test with \"quotes\" and \\ backslash"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Test with \"quotes\" and \\ backslash"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -2580,8 +2760,8 @@ test_find_git_root_no_git() {
 
 #######################################
 # Test: find_git_root with multiple git directories (uses first alphabetically)
-# Note: The production code returns immediately on the first match found via
-# alphabetical ls -1 scan, so only the first git root is discovered.
+# Note: The production code scans all candidates via find -print0 | sort -z
+# and selects the first match found alphabetically.
 #######################################
 test_find_git_root_multiple_git_dirs() {
     echo "--- Test: find_git_root with multiple git dirs ---"
@@ -2592,15 +2772,27 @@ test_find_git_root_multiple_git_dirs() {
 
     local test_repos="$TEST_TMP_DIR/fgr_multi/repos"
     mkdir -p "$test_repos/foo/aaa/.git"
+    mkdir -p "$test_repos/foo/mmm/.git"
     mkdir -p "$test_repos/foo/zzz/.git"
 
     local result
+    local stderr_output
     local exit_code=0
-    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+    # Capture stderr for warning verification
+    stderr_output=$(find_git_root "$test_repos/" "foo" 2>&1 1>/dev/null) || true
+    result=$(find_git_root "$test_repos/" "foo" 2>/dev/null) || exit_code=$?
 
-    # Should select first alphabetically (aaa) since ls -1 sorts alphabetically
+    # Should select first alphabetically (aaa) since find -print0 | sort -z sorts alphabetically
     assert_equals "$test_repos/foo/aaa" "$result" "find_git_root returns first alphabetically (aaa)"
     assert_equals 0 "$exit_code" "find_git_root exits with 0 when multiple git dirs exist"
+
+    # Verify enhanced warning messages
+    assert_contains "$stderr_output" "Multiple git roots found for repo: foo" \
+        "find_git_root warns about multiple git roots with repo name"
+    assert_contains "$stderr_output" "Candidates: [aaa, mmm, zzz]" \
+        "find_git_root lists all candidate basenames"
+    assert_contains "$stderr_output" "Selected (alphabetically first): aaa" \
+        "find_git_root indicates which candidate was selected"
 }
 
 #######################################
@@ -2624,6 +2816,1859 @@ test_find_git_root_worktree() {
 
     assert_equals "$test_repos/foo/worktree" "$result" "find_git_root returns worktree path"
     assert_equals 0 "$exit_code" "find_git_root exits with 0 for worktree"
+}
+
+#######################################
+# Test: find_git_root with directory names containing spaces
+# Verifies safe iteration does not word-split on spaces
+#######################################
+test_find_git_root_spaces_in_name() {
+    echo "--- Test: find_git_root with spaces in directory name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_spaces/repos"
+    mkdir -p "$test_repos/foo/my repo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/my repo" "$result" "find_git_root handles spaces in directory name"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for directory with spaces"
+}
+
+#######################################
+# Test: find_git_root with directory names containing newlines
+# Verifies null-terminated iteration handles embedded newlines
+#######################################
+test_find_git_root_newline_in_name() {
+    echo "--- Test: find_git_root with newline in directory name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_newline/repos"
+    # Create a directory whose name contains a literal newline
+    local dir_with_newline
+    dir_with_newline=$(printf '%s/foo/line1\nline2' "$test_repos")
+    mkdir -p "$dir_with_newline/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$dir_with_newline" "$result" "find_git_root handles newline in directory name"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for directory with newline"
+}
+
+#######################################
+# Test: find_git_root with directory names starting with a dash
+# Verifies find does not misinterpret directory names as options
+#######################################
+test_find_git_root_leading_dash() {
+    echo "--- Test: find_git_root with leading dash in directory name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_dash/repos"
+    mkdir -p "$test_repos/foo/-dash-repo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/-dash-repo" "$result" "find_git_root handles leading dash in directory name"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for directory with leading dash"
+}
+
+# =============================================================================
+# PRIORITY 10b TESTS (Helper Function Unit Tests - SDDLOOP-6.3007)
+# =============================================================================
+
+#######################################
+# Test: list_subdirectories_sorted with empty directory
+#######################################
+test_list_subdirs_empty_dir() {
+    echo "--- Test: list_subdirectories_sorted with empty directory ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_empty/parent"
+    mkdir -p "$test_dir"
+
+    # Capture null-terminated output to a temp file
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # File should be empty (no subdirectories)
+    local file_size
+    file_size=$(wc -c < "$output_file")
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 for empty dir"
+    assert_equals "0" "$file_size" "list_subdirectories_sorted produces no output for empty dir"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with single subdirectory
+#######################################
+test_list_subdirs_single() {
+    echo "--- Test: list_subdirectories_sorted with single subdir ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_single/parent"
+    mkdir -p "$test_dir/alpha"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # Read null-terminated output
+    local first_entry=""
+    local count=0
+    while IFS= read -r -d '' entry; do
+        if [ $count -eq 0 ]; then
+            first_entry="$entry"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 for single subdir"
+    assert_equals 1 "$count" "list_subdirectories_sorted returns exactly 1 entry"
+    assert_equals "$test_dir/alpha" "$first_entry" "list_subdirectories_sorted returns correct path"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with multiple subdirectories (sorted)
+#######################################
+test_list_subdirs_multiple_sorted() {
+    echo "--- Test: list_subdirectories_sorted with multiple subdirs (sorted) ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_multi/parent"
+    # Create in non-alphabetical order to verify sorting
+    mkdir -p "$test_dir/zebra"
+    mkdir -p "$test_dir/alpha"
+    mkdir -p "$test_dir/middle"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # Read null-terminated output into ordered entries
+    local entries=""
+    local count=0
+    while IFS= read -r -d '' entry; do
+        if [ -n "$entries" ]; then
+            entries="$entries|$(basename "$entry")"
+        else
+            entries="$(basename "$entry")"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 for multiple subdirs"
+    assert_equals 3 "$count" "list_subdirectories_sorted returns all 3 entries"
+    assert_equals "alpha|middle|zebra" "$entries" "list_subdirectories_sorted returns sorted order"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with nonexistent directory
+#######################################
+test_list_subdirs_nonexistent() {
+    echo "--- Test: list_subdirectories_sorted with nonexistent dir ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local exit_code=0
+    list_subdirectories_sorted "/tmp/nonexistent_dir_$$/no_such_dir" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "list_subdirectories_sorted exits 1 for nonexistent dir"
+}
+
+#######################################
+# Test: list_subdirectories_sorted excludes files (only directories)
+#######################################
+test_list_subdirs_excludes_files() {
+    echo "--- Test: list_subdirectories_sorted excludes files ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_files/parent"
+    mkdir -p "$test_dir/subdir"
+    touch "$test_dir/a-file.txt"
+    touch "$test_dir/z-file.txt"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+
+    local count=0
+    local first_entry=""
+    while IFS= read -r -d '' entry; do
+        if [ $count -eq 0 ]; then
+            first_entry="$entry"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 1 "$count" "list_subdirectories_sorted returns only directories"
+    assert_equals "$test_dir/subdir" "$first_entry" "list_subdirectories_sorted returns the directory, not files"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with spaces in directory name
+#######################################
+test_list_subdirs_spaces() {
+    echo "--- Test: list_subdirectories_sorted with spaces in name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_spaces/parent"
+    mkdir -p "$test_dir/my dir"
+    mkdir -p "$test_dir/another dir"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+
+    local count=0
+    local first_entry=""
+    while IFS= read -r -d '' entry; do
+        if [ $count -eq 0 ]; then
+            first_entry="$(basename "$entry")"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 2 "$count" "list_subdirectories_sorted returns 2 dirs with spaces"
+    assert_equals "another dir" "$first_entry" "list_subdirectories_sorted sorts dirs with spaces correctly"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: select_first_git_root with single .git directory
+#######################################
+test_select_git_root_single_dir() {
+    echo "--- Test: select_first_git_root with single .git dir ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_single"
+    mkdir -p "$test_dir/repo/.git"
+
+    # Build candidates file
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0' "$test_dir/repo" > "$candidates_file"
+
+    local result
+    local exit_code=0
+    result=$(select_first_git_root "$candidates_file" "test-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 for single .git dir"
+    assert_equals "$test_dir/repo" "$result" "select_first_git_root returns the git root"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with worktree fallback (.git file)
+#######################################
+test_select_git_root_worktree_fallback() {
+    echo "--- Test: select_first_git_root with worktree fallback ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_worktree"
+    mkdir -p "$test_dir/wt-branch"
+    echo "gitdir: /some/path/.git/worktrees/wt-branch" > "$test_dir/wt-branch/.git"
+
+    # Build candidates file (no .git directory, only .git file)
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0' "$test_dir/wt-branch" > "$candidates_file"
+
+    local result
+    local exit_code=0
+    result=$(select_first_git_root "$candidates_file" "test-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 for worktree"
+    assert_equals "$test_dir/wt-branch" "$result" "select_first_git_root returns worktree path"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root prefers .git dir over .git file
+#######################################
+test_select_git_root_prefers_dir_over_file() {
+    echo "--- Test: select_first_git_root prefers .git dir over .git file ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_prefer"
+    # aaa has .git file (worktree), bbb has .git directory
+    mkdir -p "$test_dir/aaa"
+    echo "gitdir: /some/path" > "$test_dir/aaa/.git"
+    mkdir -p "$test_dir/bbb/.git"
+
+    # Build candidates file (sorted order: aaa, bbb)
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0%s\0' "$test_dir/aaa" "$test_dir/bbb" > "$candidates_file"
+
+    local result
+    local exit_code=0
+    result=$(select_first_git_root "$candidates_file" "test-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 when preferring dir"
+    assert_equals "$test_dir/bbb" "$result" "select_first_git_root prefers .git dir over .git file"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with no git entries
+#######################################
+test_select_git_root_none_found() {
+    echo "--- Test: select_first_git_root with no git entries ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_none"
+    mkdir -p "$test_dir/just-a-dir"
+    mkdir -p "$test_dir/another-dir"
+
+    # Build candidates file (no .git anywhere)
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0%s\0' "$test_dir/just-a-dir" "$test_dir/another-dir" > "$candidates_file"
+
+    local exit_code=0
+    select_first_git_root "$candidates_file" "test-repo" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "select_first_git_root exits 1 when no git entries"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with multiple .git dirs logs warnings
+#######################################
+test_select_git_root_multiple_warns() {
+    echo "--- Test: select_first_git_root with multiple .git dirs warns ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_multi"
+    mkdir -p "$test_dir/aaa/.git"
+    mkdir -p "$test_dir/bbb/.git"
+    mkdir -p "$test_dir/ccc/.git"
+
+    # Build candidates file
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0%s\0%s\0' "$test_dir/aaa" "$test_dir/bbb" "$test_dir/ccc" > "$candidates_file"
+
+    local result
+    local stderr_output
+    local exit_code=0
+    stderr_output=$(select_first_git_root "$candidates_file" "my-repo" 2>&1 1>/dev/null) || true
+
+    # Re-read candidates file for the actual result
+    result=$(select_first_git_root "$candidates_file" "my-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 for multiple git dirs"
+    assert_equals "$test_dir/aaa" "$result" "select_first_git_root returns first alphabetically"
+    assert_contains "$stderr_output" "Multiple git roots found for repo: my-repo" \
+        "select_first_git_root warns about multiple git roots"
+    assert_contains "$stderr_output" "Candidates: [aaa, bbb, ccc]" \
+        "select_first_git_root lists all candidates"
+    assert_contains "$stderr_output" "Selected (alphabetically first): aaa" \
+        "select_first_git_root indicates selection"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with empty candidates file
+#######################################
+test_select_git_root_empty_candidates() {
+    echo "--- Test: select_first_git_root with empty candidates ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Build empty candidates file
+    local candidates_file
+    candidates_file=$(mktemp)
+
+    local exit_code=0
+    select_first_git_root "$candidates_file" "test-repo" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "select_first_git_root exits 1 for empty candidates"
+    rm -f "$candidates_file"
+}
+
+# =============================================================================
+# PRIORITY 11 TESTS (Concurrent Invocation Protection - SDDLOOP-6.3002)
+# =============================================================================
+
+#######################################
+# Test: Concurrent invocation is blocked
+# Second sdd-loop.sh instance exits with error when lock is held
+#######################################
+test_concurrent_invocation_blocked() {
+    echo "--- Test: Concurrent invocation blocked ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Hold the lock externally using a background bash process.
+    # Creates the lock file with PID (noclobber layer) and acquires flock (flock layer).
+    # Uses exec to replace the shell with sleep so killing the PID stops it.
+    bash -c "echo \$\$ > \"$lockfile\"; exec 200>\"$lockfile\"; flock -n 200; exec sleep 10" &
+    local holder_pid=$!
+
+    # Brief pause to let the holder acquire the lock
+    sleep 1
+
+    # Start sdd-loop - should fail immediately because lock is held
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    # Clean up lock holder
+    kill "$holder_pid" 2>/dev/null || true
+    wait "$holder_pid" 2>/dev/null || true
+    rm -f "$lockfile"
+
+    assert_exit_code 1 "$exit_code" "Second instance exits with code 1"
+    assert_contains "$output" "Another sdd-loop instance is already running" "Error message mentions another instance"
+    assert_contains "$output" "Lockfile:" "Error message mentions lockfile"
+}
+
+#######################################
+# Test: Lockfile cleanup on normal exit
+# After sdd-loop.sh finishes normally, the lock is released
+# (fd closed by OS, next invocation can acquire lock)
+#######################################
+test_lockfile_cleanup_on_normal_exit() {
+    echo "--- Test: Lockfile cleanup on normal exit ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Run first instance to completion
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "First instance exits successfully"
+
+    # Run second instance - should succeed because lock was released
+    local output2
+    local exit_code2=0
+    output2=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code2=$?
+
+    assert_exit_code 0 "$exit_code2" "Second instance runs after first completes"
+    assert_not_contains "$output2" "Another sdd-loop instance is already running" "No lock conflict on second run"
+}
+
+#######################################
+# Test: Lockfile cleanup on SIGTERM
+# After sdd-loop.sh is killed with SIGTERM, the lock is released
+# (lock file cleaned up by signal handler, or stale lock detected on next startup)
+#######################################
+test_lockfile_cleanup_on_sigterm() {
+    echo "--- Test: Lockfile cleanup on SIGTERM ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Hold the lock in a background bash process (simulates running sdd-loop).
+    # Creates lock file with PID and acquires flock.
+    # Uses exec to replace the shell with sleep so killing the PID stops it.
+    bash -c "echo \$\$ > \"$lockfile\"; exec 200>\"$lockfile\"; flock -n 200; exec sleep 30" &
+    local holder_pid=$!
+
+    # Brief pause to let the holder acquire the lock
+    sleep 1
+
+    # Verify lock is held (sdd-loop should fail)
+    local output_blocked
+    local exit_blocked=0
+    output_blocked=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_blocked=$?
+
+    # Verify lock was actually held
+    assert_exit_code 1 "$exit_blocked" "Lock is held before SIGTERM"
+
+    # Kill the holder with SIGTERM (OS releases fd and lock)
+    kill -TERM "$holder_pid" 2>/dev/null || true
+    wait "$holder_pid" 2>/dev/null || true
+
+    # Brief pause for OS to release file descriptor
+    sleep 0.5
+
+    # Remove stale lock file if still present (SIGTERM on bash -c does not run traps)
+    rm -f "$lockfile"
+
+    # Next invocation should succeed (lock released)
+    local output
+    local exit_code=0
+    create_mock_status_board "none" "" "" "No work"
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Instance runs after SIGTERM kills previous"
+    assert_not_contains "$output" "Another sdd-loop instance is already running" "No stale lock after SIGTERM"
+}
+
+#######################################
+# Test: Stale lock file is detected and removed
+# When a lock file exists but its PID is no longer running (e.g., process was
+# killed with SIGKILL), sdd-loop detects the stale lock and removes it.
+#######################################
+test_stale_lock_detection() {
+    echo "--- Test: Stale lock detection ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Create a stale lock file with a PID that does not exist.
+    # PID 999999 is almost certainly not running.
+    echo "999999" > "$lockfile"
+
+    # Start sdd-loop - should detect stale lock, remove it, and proceed
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Instance succeeds after stale lock removal"
+    assert_contains "$output" "stale lock" "Warns about stale lock file"
+}
+
+#######################################
+# Test: Concurrent startup race condition
+# Two sdd-loop instances launched simultaneously - only one should succeed.
+# The atomic noclobber lock creation prevents both from acquiring the lock.
+#######################################
+test_concurrent_startup_race() {
+    echo "--- Test: Concurrent startup race condition ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Ensure no stale lock file exists
+    rm -f "$lockfile"
+
+    # Launch two sdd-loop instances simultaneously in background.
+    # Both will attempt to create the lock file atomically.
+    local output_file_1="$TEST_TMP_DIR/race_output_1"
+    local output_file_2="$TEST_TMP_DIR/race_output_2"
+    local exit_file_1="$TEST_TMP_DIR/race_exit_1"
+    local exit_file_2="$TEST_TMP_DIR/race_exit_2"
+
+    # Launch process 1
+    bash -c "bash \"$SDD_LOOP\" --dry-run --max-iterations 1 --specs-root \"$TEST_TMP_DIR/specs\" --repos-root \"$TEST_TMP_DIR/repos\" >\"$output_file_1\" 2>&1; echo \$? > \"$exit_file_1\"" &
+    local pid1=$!
+
+    # Launch process 2 simultaneously (no sleep between)
+    bash -c "bash \"$SDD_LOOP\" --dry-run --max-iterations 1 --specs-root \"$TEST_TMP_DIR/specs\" --repos-root \"$TEST_TMP_DIR/repos\" >\"$output_file_2\" 2>&1; echo \$? > \"$exit_file_2\"" &
+    local pid2=$!
+
+    # Wait for both to complete
+    wait "$pid1" 2>/dev/null || true
+    wait "$pid2" 2>/dev/null || true
+
+    # Read exit codes
+    local exit1
+    local exit2
+    exit1=$(cat "$exit_file_1" 2>/dev/null) || exit1="unknown"
+    exit2=$(cat "$exit_file_2" 2>/dev/null) || exit2="unknown"
+
+    # Read outputs
+    local output1
+    local output2
+    output1=$(cat "$output_file_1" 2>/dev/null) || output1=""
+    output2=$(cat "$output_file_2" 2>/dev/null) || output2=""
+
+    # Exactly one should succeed (exit 0) and one should fail (exit 1)
+    local success_count=0
+    local fail_count=0
+
+    if [ "$exit1" = "0" ]; then
+        success_count=$((success_count + 1))
+    elif [ "$exit1" = "1" ]; then
+        fail_count=$((fail_count + 1))
+    fi
+
+    if [ "$exit2" = "0" ]; then
+        success_count=$((success_count + 1))
+    elif [ "$exit2" = "1" ]; then
+        fail_count=$((fail_count + 1))
+    fi
+
+    # Clean up lock file
+    rm -f "$lockfile"
+
+    # Assert exactly one succeeded and one failed
+    if [ "$success_count" -eq 1 ] && [ "$fail_count" -eq 1 ]; then
+        log_result "Exactly one instance succeeds in race" "pass"
+    else
+        log_result "Exactly one instance succeeds in race" "fail" "Expected 1 success + 1 failure, got $success_count successes + $fail_count failures (exit1=$exit1, exit2=$exit2)"
+    fi
+
+    # The failing instance should mention the lock conflict
+    local failed_output=""
+    if [ "$exit1" = "1" ]; then
+        failed_output="$output1"
+    elif [ "$exit2" = "1" ]; then
+        failed_output="$output2"
+    fi
+
+    if [ -n "$failed_output" ]; then
+        assert_contains "$failed_output" "lock file" "Failed instance mentions lock file"
+    fi
+}
+
+# =============================================================================
+# PRIORITY 12 TESTS (Root Structure Validation - SDDLOOP-6.3003)
+# =============================================================================
+
+#######################################
+# Test: Warning when specs-root is empty
+# Verifies that a warning is logged when specs-root has no subdirectories
+# and that execution continues (non-blocking)
+#######################################
+test_empty_specs_root_warning() {
+    echo "--- Test: Empty specs-root warning ---"
+
+    setup_test_env
+    reset_counters
+
+    # Create empty specs root and repos root
+    mkdir -p "$TEST_TMP_DIR/empty_specs"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
+
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/empty_specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script continues despite empty specs-root"
+    assert_contains "$output" "specs-root is empty" "Warning about empty specs-root emitted"
+    assert_contains "$output" "Expected structure:" "Warning includes expected structure hint"
+}
+
+#######################################
+# Test: Warning when specs-root and repos-root are identical
+# Verifies that a warning is logged when both roots point to the same path
+# and that execution continues (non-blocking)
+#######################################
+test_identical_roots_warning() {
+    echo "--- Test: Identical specs/repos roots warning ---"
+
+    setup_test_env
+    reset_counters
+
+    # Create a directory that will serve as both specs and repos root
+    mkdir -p "$TEST_TMP_DIR/shared_root/test-repo/test-repo/.git"
+    mkdir -p "$TEST_TMP_DIR/shared_root/test-repo/tickets"
+
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/shared_root" --repos-root "$TEST_TMP_DIR/shared_root" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script continues despite identical roots"
+    assert_contains "$output" "specs-root and repos-root are identical" "Warning about identical roots emitted"
+    assert_contains "$output" "unexpected behavior" "Warning includes explanation"
+}
+
+#######################################
+# Test: No warning when specs-root has subdirectories
+# Verifies that no empty-specs warning is logged for non-empty specs root
+#######################################
+test_no_warning_for_populated_specs_root() {
+    echo "--- Test: No warning for populated specs-root ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script completes successfully"
+    assert_not_contains "$output" "specs-root is empty" "No empty specs-root warning for populated directory"
+}
+
+#######################################
+# Test: No warning when roots are different paths
+# Verifies that no identical-roots warning is logged for distinct paths
+#######################################
+test_no_warning_for_different_roots() {
+    echo "--- Test: No warning for different roots ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script completes successfully"
+    assert_not_contains "$output" "specs-root and repos-root are identical" "No identical-roots warning for different paths"
+}
+
+#######################################
+# Test: Help text documents expected directory structure
+#######################################
+test_help_shows_directory_structure() {
+    echo "--- Test: Help shows directory structure ---"
+
+    local output
+    output=$(bash "$SDD_LOOP_ORIGINAL" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help option exits with code 0"
+    assert_contains "$output" "Expected directory structure" "Help documents expected directory structure"
+    assert_contains "$output" "specs-root/" "Help shows specs-root structure"
+    assert_contains "$output" "repos-root/" "Help shows repos-root structure"
+}
+
+#######################################
+# Test: Empty --specs-root is rejected with clear error
+#######################################
+test_empty_specs_root_rejected() {
+    echo "--- Test: Empty --specs-root rejected ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --specs-root "" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Empty --specs-root exits with code 1"
+    assert_contains "$output" "--specs-root cannot be empty" "Error message mentions --specs-root cannot be empty"
+}
+
+#######################################
+# Test: Empty --repos-root is rejected with clear error
+#######################################
+test_empty_repos_root_rejected() {
+    echo "--- Test: Empty --repos-root rejected ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --repos-root "" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Empty --repos-root exits with code 1"
+    assert_contains "$output" "--repos-root cannot be empty" "Error message mentions --repos-root cannot be empty"
+}
+
+# =============================================================================
+# PRIORITY 13 TESTS (find_git_root_cached Unit Tests - SDDLOOP-6.3009)
+# =============================================================================
+
+#######################################
+# Test: find_git_root_cached cache miss populates cache
+#######################################
+test_find_git_root_cached_miss() {
+    echo "--- Test: find_git_root_cached cache miss ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_miss_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_miss/repos"
+    mkdir -p "$test_repos/foo/foo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root_cached "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/foo" "$result" "find_git_root_cached returns git root on miss"
+    assert_equals 0 "$exit_code" "find_git_root_cached exits with 0 on miss"
+
+    # Verify cache file was created and contains the entry
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        assert_contains "$cache_content" "foo=$test_repos/foo/foo" \
+            "Cache file contains entry after miss"
+    else
+        log_result "Cache file created after miss" "fail" "Cache file not found: $GIT_ROOT_CACHE_FILE"
+    fi
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: find_git_root_cached cache hit returns cached result
+#######################################
+test_find_git_root_cached_hit() {
+    echo "--- Test: find_git_root_cached cache hit ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_hit_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_hit/repos"
+    mkdir -p "$test_repos/bar/bar/.git"
+
+    # First call - cache miss, populates cache
+    local result1
+    result1=$(find_git_root_cached "$test_repos/" "bar") || true
+
+    assert_equals "$test_repos/bar/bar" "$result1" "First call (miss) returns correct path"
+
+    # Now remove the .git directory to prove second call uses cache, not filesystem
+    rm -rf "$test_repos/bar/bar/.git"
+
+    # Second call - should hit cache (return cached result despite .git being gone)
+    local result2
+    local exit_code=0
+    result2=$(find_git_root_cached "$test_repos/" "bar") || exit_code=$?
+
+    assert_equals "$test_repos/bar/bar" "$result2" "Second call (hit) returns cached path"
+    assert_equals 0 "$exit_code" "Cache hit exits with 0"
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: find_git_root_cached failed lookup is not cached
+#######################################
+test_find_git_root_cached_failure_not_cached() {
+    echo "--- Test: find_git_root_cached failure not cached ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_fail_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_fail/repos"
+    mkdir -p "$test_repos/baz/subdir"
+    # No .git anywhere
+
+    # Call that should fail
+    local exit_code=0
+    find_git_root_cached "$test_repos/" "baz" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "find_git_root_cached exits with 1 when no git root"
+
+    # Verify cache file does not contain an entry for baz
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        if [ -z "$cache_content" ]; then
+            log_result "Failed lookup not cached" "pass"
+        else
+            assert_not_contains "$cache_content" "baz=" \
+                "Failed lookup not cached"
+        fi
+    else
+        # Cache file doesn't exist - failed lookup didn't create it
+        log_result "Failed lookup not cached" "pass"
+    fi
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: find_git_root_cached works across multiple repos
+#######################################
+test_find_git_root_cached_multiple_repos() {
+    echo "--- Test: find_git_root_cached multiple repos ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_multi_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_multi/repos"
+    mkdir -p "$test_repos/alpha/alpha/.git"
+    mkdir -p "$test_repos/beta/beta/.git"
+
+    # Cache both repos
+    local result_alpha result_beta
+    result_alpha=$(find_git_root_cached "$test_repos/" "alpha") || true
+    result_beta=$(find_git_root_cached "$test_repos/" "beta") || true
+
+    assert_equals "$test_repos/alpha/alpha" "$result_alpha" "First repo cached correctly"
+    assert_equals "$test_repos/beta/beta" "$result_beta" "Second repo cached correctly"
+
+    # Verify cache has two entries
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local line_count
+        line_count=$(wc -l < "$GIT_ROOT_CACHE_FILE" | tr -d ' ')
+        assert_equals "2" "$line_count" "Cache contains exactly 2 entries"
+    else
+        log_result "Cache contains exactly 2 entries" "fail" "Cache file not found"
+    fi
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: cleanup_git_root_cache removes the cache file
+#######################################
+test_cleanup_git_root_cache() {
+    echo "--- Test: cleanup_git_root_cache removes file ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Set cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_cleanup_cache"
+
+    # Initialize cache (creates the file)
+    init_git_root_cache
+
+    local cache_path="$GIT_ROOT_CACHE_FILE"
+
+    # Verify it exists
+    if [ -f "$cache_path" ]; then
+        log_result "Cache file exists before cleanup" "pass"
+    else
+        log_result "Cache file exists before cleanup" "fail" "File not created: $cache_path"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+
+    # Verify it's gone
+    if [ ! -f "$cache_path" ]; then
+        log_result "Cache file removed after cleanup" "pass"
+    else
+        log_result "Cache file removed after cleanup" "fail" "File still exists: $cache_path"
+    fi
+
+    # Verify global reset
+    assert_equals "" "$GIT_ROOT_CACHE_FILE" "GIT_ROOT_CACHE_FILE reset to empty after cleanup"
+}
+
+# =============================================================================
+# PRIORITY 13c TESTS (Proactive Cache Validation - SDDLOOP-6.4010)
+# =============================================================================
+
+#######################################
+# Test: Stale cache detected when cached directory is deleted
+# Verifies that find_git_root_cached() detects a stale cached path,
+# clears the entry, logs a warning, and fails gracefully when the
+# repo directory no longer exists.
+#######################################
+test_stale_cache_detection() {
+    echo "--- Test: stale cache detection ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics to test-specific files
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/stale_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/stale_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/stale/repos"
+    mkdir -p "$test_repos/myproject/myproject/.git"
+
+    # First call - cache miss, populates cache
+    local git_root
+    git_root=$(find_git_root_cached "$test_repos/" "myproject") || true
+    assert_equals "$test_repos/myproject/myproject" "$git_root" \
+        "Stale: initial lookup returns correct path"
+
+    # Verify cache is populated
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        assert_contains "$cache_content" "myproject=" \
+            "Stale: cache populated after initial lookup"
+    else
+        log_result "Stale: cache populated after initial lookup" "fail" "Cache file not found"
+    fi
+
+    # Delete the repo directory (simulate external change)
+    rm -rf "$test_repos/myproject/myproject"
+
+    # Re-lookup should detect stale cache, clear entry, and fail gracefully
+    local output exit_code=0
+    output=$(find_git_root_cached "$test_repos/" "myproject" 2>&1) || exit_code=$?
+
+    # Should fail because repo is gone (re-lookup also fails)
+    if [ "$exit_code" -ne 0 ]; then
+        log_result "Stale: re-lookup fails when repo deleted" "pass"
+    else
+        log_result "Stale: re-lookup fails when repo deleted" "fail" \
+            "Expected non-zero exit, got 0"
+    fi
+
+    # Warning should be logged
+    assert_contains "$output" "Cached git root no longer exists" \
+        "Stale: warning logged for stale cache"
+
+    # Cache entry should be cleared (no myproject= line)
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local remaining
+        remaining=$(cat "$GIT_ROOT_CACHE_FILE")
+        if [ -z "$remaining" ] || ! echo "$remaining" | grep -q "^myproject="; then
+            log_result "Stale: cache entry cleared after invalidation" "pass"
+        else
+            log_result "Stale: cache entry cleared after invalidation" "fail" \
+                "Cache still contains: $remaining"
+        fi
+    else
+        log_result "Stale: cache entry cleared after invalidation" "pass"
+    fi
+
+    # Metrics file should contain an I (invalidation) entry
+    if [ -f "$CACHE_METRICS_FILE" ]; then
+        local i_count
+        i_count=$(grep -c "^I$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        assert_equals "1" "$i_count" "Stale: invalidation recorded in metrics file"
+    else
+        log_result "Stale: invalidation recorded in metrics file" "fail" \
+            "Metrics file not found"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: Stale cache self-heals when directory is recreated
+# Verifies that after a stale cache is detected and cleared, a new
+# lookup rediscovers the recreated directory and re-caches it.
+#######################################
+test_stale_cache_self_healing() {
+    echo "--- Test: stale cache self-healing ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/heal_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/heal_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/heal/repos"
+    mkdir -p "$test_repos/healer/healer/.git"
+
+    # Populate cache
+    local result1
+    result1=$(find_git_root_cached "$test_repos/" "healer") || true
+    assert_equals "$test_repos/healer/healer" "$result1" \
+        "Heal: initial lookup correct"
+
+    # Delete and recreate the repo
+    rm -rf "$test_repos/healer/healer"
+    mkdir -p "$test_repos/healer/healer/.git"
+
+    # Re-lookup should detect stale (directory was deleted then recreated,
+    # but since we rm -rf and mkdir, the directory exists again)
+    # Actually the directory exists again, so cache validation passes
+    local result2 exit_code=0
+    result2=$(find_git_root_cached "$test_repos/" "healer" 2>&1) || exit_code=1
+
+    # The recreated directory exists, so the cached path is still valid
+    assert_equals 0 "$exit_code" "Heal: lookup succeeds with recreated dir"
+
+    # Now truly break it: delete, DON'T recreate, then recreate at different path
+    rm -rf "$test_repos/healer/healer"
+
+    # Create it at a different sub-path (simulating a moved repo)
+    mkdir -p "$test_repos/healer/main/.git"
+
+    # Re-lookup: cached path is stale, re-lookup should find new path
+    local result3 exit_code3=0
+    result3=$(find_git_root_cached "$test_repos/" "healer" 2>&1) || exit_code3=$?
+
+    # The re-lookup via find_git_root should find the new path
+    # Stderr (warning) mixed with stdout in $(), so check just that it works
+    # Note: output may contain the warning on stderr; actual path on stdout
+    local stdout_result
+    stdout_result=$(find_git_root_cached "$test_repos/" "healer" 2>/dev/null) || true
+    assert_equals "$test_repos/healer/main" "$stdout_result" \
+        "Heal: self-healed to new path after stale cache"
+
+    # Verify new path is now cached
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        assert_contains "$cache_content" "healer=$test_repos/healer/main" \
+            "Heal: new path cached after self-healing"
+    else
+        log_result "Heal: new path cached after self-healing" "fail" "Cache file not found"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: read_cache_metrics counts invalidation entries from metrics file
+# Verifies that "I" lines in the metrics file are counted as invalidations.
+#######################################
+test_cache_metrics_invalidation_counting() {
+    echo "--- Test: cache metrics invalidation counting ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/inval_count_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/inval_count_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/inval_count/repos"
+    mkdir -p "$test_repos/ic1/ic1/.git"
+
+    # Populate cache
+    find_git_root_cached "$test_repos/" "ic1" >/dev/null || true
+
+    # Delete the directory to trigger stale cache
+    rm -rf "$test_repos/ic1/ic1"
+
+    # Re-lookup triggers invalidation (capture stderr to suppress warning)
+    find_git_root_cached "$test_repos/" "ic1" >/dev/null 2>&1 || true
+
+    # Read metrics - should show 1 invalidation from the I line
+    read_cache_metrics
+    assert_equals "1" "$CACHE_INVALIDATIONS" \
+        "Invalidation counting: 1 invalidation from proactive validation"
+
+    # Verify metrics also show correct miss count (initial miss + re-lookup miss)
+    assert_equals "2" "$CACHE_MISSES" \
+        "Invalidation counting: 2 misses (initial + re-lookup after invalidation)"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+# =============================================================================
+# PRIORITY 13b TESTS (Cache Metrics - SDDLOOP-6.4009)
+# =============================================================================
+
+#######################################
+# Test: Cache metrics file records hits and misses
+#######################################
+test_cache_metrics_hit_miss_tracking() {
+    echo "--- Test: cache metrics hit/miss tracking ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics to test-specific files
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_tracking_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_tracking_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_tracking/repos"
+    mkdir -p "$test_repos/proj1/proj1/.git"
+
+    # First call - cache miss
+    find_git_root_cached "$test_repos/" "proj1" >/dev/null || true
+
+    # Second call - cache hit
+    find_git_root_cached "$test_repos/" "proj1" >/dev/null || true
+
+    # Third call - another cache hit
+    find_git_root_cached "$test_repos/" "proj1" >/dev/null || true
+
+    # Read metrics from file
+    read_cache_metrics
+
+    assert_equals "2" "$CACHE_HITS" "Cache metrics: 2 hits recorded"
+    assert_equals "1" "$CACHE_MISSES" "Cache metrics: 1 miss recorded"
+
+    # Verify metrics file content directly
+    if [ -f "$CACHE_METRICS_FILE" ]; then
+        local line_count
+        line_count=$(wc -l < "$CACHE_METRICS_FILE" | tr -d ' ')
+        assert_equals "3" "$line_count" "Cache metrics file has 3 entries"
+    else
+        log_result "Cache metrics file exists" "fail" "File not found: $CACHE_METRICS_FILE"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: print_cache_metrics outputs correct format
+#######################################
+test_print_cache_metrics_format() {
+    echo "--- Test: print_cache_metrics output format ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_format_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_format_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_format/repos"
+    mkdir -p "$test_repos/repoA/repoA/.git"
+    mkdir -p "$test_repos/repoB/repoB/.git"
+
+    # Generate some hits and misses
+    find_git_root_cached "$test_repos/" "repoA" >/dev/null || true  # miss
+    find_git_root_cached "$test_repos/" "repoB" >/dev/null || true  # miss
+    find_git_root_cached "$test_repos/" "repoA" >/dev/null || true  # hit
+    find_git_root_cached "$test_repos/" "repoA" >/dev/null || true  # hit
+    find_git_root_cached "$test_repos/" "repoB" >/dev/null || true  # hit
+
+    # Capture print_cache_metrics output
+    local metrics_output
+    metrics_output=$(print_cache_metrics 2>&1)
+
+    assert_contains "$metrics_output" "3/5 hits" "print_cache_metrics shows 3/5 hits"
+    assert_contains "$metrics_output" "60.0%" "print_cache_metrics shows 60.0%"
+    assert_contains "$metrics_output" "2 misses" "print_cache_metrics shows 2 misses"
+    assert_contains "$metrics_output" "0 invalidations" "print_cache_metrics shows 0 invalidations"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: print_cache_metrics handles zero lookups (division by zero)
+#######################################
+test_print_cache_metrics_zero_lookups() {
+    echo "--- Test: print_cache_metrics zero lookups ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset metrics to test-specific file with no entries
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_zero_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_zero_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    # No lookups performed - capture output
+    local metrics_output
+    metrics_output=$(print_cache_metrics 2>&1)
+
+    assert_contains "$metrics_output" "0/0 hits" "Zero lookups shows 0/0 hits"
+    assert_contains "$metrics_output" "0.0%" "Zero lookups shows 0.0%"
+    assert_contains "$metrics_output" "0 misses" "Zero lookups shows 0 misses"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: cleanup_git_root_cache tracks invalidations
+#######################################
+test_cache_invalidation_tracking() {
+    echo "--- Test: cache invalidation tracking ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset counters and files
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_inval_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_inval_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_inval/repos"
+    mkdir -p "$test_repos/r1/r1/.git"
+    mkdir -p "$test_repos/r2/r2/.git"
+
+    # Populate cache with 2 entries
+    find_git_root_cached "$test_repos/" "r1" >/dev/null || true
+    find_git_root_cached "$test_repos/" "r2" >/dev/null || true
+
+    # Verify cache has entries before cleanup
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local entry_count
+        entry_count=$(wc -l < "$GIT_ROOT_CACHE_FILE" | tr -d ' ')
+        assert_equals "2" "$entry_count" "Cache has 2 entries before cleanup"
+    else
+        log_result "Cache file exists before invalidation" "fail"
+    fi
+
+    # Clean up should track invalidations
+    cleanup_git_root_cache
+
+    assert_equals "2" "$CACHE_INVALIDATIONS" "Cache invalidations counted correctly"
+}
+
+#######################################
+# Test: Cache metrics appear in write_metrics JSON output
+#######################################
+test_cache_metrics_in_json_output() {
+    echo "--- Test: cache metrics in JSON output ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Set up required globals for write_metrics
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_json_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_json_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+    METRICS_FILE="$TEST_TMP_DIR/cm_json_output.json"
+    ITERATION_COUNT=3
+    TASKS_COMPLETED=2
+    TASKS_FAILED=1
+    START_TIME=$(date +%s)
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+    SDD_LOOP_SPECS_ROOT="/tmp/specs/"
+    SDD_LOOP_REPOS_ROOT="/tmp/repos/"
+    SDD_LOOP_DRY_RUN="false"
+    SDD_LOOP_VERBOSE="false"
+
+    local test_repos="$TEST_TMP_DIR/cm_json/repos"
+    mkdir -p "$test_repos/x1/x1/.git"
+
+    # Generate metrics: 1 miss, 2 hits
+    find_git_root_cached "$test_repos/" "x1" >/dev/null || true  # miss
+    find_git_root_cached "$test_repos/" "x1" >/dev/null || true  # hit
+    find_git_root_cached "$test_repos/" "x1" >/dev/null || true  # hit
+
+    # Read metrics into globals (normally done by print_cache_metrics)
+    read_cache_metrics
+
+    # Write metrics
+    write_metrics 0
+
+    # Verify JSON output contains cache section
+    if [ -f "$METRICS_FILE" ]; then
+        local json_content
+        json_content=$(cat "$METRICS_FILE")
+        assert_contains "$json_content" '"hits": 2' "JSON contains cache hits"
+        assert_contains "$json_content" '"misses": 1' "JSON contains cache misses"
+        assert_contains "$json_content" '"total_lookups": 3' "JSON contains total_lookups"
+        assert_contains "$json_content" '"hit_rate_percent": 66.7' "JSON contains hit_rate_percent"
+        assert_contains "$json_content" '"invalidations": 0' "JSON contains invalidations"
+    else
+        log_result "Metrics JSON file created" "fail" "File not found: $METRICS_FILE"
+    fi
+
+    # Clean up
+    rm -f "$METRICS_FILE"
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: 100% cache hit rate
+#######################################
+test_cache_metrics_perfect_hit_rate() {
+    echo "--- Test: cache metrics 100% hit rate ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_perfect_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_perfect_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_perfect/repos"
+    mkdir -p "$test_repos/p1/p1/.git"
+
+    # First call is a miss
+    find_git_root_cached "$test_repos/" "p1" >/dev/null || true
+
+    # 9 more calls are hits
+    local i=0
+    while [ "$i" -lt 9 ]; do
+        find_git_root_cached "$test_repos/" "p1" >/dev/null || true
+        i=$((i + 1))
+    done
+
+    # Read and check
+    read_cache_metrics
+
+    assert_equals "9" "$CACHE_HITS" "Perfect scenario: 9 hits"
+    assert_equals "1" "$CACHE_MISSES" "Perfect scenario: 1 miss"
+
+    local metrics_output
+    metrics_output=$(print_cache_metrics 2>&1)
+    assert_contains "$metrics_output" "90.0%" "Perfect scenario: 90.0% hit rate"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+# =============================================================================
+# Startup Health Check Tests (SDDLOOP-6.3010)
+# =============================================================================
+
+#######################################
+# Test: check_dependencies fails when jq unavailable
+#######################################
+test_health_check_fails_missing_jq() {
+    echo "--- Test: Health check fails when jq unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Override PATH to exclude jq but keep realpath, timeout, and basic tools
+    # Create a minimal bin directory with only the tools we want available
+    local fake_bin="$TEST_TMP_DIR/health_jq_bin"
+    mkdir -p "$fake_bin"
+
+    # Link realpath and timeout so they're available
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    # Link basic tools needed by the function
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when jq missing"
+
+    if [[ "$output" == *"Required dependency not found: jq"* ]]; then
+        log_result "Error message mentions jq" "pass"
+    else
+        log_result "Error message mentions jq" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install with:"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Exiting due to missing required dependencies"* ]]; then
+        log_result "Error message includes exit reason" "pass"
+    else
+        log_result "Error message includes exit reason" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies fails when realpath unavailable
+#######################################
+test_health_check_fails_missing_realpath() {
+    echo "--- Test: Health check fails when realpath unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a minimal bin directory with jq and timeout but not realpath
+    local fake_bin="$TEST_TMP_DIR/health_rp_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when realpath missing"
+
+    if [[ "$output" == *"Required dependency not found: realpath"* ]]; then
+        log_result "Error message mentions realpath" "pass"
+    else
+        log_result "Error message mentions realpath" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies fails when timeout unavailable
+#######################################
+test_health_check_fails_missing_timeout() {
+    echo "--- Test: Health check fails when timeout unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a minimal bin directory with jq and realpath but not timeout
+    local fake_bin="$TEST_TMP_DIR/health_timeout_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when timeout missing"
+
+    if [[ "$output" == *"Required command 'timeout' not found"* ]]; then
+        log_result "Error message mentions timeout" "pass"
+    else
+        log_result "Error message mentions timeout" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install GNU coreutils"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies warns when claude unavailable
+#######################################
+test_health_check_warns_missing_claude() {
+    echo "--- Test: Health check warns when claude unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a bin directory with jq, realpath, and timeout but not claude
+    local fake_bin="$TEST_TMP_DIR/health_claude_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "Health check exits with 0 when only claude missing (warn only)"
+
+    if [[ "$output" == *"Claude Code CLI not found"* ]]; then
+        log_result "Warning mentions Claude CLI" "pass"
+    else
+        log_result "Warning mentions Claude CLI" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"dry-run mode"* ]]; then
+        log_result "Warning mentions dry-run mode" "pass"
+    else
+        log_result "Warning mentions dry-run mode" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies passes when all tools available
+#######################################
+test_health_check_passes_all_available() {
+    echo "--- Test: Health check passes when all tools available ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a bin directory with all required tools
+    local fake_bin="$TEST_TMP_DIR/health_all_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    # Create a fake claude binary
+    cat > "$fake_bin/claude" << 'FAKECLAUDE'
+#!/bin/sh
+echo "fake claude"
+FAKECLAUDE
+    chmod +x "$fake_bin/claude"
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "Health check exits with 0 when all tools available"
+
+    if [[ "$output" != *"Required dependency not found"* ]]; then
+        log_result "No error messages when all tools available" "pass"
+    else
+        log_result "No error messages when all tools available" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" != *"Claude Code CLI not found"* ]]; then
+        log_result "No claude warning when claude available" "pass"
+    else
+        log_result "No claude warning when claude available" "fail" "Output: $output"
+    fi
+}
+
+# =============================================================================
+# Priority 15: Filesystem Operation Timeout Tests (SDDLOOP-6.4003)
+# =============================================================================
+
+#######################################
+# Test: list_subdirectories_sorted times out with slow find
+# Uses a mock find script that sleeps to simulate NFS stale handle
+#######################################
+test_list_subdirs_timeout_handling() {
+    echo "--- Test: list_subdirectories_sorted timeout handling ---"
+
+    setup_test_env
+
+    local test_dir="$TEST_TMP_DIR/lss_timeout/parent"
+    mkdir -p "$test_dir/subdir_a"
+
+    # Create a mock find that sleeps longer than our timeout
+    local mock_bin="$TEST_TMP_DIR/lss_timeout/mock_bin"
+    mkdir -p "$mock_bin"
+
+    # Use absolute path for sleep so mock find works with restricted PATH
+    local sleep_path
+    sleep_path="$(command -v sleep)"
+    cat > "$mock_bin/find" << MOCKFIND
+#!/bin/sh
+# Simulate a slow/hung filesystem by sleeping longer than timeout
+"$sleep_path" 10
+MOCKFIND
+    chmod +x "$mock_bin/find"
+
+    # Symlink essential tools from real PATH
+    ln -sf "$(command -v timeout)" "$mock_bin/timeout"
+    ln -sf "$(command -v sort)" "$mock_bin/sort"
+    ln -sf "$(command -v mktemp)" "$mock_bin/mktemp"
+    ln -sf "$(command -v rm)" "$mock_bin/rm"
+    ln -sf "$(command -v date)" "$mock_bin/date"
+    ln -sf "$(command -v echo)" "$mock_bin/echo"
+    ln -sf "$(command -v cat)" "$mock_bin/cat"
+    ln -sf "$(command -v wc)" "$mock_bin/wc"
+
+    # Run in a fresh bash process to avoid readonly FILESYSTEM_TIMEOUT_SECONDS
+    # from prior sourcing in the parent shell. Export the 2-second timeout
+    # so the sourced script picks it up via its guard clause.
+    # We create a helper script to avoid quoting complications with bash -c.
+    local helper_script="$TEST_TMP_DIR/lss_timeout/run_test.sh"
+    cat > "$helper_script" << HELPEREOF
+#!/usr/bin/env bash
+set -uo pipefail
+export FILESYSTEM_TIMEOUT_SECONDS=2
+source "$SDD_LOOP"
+PATH="$mock_bin" list_subdirectories_sorted "$test_dir"
+exit \$?
+HELPEREOF
+    chmod +x "$helper_script"
+
+    local output=""
+    local exit_code=0
+    output=$(bash "$helper_script" 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "list_subdirectories_sorted returns 1 on timeout"
+    assert_contains "$output" "timed out" "Timeout error message contains 'timed out'"
+    assert_contains "$output" "$test_dir" "Timeout error message contains the directory path"
+}
+
+#######################################
+# Test: list_subdirectories_sorted works normally with timeout wrapper
+# Verifies that adding the timeout wrapper doesn't break normal operation
+#######################################
+test_list_subdirs_normal_with_timeout() {
+    echo "--- Test: list_subdirectories_sorted normal operation with timeout ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_normal_timeout/parent"
+    mkdir -p "$test_dir/alpha"
+    mkdir -p "$test_dir/beta"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # Read null-terminated output
+    local entries=""
+    local count=0
+    while IFS= read -r -d '' entry; do
+        if [ -n "$entries" ]; then
+            entries="$entries|$(basename "$entry")"
+        else
+            entries="$(basename "$entry")"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 with timeout wrapper"
+    assert_equals 2 "$count" "list_subdirectories_sorted returns all entries with timeout wrapper"
+    assert_equals "alpha|beta" "$entries" "list_subdirectories_sorted returns sorted order with timeout wrapper"
+    rm -f "$output_file"
+}
+
+# =============================================================================
+# Priority 16: Shellcheck Static Analysis (SDDLOOP-6.5002)
+# =============================================================================
+
+#######################################
+# Test: shellcheck static analysis on sdd-loop.sh
+# Runs shellcheck --severity=style to prevent regressions.
+# Skips with a warning if shellcheck is not installed.
+#
+# To run shellcheck locally:
+#   shellcheck --severity=style sdd-loop.sh
+# Install shellcheck:
+#   Ubuntu/Debian: apt-get install shellcheck
+#   macOS: brew install shellcheck
+#######################################
+test_shellcheck_static_analysis() {
+    echo "--- Test: shellcheck static analysis ---"
+
+    if ! command -v shellcheck >/dev/null 2>&1; then
+        echo "  SKIP: shellcheck not installed (install with: apt-get install shellcheck)"
+        log_result "shellcheck static analysis (sdd-loop.sh)" "pass" "SKIPPED - shellcheck not available"
+        return
+    fi
+
+    local output=""
+    local exit_code=0
+    output=$(shellcheck --severity=style "$SDD_LOOP_ORIGINAL" 2>&1) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        log_result "shellcheck static analysis (sdd-loop.sh)" "pass"
+    else
+        echo "$output"
+        log_result "shellcheck static analysis (sdd-loop.sh)" "fail" "shellcheck found issues (exit code $exit_code)"
+    fi
 }
 
 # =============================================================================
@@ -2738,6 +4783,14 @@ main() {
     echo ""
     test_timeout_non_numeric
     echo ""
+    test_timeout_negative
+    echo ""
+    test_default_timeout_600
+    echo ""
+    test_help_shows_default_timeout_600
+    echo ""
+    test_timeout_override
+    echo ""
     test_poll_interval_zero
     echo ""
     test_poll_interval_non_numeric
@@ -2781,6 +4834,23 @@ main() {
     test_version_mismatch
     echo ""
     test_version_missing
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 5b TESTS (JSON Schema Validation - SDDLOOP-6.3004)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 5b Tests (JSON Schema Validation)"
+    echo "====================================="
+    echo ""
+
+    test_schema_missing_version
+    echo ""
+    test_schema_missing_repos
+    echo ""
+    test_schema_repos_not_array
+    echo ""
+    test_schema_non_json_output
     echo ""
 
     # ==========================================================================
@@ -2902,6 +4972,185 @@ main() {
     test_find_git_root_multiple_git_dirs
     echo ""
     test_find_git_root_worktree
+    echo ""
+    test_find_git_root_spaces_in_name
+    echo ""
+    test_find_git_root_newline_in_name
+    echo ""
+    test_find_git_root_leading_dash
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 10b TESTS (Helper Function Unit Tests - SDDLOOP-6.3007)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 10b Tests (list_subdirectories_sorted / select_first_git_root)"
+    echo "====================================="
+    echo ""
+
+    test_list_subdirs_empty_dir
+    echo ""
+    test_list_subdirs_single
+    echo ""
+    test_list_subdirs_multiple_sorted
+    echo ""
+    test_list_subdirs_nonexistent
+    echo ""
+    test_list_subdirs_excludes_files
+    echo ""
+    test_list_subdirs_spaces
+    echo ""
+    test_select_git_root_single_dir
+    echo ""
+    test_select_git_root_worktree_fallback
+    echo ""
+    test_select_git_root_prefers_dir_over_file
+    echo ""
+    test_select_git_root_none_found
+    echo ""
+    test_select_git_root_multiple_warns
+    echo ""
+    test_select_git_root_empty_candidates
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 11 TESTS (Concurrent Invocation Protection - SDDLOOP-6.3002)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 11 Tests (Concurrent Invocation Protection)"
+    echo "====================================="
+    echo ""
+
+    test_concurrent_invocation_blocked
+    echo ""
+    test_lockfile_cleanup_on_normal_exit
+    echo ""
+    test_lockfile_cleanup_on_sigterm
+    echo ""
+    test_stale_lock_detection
+    echo ""
+    test_concurrent_startup_race
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 12 TESTS (Root Structure Validation - SDDLOOP-6.3003)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 12 Tests (Root Structure Validation)"
+    echo "====================================="
+    echo ""
+
+    test_empty_specs_root_warning
+    echo ""
+    test_identical_roots_warning
+    echo ""
+    test_no_warning_for_populated_specs_root
+    echo ""
+    test_no_warning_for_different_roots
+    echo ""
+    test_help_shows_directory_structure
+    echo ""
+    test_empty_specs_root_rejected
+    echo ""
+    test_empty_repos_root_rejected
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 13 TESTS (find_git_root_cached - SDDLOOP-6.3009)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 13 Tests (find_git_root_cached)"
+    echo "====================================="
+    echo ""
+
+    test_find_git_root_cached_miss
+    echo ""
+    test_find_git_root_cached_hit
+    echo ""
+    test_find_git_root_cached_failure_not_cached
+    echo ""
+    test_find_git_root_cached_multiple_repos
+    echo ""
+    test_cleanup_git_root_cache
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 13c TESTS (Proactive Cache Validation - SDDLOOP-6.4010)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 13c Tests (Proactive Cache Validation)"
+    echo "====================================="
+    echo ""
+
+    test_stale_cache_detection
+    echo ""
+    test_stale_cache_self_healing
+    echo ""
+    test_cache_metrics_invalidation_counting
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 13b TESTS (Cache Metrics - SDDLOOP-6.4009)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 13b Tests (Cache Metrics)"
+    echo "====================================="
+    echo ""
+
+    test_cache_metrics_hit_miss_tracking
+    echo ""
+    test_print_cache_metrics_format
+    echo ""
+    test_print_cache_metrics_zero_lookups
+    echo ""
+    test_cache_invalidation_tracking
+    echo ""
+    test_cache_metrics_in_json_output
+    echo ""
+    test_cache_metrics_perfect_hit_rate
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 14 TESTS (Startup Health Check - SDDLOOP-6.3010)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 14 Tests (Startup Health Check)"
+    echo "====================================="
+    echo ""
+
+    test_health_check_fails_missing_jq
+    echo ""
+    test_health_check_fails_missing_realpath
+    echo ""
+    test_health_check_fails_missing_timeout
+    echo ""
+    test_health_check_warns_missing_claude
+    echo ""
+    test_health_check_passes_all_available
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 15 TESTS (Filesystem Operation Timeouts - SDDLOOP-6.4003)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 15 Tests (Filesystem Operation Timeouts)"
+    echo "====================================="
+    echo ""
+
+    test_list_subdirs_timeout_handling
+    echo ""
+    test_list_subdirs_normal_with_timeout
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 16 TESTS (Shellcheck Static Analysis - SDDLOOP-6.5002)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 16 Tests (Shellcheck Static Analysis)"
+    echo "====================================="
+    echo ""
+
+    test_shellcheck_static_analysis
     echo ""
 
     # Summary
