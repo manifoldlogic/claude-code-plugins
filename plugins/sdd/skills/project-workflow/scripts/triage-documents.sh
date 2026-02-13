@@ -99,15 +99,34 @@ fi
 overrides_plus=""
 overrides_minus=""
 overrides_json="[]"
+seen_overrides=""
 
 while [ $# -gt 0 ]; do
     arg="$1"
     # Match +doc-name or -doc-name patterns
     if printf '%s' "$arg" | grep -qE '^\+[a-z][a-z0-9-]*$'; then
+        # Check for duplicate override
+        case " $seen_overrides " in
+            *" $arg "*)
+                warn "Duplicate override '$arg' ignored"
+                shift
+                continue
+                ;;
+        esac
+        seen_overrides="$seen_overrides $arg"
         doc_name="${arg#+}"
         overrides_plus="$overrides_plus $doc_name"
         overrides_json=$(printf '%s' "$overrides_json" | jq --arg o "$arg" '. + [$o]')
     elif printf '%s' "$arg" | grep -qE '^-[a-z][a-z0-9-]*$'; then
+        # Check for duplicate override
+        case " $seen_overrides " in
+            *" $arg "*)
+                warn "Duplicate override '$arg' ignored"
+                shift
+                continue
+                ;;
+        esac
+        seen_overrides="$seen_overrides $arg"
         doc_name="${arg#-}"
         overrides_minus="$overrides_minus $doc_name"
         overrides_json=$(printf '%s' "$overrides_json" | jq --arg o "$arg" '. + [$o]')

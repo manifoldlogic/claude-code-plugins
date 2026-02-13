@@ -29,6 +29,9 @@
 #  26. Description length over limit (11000 bytes) - rejected with exit 1
 #  27. Registry schema validation - document-registry.json passes jq-based schema checks
 #  28. Registry schema negative test - broken registry copy is caught by validation
+#  29. Duplicate positive override warns - +accessibility +accessibility warns on stderr
+#  30. Duplicate negative override warns - -observability -observability warns on stderr
+#  31. Mixed duplicates both detected - +accessibility +accessibility -observability -observability
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -110,6 +113,21 @@ run_triage() {
     TRIAGE_OUTPUT=$(bash "$TRIAGE_SCRIPT" "$@" 2>/dev/null)
     TRIAGE_EXIT=$?
     set -e
+}
+
+# Run triage script and capture both stdout and stderr separately.
+# Arguments:
+#   $@ - Arguments to pass to triage-documents.sh
+# Sets global: TRIAGE_OUTPUT, TRIAGE_STDERR, TRIAGE_EXIT
+run_triage_with_stderr() {
+    local stderr_file
+    stderr_file=$(mktemp)
+    set +e
+    TRIAGE_OUTPUT=$(bash "$TRIAGE_SCRIPT" "$@" 2>"$stderr_file")
+    TRIAGE_EXIT=$?
+    set -e
+    TRIAGE_STDERR=$(cat "$stderr_file")
+    rm -f "$stderr_file"
 }
 
 # Get the action for a specific document ID from the triage output.
@@ -996,6 +1014,93 @@ rm -f "$BROKEN_REGISTRY"
 
 if $negative_ok; then
     log_pass "$test_name"
+fi
+
+# =============================================
+# Test 29: Duplicate positive override warns
+# Running with +accessibility +accessibility should:
+#   - Print warning to stderr about duplicate
+#   - Produce same manifest as single +accessibility
+# =============================================
+
+printf -- "\n${CYAN}--- Duplicate Override Tests ---${NC}\n\n"
+
+run_triage_with_stderr "simple task" "+accessibility" "+accessibility"
+
+test_name="Duplicate positive override: warns on stderr"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # Check stderr contains duplicate warning
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Duplicate override '+accessibility' ignored"; then
+        # Verify manifest matches single-override version
+        run_triage "simple task" "+accessibility"
+        single_manifest=$(printf '%s' "$TRIAGE_OUTPUT" | jq -c '.documents')
+        run_triage_with_stderr "simple task" "+accessibility" "+accessibility"
+        dup_manifest=$(printf '%s' "$TRIAGE_OUTPUT" | jq -c '.documents')
+        if [ "$single_manifest" = "$dup_manifest" ]; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "manifest differs between single and duplicate override"
+        fi
+    else
+        log_fail "$test_name" "stderr missing duplicate warning (got: $TRIAGE_STDERR)"
+    fi
+fi
+
+# =============================================
+# Test 30: Duplicate negative override warns
+# Running with -observability -observability should:
+#   - Print warning to stderr about duplicate
+# =============================================
+
+run_triage_with_stderr "backend API caching layer" "-observability" "-observability"
+
+test_name="Duplicate negative override: warns on stderr"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Duplicate override '-observability' ignored"; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "stderr missing duplicate warning (got: $TRIAGE_STDERR)"
+    fi
+fi
+
+# =============================================
+# Test 31: Mixed duplicates both detected
+# Running with +accessibility +accessibility -observability -observability should:
+#   - Print both duplicate warnings to stderr
+# =============================================
+
+run_triage_with_stderr "simple task" "+accessibility" "+accessibility" "-observability" "-observability"
+
+test_name="Mixed duplicates: both duplicate warnings present"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    has_plus_dup=$(printf '%s' "$TRIAGE_STDERR" | grep -cF "Duplicate override '+accessibility' ignored" || true)
+    has_minus_dup=$(printf '%s' "$TRIAGE_STDERR" | grep -cF "Duplicate override '-observability' ignored" || true)
+    if [ "$has_plus_dup" -ge 1 ] && [ "$has_minus_dup" -ge 1 ]; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "expected both warnings (plus_dup=$has_plus_dup, minus_dup=$has_minus_dup, stderr: $TRIAGE_STDERR)"
+    fi
 fi
 
 # --- Summary ---
