@@ -2,6 +2,47 @@
 
 Detailed error recovery for the five most common maproom issues. This is a companion to the quick-reference troubleshooting section in [SKILL.md](../SKILL.md) — start there for quick fixes, and use this file when you need root cause analysis or step-by-step recovery.
 
+## Debugging Workflow
+
+When a search command fails or produces unexpected results, follow this systematic workflow:
+
+**1. Verify CLI installed**
+```bash
+command -v crewchief-maproom
+# Expected: /path/to/crewchief-maproom
+```
+
+**2. Check CLI version**
+```bash
+crewchief-maproom --version
+# Expected: >= 0.1.0 (minimum version for this documentation)
+```
+
+**3. Verify database status**
+```bash
+crewchief-maproom status
+# Expected: List of indexed repositories
+```
+
+**4. Test basic search**
+```bash
+crewchief-maproom search --repo <repo> --query "test" --format agent
+# Expected: At least some results (if repo is indexed and non-empty)
+```
+
+**5. Enable debug mode**
+```bash
+# Add --debug flag to see detailed scoring and ranking information
+crewchief-maproom search --repo <repo> --query "test" --format agent --debug
+```
+
+If all steps pass but your specific search still fails, check:
+- Query syntax (special characters may need quoting)
+- Filter values (case-sensitive: `func` not `Func`, `py` not `PY`)
+- Repository name (must match indexed name exactly)
+
+---
+
 ### Token Limit Exceeded
 
 **Symptom:** Embedding generation fails with an error containing:
