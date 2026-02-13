@@ -1,6 +1,6 @@
 ---
 description: Create a new ticket with planning documents
-argument-hint: [ticket description or TICKET_ID name] [optional: additional instructions]
+argument-hint: [ticket description or TICKET_ID name] [+doc -doc] [optional: additional instructions]
 ---
 
 # Create Ticket
@@ -18,13 +18,27 @@ Plugin root: "${CLAUDE_PLUGIN_ROOT}"
 
 Extract from `$ARGUMENTS`:
 - **DESCRIPTION or ID + name**: Ticket description or "TICKET_ID name" pattern (primary identifier)
-- **Additional Instructions**: Optional planning context (everything after the description/ID-name pattern)
+- **Override flags**: Optional `+doc-name` (force include) or `-doc-name` (force exclude) patterns
+- **Additional Instructions**: Optional planning context (everything after the description/ID-name pattern, excluding override flags)
+
+**Override flag extraction:**
+
+```bash
+# Extract override flags from ARGUMENTS
+OVERRIDES=$(printf '%s' "$ARGUMENTS" | grep -oE '(\+|-)[a-z][a-z-]*' || true)
+
+# Clean description: remove override flags from ARGUMENTS before using as description
+CLEAN_ARGS=$(printf '%s' "$ARGUMENTS" | sed 's/[+-][a-z][a-z-]*//g' | sed 's/  */ /g' | sed 's/^ *//;s/ *$//')
+```
+
+Override flags can appear anywhere in the arguments. Extract them first, then parse the remaining text as description/ID+name and instructions.
 
 Examples:
-- `"API redesign"` → description: "API redesign", instructions: none
-- `"API redesign" Focus on backward compatibility` → description: "API redesign", instructions: "Focus on backward compatibility"
-- `APIV2 redesign` → id: "APIV2", name: "redesign", instructions: none
-- `APIV2 redesign Emphasize testing` → id: "APIV2", name: "redesign", instructions: "Emphasize testing"
+- `"API redesign"` → description: "API redesign", overrides: none, instructions: none
+- `"API redesign" Focus on backward compatibility` → description: "API redesign", overrides: none, instructions: "Focus on backward compatibility"
+- `"backend API" +accessibility -runbook` → description: "backend API", overrides: ["+accessibility", "-runbook"], instructions: none
+- `APIV2 redesign` → id: "APIV2", name: "redesign", overrides: none, instructions: none
+- `APIV2 redesign +observability Emphasize testing` → id: "APIV2", name: "redesign", overrides: ["+observability"], instructions: "Emphasize testing"
 
 ### Step 1: Determine Identifiers
 
@@ -40,18 +54,119 @@ Check for uniqueness:
 ls -d ${SDD_ROOT_DIR:-/app/.sdd}/tickets/${TICKET_ID}_* ${SDD_ROOT_DIR:-/app/.sdd}/archive/tickets/${TICKET_ID}_* 2>/dev/null
 ```
 
+### Step 1.5: Triage Documents
+
+**Purpose:** Determine which planning documents to generate based on the ticket description and any override flags.
+
+#### 1.5a: Validate Override Names
+
+If overrides were extracted in Step 0, validate them against the document registry:
+
+```bash
+SCRIPT_DIR="${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts"
+REGISTRY="${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/templates/document-registry.json"
+
+VALID_DOCS=$(jq -r '.documents | keys[]' "$REGISTRY")
+for override in $OVERRIDES; do
+  override_name=$(printf '%s' "$override" | sed 's/^[+-]//')
+  if ! printf '%s\n' "$VALID_DOCS" | grep -qx "$override_name"; then
+    echo "Warning: Unknown document override '$override_name' - will be ignored by triage"
+  fi
+done
+```
+
+Invalid override names produce a warning but do NOT block the triage step.
+
+#### 1.5b: Run Triage Script
+
+```bash
+SCRIPT_DIR="${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts"
+MANIFEST_OUTPUT=$(bash "$SCRIPT_DIR/triage-documents.sh" "$description" $OVERRIDES)
+MANIFEST_FILE="/tmp/sdd-triage-manifest-${TICKET_ID}.json"
+echo "$MANIFEST_OUTPUT" > "$MANIFEST_FILE"
+```
+
+Where `$description` is the cleaned description (override flags removed) and `$OVERRIDES` are the raw override flags (e.g., `+accessibility -runbook`).
+
+**Fallback:** If triage-documents.sh fails (non-zero exit), log the error and continue WITHOUT a manifest. Step 2 will use legacy behavior (generate all six default documents).
+
+```bash
+if [ $? -ne 0 ]; then
+  echo "Warning: Triage failed, falling back to legacy document set"
+  MANIFEST_FILE=""
+fi
+```
+
+#### 1.5c: Display Triage Results
+
+Parse the manifest and display a readable summary to the developer:
+
+```bash
+# Parse manifest for display
+GENERATE_DOCS=$(jq -r '.documents[] | select(.action=="generate") | "  - \(.id) (\(.filename)) — \(.reason)"' "$MANIFEST_FILE")
+SKIP_DOCS=$(jq -r '.documents[] | select(.action=="skip") | "  - \(.id) (\(.filename)) — \(.reason)"' "$MANIFEST_FILE")
+OVERRIDE_LIST=$(jq -r '.overrides[]' "$MANIFEST_FILE" 2>/dev/null || true)
+```
+
+Display to the developer in this format:
+
+```
+📋 Document Triage Results for {TICKET_ID}
+
+Documents to generate:
+  - analysis (analysis.md) — Core document (always generated)
+  - architecture (architecture.md) — Core document (always generated)
+  - plan (plan.md) — Core document (always generated)
+  - prd (prd.md) — Standard document (generated by default)
+  - quality-strategy (quality-strategy.md) — Standard document (generated by default)
+  - security-review (security-review.md) — Standard document (generated by default)
+  - accessibility (accessibility.md) — Override: +accessibility
+
+Documents to skip:
+  - runbook (runbook.md) — Override: -runbook
+  - observability (observability.md) — No trigger keywords matched
+  - migration-plan (migration-plan.md) — No trigger keywords matched
+  - api-contract (api-contract.md) — No trigger keywords matched
+  - dependency-audit (dependency-audit.md) — No trigger keywords matched
+
+Override effects applied: +accessibility, -runbook
+```
+
+#### 1.5d: Confirm with Developer
+
+Use **AskUserQuestion** to ask the developer to confirm:
+
+**Question:** "Proceed with these documents?"
+**Header:** "Document Triage"
+**multiSelect:** false
+
+**Options:**
+- Label: "Yes, proceed" | Description: "Generate the listed documents and scaffold the ticket"
+- Label: "No, cancel" | Description: "Cancel ticket creation"
+
+If the developer selects "No, cancel", stop the workflow and report cancellation.
+
 ### Step 2: Scaffold Structure
 
 **Delegate to script:**
 
+If a manifest file was generated in Step 1.5, pass it to scaffold-ticket.sh:
+
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts/scaffold-ticket.sh "TICKET_ID" "name"
+if [ -n "$MANIFEST_FILE" ] && [ -f "$MANIFEST_FILE" ]; then
+  bash ${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts/scaffold-ticket.sh --manifest "$MANIFEST_FILE" "TICKET_ID" "name"
+else
+  # Legacy fallback: no manifest
+  bash ${CLAUDE_PLUGIN_ROOT}/skills/project-workflow/scripts/scaffold-ticket.sh "TICKET_ID" "name"
+fi
 ```
 
 This creates:
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/README.md`
-- `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/planning/` with template files
+- `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/planning/` with generated document templates
 - `${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/tasks/`
+
+When a manifest is used, only documents with `action: "generate"` will have templates created. Skipped documents will not be scaffolded.
 
 <!-- Step 2.5 (Check Existing Skills) removed in RMSKILL ticket -->
 
@@ -67,20 +182,41 @@ Context:
 - User's description: {ARGUMENTS}
 - Scaffolded files exist with templates
 - Additional instructions: {planning context from user, or "None provided"}
+- Document triage: {TRIAGE_CONTEXT}
 
 Instructions:
 1. Research the problem space and codebase
-2. Fill analysis.md with problem analysis
-3. Create prd.md with product requirements (source of truth for requirements)
-4. Create architecture.md with solution design
-5. Define plan.md with phased execution
-6. Write quality-strategy.md with testing approach
-7. Complete security-review.md with security assessment
-8. Update README.md with overview
+2. Fill ONLY the planning documents that were generated by triage (listed below)
+3. For each generated document, replace template content with well-researched content
+4. For skipped conditional documents, no action needed (they were not scaffolded)
+5. Update README.md with overview (links only to generated documents)
+
+Generated documents to fill:
+{LIST_OF_GENERATED_DOCUMENTS}
+
+Skipped documents (not scaffolded, no action needed):
+{LIST_OF_SKIPPED_DOCUMENTS}
 
 Follow enterprise-grade quality standards with disciplined scope management.
 
 Return: Summary of planning decisions made
+```
+
+**Building the TRIAGE_CONTEXT:**
+
+If a manifest was used, build the triage context from the manifest:
+
+```bash
+# Build context for ticket-planner
+if [ -n "$MANIFEST_FILE" ] && [ -f "$MANIFEST_FILE" ]; then
+  LIST_OF_GENERATED=$(jq -r '.documents[] | select(.action=="generate") | "- \(.filename): \(.reason)"' "$MANIFEST_FILE")
+  LIST_OF_SKIPPED=$(jq -r '.documents[] | select(.action=="skip") | "- \(.id) (\(.filename)): \(.reason)"' "$MANIFEST_FILE")
+  TRIAGE_CONTEXT="Triage manifest applied. See planning/.triage-manifest.json for full details."
+else
+  LIST_OF_GENERATED="- analysis.md, architecture.md, plan.md, prd.md, quality-strategy.md, security-review.md (legacy mode: all default documents)"
+  LIST_OF_SKIPPED="None (legacy mode)"
+  TRIAGE_CONTEXT="No triage manifest. Legacy mode: all six default documents generated."
+fi
 ```
 
 **Option B: Use Task tool if specialized planner unavailable:**
@@ -97,17 +233,24 @@ Create comprehensive planning documents for ticket {TICKET_ID}_{name}
 - User's description: {ARGUMENTS}
 - Scaffolded files exist with templates
 - Additional instructions: {planning context from user, or "None provided"}
+- Document triage: {TRIAGE_CONTEXT}
 - Follow enterprise-grade quality standards
 
+## Generated Documents to Fill
+{LIST_OF_GENERATED_DOCUMENTS}
+
+## Skipped Documents (no action needed)
+{LIST_OF_SKIPPED_DOCUMENTS}
+
 ## Expected Output
-- All planning documents completed (analysis.md, prd.md, architecture.md, plan.md, quality-strategy.md, security-review.md)
-- README.md updated with overview
+- All generated planning documents completed with researched content
+- README.md updated with overview (links only to generated documents)
 - Summary of planning decisions
 
 ## Acceptance Criteria
 - Problem space thoroughly analyzed
 - Solution design is sound and phased
-- Testing and security strategies defined
+- Testing and security strategies defined (if those documents were generated)
 - Scope is disciplined and manageable
 ```
 
@@ -135,13 +278,13 @@ Structure:
 ${SDD_ROOT_DIR}/tickets/{TICKET_ID}_{name}/
 ├── README.md
 ├── planning/
-│   ├── analysis.md
-│   ├── prd.md
-│   ├── architecture.md
-│   ├── plan.md
-│   ├── quality-strategy.md
-│   └── security-review.md
+│   ├── .triage-manifest.json  (if triage was used)
+│   ├── {generated documents listed here}
+│   └── ...
 └── tasks/
+
+Documents generated: {count} of {total} ({list of generated document filenames})
+Documents skipped: {count} ({list of skipped document IDs, if any})
 
 Planning Summary:
 - Problem: {one-line from analysis}
@@ -183,11 +326,24 @@ Where {TICKET_ID} is the actual ticket ID from the command execution context (e.
 
 # With specific focus areas
 /sdd:plan-ticket "User authentication" Prioritize security review and consider OAuth integration
+
+# With override flags (force include/exclude documents)
+/sdd:plan-ticket "backend API caching layer" +accessibility -runbook
+
+# Overrides with planning context
+/sdd:plan-ticket "backend API" +observability +api-contract -runbook Focus on performance
+
+# ID-name pattern with overrides
+/sdd:plan-ticket CACHE api-caching +dependency-audit -migration-plan
 ```
 
 ## Key Constraints
 
-- Use scaffold-ticket.sh for structure
-- Use ticket-planner agent for content
+- Use triage-documents.sh to determine which documents to generate
+- Use scaffold-ticket.sh for structure (with --manifest when triage is available)
+- Use ticket-planner agent for content (only for generated documents)
 - DO NOT write planning docs yourself
-- DO NOT skip any planning document
+- DO NOT skip the triage step (unless triage-documents.sh is unavailable, then fall back to legacy)
+- DO NOT generate documents that triage marked as "skip"
+- Override flags are optional - backward compatible with existing interface
+- If triage fails, fall back to legacy behavior (all six default documents)
