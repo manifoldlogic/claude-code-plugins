@@ -370,6 +370,55 @@ log_debug() {
 }
 
 # =============================================================================
+# Startup Health Check
+# =============================================================================
+
+#######################################
+# Validate required dependencies are available
+#
+# Checks for jq, realpath (required) and claude (warning only).
+# Provides clear error messages with installation instructions.
+#
+# Outputs:
+#   Error messages to stderr if dependencies missing
+#   Warning messages to stderr if optional tools missing
+#
+# Returns:
+#   0 - All required dependencies available
+#   1 - Required dependency missing
+#######################################
+check_dependencies() {
+    local missing=0
+
+    # Check jq (required for JSON parsing)
+    if ! command -v jq >/dev/null 2>&1; then
+        log_error "Required dependency not found: jq"
+        log_error "Install with: sudo apt-get install jq (Ubuntu/Debian) or brew install jq (macOS)"
+        missing=1
+    fi
+
+    # Check realpath (required for path canonicalization)
+    if ! command -v realpath >/dev/null 2>&1; then
+        log_error "Required dependency not found: realpath"
+        log_error "Install with: sudo apt-get install coreutils (Ubuntu/Debian) or brew install coreutils (macOS)"
+        missing=1
+    fi
+
+    # Check claude (warn only - may be dry-run mode)
+    if ! command -v claude >/dev/null 2>&1; then
+        log_warn "Claude Code CLI not found in PATH"
+        log_warn "Script will work in dry-run mode but cannot execute tasks"
+    fi
+
+    if [ "$missing" -eq 1 ]; then
+        log_error "Exiting due to missing required dependencies"
+        return 1
+    fi
+
+    return 0
+}
+
+# =============================================================================
 # JSON Helper Functions
 # =============================================================================
 
@@ -1667,6 +1716,9 @@ main() {
     # Set up signal handlers
     trap handle_sigint SIGINT
     trap handle_sigterm SIGTERM
+
+    # Validate required dependencies before proceeding
+    check_dependencies || exit 1
 
     # Parse command-line arguments
     while [[ $# -gt 0 ]]; do

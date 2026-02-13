@@ -3131,6 +3131,128 @@ test_progress_with_few_repos() {
     fi
 }
 
+# =============================================================================
+# Startup Health Check Tests (SDDLOOP-6.3010)
+# =============================================================================
+
+#######################################
+# Test: check_dependencies fails when jq unavailable
+#######################################
+test_health_check_fails_missing_jq() {
+    echo "--- Test: Health check fails when jq unavailable ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a minimal bin directory without jq
+    local fake_bin="$TEST_TMP_DIR/health_jq_bin"
+    mkdir -p "$fake_bin"
+
+    # Link realpath so it's available
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when jq missing"
+
+    if [[ "$output" == *"Required dependency not found: jq"* ]]; then
+        log_result "Error message mentions jq" "pass"
+    else
+        log_result "Error message mentions jq" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install with:"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Exiting due to missing required dependencies"* ]]; then
+        log_result "Error message includes exit reason" "pass"
+    else
+        log_result "Error message includes exit reason" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies fails when realpath unavailable
+#######################################
+test_health_check_fails_missing_realpath() {
+    echo "--- Test: Health check fails when realpath unavailable ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a minimal bin directory with jq but not realpath
+    local fake_bin="$TEST_TMP_DIR/health_rp_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when realpath missing"
+
+    if [[ "$output" == *"Required dependency not found: realpath"* ]]; then
+        log_result "Error message mentions realpath" "pass"
+    else
+        log_result "Error message mentions realpath" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies passes when all tools available
+#######################################
+test_health_check_passes_all_available() {
+    echo "--- Test: Health check passes when all tools available ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a bin directory with all required tools
+    local fake_bin="$TEST_TMP_DIR/health_all_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "Health check exits with 0 when all tools available"
+
+    if [[ "$output" != *"Required dependency not found"* ]]; then
+        log_result "No error messages when all tools available" "pass"
+    else
+        log_result "No error messages when all tools available" "fail" "Output: $output"
+    fi
+}
+
 #######################################
 # Main test runner
 #######################################
@@ -3392,6 +3514,18 @@ main() {
     test_progress_quiet_mode
     echo ""
     test_progress_with_few_repos
+    echo ""
+
+    # Run startup health check tests
+    echo "====================================="
+    echo "Startup Health Check Tests (SDDLOOP-6.3010)"
+    echo "====================================="
+    echo ""
+    test_health_check_fails_missing_jq
+    echo ""
+    test_health_check_fails_missing_realpath
+    echo ""
+    test_health_check_passes_all_available
     echo ""
 
     # Summary

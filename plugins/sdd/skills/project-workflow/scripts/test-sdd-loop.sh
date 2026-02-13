@@ -3664,6 +3664,193 @@ test_cleanup_git_root_cache() {
 }
 
 # =============================================================================
+# Startup Health Check Tests (SDDLOOP-6.3010)
+# =============================================================================
+
+#######################################
+# Test: check_dependencies fails when jq unavailable
+#######################################
+test_health_check_fails_missing_jq() {
+    echo "--- Test: Health check fails when jq unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Override PATH to exclude jq but keep realpath and basic tools
+    # Create a minimal bin directory with only the tools we want available
+    local fake_bin="$TEST_TMP_DIR/health_jq_bin"
+    mkdir -p "$fake_bin"
+
+    # Link realpath so it's available
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    # Link basic tools needed by the function
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when jq missing"
+
+    if [[ "$output" == *"Required dependency not found: jq"* ]]; then
+        log_result "Error message mentions jq" "pass"
+    else
+        log_result "Error message mentions jq" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install with:"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Exiting due to missing required dependencies"* ]]; then
+        log_result "Error message includes exit reason" "pass"
+    else
+        log_result "Error message includes exit reason" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies fails when realpath unavailable
+#######################################
+test_health_check_fails_missing_realpath() {
+    echo "--- Test: Health check fails when realpath unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a minimal bin directory with jq but not realpath
+    local fake_bin="$TEST_TMP_DIR/health_rp_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when realpath missing"
+
+    if [[ "$output" == *"Required dependency not found: realpath"* ]]; then
+        log_result "Error message mentions realpath" "pass"
+    else
+        log_result "Error message mentions realpath" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies warns when claude unavailable
+#######################################
+test_health_check_warns_missing_claude() {
+    echo "--- Test: Health check warns when claude unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a bin directory with jq and realpath but not claude
+    local fake_bin="$TEST_TMP_DIR/health_claude_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "Health check exits with 0 when only claude missing (warn only)"
+
+    if [[ "$output" == *"Claude Code CLI not found"* ]]; then
+        log_result "Warning mentions Claude CLI" "pass"
+    else
+        log_result "Warning mentions Claude CLI" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"dry-run mode"* ]]; then
+        log_result "Warning mentions dry-run mode" "pass"
+    else
+        log_result "Warning mentions dry-run mode" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies passes when all tools available
+#######################################
+test_health_check_passes_all_available() {
+    echo "--- Test: Health check passes when all tools available ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a bin directory with all required tools
+    local fake_bin="$TEST_TMP_DIR/health_all_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    # Create a fake claude binary
+    cat > "$fake_bin/claude" << 'FAKECLAUDE'
+#!/bin/sh
+echo "fake claude"
+FAKECLAUDE
+    chmod +x "$fake_bin/claude"
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "Health check exits with 0 when all tools available"
+
+    if [[ "$output" != *"Required dependency not found"* ]]; then
+        log_result "No error messages when all tools available" "pass"
+    else
+        log_result "No error messages when all tools available" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" != *"Claude Code CLI not found"* ]]; then
+        log_result "No claude warning when claude available" "pass"
+    else
+        log_result "No claude warning when claude available" "fail" "Output: $output"
+    fi
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -4054,6 +4241,23 @@ main() {
     test_find_git_root_cached_multiple_repos
     echo ""
     test_cleanup_git_root_cache
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 14 TESTS (Startup Health Check - SDDLOOP-6.3010)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 14 Tests (Startup Health Check)"
+    echo "====================================="
+    echo ""
+
+    test_health_check_fails_missing_jq
+    echo ""
+    test_health_check_fails_missing_realpath
+    echo ""
+    test_health_check_warns_missing_claude
+    echo ""
+    test_health_check_passes_all_available
     echo ""
 
     # Summary

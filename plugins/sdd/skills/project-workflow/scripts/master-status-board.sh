@@ -139,6 +139,44 @@ log_info() {
 }
 
 #######################################
+# Validate required dependencies are available
+#
+# Checks for jq (required) and realpath (required).
+# Provides clear error messages with installation instructions.
+#
+# Outputs:
+#   Error messages to stderr if dependencies missing
+#
+# Returns:
+#   0 - All required dependencies available
+#   1 - Required dependency missing
+#######################################
+check_dependencies() {
+    local missing=0
+
+    # Check jq (required for JSON parsing)
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "Error: Required dependency not found: jq" >&2
+        echo "Error: Install with: sudo apt-get install jq (Ubuntu/Debian) or brew install jq (macOS)" >&2
+        missing=1
+    fi
+
+    # Check realpath (required for path canonicalization)
+    if ! command -v realpath >/dev/null 2>&1; then
+        echo "Error: Required dependency not found: realpath" >&2
+        echo "Error: Install with: sudo apt-get install coreutils (Ubuntu/Debian) or brew install coreutils (macOS)" >&2
+        missing=1
+    fi
+
+    if [ "$missing" -eq 1 ]; then
+        echo "Error: Exiting due to missing required dependencies" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+#######################################
 # Strip code blocks from file content
 # Removes fenced code blocks (``` ... ```) to avoid parsing
 # checkboxes that appear in code examples
@@ -776,6 +814,9 @@ format_elapsed_time() {
 #   $@ - Command line arguments
 #######################################
 main() {
+    # Validate required dependencies before proceeding
+    check_dependencies || exit 1
+
     local specs_root=""
     local repos_root=""
     local arg_specs_root=""
