@@ -1061,6 +1061,20 @@ list_subdirectories_sorted() {
 # Prefers main checkouts (.git is a directory) over worktrees (.git is a file).
 # Logs enhanced warnings when multiple git directories are found.
 #
+# Selection algorithm (two-pass):
+#   Pass 1: Scan for .git directories (main checkouts). Since candidates arrive
+#           sorted alphabetically, the first match is the alphabetically-first
+#           main checkout. Alphabetical ordering guarantees deterministic,
+#           stable selection so repeated runs pick the same root.
+#   Pass 2: If no main checkout found, fall back to the first .git file
+#           (worktree). Worktrees are less preferred because they depend on
+#           a parent checkout and may have limited reflog history.
+#
+# Example scenario:
+#   Candidates: BUGFIX-456/ (.git dir), FEATURE-123/ (.git file), myproject/ (.git dir)
+#   Pass 1 finds: BUGFIX-456 (first), myproject (second) -- both are main checkouts
+#   Result: BUGFIX-456 (alphabetically first main checkout)
+#
 # Arguments:
 #   $1 - candidates_file: Path to file containing null-terminated directory paths
 #   $2 - repo_name: Repository name (used in warning messages)
@@ -1076,19 +1090,27 @@ select_first_git_root() {
     local candidates_file="$1"
     local repo_name="$2"
 
-    # Prefer main checkout (.git is a directory) over worktree (.git is a file)
+    # --- Pass 1: Search for main checkouts (.git is a directory) ---
+    # Main checkouts contain the full .git directory and are preferred because
+    # they own the repository data directly, unlike worktrees which reference
+    # a parent checkout via a .git file pointer.
     local candidate
     local found_root=""
     local all_candidates=""
     local git_dir_count=0
+    # Candidates are null-terminated and pre-sorted alphabetically by
+    # list_subdirectories_sorted(), so the first .git directory we find
+    # is the alphabetically-first main checkout -- giving deterministic selection.
     while IFS= read -r -d '' candidate; do
         if [[ -d "$candidate/.git" ]]; then
             git_dir_count=$((git_dir_count + 1))
+            # Collect all main-checkout names for the multi-root warning message
             if [ -n "$all_candidates" ]; then
                 all_candidates="$all_candidates, $(basename "$candidate")"
             else
                 all_candidates="$(basename "$candidate")"
             fi
+            # Keep only the first match (alphabetically first due to sorted input)
             if [[ -z "$found_root" ]]; then
                 found_root="${candidate%/}"
             fi
@@ -1096,7 +1118,8 @@ select_first_git_root() {
     done < "$candidates_file"
 
     if [[ -n "$found_root" ]]; then
-        # Check if multiple git dirs were found and log enhanced warning
+        # Warn when multiple main checkouts exist so operators can investigate
+        # whether the extra roots are intentional or stale clones
         if [ "$git_dir_count" -gt 1 ]; then
             log_warn "Multiple git roots found for repo: $repo_name"
             log_warn "Candidates: [$all_candidates]"
@@ -1106,7 +1129,10 @@ select_first_git_root() {
         return 0
     fi
 
-    # Fallback: worktree (.git is a file)
+    # --- Pass 2: Fallback to worktrees (.git is a file) ---
+    # A .git file indicates a worktree linked to a main checkout elsewhere.
+    # Worktrees are acceptable when no main checkout exists under this repo
+    # (e.g., the main checkout lives in a different directory structure).
     while IFS= read -r -d '' candidate; do
         if [[ -f "$candidate/.git" ]]; then
             echo "${candidate%/}"
@@ -1114,6 +1140,7 @@ select_first_git_root() {
         fi
     done < "$candidates_file"
 
+    # No git root found among any candidates
     return 1
 }
 
