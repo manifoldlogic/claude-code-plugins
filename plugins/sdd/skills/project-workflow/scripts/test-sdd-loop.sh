@@ -190,7 +190,7 @@ create_mock_status_board() {
     # Create in scripts directory where sdd-loop.sh lives
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"$action","task":"$task","ticket":"$ticket","sdd_root":"$sdd_root","reason":"$reason"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"$action","task":"$task","ticket":"$ticket","sdd_root":"$sdd_root","reason":"$reason"}}'
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 }
@@ -215,9 +215,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le $iterations ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -248,7 +248,7 @@ create_mock_status_board_with_phase() {
 
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.${phase}001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase $phase"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.${phase}001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase $phase"}}'
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 }
@@ -455,7 +455,7 @@ EOF
     # The ticket ID in the JSON must match the prefix of the ticket directory (PHASE)
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"PHASE.2001","ticket":"PHASE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase 2"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"PHASE.2001","ticket":"PHASE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase 2"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -494,9 +494,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task 1"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task 1"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -567,9 +567,9 @@ fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 4 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -851,9 +851,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 2 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -890,9 +890,9 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 3 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1135,9 +1135,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid path test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid path test"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1168,7 +1168,7 @@ test_path_bounds_outside_workspace() {
     # Create mock status board returning sdd_root outside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/test-repo","reason":"Outside specs root test"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/test-repo","reason":"Outside specs root test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1198,7 +1198,7 @@ test_path_bounds_traversal_attack() {
     # Path: specs/../outside-target/test-repo canonicalizes to outside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/../outside-target/test-repo","reason":"Traversal attack test"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/../outside-target/test-repo","reason":"Traversal attack test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1226,7 +1226,7 @@ test_path_bounds_equals_workspace() {
     # which doesn't exist, causing a failure before path bounds check
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs","reason":"Equals specs root test"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs","reason":"Equals specs root test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1263,9 +1263,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs-link/test-repo","reason":"Symlink test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs-link/test-repo","reason":"Symlink test"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1298,9 +1298,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Debug test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Debug test"}}'
 else
-    echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1333,7 +1333,7 @@ test_version_matching() {
     # Create mock status board that returns correct version 1.0.0
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1360,7 +1360,7 @@ test_version_mismatch() {
     # Create mock status board that returns different version 2.0.0
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"version":"2.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+echo '{"version":"2.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1375,11 +1375,11 @@ MOCK_EOF
 }
 
 #######################################
-# Test 45: Version missing - warning logged with "unknown"
-# Validates that missing version field logs warning with "unknown"
+# Test 45: Version missing - schema validation error
+# Validates that missing version field causes validation error
 #######################################
 test_version_missing() {
-    echo "--- Test: Version missing - warning with unknown ---"
+    echo "--- Test: Version missing - schema validation error ---"
 
     setup_test_env
     reset_counters
@@ -1388,7 +1388,7 @@ test_version_missing() {
     # Create mock status board that returns JSON without version field
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+echo '{"repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -1396,10 +1396,119 @@ MOCK_EOF
     local exit_code=0
     output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
-    assert_exit_code 0 "$exit_code" "Missing version still exits with code 0 (backward compatible)"
-    assert_contains "$output" "version mismatch" "Shows version mismatch warning for missing version"
-    assert_contains "$output" "unknown" "Warning shows 'unknown' for missing version"
-    assert_contains "$output" "expected 1.0.0" "Warning includes expected version"
+    assert_exit_code 1 "$exit_code" "Missing version exits with code 1 (schema validation failure)"
+    assert_contains "$output" "missing .version field" "Shows missing .version field error"
+    assert_contains "$output" "old version or returned corrupted output" "Shows actionable guidance"
+}
+
+# =============================================================================
+# PRIORITY 5b TESTS (JSON Schema Validation - SDDLOOP-6.3004)
+# =============================================================================
+
+#######################################
+# Test 45b: Schema validation - missing .version field
+# Validates that missing .version field causes clear error
+#######################################
+test_schema_missing_version() {
+    echo "--- Test: Schema validation - missing .version field ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON without .version field
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Missing .version exits with code 1"
+    assert_contains "$output" "missing .version field" "Shows missing .version field error"
+    assert_contains "$output" "old version or returned corrupted output" "Shows actionable guidance"
+}
+
+#######################################
+# Test 45c: Schema validation - missing .repos field
+# Validates that missing .repos field causes clear error
+#######################################
+test_schema_missing_repos() {
+    echo "--- Test: Schema validation - missing .repos field ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON without .repos field
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Missing .repos exits with code 1"
+    assert_contains "$output" ".repos field is not an array" "Shows .repos not an array error"
+}
+
+#######################################
+# Test 45d: Schema validation - .repos is not an array
+# Validates that .repos being a non-array type causes clear error
+#######################################
+test_schema_repos_not_array() {
+    echo "--- Test: Schema validation - .repos is not an array ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns JSON with .repos as a string
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
+#!/usr/bin/env bash
+echo '{"version":"1.0.0","repos":"invalid","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No tasks"}}'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Non-array .repos exits with code 1"
+    assert_contains "$output" ".repos field is not an array" "Shows .repos not an array error"
+}
+
+#######################################
+# Test 45e: Schema validation - non-JSON output
+# Validates that non-JSON output from status board is handled gracefully
+# (caught by the existing jq empty check, before schema validation)
+#######################################
+test_schema_non_json_output() {
+    echo "--- Test: Schema validation - non-JSON output ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Create mock status board that returns non-JSON output
+    cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << 'MOCK_EOF'
+#!/usr/bin/env bash
+echo 'ERROR: something went wrong with the status board'
+MOCK_EOF
+    chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Non-JSON output exits with code 1"
+    assert_contains "$output" "invalid JSON" "Shows invalid JSON error"
 }
 
 # =============================================================================
@@ -1432,9 +1541,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Autogate test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Autogate test"}}'
 else
-    echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1487,9 +1596,9 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid autogate test"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid autogate test"}}'
 else
-    echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
+    echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
@@ -1754,7 +1863,7 @@ test_log_format_json_special_chars() {
     # Create a mock that returns a task with special characters in reason
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << 'MOCK_EOF'
 #!/usr/bin/env bash
-echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Test with \"quotes\" and \\ backslash"}}'
+echo '{"version":"1.0.0","repos":[],"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Test with \"quotes\" and \\ backslash"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
@@ -3082,6 +3191,23 @@ main() {
     test_version_mismatch
     echo ""
     test_version_missing
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 5b TESTS (JSON Schema Validation - SDDLOOP-6.3004)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 5b Tests (JSON Schema Validation)"
+    echo "====================================="
+    echo ""
+
+    test_schema_missing_version
+    echo ""
+    test_schema_missing_repos
+    echo ""
+    test_schema_repos_not_array
+    echo ""
+    test_schema_non_json_output
     echo ""
 
     # ==========================================================================

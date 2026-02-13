@@ -550,6 +550,26 @@ poll_status() {
     fi
 
     # ==========================================================================
+    # JSON Schema Validation
+    # Validate required fields exist before attempting to parse them.
+    # Catches malformed status board output early with clear error messages
+    # instead of cryptic jq parse failures downstream.
+    # ==========================================================================
+
+    # Validate .version field exists (required for schema compatibility)
+    if ! echo "$status_output" | jq -e '.version' >/dev/null 2>&1; then
+        log_error "Invalid JSON from status board: missing .version field"
+        log_error "Status board may be running old version or returned corrupted output"
+        return 1
+    fi
+
+    # Validate .repos field exists and is an array (required for all parsing logic)
+    if ! echo "$status_output" | jq -e '.repos | type == "array"' >/dev/null 2>&1; then
+        log_error "Invalid JSON from status board: .repos field is not an array"
+        return 1
+    fi
+
+    # ==========================================================================
     # Version Compatibility Check
     # Extract version field and validate before parsing other fields
     # ==========================================================================
