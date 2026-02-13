@@ -75,6 +75,36 @@ Requires embeddings (see First-Time Setup step 2).
 
 For query optimization, see [search-best-practices.md](./references/search-best-practices.md).
 
+## Output Formats
+
+The `search` and `vector-search` commands support two output formats via `--format`:
+
+**JSON (default):** Verbose structured output with full metadata. Preview requires explicit `--preview` flag.
+**Agent (`--format agent`):** Compact one-line-per-result optimized for agent context windows. Preview is implicit (120 chars).
+
+### JSON Format Example
+```bash
+$ crewchief-maproom search --repo <repo> --query "test" --format json --k 2
+```
+```
+{"hits":[{"chunk_id":4722,"end_line":159,"file_relpath":"plugins/.../README.md","kind":"code_block","score":3.60,"start_line":150,"symbol_name":"Code: text"}]}
+```
+
+### Agent Format Example
+```bash
+$ crewchief-maproom search --repo <repo> --query "test" --format agent
+```
+```
+plugins/.../README.md:150 | code_block Code: text | 3.60 | ```text tests/ ├── integration-test-sdd-loop.sh...
+```
+Structure: `{file}:{line} | {kind} {symbol} | {score} | {preview}...`
+
+### Preview Behavior
+Agent format implicitly enables preview — adding `--preview` is redundant. Use `--preview-length` to adjust (default: 120 chars for agent, 200 for json). For JSON format, `--preview` must be explicitly passed to include a `"preview"` field.
+
+### Recommendation
+For agent use, always pass `--format agent`. It conserves context window tokens while preserving essential location, kind, score, and preview information.
+
 ## Context Command Reference
 
 Explore a chunk's relationships after finding it via search:
