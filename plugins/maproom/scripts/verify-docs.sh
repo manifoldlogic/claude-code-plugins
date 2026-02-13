@@ -37,7 +37,7 @@ CHECKS:
   8.  Output Formats and Filtering sections in SKILL.md (= 2)
   9.  New flags (--kind/--lang/--preview/--preview-length/--threshold) in SKILL.md (>= 5)
   10. --format agent in troubleshooting.md (= 0, must not appear)
-  11. Cross-reference integrity (./references/*.md links in SKILL.md)
+  11. Cross-reference integrity (./references/*.md and ./templates/* links in SKILL.md)
 
 EXIT CODES:
   0   All checks passed
@@ -241,19 +241,23 @@ else
 fi
 
 # ===========================================================================
-# Check 11: Cross-reference integrity (./references/*.md links in SKILL.md)
+# Check 11: Cross-reference integrity (./references/*.md and ./templates/* in SKILL.md)
 # ===========================================================================
-echo "Check 11: Cross-reference integrity (./references/*.md links in SKILL.md)"
-# Extract ./references/*.md links from SKILL.md
+echo "Check 11: Cross-reference integrity (./references/*.md and ./templates/* links in SKILL.md)"
+
+broken=0
+total_refs=0
+
+# --- 11a: Check ./references/*.md links ---
 refs=$(grep -o '\./references/[a-z_-]*\.md' "$SKILL_MD" | sort -u || true)
 if [ -z "$refs" ]; then
-  report_fail "No ./references/*.md links found in SKILL.md"
+  echo "    WARNING: No ./references/*.md links found in SKILL.md"
 else
-  broken=0
   while IFS= read -r ref; do
     if [ -z "$ref" ]; then
       continue
     fi
+    total_refs=$((total_refs + 1))
     target="$SKILL_DIR/$ref"
     if [ ! -f "$target" ]; then
       echo "    BROKEN: $ref -> $target does not exist"
@@ -262,13 +266,35 @@ else
   done <<EOF
 $refs
 EOF
+fi
 
-  ref_count=$(echo "$refs" | wc -l | tr -d ' ')
-  if [ "$broken" -eq 0 ]; then
-    report_pass "All $ref_count cross-references resolve to existing files"
-  else
-    report_fail "$broken of $ref_count cross-references are broken"
-  fi
+# --- 11b: Check ./templates/*.yaml|yml|json|toml links ---
+tmpl_refs=$(grep -o '\./templates/[a-z_-]*\.\(yaml\|yml\|json\|toml\)' "$SKILL_MD" | sort -u || true)
+if [ -z "$tmpl_refs" ]; then
+  echo "    INFO: No ./templates/* references found in SKILL.md (as expected if none exist)"
+else
+  while IFS= read -r ref; do
+    if [ -z "$ref" ]; then
+      continue
+    fi
+    total_refs=$((total_refs + 1))
+    target="$SKILL_DIR/$ref"
+    if [ ! -f "$target" ]; then
+      echo "    BROKEN: $ref -> $target does not exist"
+      broken=$((broken + 1))
+    fi
+  done <<EOF
+$tmpl_refs
+EOF
+fi
+
+# --- 11: Report result ---
+if [ "$total_refs" -eq 0 ]; then
+  report_fail "No cross-references found in SKILL.md"
+elif [ "$broken" -eq 0 ]; then
+  report_pass "All $total_refs cross-references resolve to existing files"
+else
+  report_fail "$broken of $total_refs cross-references are broken"
 fi
 
 # ===========================================================================
