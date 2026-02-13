@@ -27,6 +27,8 @@
 #  24. jq dependency check - exits 1 with actionable error when jq not in PATH
 #  25. Description length at limit (10240 bytes) - accepted
 #  26. Description length over limit (11000 bytes) - rejected with exit 1
+#  27. Registry schema validation - document-registry.json passes jq-based schema checks
+#  28. Registry schema negative test - broken registry copy is caught by validation
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -848,6 +850,152 @@ if $test_ok; then
     else
         log_fail "$test_name" "error message does not contain 'exceeds'"
     fi
+fi
+
+# =============================================
+# Test 27: Registry schema validation (jq-based)
+# Validate document-registry.json structure:
+#   - All documents have required fields (filename, title, tier, template, create_tasks_validation)
+#   - All tier values are one of: core, standard, conditional
+#   - All filenames match pattern ^[a-z][a-z0-9-]*\.md$
+#   - All trigger objects (when present) have keywords array and description string
+# =============================================
+
+printf -- "\n${CYAN}--- Registry Schema Validation Tests ---${NC}\n\n"
+
+SCHEMA_REGISTRY="$SCRIPT_DIR/../templates/document-registry.json"
+
+test_name="Registry schema validation: document-registry.json passes jq-based checks"
+schema_ok=true
+
+# Check 1: All documents have required fields
+missing_fields=$(jq -r '
+  .documents | to_entries[] |
+  select(
+    (.value.filename == null) or
+    (.value.title == null) or
+    (.value.tier == null) or
+    (.value.template == null) or
+    (.value.create_tasks_validation == null)
+  ) | .key
+' "$SCHEMA_REGISTRY")
+
+if [ -n "$missing_fields" ]; then
+    log_fail "$test_name" "documents missing required fields: $missing_fields"
+    schema_ok=false
+fi
+
+# Check 2: All tier values are valid enum
+if $schema_ok; then
+    invalid_tiers=$(jq -r '
+      .documents | to_entries[] |
+      select(.value.tier != "core" and .value.tier != "standard" and .value.tier != "conditional") |
+      "\(.key)=\(.value.tier)"
+    ' "$SCHEMA_REGISTRY")
+
+    if [ -n "$invalid_tiers" ]; then
+        log_fail "$test_name" "invalid tier values: $invalid_tiers"
+        schema_ok=false
+    fi
+fi
+
+# Check 3: All filenames match pattern ^[a-z][a-z0-9-]*\.md$
+if $schema_ok; then
+    invalid_filenames=$(jq -r '
+      .documents | to_entries[] |
+      select(.value.filename | test("^[a-z][a-z0-9-]*\\.md$") | not) |
+      "\(.key)=\(.value.filename)"
+    ' "$SCHEMA_REGISTRY")
+
+    if [ -n "$invalid_filenames" ]; then
+        log_fail "$test_name" "invalid filenames: $invalid_filenames"
+        schema_ok=false
+    fi
+fi
+
+# Check 4: All trigger objects have keywords (array) and description (string)
+if $schema_ok; then
+    invalid_triggers=$(jq -r '
+      .documents | to_entries[] |
+      select(.value.triggers != null) |
+      select(
+        (.value.triggers.keywords | type) != "array" or
+        (.value.triggers.description | type) != "string"
+      ) |
+      .key
+    ' "$SCHEMA_REGISTRY")
+
+    if [ -n "$invalid_triggers" ]; then
+        log_fail "$test_name" "documents with invalid triggers structure: $invalid_triggers"
+        schema_ok=false
+    fi
+fi
+
+# Check 5: Root-level required fields exist
+if $schema_ok; then
+    has_version=$(jq 'has("version")' "$SCHEMA_REGISTRY")
+    has_tiers=$(jq 'has("tiers")' "$SCHEMA_REGISTRY")
+    has_documents=$(jq 'has("documents")' "$SCHEMA_REGISTRY")
+
+    if [ "$has_version" != "true" ] || [ "$has_tiers" != "true" ] || [ "$has_documents" != "true" ]; then
+        log_fail "$test_name" "missing root fields: version=$has_version, tiers=$has_tiers, documents=$has_documents"
+        schema_ok=false
+    fi
+fi
+
+if $schema_ok; then
+    log_pass "$test_name"
+fi
+
+# =============================================
+# Test 28: Registry schema negative test
+# Create a broken registry copy (missing tier field, invalid filename)
+# and verify jq-based validation catches the errors
+# =============================================
+
+test_name="Registry schema negative test: broken registry caught by validation"
+BROKEN_REGISTRY=$(mktemp)
+
+# Create a broken registry: remove "tier" from first document, set invalid filename on second
+jq '
+  .documents.analysis |= del(.tier) |
+  .documents.architecture.filename = "INVALID_NAME"
+' "$SCHEMA_REGISTRY" > "$BROKEN_REGISTRY"
+
+negative_ok=true
+
+# Negative check 1: Should detect missing tier field
+missing_tier=$(jq -r '
+  .documents | to_entries[] |
+  select(.value.tier == null) |
+  .key
+' "$BROKEN_REGISTRY")
+
+if [ -z "$missing_tier" ]; then
+    log_fail "$test_name" "validation did not catch missing tier field"
+    negative_ok=false
+fi
+
+# Negative check 2: Should detect invalid filename
+if $negative_ok; then
+    invalid_fn=$(jq -r '
+      .documents | to_entries[] |
+      select(.value.filename != null) |
+      select(.value.filename | test("^[a-z][a-z0-9-]*\\.md$") | not) |
+      "\(.key)=\(.value.filename)"
+    ' "$BROKEN_REGISTRY")
+
+    if [ -z "$invalid_fn" ]; then
+        log_fail "$test_name" "validation did not catch invalid filename"
+        negative_ok=false
+    fi
+fi
+
+# Clean up temporary file
+rm -f "$BROKEN_REGISTRY"
+
+if $negative_ok; then
+    log_pass "$test_name"
 fi
 
 # --- Summary ---
