@@ -77,6 +77,7 @@ Then use `--repo claude-code-plugins-specs` in search commands.
 
 The spec directory under `SDD_ROOT_DIR` contains the following structure:
 
+<!-- KEEP IN SYNC WITH: scaffold-ticket.sh, scaffold-epic.sh -->
 ```
 {SDD_ROOT_DIR}/
 ├── epics/
