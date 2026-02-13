@@ -151,6 +151,8 @@ Uses context expansion to show where validateCart is called throughout the codeb
 bash plugins/maproom/scripts/monthly-cli-verification.sh
 ```
 
+**Automated Baseline Diff:** Run `bash plugins/maproom/scripts/compare-cli-flags.sh` to automatically detect flag drift against the baseline verification document. The script extracts flags from both the baseline (`cli-flag-verification.md`) and the current CLI help output, then reports any added or removed flags. Exit 0 = no drift, exit 1 = drift detected, exit 2 = usage error.
+
 **Cadence:** First Friday of each month
 
 **Owner:** Maproom plugin maintainer
