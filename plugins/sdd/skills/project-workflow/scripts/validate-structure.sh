@@ -14,11 +14,19 @@ set -euo pipefail
 
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 
-# Required planning files
-REQUIRED_PLANNING_FILES=(
+# Core-tier documents: ALWAYS required regardless of manifest content
+CORE_TIER_FILES=(
     "analysis.md"
     "architecture.md"
     "plan.md"
+)
+
+# Legacy required set: used when no triage manifest is present
+LEGACY_REQUIRED_FILES=(
+    "analysis.md"
+    "architecture.md"
+    "plan.md"
+    "prd.md"
     "quality-strategy.md"
     "security-review.md"
 )
@@ -29,6 +37,79 @@ REQUIRED_TICKET_SECTIONS=(
     "Summary"
     "Acceptance Criteria"
 )
+
+# Resolve required planning files for a ticket directory
+# Sets RESOLVED_REQUIRED_FILES array and VALIDATION_MODE string
+# Returns 1 if manifest is invalid JSON (caller should handle)
+resolve_required_files() {
+    local ticket_path="$1"
+    local manifest_path="$ticket_path/planning/.triage-manifest.json"
+
+    RESOLVED_REQUIRED_FILES=()
+    RESOLVED_CORE_FILES=()
+    RESOLVED_MANIFEST_FILES=()
+    VALIDATION_MODE="legacy"
+
+    if [[ -f "$manifest_path" ]]; then
+        # Manifest exists - validate it is parseable JSON
+        if ! jq empty "$manifest_path" 2>/dev/null; then
+            VALIDATION_MODE="invalid"
+            return 1
+        fi
+
+        VALIDATION_MODE="manifest"
+
+        # Core-tier documents are always required
+        for file in "${CORE_TIER_FILES[@]}"; do
+            RESOLVED_CORE_FILES+=("$file")
+        done
+
+        # Get documents with action="generate" from manifest
+        local manifest_files
+        manifest_files=$(jq -r '.documents[] | select(.action=="generate") | .filename' "$manifest_path" 2>/dev/null)
+
+        # Add manifest-generated files (dedup against core)
+        local f
+        for f in $manifest_files; do
+            # Skip if already in core tier
+            local is_core=false
+            local c
+            for c in "${CORE_TIER_FILES[@]}"; do
+                if [[ "$f" = "$c" ]]; then
+                    is_core=true
+                    break
+                fi
+            done
+            if [[ "$is_core" = "false" ]]; then
+                RESOLVED_MANIFEST_FILES+=("$f")
+            fi
+        done
+
+        # Combine: core + manifest-only files
+        RESOLVED_REQUIRED_FILES=("${RESOLVED_CORE_FILES[@]}")
+        if [[ ${#RESOLVED_MANIFEST_FILES[@]} -gt 0 ]]; then
+            RESOLVED_REQUIRED_FILES+=("${RESOLVED_MANIFEST_FILES[@]}")
+        fi
+    else
+        # No manifest - use legacy required set
+        VALIDATION_MODE="legacy"
+        RESOLVED_REQUIRED_FILES=("${LEGACY_REQUIRED_FILES[@]}")
+    fi
+
+    return 0
+}
+
+# Check if a filename is in the core tier
+is_core_tier() {
+    local filename="$1"
+    local c
+    for c in "${CORE_TIER_FILES[@]}"; do
+        if [[ "$filename" = "$c" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 # Validate ticket structure
 validate_ticket() {
@@ -46,14 +127,32 @@ validate_ticket() {
     if [[ ! -d "$ticket_path/planning" ]]; then
         issues+=("Missing planning/ directory")
     else
-        # Check required planning files
-        for file in "${REQUIRED_PLANNING_FILES[@]}"; do
-            if [[ ! -f "$ticket_path/planning/$file" ]]; then
-                issues+=("Missing planning/$file")
-            elif [[ ! -s "$ticket_path/planning/$file" ]]; then
-                warnings+=("Empty planning/$file")
-            fi
-        done
+        # Resolve required planning files dynamically
+        if ! resolve_required_files "$ticket_path"; then
+            # Invalid manifest JSON
+            issues+=("Error: Manifest file exists but contains invalid JSON")
+        fi
+
+        if [[ "$VALIDATION_MODE" != "invalid" ]]; then
+            # Validate each required file
+            for file in "${RESOLVED_REQUIRED_FILES[@]}"; do
+                if [[ ! -f "$ticket_path/planning/$file" ]]; then
+                    if [[ "$VALIDATION_MODE" = "manifest" ]]; then
+                        # Manifest mode: distinguish core vs manifested errors
+                        if is_core_tier "$file"; then
+                            issues+=("Error: Required core document missing: $file")
+                        else
+                            issues+=("Error: Manifested document missing: $file")
+                        fi
+                    else
+                        # Legacy mode: use original error format
+                        issues+=("Missing planning/$file")
+                    fi
+                elif [[ ! -s "$ticket_path/planning/$file" ]]; then
+                    warnings+=("Empty planning/$file")
+                fi
+            done
+        fi
     fi
 
     # Check tasks directory
