@@ -3281,6 +3281,112 @@ test_health_check_passes_all_available() {
     fi
 }
 
+# =============================================================================
+# Filesystem Operation Timeout Tests (SDDLOOP-6.4003)
+# =============================================================================
+
+#######################################
+# Test: scan_repo times out with slow find
+# Uses a mock find script that sleeps to simulate NFS stale handle
+#######################################
+test_scan_repo_timeout_handling() {
+    echo "--- Test: scan_repo timeout handling ---"
+
+    local sdd_root="$TEST_TMP_DIR/timeout_sdd/test-repo"
+    local tickets_dir="$sdd_root/tickets"
+    mkdir -p "$tickets_dir/TICKET-1_test/tasks"
+
+    # Create a mock find that sleeps longer than our timeout
+    local mock_bin="$TEST_TMP_DIR/timeout_sdd/mock_bin"
+    mkdir -p "$mock_bin"
+
+    # Use absolute path for sleep so mock find works with restricted PATH
+    local sleep_path
+    sleep_path="$(command -v sleep)"
+    cat > "$mock_bin/find" << MOCKFIND
+#!/bin/sh
+# Simulate a slow/hung filesystem by sleeping longer than timeout
+"$sleep_path" 10
+MOCKFIND
+    chmod +x "$mock_bin/find"
+
+    # Symlink essential tools from real PATH
+    ln -sf "$(command -v timeout)" "$mock_bin/timeout"
+    ln -sf "$(command -v sort)" "$mock_bin/sort"
+    ln -sf "$(command -v mktemp)" "$mock_bin/mktemp"
+    ln -sf "$(command -v rm)" "$mock_bin/rm"
+    ln -sf "$(command -v date)" "$mock_bin/date"
+    ln -sf "$(command -v echo)" "$mock_bin/echo"
+    ln -sf "$(command -v cat)" "$mock_bin/cat"
+    ln -sf "$(command -v wc)" "$mock_bin/wc"
+    ln -sf "$(command -v basename)" "$mock_bin/basename"
+    ln -sf "$(command -v head)" "$mock_bin/head"
+    ln -sf "$(command -v sed)" "$mock_bin/sed"
+    ln -sf "$(command -v jq)" "$mock_bin/jq"
+    ln -sf "$(command -v grep)" "$mock_bin/grep"
+    ln -sf "$(command -v printf)" "$mock_bin/printf" 2>/dev/null || true
+    ln -sf "$(command -v awk)" "$mock_bin/awk"
+    ln -sf "$(command -v tr)" "$mock_bin/tr"
+    ln -sf "$(command -v readlink)" "$mock_bin/readlink"
+    ln -sf "$(command -v realpath)" "$mock_bin/realpath"
+    ln -sf "$(command -v ls)" "$mock_bin/ls"
+    ln -sf "$(command -v test)" "$mock_bin/test" 2>/dev/null || true
+
+    # Run in a fresh bash process to avoid readonly FILESYSTEM_TIMEOUT_SECONDS
+    # from prior sourcing in the parent shell. Export the 2-second timeout
+    # so the sourced script picks it up via its guard clause.
+    # We create a helper script to avoid quoting complications with bash -c.
+    local helper_script="$TEST_TMP_DIR/timeout_sdd/run_test.sh"
+    cat > "$helper_script" << HELPEREOF
+#!/usr/bin/env bash
+set -uo pipefail
+export FILESYSTEM_TIMEOUT_SECONDS=2
+source "$MASTER_SCRIPT"
+PATH="$mock_bin" scan_repo "$sdd_root" ""
+exit \$?
+HELPEREOF
+    chmod +x "$helper_script"
+
+    local output=""
+    local exit_code=0
+    output=$(bash "$helper_script" 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "scan_repo returns 1 on find timeout"
+    assert_contains "$output" "timed out" "scan_repo timeout error mentions 'timed out'"
+}
+
+#######################################
+# Test: scan_repo works normally with timeout wrapper
+# Verifies timeout doesn't interfere with normal operation
+#######################################
+test_scan_repo_normal_with_timeout() {
+    echo "--- Test: scan_repo normal operation with timeout ---"
+
+    source "$MASTER_SCRIPT"
+
+    local sdd_root="$TEST_TMP_DIR/timeout_normal/test-repo"
+    local tickets_dir="$sdd_root/tickets"
+    local ticket_dir="$tickets_dir/TICKET-1_test"
+    mkdir -p "$ticket_dir/tasks"
+    # Create a task file
+    cat > "$ticket_dir/tasks/TICKET-1.1001_do-something.md" << 'TASKMD'
+# Task: [TICKET-1.1001]: Do Something
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+TASKMD
+
+    local output=""
+    local exit_code=0
+    output=$(scan_repo "$sdd_root" "" 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "scan_repo exits 0 with timeout wrapper in normal case"
+    assert_contains "$output" "TICKET-1_test" "scan_repo output contains ticket directory"
+    assert_contains "$output" "TICKET-1.1001" "scan_repo output contains task ID"
+}
+
 #######################################
 # Main test runner
 #######################################
@@ -3558,6 +3664,16 @@ main() {
     test_health_check_fails_missing_realpath
     echo ""
     test_health_check_passes_all_available
+    echo ""
+
+    # Run filesystem timeout tests
+    echo "====================================="
+    echo "Filesystem Operation Timeout Tests (SDDLOOP-6.4003)"
+    echo "====================================="
+    echo ""
+    test_scan_repo_timeout_handling
+    echo ""
+    test_scan_repo_normal_with_timeout
     echo ""
 
     # Summary

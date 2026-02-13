@@ -106,6 +106,13 @@ VERSION="2.0.0"
 [ -z "${DEFAULT_SPECS_ROOT:-}" ] && readonly DEFAULT_SPECS_ROOT="/workspace/_SPECS/"
 [ -z "${DEFAULT_REPOS_ROOT:-}" ] && readonly DEFAULT_REPOS_ROOT="/workspace/repos/"
 
+# Filesystem operation timeout in seconds for find commands.
+# 30 seconds is generous for local filesystem operations (typically <1 second)
+# but prevents indefinite hangs on NFS mounts with stale handles or network issues.
+# If a find command does not complete within this timeout, it is killed and a
+# clear error is logged.
+[ -z "${FILESYSTEM_TIMEOUT_SECONDS:-}" ] && readonly FILESYSTEM_TIMEOUT_SECONDS=30
+
 # Global flags
 DEBUG="${DEBUG:-false}"
 SUMMARY_ONLY="${SUMMARY_ONLY:-false}"
@@ -402,6 +409,17 @@ scan_ticket() {
         debug_log "  Scanning tasks directory: $tasks_dir"
 
         # Find all .md files in tasks directory (not recursive)
+        # Wrapped with timeout to prevent hangs on NFS mounts with stale handles
+        local tasks_tmp_file
+        tasks_tmp_file=$(mktemp)
+        local tasks_find_exit=0
+        timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$tasks_dir" -maxdepth 1 -type f -name "*.md" -print0 > "$tasks_tmp_file" 2>/dev/null || tasks_find_exit=$?
+        if [ "$tasks_find_exit" -eq 124 ]; then
+            echo "Error: Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $tasks_dir" >&2
+            rm -f "$tasks_tmp_file"
+            return 1
+        fi
+
         while IFS= read -r -d '' task_file; do
             debug_log "    Found task file: $task_file"
 
@@ -440,7 +458,8 @@ scan_ticket() {
             else
                 pending=$((pending + 1))
             fi
-        done < <(find "$tasks_dir" -maxdepth 1 -type f -name "*.md" -print0 2>/dev/null | sort -z)
+        done < <(sort -z < "$tasks_tmp_file")
+        rm -f "$tasks_tmp_file"
     else
         debug_log "  No tasks/ directory found"
     fi
@@ -521,6 +540,17 @@ scan_repo() {
         debug_log "  Scanning tickets directory: $tickets_dir"
 
         # Find all ticket directories (not recursive, one level only)
+        # Wrapped with timeout to prevent hangs on NFS mounts with stale handles
+        local tickets_tmp_file
+        tickets_tmp_file=$(mktemp)
+        local tickets_find_exit=0
+        timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$tickets_dir" -maxdepth 1 -mindepth 1 -type d -print0 > "$tickets_tmp_file" 2>/dev/null || tickets_find_exit=$?
+        if [ "$tickets_find_exit" -eq 124 ]; then
+            echo "Error: Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $tickets_dir" >&2
+            rm -f "$tickets_tmp_file"
+            return 1
+        fi
+
         while IFS= read -r -d '' ticket_dir; do
             # Skip if not a directory (shouldn't happen with -type d, but be safe)
             [[ ! -d "$ticket_dir" ]] && continue
@@ -561,7 +591,8 @@ scan_repo() {
             total_completed=$((total_completed + ticket_completed))
             total_tested=$((total_tested + ticket_tested))
             total_verified=$((total_verified + ticket_verified))
-        done < <(find "$tickets_dir" -maxdepth 1 -mindepth 1 -type d -print0 2>/dev/null | sort -z)
+        done < <(sort -z < "$tickets_tmp_file")
+        rm -f "$tickets_tmp_file"
     else
         debug_log "  No tickets/ directory found in $sdd_root"
     fi
@@ -1017,8 +1048,14 @@ main() {
     local first_repo=true
 
     # Count total specs directories before discovery loop (for progress indication)
+    # Wrapped with timeout to prevent hangs on NFS mounts with stale handles
     local discovery_total
-    discovery_total=$(find "$specs_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    discovery_total=$(timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$specs_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    local discovery_find_exit=${PIPESTATUS[0]:-0}
+    if [ "$discovery_find_exit" -eq 124 ]; then
+        echo "Error: Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $specs_root" >&2
+        exit 1
+    fi
     discovery_total=$(echo "$discovery_total" | tr -d ' ')
     local discovery_current=0
 

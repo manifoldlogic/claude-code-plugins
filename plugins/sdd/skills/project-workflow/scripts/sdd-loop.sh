@@ -114,6 +114,14 @@ VERSION="2.0.0"
 # Poll interval in seconds between status board checks
 [[ -z "${SDD_LOOP_DEFAULT_POLL_INTERVAL:-}" ]] && readonly SDD_LOOP_DEFAULT_POLL_INTERVAL=5
 
+# Filesystem operation timeout in seconds for find commands.
+# 30 seconds is generous for local filesystem operations (typically <1 second)
+# but prevents indefinite hangs on NFS mounts with stale handles or network issues.
+# If a find command does not complete within this timeout, it is killed and a
+# clear error is logged. This protects the loop from becoming unresponsive when
+# _SPECS/ or repos/ are on network-mounted filesystems.
+[[ -z "${FILESYSTEM_TIMEOUT_SECONDS:-}" ]] && readonly FILESYSTEM_TIMEOUT_SECONDS=30
+
 # =============================================================================
 # Global State (configurable via env vars and CLI args)
 # =============================================================================
@@ -471,7 +479,30 @@ list_subdirectories_sorted() {
     # Use find -print0 | sort -z to produce a null-terminated, alphabetically
     # sorted list. This avoids word-splitting on directory names that contain
     # spaces, newlines, or other special characters.
-    find "$parent_dir" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z
+    #
+    # The find command is wrapped with timeout to prevent indefinite hangs
+    # when the filesystem is on an NFS mount with stale handles. Output is
+    # captured to a temp file so the timeout exit code is not lost to the pipe.
+    local tmp_file
+    tmp_file=$(mktemp) || return 1
+
+    local find_exit=0
+    timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$parent_dir" -mindepth 1 -maxdepth 1 -type d -print0 > "$tmp_file" 2>/dev/null || find_exit=$?
+
+    if [ "$find_exit" -eq 124 ]; then
+        log_error "Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $parent_dir"
+        rm -f "$tmp_file"
+        return 1
+    fi
+
+    if [ "$find_exit" -ne 0 ]; then
+        log_error "Filesystem operation failed (exit code $find_exit): $parent_dir"
+        rm -f "$tmp_file"
+        return 1
+    fi
+
+    sort -z < "$tmp_file"
+    rm -f "$tmp_file"
 }
 
 #######################################
@@ -1039,7 +1070,12 @@ check_phase_boundary() {
     # Step 1: Find ticket directory
     # ==========================================================================
     local ticket_dir
-    ticket_dir=$(find "$sdd_root/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -n1)
+    ticket_dir=$(timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$sdd_root/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -n1)
+    local find_exit=${PIPESTATUS[0]:-0}
+    if [ "$find_exit" -eq 124 ]; then
+        log_error "Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $sdd_root/tickets"
+        return 0  # Continue - treat timeout as "no phase boundary" (graceful)
+    fi
 
     if [[ -z "$ticket_dir" ]]; then
         log_verbose "check_phase_boundary: Ticket directory not found for $ticket_id"

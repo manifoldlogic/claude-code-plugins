@@ -4005,6 +4005,108 @@ FAKECLAUDE
 }
 
 # =============================================================================
+# Priority 15: Filesystem Operation Timeout Tests (SDDLOOP-6.4003)
+# =============================================================================
+
+#######################################
+# Test: list_subdirectories_sorted times out with slow find
+# Uses a mock find script that sleeps to simulate NFS stale handle
+#######################################
+test_list_subdirs_timeout_handling() {
+    echo "--- Test: list_subdirectories_sorted timeout handling ---"
+
+    setup_test_env
+
+    local test_dir="$TEST_TMP_DIR/lss_timeout/parent"
+    mkdir -p "$test_dir/subdir_a"
+
+    # Create a mock find that sleeps longer than our timeout
+    local mock_bin="$TEST_TMP_DIR/lss_timeout/mock_bin"
+    mkdir -p "$mock_bin"
+
+    # Use absolute path for sleep so mock find works with restricted PATH
+    local sleep_path
+    sleep_path="$(command -v sleep)"
+    cat > "$mock_bin/find" << MOCKFIND
+#!/bin/sh
+# Simulate a slow/hung filesystem by sleeping longer than timeout
+"$sleep_path" 10
+MOCKFIND
+    chmod +x "$mock_bin/find"
+
+    # Symlink essential tools from real PATH
+    ln -sf "$(command -v timeout)" "$mock_bin/timeout"
+    ln -sf "$(command -v sort)" "$mock_bin/sort"
+    ln -sf "$(command -v mktemp)" "$mock_bin/mktemp"
+    ln -sf "$(command -v rm)" "$mock_bin/rm"
+    ln -sf "$(command -v date)" "$mock_bin/date"
+    ln -sf "$(command -v echo)" "$mock_bin/echo"
+    ln -sf "$(command -v cat)" "$mock_bin/cat"
+    ln -sf "$(command -v wc)" "$mock_bin/wc"
+
+    # Run in a fresh bash process to avoid readonly FILESYSTEM_TIMEOUT_SECONDS
+    # from prior sourcing in the parent shell. Export the 2-second timeout
+    # so the sourced script picks it up via its guard clause.
+    # We create a helper script to avoid quoting complications with bash -c.
+    local helper_script="$TEST_TMP_DIR/lss_timeout/run_test.sh"
+    cat > "$helper_script" << HELPEREOF
+#!/usr/bin/env bash
+set -uo pipefail
+export FILESYSTEM_TIMEOUT_SECONDS=2
+source "$SDD_LOOP"
+PATH="$mock_bin" list_subdirectories_sorted "$test_dir"
+exit \$?
+HELPEREOF
+    chmod +x "$helper_script"
+
+    local output=""
+    local exit_code=0
+    output=$(bash "$helper_script" 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "list_subdirectories_sorted returns 1 on timeout"
+    assert_contains "$output" "timed out" "Timeout error message contains 'timed out'"
+    assert_contains "$output" "$test_dir" "Timeout error message contains the directory path"
+}
+
+#######################################
+# Test: list_subdirectories_sorted works normally with timeout wrapper
+# Verifies that adding the timeout wrapper doesn't break normal operation
+#######################################
+test_list_subdirs_normal_with_timeout() {
+    echo "--- Test: list_subdirectories_sorted normal operation with timeout ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_normal_timeout/parent"
+    mkdir -p "$test_dir/alpha"
+    mkdir -p "$test_dir/beta"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # Read null-terminated output
+    local entries=""
+    local count=0
+    while IFS= read -r -d '' entry; do
+        if [ -n "$entries" ]; then
+            entries="$entries|$(basename "$entry")"
+        else
+            entries="$(basename "$entry")"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 with timeout wrapper"
+    assert_equals 2 "$count" "list_subdirectories_sorted returns all entries with timeout wrapper"
+    assert_equals "alpha|beta" "$entries" "list_subdirectories_sorted returns sorted order with timeout wrapper"
+    rm -f "$output_file"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -4420,6 +4522,19 @@ main() {
     test_health_check_warns_missing_claude
     echo ""
     test_health_check_passes_all_available
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 15 TESTS (Filesystem Operation Timeouts - SDDLOOP-6.4003)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 15 Tests (Filesystem Operation Timeouts)"
+    echo "====================================="
+    echo ""
+
+    test_list_subdirs_timeout_handling
+    echo ""
+    test_list_subdirs_normal_with_timeout
     echo ""
 
     # Summary
