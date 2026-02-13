@@ -300,6 +300,75 @@ export OPENAI_API_KEY="<your-key>"
 crewchief-maproom search --repo <repo-name> --query "<search terms>"
 ```
 
+### Network Timeout During Vector Search
+
+**Symptom:** `crewchief-maproom vector-search` hangs or times out during embedding generation. The command does not return results or an error within the expected time frame.
+
+**Root Cause:** The OpenAI API is unreachable due to network connectivity issues. Vector search requires a live API call to generate query embeddings — unlike FTS search, it cannot operate offline.
+
+**Fix:**
+1. Check network connectivity to the OpenAI API:
+   ```bash
+   curl -sf https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" > /dev/null && echo "API reachable" || echo "API unreachable"
+   ```
+2. Retry the vector-search command (max 3 retries with 2-4-8 second exponential backoff):
+   ```bash
+   # Retry after a short wait
+   sleep 2
+   crewchief-maproom vector-search --repo <repo> --query "<terms>" --format agent
+   ```
+3. If retries fail, fall back to FTS search which requires no API connectivity:
+   ```bash
+   # FTS search works entirely offline against the local index
+   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   ```
+
+**Prevention:** Before running vector-search, verify network connectivity is stable. If working in an environment with intermittent network access, prefer FTS search (`search`) over `vector-search` for reliability. See the Choosing Search Type section in [SKILL.md](../SKILL.md) for guidance on when each search type is appropriate.
+
+### Rate Limit Exceeded
+
+**Symptom:** `crewchief-maproom vector-search` fails with a rate limit error, such as a 429 status code or a message indicating too many requests.
+
+**Root Cause:** The OpenAI API is throttling requests because the rate limit has been exceeded. This can happen when running many vector searches in quick succession or when other applications share the same API key.
+
+**Fix:**
+1. Wait before retrying. Use exponential backoff (max 3 retries with 2-4-8 second delays):
+   ```bash
+   # Wait for the rate limit window to reset, then retry
+   sleep 4
+   crewchief-maproom vector-search --repo <repo> --query "<terms>" --format agent
+   ```
+2. If immediate results are needed, fall back to FTS search which does not call the OpenAI API:
+   ```bash
+   # FTS search is not subject to OpenAI rate limits
+   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   ```
+3. If rate limiting persists, check whether other processes are consuming the same API quota.
+
+**Prevention:** Monitor API usage to avoid hitting rate limits. Space out vector-search calls when running multiple searches in sequence. For batch search workflows, prefer FTS search to avoid API dependency entirely.
+
+### OpenAI API Degraded Performance
+
+**Symptom:** `crewchief-maproom vector-search` completes but takes significantly longer than normal (e.g., 10+ seconds instead of 1-2 seconds for query embedding generation).
+
+**Root Cause:** The OpenAI API is experiencing degraded service. The API is reachable and responding, but response times are elevated beyond normal operating parameters.
+
+**Fix:**
+1. Switch to FTS search for faster results that do not depend on the API:
+   ```bash
+   # FTS search operates against the local index with no API latency
+   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   ```
+2. Retry vector-search later when API performance has recovered (max 3 retries with 2-4-8 second backoff):
+   ```bash
+   # Check if performance has improved
+   sleep 8
+   crewchief-maproom vector-search --repo <repo> --query "<terms>" --format agent
+   ```
+3. If degraded performance persists, use FTS search for the remainder of the session.
+
+**Prevention:** Monitor the [OpenAI Status Page](https://status.openai.com/) for service degradation notices. When latency is elevated, switch proactively to FTS search rather than waiting for timeouts. See the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for enabling debug mode to measure response times.
+
 ### Invalid Flag Value
 
 ```
