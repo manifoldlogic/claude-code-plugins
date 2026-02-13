@@ -417,35 +417,47 @@ find_git_root() {
 
     [[ -d "$repo_parent" ]] || return 1
 
+    # Build a null-terminated, alphabetically sorted list of subdirectories.
+    # Using find -print0 | sort -z avoids word-splitting on directory names
+    # that contain spaces, newlines, or other special characters.
+    local candidates_file
+    candidates_file=$(mktemp) || return 1
+
+    # Use -- to protect against directory names starting with a dash
+    find "$repo_parent" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z > "$candidates_file"
+
     # Prefer main checkout (.git is a directory) over worktree (.git is a file)
-    # Use ls -1 for alphabetical sort to ensure deterministic selection
     local candidate
     local git_dir_count=0
-    for candidate in $(ls -1 "$repo_parent"); do
-        candidate="$repo_parent/$candidate"
-        [[ -d "$candidate" ]] || continue
+    local found_root=""
+    while IFS= read -r -d '' candidate; do
         if [[ -d "$candidate/.git" ]]; then
             git_dir_count=$((git_dir_count + 1))
             if [[ $git_dir_count -gt 1 ]]; then
                 log_warn "Multiple git roots found in $repo_parent; using first alphabetically"
             fi
             if [[ $git_dir_count -eq 1 ]]; then
-                echo "${candidate%/}"
-                return 0
+                found_root="${candidate%/}"
             fi
         fi
-    done
+    done < "$candidates_file"
+
+    if [[ -n "$found_root" ]]; then
+        rm -f "$candidates_file"
+        echo "$found_root"
+        return 0
+    fi
 
     # Fallback: worktree (.git is a file)
-    for candidate in $(ls -1 "$repo_parent"); do
-        candidate="$repo_parent/$candidate"
-        [[ -d "$candidate" ]] || continue
+    while IFS= read -r -d '' candidate; do
         if [[ -f "$candidate/.git" ]]; then
+            rm -f "$candidates_file"
             echo "${candidate%/}"
             return 0
         fi
-    done
+    done < "$candidates_file"
 
+    rm -f "$candidates_file"
     return 1
 }
 

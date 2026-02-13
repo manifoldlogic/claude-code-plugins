@@ -2580,8 +2580,8 @@ test_find_git_root_no_git() {
 
 #######################################
 # Test: find_git_root with multiple git directories (uses first alphabetically)
-# Note: The production code returns immediately on the first match found via
-# alphabetical ls -1 scan, so only the first git root is discovered.
+# Note: The production code scans all candidates via find -print0 | sort -z
+# and selects the first match found alphabetically.
 #######################################
 test_find_git_root_multiple_git_dirs() {
     echo "--- Test: find_git_root with multiple git dirs ---"
@@ -2598,7 +2598,7 @@ test_find_git_root_multiple_git_dirs() {
     local exit_code=0
     result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
 
-    # Should select first alphabetically (aaa) since ls -1 sorts alphabetically
+    # Should select first alphabetically (aaa) since find -print0 | sort -z sorts alphabetically
     assert_equals "$test_repos/foo/aaa" "$result" "find_git_root returns first alphabetically (aaa)"
     assert_equals 0 "$exit_code" "find_git_root exits with 0 when multiple git dirs exist"
 }
@@ -2624,6 +2624,75 @@ test_find_git_root_worktree() {
 
     assert_equals "$test_repos/foo/worktree" "$result" "find_git_root returns worktree path"
     assert_equals 0 "$exit_code" "find_git_root exits with 0 for worktree"
+}
+
+#######################################
+# Test: find_git_root with directory names containing spaces
+# Verifies safe iteration does not word-split on spaces
+#######################################
+test_find_git_root_spaces_in_name() {
+    echo "--- Test: find_git_root with spaces in directory name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_spaces/repos"
+    mkdir -p "$test_repos/foo/my repo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/my repo" "$result" "find_git_root handles spaces in directory name"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for directory with spaces"
+}
+
+#######################################
+# Test: find_git_root with directory names containing newlines
+# Verifies null-terminated iteration handles embedded newlines
+#######################################
+test_find_git_root_newline_in_name() {
+    echo "--- Test: find_git_root with newline in directory name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_newline/repos"
+    # Create a directory whose name contains a literal newline
+    local dir_with_newline
+    dir_with_newline=$(printf '%s/foo/line1\nline2' "$test_repos")
+    mkdir -p "$dir_with_newline/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$dir_with_newline" "$result" "find_git_root handles newline in directory name"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for directory with newline"
+}
+
+#######################################
+# Test: find_git_root with directory names starting with a dash
+# Verifies find does not misinterpret directory names as options
+#######################################
+test_find_git_root_leading_dash() {
+    echo "--- Test: find_git_root with leading dash in directory name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_dash/repos"
+    mkdir -p "$test_repos/foo/-dash-repo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/-dash-repo" "$result" "find_git_root handles leading dash in directory name"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for directory with leading dash"
 }
 
 # =============================================================================
@@ -2902,6 +2971,12 @@ main() {
     test_find_git_root_multiple_git_dirs
     echo ""
     test_find_git_root_worktree
+    echo ""
+    test_find_git_root_spaces_in_name
+    echo ""
+    test_find_git_root_newline_in_name
+    echo ""
+    test_find_git_root_leading_dash
     echo ""
 
     # Summary
