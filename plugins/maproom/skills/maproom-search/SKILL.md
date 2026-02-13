@@ -109,25 +109,21 @@ For agent use, always pass `--format agent`. It conserves context window tokens 
 
 All filter values are **case-sensitive**. Combine multiple values with commas for OR logic. Filters are AND-combined across flags: `--kind func --lang py` returns only Python functions.
 
-**`--kind <KIND>`** — Filter by chunk type:
-
-| Kind | Description |
-|------|-------------|
-| `func` | Function definitions |
-| `class` | Class definitions |
-| `method` | Class methods |
-| `heading_2` / `heading_3` | Markdown headings |
-| `code_block` | Fenced code blocks |
-| `markdown_section` | Markdown sections (lists, tables) |
-| `json_key` | JSON key-value pairs |
-
-**`--lang <LANG>`** — Filter by file extension:
-
-| Lang | File Type | Lang | File Type |
-|------|-----------|------|-----------|
-| `py` | Python | `go` | Go |
-| `ts` | TypeScript | `md` | Markdown |
-| `rs` | Rust | `json` | JSON |
+| Flag | Value | Matches |
+|------|-------|---------|
+| `--kind` | `func` | Function definitions |
+| `--kind` | `class` | Class definitions |
+| `--kind` | `method` | Class methods |
+| `--kind` | `heading_2` / `heading_3` | Markdown headings |
+| `--kind` | `code_block` | Fenced code blocks |
+| `--kind` | `markdown_section` | Markdown sections (lists, tables) |
+| `--kind` | `json_key` | JSON key-value pairs |
+| `--lang` | `py` | Python (.py) |
+| `--lang` | `ts` | TypeScript (.ts) |
+| `--lang` | `rs` | Rust (.rs) |
+| `--lang` | `go` | Go (.go) |
+| `--lang` | `md` | Markdown (.md) |
+| `--lang` | `json` | JSON (.json) |
 
 ```bash
 $ crewchief-maproom search --repo <repo> --query "auth" --kind func --lang py --format agent
@@ -135,7 +131,6 @@ $ crewchief-maproom vector-search --repo <repo> --query "error handling" --thres
 ```
 
 **`--preview-length <N>`** — Adjust preview character limit (default: 120 for agent, 200 for json). See [Output Formats](#output-formats) for preview behavior details.
-
 **`--threshold <N>`** — Vector-search only. Cosine similarity filter (0.0-1.0); only results >= threshold are returned. Omit for no filtering.
 
 | Task | Recommended Flags |
