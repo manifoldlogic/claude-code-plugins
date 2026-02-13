@@ -25,7 +25,7 @@
 #   --repos-root DIR        Root directory for git repositories (default: /workspace/repos/)
 #   --max-iterations N      Maximum task iterations before stopping (default: 50)
 #   --max-errors N          Maximum consecutive errors before stopping (default: 3)
-#   --timeout SECONDS       Task execution timeout in seconds (default: 3600)
+#   --timeout SECONDS       Task execution timeout in seconds (default: 600)
 #   --poll-interval SECONDS Interval between status polls (default: 5)
 #   --metrics-file FILE     Write JSON metrics to FILE at end of execution
 #
@@ -35,7 +35,7 @@
 #   SDD_LOOP_WORKSPACE_ROOT   [DEPRECATED] Maps to SDD_LOOP_REPOS_ROOT with warning
 #   SDD_LOOP_MAX_ITERATIONS   Maximum iterations (default: 50)
 #   SDD_LOOP_MAX_ERRORS       Maximum consecutive errors (default: 3)
-#   SDD_LOOP_TIMEOUT          Task timeout in seconds (default: 3600)
+#   SDD_LOOP_TIMEOUT          Task timeout in seconds (default: 600)
 #   SDD_LOOP_POLL_INTERVAL    Poll interval in seconds (default: 5)
 #   SDD_LOOP_DRY_RUN          Set to "true" for dry-run mode
 #   SDD_LOOP_VERBOSE          Set to "true" for verbose output
@@ -109,7 +109,7 @@ VERSION="2.0.0"
 [[ -z "${SDD_LOOP_DEFAULT_MAX_ERRORS:-}" ]] && readonly SDD_LOOP_DEFAULT_MAX_ERRORS=3
 
 # Task execution timeout in seconds
-[[ -z "${SDD_LOOP_DEFAULT_TIMEOUT:-}" ]] && readonly SDD_LOOP_DEFAULT_TIMEOUT=3600
+[[ -z "${SDD_LOOP_DEFAULT_TIMEOUT:-}" ]] && readonly SDD_LOOP_DEFAULT_TIMEOUT=600
 
 # Poll interval in seconds between status board checks
 [[ -z "${SDD_LOOP_DEFAULT_POLL_INTERVAL:-}" ]] && readonly SDD_LOOP_DEFAULT_POLL_INTERVAL=5
@@ -1326,7 +1326,7 @@ OPTIONS
 
     --timeout SECONDS
         Task execution timeout in seconds.
-        Default: 3600 (1 hour). Must be a positive integer.
+        Default: 600 (10 minutes). Must be a positive integer.
         Timeout uses GNU coreutils timeout command.
         Exit code 124 indicates timeout occurred.
 
@@ -1376,7 +1376,7 @@ ENVIRONMENT VARIABLES
         Overridden by --max-errors.
 
     SDD_LOOP_TIMEOUT
-        Task execution timeout in seconds (default: 3600).
+        Task execution timeout in seconds (default: 600).
         Overridden by --timeout.
 
     SDD_LOOP_POLL_INTERVAL
@@ -1834,7 +1834,7 @@ main() {
     # Safety limits enforced:
     # - Max iteration limit (default: 50)
     # - Consecutive error tracking (default: 3)
-    # - Task execution timeout (default: 3600s)
+    # - Task execution timeout (default: 600s)
     # ==========================================================================
 
     local consecutive_errors=0

@@ -1050,6 +1050,63 @@ test_timeout_non_numeric() {
 }
 
 #######################################
+# Test: Default timeout is 600 seconds
+# Verifies the default timeout (no --timeout flag) is 600
+#######################################
+test_default_timeout_600() {
+    echo "--- Test: Default timeout is 600 seconds ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    # Run without --timeout flag; the safety limits log line shows the default
+    output=$(bash "$SDD_LOOP" --dry-run --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Default timeout run exits with code 0"
+    assert_contains "$output" "timeout=600s" "Safety limits log shows default timeout=600s"
+}
+
+#######################################
+# Test: Help text shows 600 as default timeout
+# Verifies --help output references the new default
+#######################################
+test_help_shows_default_timeout_600() {
+    echo "--- Test: Help text shows 600 as default timeout ---"
+
+    local output
+    output=$(bash "$SDD_LOOP_ORIGINAL" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help exits with code 0"
+    assert_contains "$output" "Default: 600" "Help text shows Default: 600"
+    assert_contains "$output" "10 minutes" "Help text mentions 10 minutes"
+}
+
+#######################################
+# Test: --timeout flag overrides default
+# Verifies custom timeout via --timeout still works
+#######################################
+test_timeout_override() {
+    echo "--- Test: --timeout flag overrides default ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --timeout 3600 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Custom timeout run exits with code 0"
+    assert_contains "$output" "timeout=3600s" "Safety limits log shows overridden timeout=3600s"
+}
+
+#######################################
 # Test 33: --poll-interval with valid zero value (allowed)
 #######################################
 test_poll_interval_zero() {
@@ -3159,6 +3216,12 @@ main() {
     test_timeout_zero
     echo ""
     test_timeout_non_numeric
+    echo ""
+    test_default_timeout_600
+    echo ""
+    test_help_shows_default_timeout_600
+    echo ""
+    test_timeout_override
     echo ""
     test_poll_interval_zero
     echo ""
