@@ -10,6 +10,9 @@
 #   4. validate-structure.sh passes for archived tickets (legacy structure)
 #   5. create-tasks validation tiers: plan.md and architecture.md are "required"
 #   6. README.md for legacy ticket contains links to all six documents
+#   7. Successful scaffold does NOT trigger cleanup (directory persists)
+#   8. Failed scaffold triggers cleanup (partial directory removed)
+#   9. Pre-existing directory is NOT cleaned up on failure
 #
 # Usage:
 #   bash test-backward-compatibility.sh
@@ -332,6 +335,106 @@ else
         log_fail "$test_name" "Missing links for:${missing_links}"
     fi
 fi
+
+# =============================================
+# Test 7: Successful scaffold does NOT trigger
+#         cleanup (directory persists)
+# =============================================
+
+printf -- "\n${CYAN}--- Cleanup Behavior Tests (SMRTING.5002) ---${NC}\n\n"
+
+# Use a fresh SDD_ROOT_DIR for cleanup tests
+CLEANUP_TEST_DIR="$TEMP_DIR/cleanup-tests"
+mkdir -p "$CLEANUP_TEST_DIR/tickets"
+export SDD_ROOT_DIR="$CLEANUP_TEST_DIR"
+
+test_name="Successful scaffold does NOT trigger cleanup (directory persists)"
+
+set +e
+CLEANUP_T7_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" "CLNSUCC" "cleanup-success" 2>&1)
+CLEANUP_T7_EXIT=$?
+set -e
+
+CLEANUP_T7_DIR="$CLEANUP_TEST_DIR/tickets/CLNSUCC_cleanup-success"
+
+if [ "$CLEANUP_T7_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "scaffold-ticket.sh exited $CLEANUP_T7_EXIT unexpectedly"
+elif [ -d "$CLEANUP_T7_DIR" ]; then
+    log_pass "$test_name"
+else
+    log_fail "$test_name" "Ticket directory was removed despite successful exit"
+fi
+
+# Clean up after test 7
+rm -rf "$CLEANUP_T7_DIR"
+
+# =============================================
+# Test 8: Failed scaffold triggers cleanup
+#         (partial directory removed)
+# =============================================
+
+test_name="Failed scaffold triggers cleanup (partial directory removed)"
+
+# Create a manifest that references a non-existent template file.
+# scaffold-ticket.sh will: create ticket dir -> attempt generate_doc -> fail on missing template -> cleanup.
+FAKE_MANIFEST="$TEMP_DIR/fake-manifest.json"
+cat > "$FAKE_MANIFEST" << 'MANIFEST_EOF'
+{
+  "documents": [
+    {"filename": "nonexistent-template-xyz.md", "action": "generate"}
+  ]
+}
+MANIFEST_EOF
+
+set +e
+CLEANUP_T8_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" --manifest "$FAKE_MANIFEST" "CLNFAIL" "cleanup-failure" 2>&1)
+CLEANUP_T8_EXIT=$?
+set -e
+
+CLEANUP_T8_DIR="$CLEANUP_TEST_DIR/tickets/CLNFAIL_cleanup-failure"
+
+if [ "$CLEANUP_T8_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "scaffold-ticket.sh should have failed but exited 0"
+    rm -rf "$CLEANUP_T8_DIR"
+elif [ -d "$CLEANUP_T8_DIR" ]; then
+    log_fail "$test_name" "Ticket directory still exists after failure (cleanup did not run)"
+    rm -rf "$CLEANUP_T8_DIR"
+else
+    log_pass "$test_name"
+fi
+
+# =============================================
+# Test 9: Pre-existing directory is NOT cleaned
+#         up on failure (atomic mkdir guard)
+# =============================================
+
+test_name="Pre-existing directory is NOT cleaned up on failure"
+
+# Manually create a directory that matches the ticket path pattern.
+# scaffold-ticket.sh should fail at the atomic mkdir (directory already exists),
+# and the cleanup trap must NOT remove the pre-existing directory.
+PREEXIST_DIR="$CLEANUP_TEST_DIR/tickets/CLNPRE_cleanup-preexist"
+mkdir -p "$PREEXIST_DIR"
+# Place a sentinel file so we can verify contents are intact
+printf "sentinel\n" > "$PREEXIST_DIR/sentinel.txt"
+
+set +e
+CLEANUP_T9_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" "CLNPRE" "cleanup-preexist" 2>&1)
+CLEANUP_T9_EXIT=$?
+set -e
+
+if [ "$CLEANUP_T9_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "scaffold-ticket.sh should have failed but exited 0"
+elif [ ! -d "$PREEXIST_DIR" ]; then
+    log_fail "$test_name" "Pre-existing directory was deleted by cleanup"
+elif [ ! -f "$PREEXIST_DIR/sentinel.txt" ]; then
+    log_fail "$test_name" "Pre-existing directory contents were modified"
+else
+    log_pass "$test_name"
+fi
+
+# Clean up pre-existing test directory
+rm -rf "$PREEXIST_DIR"
 
 # --- Summary ---
 

@@ -26,9 +26,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/../templates/ticket"
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 
+# Cleanup state: tracks whether this invocation created the ticket directory
+CREATED_TICKET_DIR=false
+CLEANUP_TICKET_PATH=""
+
 error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 info() { echo -e "${GREEN}[INFO]${NC} $1" >&2; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
+
+# Cleanup partial ticket directory on failure.
+# Only removes directory if it was created by THIS invocation (not pre-existing).
+# Checks exit code so successful exits (via EXIT trap) do not trigger cleanup.
+cleanup_on_error() {
+    local exit_code=$?
+    if [ "$CREATED_TICKET_DIR" = "true" ] && [ $exit_code -ne 0 ]; then
+        error "Cleanup: Removing partial ticket directory $CLEANUP_TICKET_PATH due to failure"
+        rm -rf "$CLEANUP_TICKET_PATH"
+    fi
+}
 
 usage() {
     cat << EOF
@@ -233,6 +248,10 @@ main() {
     validate_name "$name"
     check_ticket_id_unique "$ticket_id"
 
+    # Register cleanup trap (before any directory creation)
+    CLEANUP_TICKET_PATH="$ticket_path"
+    trap 'cleanup_on_error' ERR EXIT
+
     # Validate manifest if provided
     if [ -n "$manifest_path" ]; then
         if [ ! -f "$manifest_path" ]; then
@@ -256,6 +275,7 @@ main() {
         error "Ticket already exists: $ticket_path"
         exit 1
     fi
+    CREATED_TICKET_DIR=true
 
     # Create subdirectories (ticket_path now guaranteed to exist and be ours)
     mkdir -p "$ticket_path"/{planning,tasks,deliverables}
@@ -297,6 +317,9 @@ main() {
         created_json="${created_json},
     \"$ticket_path/planning/$doc\""
     done
+
+    # Disable cleanup trap - execution succeeded, directory should be kept
+    trap - ERR EXIT
 
     # Output JSON
     cat << EOF
