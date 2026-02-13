@@ -75,8 +75,10 @@ def main():
     # Determine status based on transcript_path
     status = 'ok' if transcript_path else 'empty_path'
 
-    # Generate timestamp with microsecond resolution
-    timestamp = datetime.datetime.now().strftime('%Y%m%dT%H%M%S%f')
+    # Capture current time once and derive both formats from the same instant
+    now = datetime.datetime.now()
+    compact_timestamp = now.strftime('%Y%m%dT%H%M%S%f')
+    iso_timestamp = now.isoformat()
 
     # Build log entry with common fields
     log_entry = {
@@ -84,7 +86,7 @@ def main():
         'transcript_path': transcript_path,
         'cwd': cwd,
         'hook_event_name': hook_event_name,
-        'timestamp': datetime.datetime.now().isoformat(),
+        'timestamp': iso_timestamp,
         'status': status,
     }
 
@@ -100,7 +102,7 @@ def main():
 
     # Construct filename
     event = hook_event_name if hook_event_name else 'unknown'
-    filename = f"{sanitized_session_id}_{event}_{timestamp}.json"
+    filename = f"{sanitized_session_id}_{event}_{compact_timestamp}.json"
     filepath = os.path.join(log_dir, filename)
 
     # Set umask for 0600 file permissions before writing
