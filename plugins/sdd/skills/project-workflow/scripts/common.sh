@@ -10,15 +10,15 @@
 # Color control: respect NO_COLOR env var (https://no-color.org)
 # Callers can also set USE_COLOR=false before sourcing
 if [ "${NO_COLOR:-}" != "" ] || [ "${USE_COLOR:-}" = "false" ]; then
-    RED=""
-    GREEN=""
-    YELLOW=""
-    NC=""
+    SDD_COLOR_RED=""
+    SDD_COLOR_GREEN=""
+    SDD_COLOR_YELLOW=""
+    SDD_COLOR_NC=""
 else
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    NC='\033[0m'
+    SDD_COLOR_RED='\033[0;31m'
+    SDD_COLOR_GREEN='\033[0;32m'
+    SDD_COLOR_YELLOW='\033[1;33m'
+    SDD_COLOR_NC='\033[0m'
 fi
 
 # Debug mode: enable verbose command tracing
@@ -58,10 +58,10 @@ check_jq_version() {
 }
 
 # Print error message to stderr in red (with timestamp)
-error() { printf "[$(date +"%T")] ${RED}[ERROR]${NC} %s\n" "$1" >&2; }
+error() { printf "[$(date +"%T")] ${SDD_COLOR_RED}[ERROR]${SDD_COLOR_NC} %s\n" "$1" >&2; }
 
 # Print warning message to stderr in yellow (with timestamp)
-warn() { printf "[$(date +"%T")] ${YELLOW}[WARN]${NC} %s\n" "$1" >&2; }
+warn() { printf "[$(date +"%T")] ${SDD_COLOR_YELLOW}[WARN]${SDD_COLOR_NC} %s\n" "$1" >&2; }
 
 # Print info message to stderr in green (with timestamp)
-info() { printf "[$(date +"%T")] ${GREEN}[INFO]${NC} %s\n" "$1" >&2; }
+info() { printf "[$(date +"%T")] ${SDD_COLOR_GREEN}[INFO]${SDD_COLOR_NC} %s\n" "$1" >&2; }
