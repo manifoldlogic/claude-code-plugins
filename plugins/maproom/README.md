@@ -8,6 +8,7 @@ The Maproom plugin provides semantic code search capabilities powered by the cre
 
 - **Full-Text Search (FTS)**: Fast, precise keyword-based search for exact matches, identifiers, and specific terms
 - **Vector Semantic Search**: Find code by meaning and concept, even when exact keywords differ
+- **Agent-Optimized Output**: Compact `--format agent` mode designed for LLM context efficiency
 - **Hybrid Search**: Combines FTS and vector search for optimal relevance ranking
 - **Context Expansion**: Automatically retrieve related code including imports, callers, callees, and tests
 - **Graph Relationships**: Navigate code relationships through call graphs and dependency analysis
