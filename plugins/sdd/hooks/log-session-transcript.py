@@ -19,17 +19,29 @@ import os
 import sys
 import datetime
 
+# Maximum length for sanitized session IDs to prevent filesystem issues
+MAX_SESSION_ID_LENGTH = 128
+
 
 def sanitize_session_id(session_id):
     """
-    Sanitize session_id for safe use in filenames.
+    Sanitize session ID for safe use in filenames.
+
+    Removes path traversal characters and truncates to MAX_SESSION_ID_LENGTH
+    to prevent filesystem issues from excessively long IDs.
 
     Defense-in-depth against path traversal:
     1. Strip dangerous characters: /, \\, .., null bytes
-    2. Truncate to 128 chars to prevent filesystem issues
+    2. Truncate to MAX_SESSION_ID_LENGTH chars to prevent filesystem issues
     3. Apply os.path.basename() as final layer
+
+    Args:
+        session_id: Raw session ID from hook input
+
+    Returns:
+        Sanitized session ID safe for filename use
     """
-    sanitized = session_id.replace('/', '').replace('\\', '').replace('..', '').replace('\0', '')[:128]
+    sanitized = session_id.replace('/', '').replace('\\', '').replace('..', '').replace('\0', '')[:MAX_SESSION_ID_LENGTH]
     return os.path.basename(sanitized)
 
 
