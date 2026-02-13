@@ -58,6 +58,60 @@ Filter by date range if analyzing a specific time period.
 Count total files to gauge analysis scope.
 ```
 
+### Log File Retention
+
+Session transcript logs accumulate over time. Recommended retention policies:
+
+**Active Retention (90 days):**
+Logs from the past 90 days are useful for skill discovery - recent patterns are more likely to become reusable skills. This window balances disk usage with analysis value.
+
+**Historical Retention (1 year):**
+Older logs may have long-term analytical value but are unlikely to reveal new skills. Archive them for future reference without cluttering active storage.
+
+**Deletion (after 90 days):**
+
+To permanently delete logs older than 90 days:
+
+```bash
+find ${SDD_ROOT_DIR}/logs/session-transcripts/ -type f -name "*.json" -mtime +90 -delete
+```
+
+**Warning:** This is irreversible. Verify with dry-run first:
+
+```bash
+find ${SDD_ROOT_DIR}/logs/session-transcripts/ -type f -name "*.json" -mtime +90 -print
+```
+
+**Archival (after 90 days):**
+
+To compress and archive logs older than 90 days:
+
+```bash
+# Create archive directory
+mkdir -p ${SDD_ROOT_DIR}/logs/archives
+
+# Find and archive old logs
+archive_date=$(date +%Y%m%d)
+find ${SDD_ROOT_DIR}/logs/session-transcripts/ -type f -name "*.json" -mtime +90 -print0 | \
+    tar -czf ${SDD_ROOT_DIR}/logs/archives/session-transcripts-${archive_date}.tar.gz --null -T -
+
+# After verifying archive, delete originals
+find ${SDD_ROOT_DIR}/logs/session-transcripts/ -type f -name "*.json" -mtime +90 -delete
+```
+
+Archived logs can be extracted later for historical analysis:
+
+```bash
+tar -xzf ${SDD_ROOT_DIR}/logs/archives/session-transcripts-YYYYMMDD.tar.gz -C /tmp/
+```
+
+**Custom Retention:**
+
+Adjust retention based on your needs:
+- High disk usage: 30-day active retention
+- Historical analysis: 180-day or longer retention
+- Compliance requirements: Never delete, archive only
+
 ### Step 2: Read and Triage Transcripts
 
 For each log file, extract the transcript reference and assess availability.
