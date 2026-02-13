@@ -614,6 +614,22 @@ Timing Output (with --verbose):
   [0.25s] Scanned repo-b (2 tickets, 8 tasks)
   [0.38s] Total: 5 tickets, 23 tasks in 0.38s
 
+Expected Directory Structure:
+  specs-root/
+      <repo-name>/
+          tickets/
+              <TICKET-ID>_<slug>/
+                  tasks/
+                      <TASK-ID>_<slug>.md
+  repos-root/
+      <repo-name>/
+          <git-dir>/
+              .git/
+
+  Warnings are logged (non-blocking) if:
+  - specs-root is empty (no subdirectories found)
+  - specs-root and repos-root point to the same directory
+
 Exit Codes:
   0 - Success (including empty specs root)
   1 - Specs directory does not exist
@@ -884,6 +900,29 @@ main() {
     debug_log "Resolved repos root: $repos_root"
     debug_log "SUMMARY_ONLY: $SUMMARY_ONLY"
     debug_log "VERBOSE: $VERBOSE"
+
+    # ==========================================================================
+    # Root Structure Validation (non-blocking warnings)
+    # Warns about common configuration errors after path canonicalization.
+    # These are advisory only - execution continues regardless.
+    # ==========================================================================
+
+    # Canonicalize paths for reliable comparison
+    local canonical_specs_root canonical_repos_root
+    canonical_specs_root="$(realpath "$specs_root" 2>/dev/null)" || canonical_specs_root="$specs_root"
+    canonical_repos_root="$(realpath "$repos_root" 2>/dev/null)" || canonical_repos_root="$repos_root"
+
+    # Check 1: Empty specs-root (no subdirectories)
+    if [ -z "$(ls -A "$canonical_specs_root" 2>/dev/null)" ]; then
+        echo "Warning: specs-root is empty (no subdirectories): $specs_root" >&2
+        echo "Warning: Expected structure: specs-root/<repo-name>/tickets/" >&2
+    fi
+
+    # Check 2: Identical specs-root and repos-root paths
+    if [ "$canonical_specs_root" = "$canonical_repos_root" ]; then
+        echo "Warning: specs-root and repos-root are identical: $canonical_specs_root" >&2
+        echo "Warning: This may cause unexpected behavior. Typically they should be separate directories." >&2
+    fi
 
     # Discover all SDD spec directories
     debug_log "Discovering SDD spec directories in: $specs_root"

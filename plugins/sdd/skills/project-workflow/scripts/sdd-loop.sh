@@ -1231,6 +1231,22 @@ DESCRIPTION
     - Specs root: Contains SDD data directories (_SPECS/<name>/)
     - Repos root: Contains git repositories (repos/<name>/<git-dir>/)
 
+    Expected directory structure:
+        specs-root/
+            <repo-name>/
+                tickets/
+                    <TICKET-ID>_<slug>/
+                        tasks/
+                            <TASK-ID>_<slug>.md
+        repos-root/
+            <repo-name>/
+                <git-dir>/
+                    .git/
+
+    Warnings are logged (non-blocking) if:
+    - specs-root is empty (no subdirectories found)
+    - specs-root and repos-root point to the same directory
+
     The controller continues processing tasks until:
     - No more agent-ready work remains (action: "none")
     - Maximum iterations reached (safety limit)
@@ -1718,6 +1734,29 @@ main() {
     if [[ ! -d "$SDD_LOOP_REPOS_ROOT" ]]; then
         log_error "Repos directory does not exist: $SDD_LOOP_REPOS_ROOT"
         exit 1
+    fi
+
+    # ==========================================================================
+    # Root Structure Validation (non-blocking warnings)
+    # Warns about common configuration errors after path canonicalization.
+    # These are advisory only - execution continues regardless.
+    # ==========================================================================
+
+    # Canonicalize paths for reliable comparison
+    local canonical_specs_root canonical_repos_root
+    canonical_specs_root="$(realpath "$SDD_LOOP_SPECS_ROOT" 2>/dev/null)" || canonical_specs_root="$SDD_LOOP_SPECS_ROOT"
+    canonical_repos_root="$(realpath "$SDD_LOOP_REPOS_ROOT" 2>/dev/null)" || canonical_repos_root="$SDD_LOOP_REPOS_ROOT"
+
+    # Check 1: Empty specs-root (no subdirectories)
+    if [ -z "$(ls -A "$canonical_specs_root" 2>/dev/null)" ]; then
+        log_warn "specs-root is empty (no subdirectories): $SDD_LOOP_SPECS_ROOT"
+        log_warn "Expected structure: specs-root/<repo-name>/tickets/"
+    fi
+
+    # Check 2: Identical specs-root and repos-root paths
+    if [ "$canonical_specs_root" = "$canonical_repos_root" ]; then
+        log_warn "specs-root and repos-root are identical: $canonical_specs_root"
+        log_warn "This may cause unexpected behavior. Typically they should be separate directories."
     fi
 
     # ==========================================================================

@@ -2816,6 +2816,118 @@ test_lockfile_cleanup_on_sigterm() {
 }
 
 # =============================================================================
+# PRIORITY 12 TESTS (Root Structure Validation - SDDLOOP-6.3003)
+# =============================================================================
+
+#######################################
+# Test: Warning when specs-root is empty
+# Verifies that a warning is logged when specs-root has no subdirectories
+# and that execution continues (non-blocking)
+#######################################
+test_empty_specs_root_warning() {
+    echo "--- Test: Empty specs-root warning ---"
+
+    setup_test_env
+    reset_counters
+
+    # Create empty specs root and repos root
+    mkdir -p "$TEST_TMP_DIR/empty_specs"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
+
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/empty_specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script continues despite empty specs-root"
+    assert_contains "$output" "specs-root is empty" "Warning about empty specs-root emitted"
+    assert_contains "$output" "Expected structure:" "Warning includes expected structure hint"
+}
+
+#######################################
+# Test: Warning when specs-root and repos-root are identical
+# Verifies that a warning is logged when both roots point to the same path
+# and that execution continues (non-blocking)
+#######################################
+test_identical_roots_warning() {
+    echo "--- Test: Identical specs/repos roots warning ---"
+
+    setup_test_env
+    reset_counters
+
+    # Create a directory that will serve as both specs and repos root
+    mkdir -p "$TEST_TMP_DIR/shared_root/test-repo/test-repo/.git"
+    mkdir -p "$TEST_TMP_DIR/shared_root/test-repo/tickets"
+
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/shared_root" --repos-root "$TEST_TMP_DIR/shared_root" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script continues despite identical roots"
+    assert_contains "$output" "specs-root and repos-root are identical" "Warning about identical roots emitted"
+    assert_contains "$output" "unexpected behavior" "Warning includes explanation"
+}
+
+#######################################
+# Test: No warning when specs-root has subdirectories
+# Verifies that no empty-specs warning is logged for non-empty specs root
+#######################################
+test_no_warning_for_populated_specs_root() {
+    echo "--- Test: No warning for populated specs-root ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script completes successfully"
+    assert_not_contains "$output" "specs-root is empty" "No empty specs-root warning for populated directory"
+}
+
+#######################################
+# Test: No warning when roots are different paths
+# Verifies that no identical-roots warning is logged for distinct paths
+#######################################
+test_no_warning_for_different_roots() {
+    echo "--- Test: No warning for different roots ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script completes successfully"
+    assert_not_contains "$output" "specs-root and repos-root are identical" "No identical-roots warning for different paths"
+}
+
+#######################################
+# Test: Help text documents expected directory structure
+#######################################
+test_help_shows_directory_structure() {
+    echo "--- Test: Help shows directory structure ---"
+
+    local output
+    output=$(bash "$SDD_LOOP_ORIGINAL" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help option exits with code 0"
+    assert_contains "$output" "Expected directory structure" "Help documents expected directory structure"
+    assert_contains "$output" "specs-root/" "Help shows specs-root structure"
+    assert_contains "$output" "repos-root/" "Help shows repos-root structure"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -3112,6 +3224,25 @@ main() {
     test_lockfile_cleanup_on_normal_exit
     echo ""
     test_lockfile_cleanup_on_sigterm
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 12 TESTS (Root Structure Validation - SDDLOOP-6.3003)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 12 Tests (Root Structure Validation)"
+    echo "====================================="
+    echo ""
+
+    test_empty_specs_root_warning
+    echo ""
+    test_identical_roots_warning
+    echo ""
+    test_no_warning_for_populated_specs_root
+    echo ""
+    test_no_warning_for_different_roots
+    echo ""
+    test_help_shows_directory_structure
     echo ""
 
     # Summary
