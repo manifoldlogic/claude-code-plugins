@@ -23,6 +23,24 @@ All paths referencing the SDD data directory use `{{SDD_ROOT}}` as a placeholder
 5. **Track Changes**: Document everything in review-updates.md
 6. **Verify Consistency**: Ensure all documents remain aligned
 
+## Document Discovery
+
+List files in planning directory: `ls planning/*.md`
+Read all discovered documents as context.
+Do NOT assume specific documents exist - the document set varies per ticket based on triage decisions. New document types (e.g., observability.md, accessibility.md, migration-plan.md) are automatically available through dynamic discovery.
+
+## N/A Document Handling
+
+For each planning document:
+1. Check if N/A-signed: read first 100 bytes, look for `**Status:** N/A`
+2. Check file size: if >500 bytes, treat as full document (N/A marker may be in quoted example)
+3. If N/A-signed (marker present + <500 bytes):
+   - Read status and assessment for awareness
+   - Skip deep content processing
+   - Do not extract detailed requirements from this document
+   - Skip update validation for this document
+   - Do not expect N/A-signed documents to be updated by the user
+
 ## Update Priority Order
 
 Address issues in this sequence:
@@ -50,12 +68,22 @@ Address issues in this sequence:
 2. **Create tracking document:**
    Create `planning/review-updates.md` to track all changes
 
-3. **Load current documents:**
-   - analysis.md
-   - architecture.md
-   - plan.md
-   - quality-strategy.md
-   - security-review.md
+3. **Discover and load planning documents:**
+   List files in planning directory: `ls planning/*.md`
+   Read all discovered documents as context.
+   Do NOT assume specific documents exist - the document set varies per ticket based on triage decisions.
+
+   **N/A Document Detection:**
+   For each planning document:
+   1. Check if N/A-signed: read first 100 bytes, look for `**Status:** N/A`
+   2. Check file size: if >500 bytes, treat as full document (N/A marker may be in quoted example)
+   3. If N/A-signed (marker present + <500 bytes):
+      - Read status and assessment for awareness
+      - Skip deep content processing
+      - Do not extract detailed requirements from this document
+      - Skip update validation for this document (do not expect updates to N/A-signed documents)
+
+   Also load:
    - README.md
    - All tickets in tickets/ (if they exist)
    - All deliverables in deliverables/ (if they exist)

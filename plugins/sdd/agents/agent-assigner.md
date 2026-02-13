@@ -51,16 +51,22 @@ Compare:
 
 ### Step 3: Read Ticket Planning Documents
 
-Read all documents that need updating:
+Discover and read all planning documents that may need updating:
 ```
 {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/
 ├── planning/
-│   ├── plan.md (PRIMARY - contains agent assignments)
-│   ├── architecture.md (may mention agent responsibilities)
-│   ├── quality-strategy.md (may mention testing agents)
-│   └── security-review.md (may mention security agents)
+│   ├── *.md (discover dynamically - document set varies per ticket)
+│   │   plan.md is PRIMARY (contains agent assignments)
+│   │   Other documents may mention agent responsibilities
+│   │   (e.g., architecture.md, quality-strategy.md, security-review.md, etc.)
 └── tickets/ (if they exist)
 ```
+
+List files in planning directory: `ls planning/*.md`
+Read all discovered documents as context.
+Do NOT assume specific documents exist - the document set varies per ticket based on triage decisions.
+
+**N/A Document Handling**: For each planning document, check if N/A-signed (first 100 bytes contain `**Status:** N/A` and file size <500 bytes). If N/A-signed, read status for awareness but skip deep processing - do not attempt to add agent assignments to N/A-signed documents.
 
 ### Step 4: Update Execution Plan
 

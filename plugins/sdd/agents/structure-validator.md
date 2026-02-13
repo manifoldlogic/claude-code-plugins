@@ -28,8 +28,12 @@ Required files:
 - `planning/analysis.md` - Problem analysis
 - `planning/architecture.md` - Solution design
 - `planning/plan.md` - Execution plan
-- `planning/quality-strategy.md` - Testing approach
-- `planning/security-review.md` - Security assessment
+
+Optional/variable files (discovered dynamically via `ls planning/*.md`):
+- Additional planning documents vary per ticket based on triage decisions
+- Common examples: `quality-strategy.md`, `security-review.md`, `observability.md`, `accessibility.md`, `migration-plan.md`
+- Documents may be N/A-signed (first 100 bytes contain `**Status:** N/A` and file size <500 bytes) - this is valid
+- Do NOT flag missing optional documents as errors
 
 ### Ticket Structure
 
@@ -80,8 +84,7 @@ Examples:
   - analysis.md: Present/Missing
   - architecture.md: Present/Missing
   - plan.md: Present/Missing
-  - quality-strategy.md: Present/Missing
-  - security-review.md: Present/Missing
+  - {additional documents discovered dynamically}: Present (or N/A-signed)
 - tasks/: Present/Missing ({count} tasks)
 
 ### Issues ({count})

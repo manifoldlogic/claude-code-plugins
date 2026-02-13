@@ -32,18 +32,22 @@ Your job is to **deeply consider** whether custom specialized agents would **mea
 
 ### Step 1: Read All Planning Documents
 
-Read the complete ticket:
+Discover and read all planning documents dynamically:
 ```
 {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/
 ├── README.md
 ├── planning/
-│   ├── analysis.md
-│   ├── architecture.md
-│   ├── plan.md
-│   ├── quality-strategy.md
-│   └── security-review.md
+│   └── *.md (discover dynamically - document set varies per ticket)
+│       Core: analysis.md, architecture.md, plan.md
+│       Variable: quality-strategy.md, security-review.md, observability.md, etc.
 └── tickets/ (if they exist)
 ```
+
+List files in planning directory: `ls planning/*.md`
+Read all discovered documents as context.
+Do NOT assume specific documents exist.
+
+**N/A Document Handling**: For each planning document, check if N/A-signed (first 100 bytes contain `**Status:** N/A` and file size <500 bytes). If N/A-signed, note the assessment for awareness but do not analyze it for agent specialization opportunities.
 
 ### Step 2: Identify Specialization Candidates
 
