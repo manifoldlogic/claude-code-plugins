@@ -1029,9 +1029,9 @@ test_timeout_zero() {
     local exit_code=0
     output=$(bash "$SDD_LOOP_ORIGINAL" --timeout 0 2>&1) || exit_code=$?
 
-    assert_exit_code 2 "$exit_code" "Zero --timeout exits with code 2"
-    assert_contains "$output" "positive integer greater than zero" "Shows zero error message"
-    assert_contains "$output" "got: 0" "Error message includes the invalid value"
+    assert_exit_code 1 "$exit_code" "Zero --timeout exits with code 1"
+    assert_contains "$output" "must be a positive integer" "Shows zero error message"
+    assert_contains "$output" "Error:" "Zero timeout error has Error prefix"
 }
 
 #######################################
@@ -1044,9 +1044,23 @@ test_timeout_non_numeric() {
     local exit_code=0
     output=$(bash "$SDD_LOOP_ORIGINAL" --timeout 10s 2>&1) || exit_code=$?
 
-    assert_exit_code 2 "$exit_code" "Non-numeric --timeout exits with code 2"
-    assert_contains "$output" "positive integer" "Shows non-numeric error message"
-    assert_contains "$output" "10s" "Error message includes the invalid value"
+    assert_exit_code 1 "$exit_code" "Non-numeric --timeout exits with code 1"
+    assert_contains "$output" "must be a positive integer" "Shows non-numeric error message"
+    assert_contains "$output" "Error:" "Non-numeric timeout error has Error prefix"
+}
+
+#######################################
+# Test: --timeout with negative value
+#######################################
+test_timeout_negative() {
+    echo "--- Test: --timeout with negative value ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --timeout -1 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Negative --timeout exits with code 1"
+    assert_contains "$output" "must be a positive integer" "Shows negative timeout error message"
 }
 
 #######################################
@@ -4675,6 +4689,8 @@ main() {
     test_timeout_zero
     echo ""
     test_timeout_non_numeric
+    echo ""
+    test_timeout_negative
     echo ""
     test_default_timeout_600
     echo ""

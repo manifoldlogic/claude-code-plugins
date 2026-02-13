@@ -2642,13 +2642,13 @@ main() {
                     log_error "Option --timeout requires a value"
                     exit 2
                 fi
-                if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    log_error "Option --timeout requires a positive integer (got: '$2')"
-                    exit 2
+                if ! [[ "$2" =~ ^-?[0-9]+$ ]]; then
+                    log_error "Error: --timeout must be a positive integer"
+                    exit 1
                 fi
-                if [[ "$2" -eq 0 ]]; then
-                    log_error "Option --timeout requires a positive integer greater than zero (got: $2)"
-                    exit 2
+                if [ "$2" -le 0 ]; then
+                    log_error "Error: --timeout must be a positive integer"
+                    exit 1
                 fi
                 SDD_LOOP_TIMEOUT="$2"
                 shift 2
