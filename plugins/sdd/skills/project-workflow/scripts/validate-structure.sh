@@ -288,7 +288,11 @@ validate_ticket() {
         fi
     fi
 
-    # Extract TICKET_ID from folder name (supports PROJ and UIT-9819 formats)
+    # WHY: Extract the TICKET_ID portion from a folder name formatted as "TICKETID_name".
+    # The capture group grabs everything before the first underscore, supporting both simple
+    # IDs (APIV2, AUTH) and Jira-style IDs with dash-separated segments (UIT-9819, PROJ-123).
+    # Valid folders: APIV2_api-redesign, UIT-9819_user-profile, DATA-SYNC-V2_migration
+    # Invalid folders: lowercase_name (no uppercase ID), _missing-id (starts with underscore)
     local ticket_id=""
     if [[ "$ticket_name" =~ ^([A-Z][A-Z0-9]*(-[A-Z0-9]+)*)_ ]]; then
         ticket_id="${BASH_REMATCH[1]}"
@@ -296,7 +300,11 @@ validate_ticket() {
         issues+=("Invalid ticket folder name format (expected TICKET_ID_name)")
     fi
 
-    # Validate folder name format (supports Jira-style IDs like UIT-9819)
+    # WHY: Full folder name must follow the convention "TICKETID_kebab-name" to ensure
+    # consistent, parseable directory names. The left side is the uppercase ticket ID
+    # (with optional Jira-style dash segments), the right side is the kebab-case name.
+    # Valid: APIV2_api-redesign, UIT-9819_user-profile, AUTH_login-fix
+    # Invalid: apiv2_api-redesign (lowercase ID), APIV2_Api-Redesign (uppercase name), APIV2 (no underscore+name)
     if [[ ! "$ticket_name" =~ ^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*_[a-z][a-z0-9-]*$ ]]; then
         warnings+=("Folder name may not follow naming convention")
     fi
@@ -345,7 +353,12 @@ validate_task() {
     local issues=()
     local warnings=()
 
-    # Check filename format (supports PROJ.1001 and UIT-9819.1001 formats)
+    # WHY: Task filenames must follow the convention "TICKETID.NNNN_description.md" where
+    # TICKETID matches the parent ticket's ID format (uppercase, optional Jira-style dashes),
+    # NNNN is a numeric task sequence number, and description is free-form text.
+    # This ensures tasks are easily linked back to their parent ticket and sorted by number.
+    # Valid: APIV2.1001_implement-cache.md, UIT-9819.1001_fix-profile-bug.md
+    # Invalid: apiv2.1001_task.md (lowercase), APIV2-1001_task.md (dash instead of dot before number)
     if [[ ! "$filename" =~ ^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*\.[0-9]+_.*\.md$ ]]; then
         issues+=("Invalid task filename format")
     fi

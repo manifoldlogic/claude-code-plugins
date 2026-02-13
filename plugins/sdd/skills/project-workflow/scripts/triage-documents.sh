@@ -50,6 +50,10 @@ check_jq_version || exit 1
 # Escapes shell metacharacters: backticks, $, (), {}, ;, <, >, |, &
 # Preserves the original text content for keyword matching.
 sanitize_description() {
+    # WHY: Security - escape shell metacharacters in user-provided descriptions to prevent
+    # injection when the description is later used in shell contexts (e.g., jq --arg).
+    # Escapes: backticks, $, (), {}, ;, <, >, |, & by prepending a backslash.
+    # Example: "deploy $(rm -rf /)" -> "deploy \$\(rm -rf /\)"
     # Single quotes are intentional to prevent shell expansion in sed pattern
     # shellcheck disable=SC2016
     printf '%s' "$1" | sed 's/[`$(){};<>|&]/\\&/g'
@@ -112,7 +116,12 @@ while [ $# -gt 0 ]; do
         shift
         continue
     fi
-    # Match +doc-name or -doc-name patterns
+    # WHY: Override arguments use +name to force-include and -name to force-exclude documents.
+    # Names must be lowercase kebab-case matching document registry IDs (e.g., "accessibility",
+    # "dependency-audit"). The pattern requires starting with a letter to prevent ambiguity
+    # with numeric arguments or flags.
+    # Valid: +accessibility, +dependency-audit, -runbook, -security-review
+    # Invalid: +Accessibility (uppercase), +123 (starts with digit), + (empty name)
     if printf '%s' "$arg" | grep -qE '^\+[a-z][a-z0-9-]*$'; then
         # Check for duplicate override
         case " $seen_overrides " in
@@ -126,6 +135,7 @@ while [ $# -gt 0 ]; do
         doc_name="${arg#+}"
         overrides_plus="$overrides_plus $doc_name"
         overrides_json=$(printf '%s' "$overrides_json" | jq --arg o "$arg" '. + [$o]')
+    # WHY: Same naming rules as +override above, but with "-" prefix to force-exclude a document.
     elif printf '%s' "$arg" | grep -qE '^-[a-z][a-z0-9-]*$'; then
         # Check for duplicate override
         case " $seen_overrides " in

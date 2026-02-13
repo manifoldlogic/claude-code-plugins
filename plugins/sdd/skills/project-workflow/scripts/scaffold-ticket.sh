@@ -75,8 +75,11 @@ EOF
 
 validate_ticket_id() {
     local ticket_id="$1"
-    # Allow formats like: APIV2, DKRHUB (4-8 uppercase) OR UIT-9819, PROJ-123 (Jira-style)
-    # Pattern: Start with uppercase letter, then alphanumeric, optionally followed by dash + alphanumeric segments
+    # WHY: Ticket IDs must start with an uppercase letter, followed by uppercase letters/digits,
+    # with optional dash-separated segments for Jira-style IDs. This enforces a consistent,
+    # filesystem-safe naming convention across all tickets.
+    # Valid: APIV2, DKRHUB, AUTH, UIT-9819, PROJ-123, DATA-SYNC-V2
+    # Invalid: auth (lowercase), 123 (starts with digit), UIT- (trailing dash), -PROJ (leading dash)
     if [[ ! "$ticket_id" =~ ^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*$ ]]; then
         error "Invalid TICKET_ID format."
         error "Valid formats: APIV2, DKRHUB (uppercase) or UIT-9819, PROJ-123 (Jira-style)"
@@ -91,6 +94,11 @@ validate_ticket_id() {
 
 validate_name() {
     local name="$1"
+    # WHY: Ticket names become directory names, so they must be kebab-case (lowercase, digits,
+    # hyphens). Must start with a letter, end with a letter or digit (no trailing hyphens),
+    # and the second pattern allows single-character names as a special case.
+    # Valid: api-redesign, docker-hub-publishing, v2, a
+    # Invalid: API-redesign (uppercase), -leading (starts with hyphen), trailing- (ends with hyphen), 123 (starts with digit)
     if [[ ! "$name" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]] && [[ ! "$name" =~ ^[a-z]$ ]]; then
         error "Invalid name format. Use lowercase letters, numbers, and hyphens."
         error "Example: api-redesign, docker-hub-publishing"
@@ -130,7 +138,11 @@ generate_doc() {
     local template_path="$TEMPLATE_DIR/$filename"
     local output_path="$output_dir/$filename"
 
-    # Validate filename against path traversal
+    # WHY: Security - prevent directory traversal attacks via template filenames.
+    # A malicious filename containing "../" could escape the output directory and
+    # overwrite arbitrary files. Only the literal sequence "../" is blocked.
+    # Valid: analysis.md, security-review.md, my.config.md
+    # Invalid: ../../../etc/passwd, ../../secret.md
     if printf '%s' "$filename" | grep -qE '\.\./' ; then
         error "Invalid template filename: $filename (path traversal attempt)"
         exit 1
@@ -170,7 +182,9 @@ generate_readme() {
         fi
         # Fallback: derive title from filename
         if [ -z "$title" ]; then
-            # Remove .md extension, replace hyphens with spaces, capitalize first letter
+            # WHY: Convert a kebab-case filename into a human-readable title for the README.
+            # Chain: strip .md extension -> replace hyphens with spaces -> capitalize each word.
+            # Example: "security-review.md" -> "security-review" -> "security review" -> "Security Review"
             title=$(printf '%s' "$filename" | sed 's/\.md$//' | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
         fi
         planning_links="${planning_links}- [${filename}](planning/${filename}) - ${title}
