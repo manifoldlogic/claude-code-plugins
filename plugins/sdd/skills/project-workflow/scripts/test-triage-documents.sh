@@ -542,6 +542,89 @@ else
     fi
 fi
 
+# =============================================
+# Test 17: Shell injection - command substitution
+# Description contains $(whoami) - should be sanitized, not executed
+# =============================================
+
+printf -- "\n${CYAN}--- Shell Injection Tests ---${NC}\n\n"
+
+run_triage 'test$(whoami)'
+
+test_name="Shell injection: command substitution \$(whoami) is treated as literal"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    # The description in the JSON output should NOT contain the current username
+    # from executing whoami - it should contain the escaped/literal form
+    actual_user=$(whoami)
+    desc_in_output=$(printf '%s' "$TRIAGE_OUTPUT" | jq -r '.ticket_description')
+    if printf '%s' "$desc_in_output" | grep -qF "$actual_user"; then
+        log_fail "$test_name" "command substitution was executed (found '$actual_user' in output)"
+    else
+        log_pass "$test_name"
+    fi
+fi
+
+# =============================================
+# Test 18: Shell injection - pipe
+# Description: "test | echo injected" - pipe should not execute
+# =============================================
+
+run_triage 'test | echo injected'
+
+test_name="Shell injection: pipe operator is sanitized"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    # Verify the script produced valid JSON (did not break from pipe)
+    if printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "output is not valid JSON (pipe may have broken execution)"
+    fi
+fi
+
+# =============================================
+# Test 19: Shell injection - semicolon
+# Description: "test; echo injected" - semicolon should not execute
+# =============================================
+
+run_triage 'test; echo injected'
+
+test_name="Shell injection: semicolon is sanitized"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    # Verify the script produced valid JSON (did not break from semicolon)
+    if printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "output is not valid JSON (semicolon may have broken execution)"
+    fi
+fi
+
+# =============================================
+# Test 20: Legitimate special characters preserved
+# Description: "API (v2) deployment & testing"
+# Should still match keywords: "api", "deploy"
+# =============================================
+
+run_triage 'API (v2) deployment & testing'
+
+test_name="Legitimate special chars: 'API (v2) deployment & testing' still matches keywords"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    api_action=$(get_action "api-contract")
+    obs_action=$(get_action "observability")
+    if [ "$api_action" = "generate" ] && [ "$obs_action" = "generate" ]; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "api-contract='$api_action', observability='$obs_action' (both should be 'generate')"
+    fi
+fi
+
 # --- Summary ---
 
 printf -- "\n${CYAN}============================================${NC}\n"

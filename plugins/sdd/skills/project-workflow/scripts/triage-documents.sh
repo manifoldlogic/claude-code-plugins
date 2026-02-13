@@ -38,6 +38,13 @@ REGISTRY_FILE="$SCRIPT_DIR/../templates/document-registry.json"
 error() { printf "${RED}[ERROR]${NC} %s\n" "$1" >&2; }
 warn() { printf "${YELLOW}[WARN]${NC} %s\n" "$1" >&2; }
 
+# Sanitize user-provided description to prevent shell injection.
+# Escapes shell metacharacters: backticks, $, (), {}, ;, <, >, |, &
+# Preserves the original text content for keyword matching.
+sanitize_description() {
+    printf '%s' "$1" | sed 's/[`$(){};<>|&]/\\&/g'
+}
+
 usage() {
     cat >&2 << 'EOF'
 Usage: triage-documents.sh "ticket description" [+override] [-override] ...
@@ -61,7 +68,7 @@ if [ $# -lt 1 ] || [ -z "$1" ]; then
     usage
 fi
 
-description="$1"
+description=$(sanitize_description "$1")
 shift
 
 # --- Parse Overrides ---
@@ -144,7 +151,7 @@ for doc_id in $all_doc_ids; do
             while IFS= read -r keyword; do
                 [ -z "$keyword" ] && continue
                 # Case-insensitive substring match
-                if printf '%s' "$description" | grep -qi "$keyword"; then
+                if printf '%s' "$description" | grep -qiF "$keyword"; then
                     if [ -z "$matched_keywords" ]; then
                         matched_keywords="'$keyword'"
                     else

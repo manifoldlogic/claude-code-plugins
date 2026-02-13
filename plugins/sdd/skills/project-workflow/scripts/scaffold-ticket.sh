@@ -102,6 +102,12 @@ generate_doc() {
     local template_path="$TEMPLATE_DIR/$filename"
     local output_path="$output_dir/$filename"
 
+    # Validate filename against path traversal
+    if printf '%s' "$filename" | grep -qE '\.\./' ; then
+        error "Invalid template filename: $filename (path traversal attempt)"
+        exit 1
+    fi
+
     if [ ! -f "$template_path" ]; then
         error "Template file missing: $template_path"
         exit 1
