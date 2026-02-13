@@ -94,11 +94,15 @@ check_ticket_id_unique() {
     local ticket_id="$1"
     # Pre-check: detect reuse of ticket ID with any name (non-atomic, defense-in-depth)
     # The atomic mkdir below is the authoritative duplicate guard
+    # ls|grep is used for glob matching across directory entries; safe for ticket ID naming convention
+    # shellcheck disable=SC2010
     if ls -d "$SDD_ROOT_DIR/tickets/${ticket_id}_"* 2>/dev/null | grep -q .; then
         error "TICKET_ID '$ticket_id' already exists in active tickets"
         exit 1
     fi
     # Check archived tickets (advisory warning only)
+    # ls|grep is used for glob matching across directory entries; safe for ticket ID naming convention
+    # shellcheck disable=SC2010
     if ls -d "$SDD_ROOT_DIR/archive/tickets/${ticket_id}_"* 2>/dev/null | grep -q .; then
         warn "TICKET_ID '$ticket_id' exists in archived tickets - proceeding with caution"
     fi

@@ -33,6 +33,9 @@
 #   1 - One or more tests failed
 #   2 - Setup validation failed (missing dependencies)
 
+# Color variables in printf format strings are intentional; they contain ANSI escapes, not format specifiers
+# shellcheck disable=SC2059
+
 set -euo pipefail
 
 # --- Configuration ---
@@ -64,12 +67,15 @@ TOTAL=0
 if [ -t 1 ]; then
     GREEN='\033[0;32m'
     RED='\033[0;31m'
+    # YELLOW is defined for consistency with the color variable set; may be used in future tests
+    # shellcheck disable=SC2034
     YELLOW='\033[1;33m'
     CYAN='\033[0;36m'
     NC='\033[0m'
 else
     GREEN=''
     RED=''
+    # shellcheck disable=SC2034
     YELLOW=''
     CYAN=''
     NC=''
@@ -569,6 +575,8 @@ fi
 
 printf -- "\n${CYAN}--- Shell Injection Tests ---${NC}\n\n"
 
+# Single quotes are intentional; testing that shell injection payloads are NOT expanded
+# shellcheck disable=SC2016
 run_triage 'test$(touch /tmp/smrting-test-marker-17)$(whoami)'
 
 test_name="Shell injection: command substitution \$(whoami) is treated as literal"
@@ -659,6 +667,8 @@ fi
 # Backticks should be sanitized, marker file must NOT be created
 # =============================================
 
+# Single quotes are intentional; testing that backtick injection is NOT expanded
+# shellcheck disable=SC2016
 run_triage 'test `touch /tmp/smrting-test-marker-21`'
 
 test_name="Shell injection: backtick execution is sanitized"
@@ -715,6 +725,8 @@ fi
 # $(touch /tmp/smrting-test-marker-23); `id` | cat
 # =============================================
 
+# Single quotes are intentional; testing that combined injection vectors are NOT expanded
+# shellcheck disable=SC2016
 run_triage 'deploy $(touch /tmp/smrting-test-marker-23); `id` | cat'
 
 test_name="Shell injection: combined vectors with marker file detection"

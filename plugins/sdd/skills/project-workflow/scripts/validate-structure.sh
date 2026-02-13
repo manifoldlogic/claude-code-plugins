@@ -114,7 +114,8 @@ is_core_tier() {
 # Validate ticket structure
 validate_ticket() {
     local ticket_path="$1"
-    local ticket_name=$(basename "$ticket_path")
+    local ticket_name
+    ticket_name=$(basename "$ticket_path")
     local issues=()
     local warnings=()
 
@@ -160,7 +161,8 @@ validate_ticket() {
         issues+=("Missing tasks/ directory")
     else
         # Count tasks
-        local task_count=$(find "$ticket_path/tasks" -name "*.md" -type f 2>/dev/null | wc -l)
+        local task_count
+        task_count=$(find "$ticket_path/tasks" -name "*.md" -type f 2>/dev/null | wc -l)
         if [[ $task_count -eq 0 ]]; then
             warnings+=("No tasks in tasks/ directory")
         fi
@@ -218,7 +220,8 @@ validate_ticket() {
 # Validate task file structure
 validate_task() {
     local file="$1"
-    local filename=$(basename "$file")
+    local filename
+    filename=$(basename "$file")
     local issues=()
     local warnings=()
 
@@ -228,6 +231,9 @@ validate_task() {
     fi
 
     # Check required sections
+    # content loaded for potential future use; cat also validates readability
+    # shellcheck disable=SC2155
+    # shellcheck disable=SC2034
     local content=$(cat "$file")
     for section in "${REQUIRED_TICKET_SECTIONS[@]}"; do
         if ! grep -q "## $section" "$file" && ! grep -q "# $section" "$file"; then
@@ -252,7 +258,8 @@ validate_task() {
     fi
 
     # Check for Acceptance Criteria checkboxes
-    local ac_count=$(grep -c "\- \[.\] " "$file" 2>/dev/null || echo "0")
+    local ac_count
+    ac_count=$(grep -c "\- \[.\] " "$file" 2>/dev/null || echo "0")
     if [[ $ac_count -lt 3 ]]; then
         warnings+=("Few acceptance criteria checkboxes (found $ac_count)")
     fi
@@ -325,7 +332,8 @@ main() {
 
     if [[ -n "$ticket_id" ]]; then
         # Validate specific ticket
-        local ticket_path=$(find "$SDD_ROOT_DIR/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -1)
+        local ticket_path
+        ticket_path=$(find "$SDD_ROOT_DIR/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -1)
         if [[ -n "$ticket_path" ]]; then
             echo "  \"ticket\":"
             validate_ticket "$ticket_path"

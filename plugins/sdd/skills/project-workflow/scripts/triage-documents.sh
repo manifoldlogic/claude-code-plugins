@@ -42,6 +42,8 @@ warn() { printf "${YELLOW}[WARN]${NC} %s\n" "$1" >&2; }
 # Escapes shell metacharacters: backticks, $, (), {}, ;, <, >, |, &
 # Preserves the original text content for keyword matching.
 sanitize_description() {
+    # Single quotes are intentional to prevent shell expansion in sed pattern
+    # shellcheck disable=SC2016
     printf '%s' "$1" | sed 's/[`$(){};<>|&]/\\&/g'
 }
 

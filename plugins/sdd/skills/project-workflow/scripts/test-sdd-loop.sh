@@ -11,6 +11,9 @@
 #   1 - One or more tests failed
 #
 
+# Source targets are set at runtime (SDD_LOOP variable); cannot be followed statically
+# shellcheck disable=SC1090
+
 set -euo pipefail
 
 # Get the directory where this test script lives
@@ -2674,6 +2677,8 @@ test_circuit_breaker_warning_iterations_tracking() {
     fi
 
     # Second threshold at 40
+    # ITERATION_COUNT is read by circuit_breaker_check (sourced function)
+    # shellcheck disable=SC2034
     ITERATION_COUNT=40
     circuit_breaker_check >/dev/null 2>&1
 
@@ -3345,6 +3350,8 @@ test_lockfile_cleanup_on_sigterm() {
     # Verify lock is held (sdd-loop should fail)
     local output_blocked
     local exit_blocked=0
+    # output_blocked captured for potential debugging; primary check uses exit_blocked
+    # shellcheck disable=SC2034
     output_blocked=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_blocked=$?
 
     # Verify lock was actually held
@@ -3968,6 +3975,8 @@ test_stale_cache_self_healing() {
 
     # Re-lookup: cached path is stale, re-lookup should find new path
     local result3 exit_code3=0
+    # result3 and exit_code3 captured for potential debugging; test validates cache behavior
+    # shellcheck disable=SC2034
     result3=$(find_git_root_cached "$test_repos/" "healer" 2>&1) || exit_code3=$?
 
     # The re-lookup via find_git_root should find the new path
@@ -4204,15 +4213,25 @@ test_cache_metrics_in_json_output() {
     CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_json_metrics"
     rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
     METRICS_FILE="$TEST_TMP_DIR/cm_json_output.json"
+    # These variables are consumed by write_metrics (sourced from sdd-loop.sh)
+    # shellcheck disable=SC2034
     ITERATION_COUNT=3
+    # shellcheck disable=SC2034
     TASKS_COMPLETED=2
+    # shellcheck disable=SC2034
     TASKS_FAILED=1
+    # shellcheck disable=SC2034
     START_TIME=$(date +%s)
     CIRCUIT_BREAKER_WARNINGS_LOGGED=0
     CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+    # These variables are consumed by write_metrics (sourced from sdd-loop.sh)
+    # shellcheck disable=SC2034
     SDD_LOOP_SPECS_ROOT="/tmp/specs/"
+    # shellcheck disable=SC2034
     SDD_LOOP_REPOS_ROOT="/tmp/repos/"
+    # shellcheck disable=SC2034
     SDD_LOOP_DRY_RUN="false"
+    # shellcheck disable=SC2034
     SDD_LOOP_VERBOSE="false"
 
     local test_repos="$TEST_TMP_DIR/cm_json/repos"
@@ -4644,9 +4663,9 @@ test_list_subdirs_normal_with_timeout() {
 # Runs shellcheck --severity=style to prevent regressions.
 # Skips with a warning if shellcheck is not installed.
 #
-# To run shellcheck locally:
-#   shellcheck --severity=style sdd-loop.sh
-# Install shellcheck:
+# To run locally:
+#   shell-check --severity=style sdd-loop.sh  (remove hyphen)
+# Install:
 #   Ubuntu/Debian: apt-get install shellcheck
 #   macOS: brew install shellcheck
 #######################################

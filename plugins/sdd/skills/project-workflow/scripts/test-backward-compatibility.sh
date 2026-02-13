@@ -22,6 +22,9 @@
 #   1 - One or more tests failed
 #   2 - Setup validation failed (missing dependencies)
 
+# Color variables in printf format strings are intentional; they contain ANSI escapes, not format specifiers
+# shellcheck disable=SC2059
+
 set -euo pipefail
 
 # --- Configuration ---
@@ -44,19 +47,22 @@ TOTAL=0
 # --- Temporary directory with cleanup ---
 
 TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # --- Colors (if terminal supports) ---
 
 if [ -t 1 ]; then
     GREEN='\033[0;32m'
     RED='\033[0;31m'
+    # YELLOW is defined for consistency with the color variable set; may be used in future tests
+    # shellcheck disable=SC2034
     YELLOW='\033[1;33m'
     CYAN='\033[0;36m'
     NC='\033[0m'
 else
     GREEN=''
     RED=''
+    # shellcheck disable=SC2034
     YELLOW=''
     CYAN=''
     NC=''
@@ -121,6 +127,8 @@ export SDD_ROOT_DIR="$TEMP_DIR/test1"
 mkdir -p "$SDD_ROOT_DIR/tickets"
 
 set +e
+# SCAFFOLD_OUTPUT captured for potential debugging; primary check uses SCAFFOLD_EXIT
+# shellcheck disable=SC2034
 SCAFFOLD_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" "BCTEST" "backward-compat" 2>&1)
 SCAFFOLD_EXIT=$?
 set -e
@@ -185,6 +193,8 @@ if [ "$SCAFFOLD_EXIT" -ne 0 ]; then
 else
     set +e
     VALIDATE_OUTPUT=$(bash "$VALIDATE_SCRIPT" "BCTEST" 2>&1)
+    # VALIDATE_EXIT captured for potential debugging; primary check uses grep on output
+    # shellcheck disable=SC2034
     VALIDATE_EXIT=$?
     set -e
 
@@ -207,6 +217,8 @@ ARCHIVE_FOUND=false
 
 if [ -d "$ARCHIVE_DIR" ]; then
     # Get the 3 most recent archived tickets (by modification time)
+    # ls -t used intentionally for modification-time sorting; ticket names are alphanumeric
+    # shellcheck disable=SC2012
     ARCHIVED_TICKETS=$(ls -t "$ARCHIVE_DIR" 2>/dev/null | head -3)
     if [ -n "$ARCHIVED_TICKETS" ]; then
         ARCHIVE_FOUND=true
@@ -234,6 +246,8 @@ if $ARCHIVE_FOUND; then
 
         set +e
         ARC_OUTPUT=$(bash "$VALIDATE_SCRIPT" "$ticket_id" 2>&1)
+        # ARC_EXIT captured for potential debugging; primary check uses grep on output
+        # shellcheck disable=SC2034
         ARC_EXIT=$?
         set -e
 
@@ -272,6 +286,8 @@ else
 
         set +e
         LEG_OUTPUT=$(bash "$VALIDATE_SCRIPT" "$ticket_id" 2>&1)
+        # LEG_EXIT captured for potential debugging; primary check uses grep on output
+        # shellcheck disable=SC2034
         LEG_EXIT=$?
         set -e
 
@@ -351,6 +367,8 @@ export SDD_ROOT_DIR="$CLEANUP_TEST_DIR"
 test_name="Successful scaffold does NOT trigger cleanup (directory persists)"
 
 set +e
+# CLEANUP_T7_OUTPUT captured for potential debugging; primary check uses exit code
+# shellcheck disable=SC2034
 CLEANUP_T7_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" "CLNSUCC" "cleanup-success" 2>&1)
 CLEANUP_T7_EXIT=$?
 set -e
@@ -387,6 +405,8 @@ cat > "$FAKE_MANIFEST" << 'MANIFEST_EOF'
 MANIFEST_EOF
 
 set +e
+# CLEANUP_T8_OUTPUT captured for potential debugging; primary check uses exit code
+# shellcheck disable=SC2034
 CLEANUP_T8_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" --manifest "$FAKE_MANIFEST" "CLNFAIL" "cleanup-failure" 2>&1)
 CLEANUP_T8_EXIT=$?
 set -e
@@ -419,6 +439,8 @@ mkdir -p "$PREEXIST_DIR"
 printf "sentinel\n" > "$PREEXIST_DIR/sentinel.txt"
 
 set +e
+# CLEANUP_T9_OUTPUT captured for potential debugging; primary check uses exit code
+# shellcheck disable=SC2034
 CLEANUP_T9_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" "CLNPRE" "cleanup-preexist" 2>&1)
 CLEANUP_T9_EXIT=$?
 set -e
