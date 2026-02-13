@@ -250,6 +250,43 @@ These patterns combine searches across code and docs repos to answer questions t
 
 **General rule:** Search specs for *why*, then search code for *how*. Use the terms you find in one repo to refine your search in the other.
 
+## Troubleshooting Searches
+
+### Zero Results -- Progressive Filter Relaxation
+
+When a filtered search returns zero results, progressively relax filters to find relevant chunks. Remove one filter at a time to identify which constraint is too narrow.
+
+**Scenario:** Searching for authentication functions in Python
+
+```bash
+# Initial attempt -- too narrow (both --kind and --lang filters)
+crewchief-maproom search --repo crewchief --query "authentication" --kind func --lang py --format agent
+# Returns 0 results
+```
+
+**Step 1: Remove language filter** (keep `--kind`, search all languages for functions):
+
+```bash
+crewchief-maproom search --repo crewchief --query "authentication" --kind func --format agent
+# May find authentication functions in TypeScript, Rust, or other languages
+```
+
+**Step 2: Remove kind filter** (keep `--lang`, search all Python chunks):
+
+```bash
+crewchief-maproom search --repo crewchief --query "authentication" --lang py --format agent
+# May find authentication in class definitions, imports, or method bodies
+```
+
+**Step 3: Remove all filters** (broaden search completely):
+
+```bash
+crewchief-maproom search --repo crewchief --query "authentication" --format agent
+# Returns all chunks mentioning authentication across all files and languages
+```
+
+**Why this order:** Removing `--lang` first is usually more productive because the concept you are searching for may be implemented in a different language than expected. Removing `--kind` second catches cases where the logic lives in a class, method, or configuration rather than a standalone function. Removing all filters last gives the broadest view when earlier steps still return nothing.
+
 ## Configuration Setup Guide
 
 This section explains how to configure maproom for multi-repo search in a new workspace.
