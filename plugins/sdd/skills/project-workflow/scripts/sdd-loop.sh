@@ -205,6 +205,10 @@ CLAUDE_PID=""
 # Flag to prevent re-entry into cleanup function
 CLEANUP_IN_PROGRESS=false
 
+# Git root discovery cache file (temp file, one entry per line: repo_name=path)
+# Initialized eagerly with a PID-based path so subshells can access it.
+GIT_ROOT_CACHE_FILE="/tmp/sdd-loop-git-cache.$$"
+
 # =============================================================================
 # Logging Functions
 # =============================================================================
@@ -526,6 +530,87 @@ find_git_root() {
 }
 
 # =============================================================================
+# Git Root Cache Management
+# =============================================================================
+
+#######################################
+# Initialize the git root cache file
+# Creates a temporary file for caching find_git_root() results.
+# Idempotent - safe to call multiple times.
+#
+# Globals Set:
+#   GIT_ROOT_CACHE_FILE - Path to the cache temp file
+#
+# Returns:
+#   0 - Always succeeds
+#######################################
+init_git_root_cache() {
+    if [ ! -f "$GIT_ROOT_CACHE_FILE" ]; then
+        touch "$GIT_ROOT_CACHE_FILE"
+        log_debug "init_git_root_cache: Created cache file: $GIT_ROOT_CACHE_FILE"
+    fi
+}
+
+#######################################
+# Clean up the git root cache file
+# Removes the temporary cache file if it exists.
+# Idempotent - safe to call multiple times.
+#
+# Globals:
+#   GIT_ROOT_CACHE_FILE - Path to the cache temp file
+#######################################
+cleanup_git_root_cache() {
+    if [ -n "$GIT_ROOT_CACHE_FILE" ] && [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        rm -f "$GIT_ROOT_CACHE_FILE"
+        log_debug "cleanup_git_root_cache: Removed cache file: $GIT_ROOT_CACHE_FILE"
+    fi
+    GIT_ROOT_CACHE_FILE=""
+}
+
+#######################################
+# Find git root with caching (wrapper around find_git_root)
+# Caches successful find_git_root() results in a temp file to avoid
+# redundant filesystem operations when multiple tasks share a repo.
+#
+# Arguments:
+#   $1 - repos_root: Root directory for repositories
+#   $2 - repo_name: Name of the repository
+#
+# Outputs:
+#   Path to the git root directory on stdout (cached if available)
+#
+# Returns:
+#   0 - Found a git root (from cache or fresh lookup)
+#   1 - No git root found
+#######################################
+find_git_root_cached() {
+    local repos_root="$1"
+    local repo_name="$2"
+
+    init_git_root_cache
+
+    # Check cache first
+    local cached
+    cached=$(grep "^${repo_name}=" "$GIT_ROOT_CACHE_FILE" 2>/dev/null | head -1 | cut -d= -f2-)
+    if [ -n "$cached" ]; then
+        log_debug "find_git_root_cached: Cache hit for repo: $repo_name"
+        echo "$cached"
+        return 0
+    fi
+
+    # Cache miss - call original function
+    local result
+    if result=$(find_git_root "$repos_root" "$repo_name"); then
+        echo "${repo_name}=${result}" >> "$GIT_ROOT_CACHE_FILE"
+        log_debug "find_git_root_cached: Cache miss for repo: $repo_name, cached result: $result"
+        echo "$result"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# =============================================================================
 # Core Functions (Skeletons for Phase 1)
 # =============================================================================
 
@@ -732,7 +817,7 @@ execute_task() {
     local repo_name
     repo_name=$(basename "$sdd_root")
     local repo_path
-    repo_path=$(find_git_root "$SDD_LOOP_REPOS_ROOT" "$repo_name") || {
+    repo_path=$(find_git_root_cached "$SDD_LOOP_REPOS_ROOT" "$repo_name") || {
         log_error "Cannot find git root for repo: $repo_name (under $SDD_LOOP_REPOS_ROOT$repo_name/)"
         return 1
     }
@@ -1201,6 +1286,9 @@ cleanup() {
     # Clean up any running Claude process
     cleanup_claude_process
 
+    # Clean up git root cache
+    cleanup_git_root_cache
+
     # Write metrics file if configured
     write_metrics "$EXIT_CODE"
 
@@ -1216,6 +1304,7 @@ handle_sigint() {
     EXIT_CODE=130
     log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
     cleanup_claude_process
+    cleanup_git_root_cache
     write_metrics "$EXIT_CODE"
     exit 130
 }
@@ -1229,6 +1318,7 @@ handle_sigterm() {
     EXIT_CODE=143
     log_info "Received SIGTERM, shutting down gracefully..."
     cleanup_claude_process
+    cleanup_git_root_cache
     write_metrics "$EXIT_CODE"
     exit 143
 }

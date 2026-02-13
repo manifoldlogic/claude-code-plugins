@@ -3463,6 +3463,207 @@ test_help_shows_directory_structure() {
 }
 
 # =============================================================================
+# PRIORITY 13 TESTS (find_git_root_cached Unit Tests - SDDLOOP-6.3009)
+# =============================================================================
+
+#######################################
+# Test: find_git_root_cached cache miss populates cache
+#######################################
+test_find_git_root_cached_miss() {
+    echo "--- Test: find_git_root_cached cache miss ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_miss_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_miss/repos"
+    mkdir -p "$test_repos/foo/foo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root_cached "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/foo" "$result" "find_git_root_cached returns git root on miss"
+    assert_equals 0 "$exit_code" "find_git_root_cached exits with 0 on miss"
+
+    # Verify cache file was created and contains the entry
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        assert_contains "$cache_content" "foo=$test_repos/foo/foo" \
+            "Cache file contains entry after miss"
+    else
+        log_result "Cache file created after miss" "fail" "Cache file not found: $GIT_ROOT_CACHE_FILE"
+    fi
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: find_git_root_cached cache hit returns cached result
+#######################################
+test_find_git_root_cached_hit() {
+    echo "--- Test: find_git_root_cached cache hit ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_hit_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_hit/repos"
+    mkdir -p "$test_repos/bar/bar/.git"
+
+    # First call - cache miss, populates cache
+    local result1
+    result1=$(find_git_root_cached "$test_repos/" "bar") || true
+
+    assert_equals "$test_repos/bar/bar" "$result1" "First call (miss) returns correct path"
+
+    # Now remove the .git directory to prove second call uses cache, not filesystem
+    rm -rf "$test_repos/bar/bar/.git"
+
+    # Second call - should hit cache (return cached result despite .git being gone)
+    local result2
+    local exit_code=0
+    result2=$(find_git_root_cached "$test_repos/" "bar") || exit_code=$?
+
+    assert_equals "$test_repos/bar/bar" "$result2" "Second call (hit) returns cached path"
+    assert_equals 0 "$exit_code" "Cache hit exits with 0"
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: find_git_root_cached failed lookup is not cached
+#######################################
+test_find_git_root_cached_failure_not_cached() {
+    echo "--- Test: find_git_root_cached failure not cached ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_fail_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_fail/repos"
+    mkdir -p "$test_repos/baz/subdir"
+    # No .git anywhere
+
+    # Call that should fail
+    local exit_code=0
+    find_git_root_cached "$test_repos/" "baz" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "find_git_root_cached exits with 1 when no git root"
+
+    # Verify cache file does not contain an entry for baz
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local cache_content
+        cache_content=$(cat "$GIT_ROOT_CACHE_FILE")
+        if [ -z "$cache_content" ]; then
+            log_result "Failed lookup not cached" "pass"
+        else
+            assert_not_contains "$cache_content" "baz=" \
+                "Failed lookup not cached"
+        fi
+    else
+        # Cache file doesn't exist - failed lookup didn't create it
+        log_result "Failed lookup not cached" "pass"
+    fi
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: find_git_root_cached works across multiple repos
+#######################################
+test_find_git_root_cached_multiple_repos() {
+    echo "--- Test: find_git_root_cached multiple repos ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_multi_cache"
+    rm -f "$GIT_ROOT_CACHE_FILE"
+
+    local test_repos="$TEST_TMP_DIR/fgrc_multi/repos"
+    mkdir -p "$test_repos/alpha/alpha/.git"
+    mkdir -p "$test_repos/beta/beta/.git"
+
+    # Cache both repos
+    local result_alpha result_beta
+    result_alpha=$(find_git_root_cached "$test_repos/" "alpha") || true
+    result_beta=$(find_git_root_cached "$test_repos/" "beta") || true
+
+    assert_equals "$test_repos/alpha/alpha" "$result_alpha" "First repo cached correctly"
+    assert_equals "$test_repos/beta/beta" "$result_beta" "Second repo cached correctly"
+
+    # Verify cache has two entries
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local line_count
+        line_count=$(wc -l < "$GIT_ROOT_CACHE_FILE" | tr -d ' ')
+        assert_equals "2" "$line_count" "Cache contains exactly 2 entries"
+    else
+        log_result "Cache contains exactly 2 entries" "fail" "Cache file not found"
+    fi
+
+    # Clean up cache
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: cleanup_git_root_cache removes the cache file
+#######################################
+test_cleanup_git_root_cache() {
+    echo "--- Test: cleanup_git_root_cache removes file ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Set cache to a test-specific file path
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/fgrc_cleanup_cache"
+
+    # Initialize cache (creates the file)
+    init_git_root_cache
+
+    local cache_path="$GIT_ROOT_CACHE_FILE"
+
+    # Verify it exists
+    if [ -f "$cache_path" ]; then
+        log_result "Cache file exists before cleanup" "pass"
+    else
+        log_result "Cache file exists before cleanup" "fail" "File not created: $cache_path"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+
+    # Verify it's gone
+    if [ ! -f "$cache_path" ]; then
+        log_result "Cache file removed after cleanup" "pass"
+    else
+        log_result "Cache file removed after cleanup" "fail" "File still exists: $cache_path"
+    fi
+
+    # Verify global reset
+    assert_equals "" "$GIT_ROOT_CACHE_FILE" "GIT_ROOT_CACHE_FILE reset to empty after cleanup"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -3834,6 +4035,25 @@ main() {
     test_no_warning_for_different_roots
     echo ""
     test_help_shows_directory_structure
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 13 TESTS (find_git_root_cached - SDDLOOP-6.3009)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 13 Tests (find_git_root_cached)"
+    echo "====================================="
+    echo ""
+
+    test_find_git_root_cached_miss
+    echo ""
+    test_find_git_root_cached_hit
+    echo ""
+    test_find_git_root_cached_failure_not_cached
+    echo ""
+    test_find_git_root_cached_multiple_repos
+    echo ""
+    test_cleanup_git_root_cache
     echo ""
 
     # Summary
