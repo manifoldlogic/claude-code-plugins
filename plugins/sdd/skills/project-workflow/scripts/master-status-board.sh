@@ -175,6 +175,12 @@ check_dependencies() {
         missing=1
     fi
 
+    # Check timeout (required for filesystem operation timeouts)
+    if ! command -v timeout >/dev/null 2>&1; then
+        echo "Error: Required command 'timeout' not found. Install GNU coreutils." >&2
+        missing=1
+    fi
+
     if [ "$missing" -eq 1 ]; then
         echo "Error: Exiting due to missing required dependencies" >&2
         return 1

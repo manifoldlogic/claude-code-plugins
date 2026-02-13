@@ -1035,6 +1035,12 @@ check_dependencies() {
         missing=1
     fi
 
+    # Check timeout (required for filesystem operation timeouts)
+    if ! command -v timeout >/dev/null 2>&1; then
+        log_error "Required command 'timeout' not found. Install GNU coreutils."
+        missing=1
+    fi
+
     # Check claude (warn only - may be dry-run mode)
     if ! command -v claude >/dev/null 2>&1; then
         log_warn "Claude Code CLI not found in PATH"

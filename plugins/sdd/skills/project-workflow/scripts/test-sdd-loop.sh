@@ -4303,14 +4303,17 @@ test_health_check_fails_missing_jq() {
 
     source "$SDD_LOOP"
 
-    # Override PATH to exclude jq but keep realpath and basic tools
+    # Override PATH to exclude jq but keep realpath, timeout, and basic tools
     # Create a minimal bin directory with only the tools we want available
     local fake_bin="$TEST_TMP_DIR/health_jq_bin"
     mkdir -p "$fake_bin"
 
-    # Link realpath so it's available
+    # Link realpath and timeout so they're available
     if command -v realpath >/dev/null 2>&1; then
         ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
     fi
     # Link basic tools needed by the function
     for tool in date echo; do
@@ -4354,12 +4357,15 @@ test_health_check_fails_missing_realpath() {
 
     source "$SDD_LOOP"
 
-    # Create a minimal bin directory with jq but not realpath
+    # Create a minimal bin directory with jq and timeout but not realpath
     local fake_bin="$TEST_TMP_DIR/health_rp_bin"
     mkdir -p "$fake_bin"
 
     if command -v jq >/dev/null 2>&1; then
         ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
     fi
     for tool in date echo; do
         if command -v "$tool" >/dev/null 2>&1; then
@@ -4381,6 +4387,51 @@ test_health_check_fails_missing_realpath() {
 }
 
 #######################################
+# Test: check_dependencies fails when timeout unavailable
+#######################################
+test_health_check_fails_missing_timeout() {
+    echo "--- Test: Health check fails when timeout unavailable ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Create a minimal bin directory with jq and realpath but not timeout
+    local fake_bin="$TEST_TMP_DIR/health_timeout_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when timeout missing"
+
+    if [[ "$output" == *"Required command 'timeout' not found"* ]]; then
+        log_result "Error message mentions timeout" "pass"
+    else
+        log_result "Error message mentions timeout" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install GNU coreutils"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+}
+
+#######################################
 # Test: check_dependencies warns when claude unavailable
 #######################################
 test_health_check_warns_missing_claude() {
@@ -4390,7 +4441,7 @@ test_health_check_warns_missing_claude() {
 
     source "$SDD_LOOP"
 
-    # Create a bin directory with jq and realpath but not claude
+    # Create a bin directory with jq, realpath, and timeout but not claude
     local fake_bin="$TEST_TMP_DIR/health_claude_bin"
     mkdir -p "$fake_bin"
 
@@ -4399,6 +4450,9 @@ test_health_check_warns_missing_claude() {
     fi
     if command -v realpath >/dev/null 2>&1; then
         ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
     fi
     for tool in date echo; do
         if command -v "$tool" >/dev/null 2>&1; then
@@ -4444,6 +4498,9 @@ test_health_check_passes_all_available() {
     fi
     if command -v realpath >/dev/null 2>&1; then
         ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
     fi
     # Create a fake claude binary
     cat > "$fake_bin/claude" << 'FAKECLAUDE'
@@ -5064,6 +5121,8 @@ main() {
     test_health_check_fails_missing_jq
     echo ""
     test_health_check_fails_missing_realpath
+    echo ""
+    test_health_check_fails_missing_timeout
     echo ""
     test_health_check_warns_missing_claude
     echo ""
