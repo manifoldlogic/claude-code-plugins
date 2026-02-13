@@ -157,6 +157,19 @@ Use the Grep tool searching for "Decision" or "Rationale" in `planning/architect
 
 The fallback approach is slower and less precise than maproom search but works without any indexing setup.
 
+#### Multiple Spec Repositories
+
+If `crewchief-maproom status` shows multiple repos with overlapping paths:
+
+1. Use the repo with the **longest matching path prefix** for your `SDD_ROOT_DIR`
+2. Example:
+   - Repo A indexed at: `/workspace/_SPECS/`
+   - Repo B indexed at: `/workspace/_SPECS/claude-code-plugins/`
+   - Your SDD_ROOT_DIR: `/workspace/_SPECS/claude-code-plugins`
+   - **Use Repo B** (most specific match)
+
+See [multi-repo-guide.md](../maproom-search/references/multi-repo-guide.md) for advanced path resolution patterns.
+
 ### Troubleshooting Common Issues
 
 #### "command not found: crewchief-maproom"
@@ -206,6 +219,8 @@ crewchief-maproom search --repo claude-code-plugins-specs --query "APIV2"
 ```bash
 crewchief-maproom search --repo claude-code-plugins-specs --query "APIV2 architecture decision rationale"
 ```
+
+> **Note:** Example repo names like `claude-code-plugins-specs` are placeholders. Replace with your actual repo name from `crewchief-maproom status`. The repo name must match your `SDD_ROOT_DIR` path.
 
 ### Example 2: Search for Design Rationale Across All Tickets
 
