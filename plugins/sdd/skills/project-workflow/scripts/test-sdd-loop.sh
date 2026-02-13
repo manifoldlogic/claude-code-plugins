@@ -2696,6 +2696,126 @@ test_find_git_root_leading_dash() {
 }
 
 # =============================================================================
+# PRIORITY 11 TESTS (Concurrent Invocation Protection - SDDLOOP-6.3002)
+# =============================================================================
+
+#######################################
+# Test: Concurrent invocation is blocked
+# Second sdd-loop.sh instance exits with error when lock is held
+#######################################
+test_concurrent_invocation_blocked() {
+    echo "--- Test: Concurrent invocation blocked ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Hold the lock externally using a background bash process.
+    # Uses exec to replace the shell with sleep so killing the PID stops it.
+    bash -c "exec 200>\"$lockfile\"; flock -n 200; exec sleep 10" &
+    local holder_pid=$!
+
+    # Brief pause to let the holder acquire the lock
+    sleep 1
+
+    # Start sdd-loop - should fail immediately because lock is held
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    # Clean up lock holder
+    kill "$holder_pid" 2>/dev/null || true
+    wait "$holder_pid" 2>/dev/null || true
+
+    assert_exit_code 1 "$exit_code" "Second instance exits with code 1"
+    assert_contains "$output" "Another sdd-loop instance is already running" "Error message mentions another instance"
+    assert_contains "$output" "Lockfile:" "Error message mentions lockfile"
+}
+
+#######################################
+# Test: Lockfile cleanup on normal exit
+# After sdd-loop.sh finishes normally, the lock is released
+# (fd closed by OS, next invocation can acquire lock)
+#######################################
+test_lockfile_cleanup_on_normal_exit() {
+    echo "--- Test: Lockfile cleanup on normal exit ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+    create_mock_status_board "none" "" "" "No work"
+
+    # Run first instance to completion
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "First instance exits successfully"
+
+    # Run second instance - should succeed because lock was released
+    local output2
+    local exit_code2=0
+    output2=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code2=$?
+
+    assert_exit_code 0 "$exit_code2" "Second instance runs after first completes"
+    assert_not_contains "$output2" "Another sdd-loop instance is already running" "No lock conflict on second run"
+}
+
+#######################################
+# Test: Lockfile cleanup on SIGTERM
+# After sdd-loop.sh is killed with SIGTERM, the lock is released
+# (fd closed by OS when process dies, next invocation can acquire lock)
+#######################################
+test_lockfile_cleanup_on_sigterm() {
+    echo "--- Test: Lockfile cleanup on SIGTERM ---"
+
+    setup_test_env
+    reset_counters
+    create_test_workspace
+
+    # Calculate the lockfile path the same way sdd-loop.sh does
+    local specs_root="$TEST_TMP_DIR/specs/"
+    local lockfile="/tmp/sdd-loop-${specs_root//\//_}.lock"
+
+    # Hold the lock in a background bash process (simulates running sdd-loop).
+    # Uses exec to replace the shell with sleep so killing the PID stops it.
+    bash -c "exec 200>\"$lockfile\"; flock -n 200; exec sleep 30" &
+    local holder_pid=$!
+
+    # Brief pause to let the holder acquire the lock
+    sleep 1
+
+    # Verify lock is held (sdd-loop should fail)
+    local output_blocked
+    local exit_blocked=0
+    output_blocked=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_blocked=$?
+
+    # Verify lock was actually held
+    assert_exit_code 1 "$exit_blocked" "Lock is held before SIGTERM"
+
+    # Kill the holder with SIGTERM (OS releases fd and lock)
+    kill -TERM "$holder_pid" 2>/dev/null || true
+    wait "$holder_pid" 2>/dev/null || true
+
+    # Brief pause for OS to release file descriptor
+    sleep 0.5
+
+    # Next invocation should succeed (lock released by OS when process died)
+    local output
+    local exit_code=0
+    create_mock_status_board "none" "" "" "No work"
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Instance runs after SIGTERM kills previous"
+    assert_not_contains "$output" "Another sdd-loop instance is already running" "No stale lock after SIGTERM"
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -2977,6 +3097,21 @@ main() {
     test_find_git_root_newline_in_name
     echo ""
     test_find_git_root_leading_dash
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 11 TESTS (Concurrent Invocation Protection - SDDLOOP-6.3002)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 11 Tests (Concurrent Invocation Protection)"
+    echo "====================================="
+    echo ""
+
+    test_concurrent_invocation_blocked
+    echo ""
+    test_lockfile_cleanup_on_normal_exit
+    echo ""
+    test_lockfile_cleanup_on_sigterm
     echo ""
 
     # Summary

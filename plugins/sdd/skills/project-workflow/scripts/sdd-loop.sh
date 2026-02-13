@@ -1417,6 +1417,14 @@ INTEGRATION
     3. Monitor logs for progress
     4. Review completed work
 
+SINGLE INSTANCE
+    Only one sdd-loop instance can run per specs-root at a time. If a
+    second instance is started against the same specs-root, it exits
+    immediately with exit code 1 and an error message. This prevents
+    race conditions such as executing the same task twice or concurrent
+    git modifications. Different specs-root paths use separate lockfiles,
+    so multiple instances with different roots can run concurrently.
+
 SAFETY FEATURES
     Circuit Breaker (Advisory-Only)
         Logs warnings at iteration thresholds but NEVER aborts automatically:
@@ -1711,6 +1719,22 @@ main() {
         log_error "Repos directory does not exist: $SDD_LOOP_REPOS_ROOT"
         exit 1
     fi
+
+    # ==========================================================================
+    # Concurrent Invocation Protection (flock-based)
+    # Prevents multiple sdd-loop instances from running against the same
+    # specs root, which could cause race conditions (e.g., executing the
+    # same task twice or concurrent git modifications).
+    # ==========================================================================
+    readonly SDD_LOOP_LOCKFILE="/tmp/sdd-loop-${SDD_LOOP_SPECS_ROOT//\//_}.lock"
+
+    exec 200>"$SDD_LOOP_LOCKFILE"
+    if ! flock -n 200; then
+        log_error "Another sdd-loop instance is already running for specs-root: $SDD_LOOP_SPECS_ROOT"
+        log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        exit 1
+    fi
+    log_debug "Acquired exclusive lock: $SDD_LOOP_LOCKFILE"
 
     # Track start time for metrics duration calculation
     START_TIME=$(date +%s)
