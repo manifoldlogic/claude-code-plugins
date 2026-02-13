@@ -5,11 +5,12 @@
 # and produces a JSON manifest indicating which documents to generate.
 #
 # Usage:
-#   bash triage-documents.sh [--no-color] [--debug] "ticket description" [+override] [-override] ...
+#   bash triage-documents.sh [--no-color] [--debug] [--verbose] "ticket description" [+override] [-override] ...
 #
 # Arguments:
 #   --no-color          - Disable color output (also: NO_COLOR=1)
 #   --debug             - Enable verbose command tracing (also: DEBUG=1)
+#   --verbose           - Enable human-readable progress output (also: VERBOSE=1)
 #   ticket description  - Text describing the ticket (required, first argument)
 #   +doc-name           - Force-include a document (e.g., +accessibility)
 #   -doc-name           - Force-exclude a document (e.g., -runbook)
@@ -37,6 +38,7 @@ for arg in "$@"; do
     case "$arg" in
         --no-color) USE_COLOR=false ;;
         --debug) SDD_DEBUG=true ;;
+        --verbose) SDD_VERBOSE=true ;;
     esac
 done
 
@@ -45,6 +47,7 @@ done
 
 # Check for required dependencies (after sourcing common.sh for check_jq_version)
 check_jq_version || exit 1
+verbose "Checking jq availability... OK"
 
 # Sanitize user-provided description to prevent shell injection.
 # Escapes shell metacharacters: backticks, $, (), {}, ;, <, >, |, &
@@ -61,11 +64,12 @@ sanitize_description() {
 
 usage() {
     cat >&2 << 'EOF'
-Usage: triage-documents.sh [--no-color] [--debug] "ticket description" [+override] [-override] ...
+Usage: triage-documents.sh [--no-color] [--debug] [--verbose] "ticket description" [+override] [-override] ...
 
 Arguments:
   --no-color          Disable color output (also: NO_COLOR=1)
   --debug             Enable verbose command tracing (also: DEBUG=1)
+  --verbose           Enable human-readable progress output (also: VERBOSE=1)
   ticket description  Text describing the ticket (required, first argument)
   +doc-name           Force-include a document (e.g., +accessibility)
   -doc-name           Force-exclude a document (e.g., -runbook)
@@ -73,14 +77,15 @@ Arguments:
 Examples:
   bash triage-documents.sh "backend API caching layer"
   bash triage-documents.sh "backend API caching layer" +accessibility -runbook
+  bash triage-documents.sh --verbose "backend API caching layer"
 EOF
     exit 1
 }
 
 # --- Input Validation ---
 
-# Skip --no-color and --debug if they appear before the description (already handled above)
-while [ "${1:-}" = "--no-color" ] || [ "${1:-}" = "--debug" ]; do
+# Skip --no-color, --debug, and --verbose if they appear before the description (already handled above)
+while [ "${1:-}" = "--no-color" ] || [ "${1:-}" = "--debug" ] || [ "${1:-}" = "--verbose" ]; do
     shift
 done
 
@@ -102,6 +107,8 @@ if [ "$desc_length" -gt "$DESCRIPTION_MAX_LENGTH" ]; then
     exit 1
 fi
 
+verbose "Description validated (${desc_length} bytes)"
+
 # --- Parse Overrides ---
 
 overrides_plus=""
@@ -111,8 +118,8 @@ seen_overrides=""
 
 while [ $# -gt 0 ]; do
     arg="$1"
-    # Skip --no-color and --debug (already handled before sourcing common.sh)
-    if [ "$arg" = "--no-color" ] || [ "$arg" = "--debug" ]; then
+    # Skip --no-color, --debug, and --verbose (already handled before sourcing common.sh)
+    if [ "$arg" = "--no-color" ] || [ "$arg" = "--debug" ] || [ "$arg" = "--verbose" ]; then
         shift
         continue
     fi
@@ -182,6 +189,8 @@ fi
 # --- Validate Overrides Against Registry ---
 
 all_doc_ids=$(jq -r '.documents | keys[]' "$REGISTRY_FILE")
+doc_count=$(printf '%s\n' "$all_doc_ids" | wc -l | tr -d ' ')
+verbose "Loaded document registry: ${doc_count} document types"
 
 for doc_name in $overrides_plus; do
     if ! printf '%s\n' "$all_doc_ids" | grep -qx "$doc_name"; then
@@ -237,6 +246,7 @@ EOF
             if [ -n "$matched_keywords" ]; then
                 action="generate"
                 reason="Matched: $matched_keywords"
+                verbose "Matched ${doc_id}: keywords ${matched_keywords}"
             else
                 action="skip"
                 reason="No trigger keywords matched"
@@ -254,6 +264,7 @@ EOF
         if [ "$plus_doc" = "$doc_id" ]; then
             action="generate"
             reason="Override: +$doc_id"
+            verbose "Override: +${doc_id} (force include)"
             break
         fi
     done
@@ -263,6 +274,7 @@ EOF
         if [ "$minus_doc" = "$doc_id" ]; then
             action="skip"
             reason="Override: -$doc_id"
+            verbose "Override: -${doc_id} (force exclude)"
             break
         fi
     done
@@ -277,6 +289,9 @@ EOF
 done
 
 # --- Output JSON Manifest ---
+
+generate_count=$(printf '%s' "$documents_json" | jq '[.[] | select(.action == "generate")] | length')
+verbose "Generating manifest: ${generate_count} documents selected"
 
 jq -n \
     --arg desc "$description" \

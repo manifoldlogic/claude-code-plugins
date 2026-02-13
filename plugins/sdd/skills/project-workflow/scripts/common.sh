@@ -27,6 +27,23 @@ if [ "${SDD_DEBUG:-}" = "true" ] || [ "${DEBUG:-}" = "1" ]; then
     set -x
 fi
 
+# Verbose mode: human-readable progress output (mid-level between silent and --debug)
+# Callers can set SDD_VERBOSE=true before sourcing, or use --verbose flag
+# Also supports VERBOSE=1 environment variable
+if [ "${VERBOSE:-}" = "1" ]; then
+    SDD_VERBOSE=true
+fi
+SDD_VERBOSE="${SDD_VERBOSE:-false}"
+
+# Verbose helper - prints human-readable progress to stderr
+# Arguments:
+#   $1 - message to print
+verbose() {
+    if [ "$SDD_VERBOSE" = "true" ]; then
+        printf "[VERBOSE] %s\n" "$1" >&2
+    fi
+}
+
 # Ticket ID length constraints
 # MIN: 2 characters (e.g., "TA")
 # MAX: 12 characters (readable, fits in file paths, allows Jira-style IDs)

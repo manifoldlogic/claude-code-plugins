@@ -4,12 +4,13 @@
 # Creates the folder structure for a new ticket
 #
 # Usage:
-#   bash scaffold-ticket.sh [--manifest <path>] [--no-color] [--debug] <TICKET_ID> <name>
+#   bash scaffold-ticket.sh [--manifest <path>] [--no-color] [--debug] [--verbose] <TICKET_ID> <name>
 #
 # Arguments:
 #   --manifest <path>  Optional path to triage manifest JSON
 #   --no-color         Disable color output (also: NO_COLOR=1)
 #   --debug            Enable verbose command tracing (also: DEBUG=1)
+#   --verbose          Enable human-readable progress output (also: VERBOSE=1)
 #   TICKET_ID          Ticket identifier (uppercase with optional dashes for Jira IDs like UIT-9819)
 #   name               Ticket name (kebab-case)
 #
@@ -27,6 +28,7 @@ for arg in "$@"; do
     case "$arg" in
         --no-color) USE_COLOR=false ;;
         --debug) SDD_DEBUG=true ;;
+        --verbose) SDD_VERBOSE=true ;;
     esac
 done
 
@@ -35,6 +37,7 @@ done
 
 # Check for required dependencies (after sourcing common.sh for check_jq_version)
 check_jq_version || exit 1
+verbose "Checking jq availability... OK"
 
 # Cleanup state: tracks whether this invocation created the ticket directory
 CREATED_TICKET_DIR=false
@@ -53,12 +56,13 @@ cleanup_on_error() {
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--manifest <path>] [--no-color] [--debug] <TICKET_ID> <name>
+Usage: $(basename "$0") [--manifest <path>] [--no-color] [--debug] [--verbose] <TICKET_ID> <name>
 
 Arguments:
   --manifest <path>  Optional triage manifest JSON (output of triage-documents.sh)
   --no-color         Disable color output (also: NO_COLOR=1)
   --debug            Enable verbose command tracing (also: DEBUG=1)
+  --verbose          Enable human-readable progress output (also: VERBOSE=1)
   TICKET_ID          Ticket identifier (e.g., APIV2, DKRHUB, or Jira ID like UIT-9819)
   name               Ticket name (kebab-case, e.g., "api-redesign")
 
@@ -66,6 +70,7 @@ Examples:
   $(basename "$0") APIV2 api-version-2
   $(basename "$0") --manifest /tmp/manifest.json DKRHUB docker-hub-publishing
   $(basename "$0") UIT-9819 user-profile-update    # Jira-based ticket ID
+  $(basename "$0") --verbose APIV2 api-version-2
 
 Output:
   JSON object with created structure
@@ -247,7 +252,7 @@ main() {
                 manifest_path="$2"
                 shift 2
                 ;;
-            --no-color|--debug)
+            --no-color|--debug|--verbose)
                 # Already handled before sourcing common.sh; consume silently
                 shift
                 ;;
@@ -275,6 +280,7 @@ main() {
     local ticket_name="${name//-/ }"
 
     validate_ticket_id "$ticket_id"
+    verbose "Ticket ID validated: ${ticket_id}"
     validate_name "$name"
     check_ticket_id_unique "$ticket_id"
 
@@ -306,6 +312,7 @@ main() {
         exit 1
     fi
     CREATED_TICKET_DIR=true
+    verbose "Created ticket directory: ${ticket_path}"
 
     # Create directory structure
     # IMPORTANT: If structure changes, update plugins/maproom/skills/sdd-spec-search/SKILL.md
@@ -317,6 +324,7 @@ main() {
     if [ -n "$manifest_path" ]; then
         # Manifest-driven: generate only documents with action="generate"
         docs_to_generate=$(jq -r '.documents[] | select(.action=="generate") | .filename' "$manifest_path")
+        verbose "Loading triage manifest from --manifest flag"
 
         # Copy manifest for downstream reference
         cp "$manifest_path" "$ticket_path/planning/.triage-manifest.json"
@@ -324,6 +332,7 @@ main() {
     else
         # Legacy: generate original six documents
         docs_to_generate="analysis.md architecture.md plan.md prd.md quality-strategy.md security-review.md"
+        verbose "No manifest provided, using legacy document set"
     fi
 
     # --- Generate planning documents ---
@@ -331,6 +340,7 @@ main() {
     local created_paths=""
 
     for doc in $docs_to_generate; do
+        verbose "Creating planning/${doc}"
         generate_doc "$doc" "$ticket_path/planning" "$ticket_name"
         created_files="${created_files}${created_files:+ }${doc}"
         created_paths="${created_paths}
@@ -378,6 +388,7 @@ main() {
 }
 EOF
 
+    verbose "Ticket structure created successfully"
     info "Ticket created at: $ticket_path"
 }
 

@@ -277,6 +277,32 @@ Scripts use these templates when scaffolding. The triage system determines which
 
 The triage system selects which planning documents to generate for each ticket. This replaces the previous fixed six-document approach with a context-aware selection algorithm.
 
+### Script Flags
+
+All workflow scripts (`triage-documents.sh`, `scaffold-ticket.sh`, `validate-structure.sh`) support the following common flags:
+
+| Flag | Environment Variable | Description |
+|------|---------------------|-------------|
+| `--no-color` | `NO_COLOR=1` | Disable ANSI color codes in output |
+| `--debug` | `DEBUG=1` | Enable shell command tracing (`set -x`) |
+| `--verbose` | `VERBOSE=1` | Enable human-readable progress output to stderr |
+
+The `--verbose` flag provides mid-level visibility between silent mode (default) and `--debug` (full shell tracing). Verbose output goes to stderr, preserving clean JSON on stdout.
+
+**Example verbose output from `triage-documents.sh`:**
+```
+[VERBOSE] Checking jq availability... OK
+[VERBOSE] Description validated (42 bytes)
+[VERBOSE] Loaded document registry: 12 document types
+[VERBOSE] Matched observability: keywords 'api', 'backend'
+[VERBOSE] Matched api-contract: keywords 'api'
+[VERBOSE] Override: +accessibility (force include)
+[VERBOSE] Override: -runbook (force exclude)
+[VERBOSE] Generating manifest: 9 documents selected
+```
+
+Flags can be combined: `--verbose --debug` shows both human-readable progress and shell command tracing.
+
 ### Triage Algorithm
 
 The `triage-documents.sh` script runs during `/sdd:plan-ticket` (Step 1.5) and follows this algorithm:

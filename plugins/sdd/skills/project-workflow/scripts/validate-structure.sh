@@ -4,12 +4,13 @@
 # Validates ticket/task structure and reports issues
 #
 # Usage:
-#   bash validate-structure.sh [--no-color] [--debug] <TICKET_ID> # Validate specific ticket
-#   bash validate-structure.sh [--no-color] [--debug]             # Validate all tickets
+#   bash validate-structure.sh [--no-color] [--debug] [--verbose] <TICKET_ID> # Validate specific ticket
+#   bash validate-structure.sh [--no-color] [--debug] [--verbose]             # Validate all tickets
 #
 # Arguments:
 #   --no-color         Disable color output (also: NO_COLOR=1)
 #   --debug            Enable verbose command tracing (also: DEBUG=1)
+#   --verbose          Enable human-readable progress output (also: VERBOSE=1)
 #
 # Output:
 #   JSON validation report
@@ -24,6 +25,7 @@ for arg in "$@"; do
     case "$arg" in
         --no-color) USE_COLOR=false ;;
         --debug) SDD_DEBUG=true ;;
+        --verbose) SDD_VERBOSE=true ;;
     esac
 done
 
@@ -32,6 +34,7 @@ done
 
 # Check for required dependencies (uses check_jq_version from common.sh)
 check_jq_version || exit 1
+verbose "Checking jq availability... OK"
 
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 
@@ -231,15 +234,22 @@ validate_ticket() {
     local issues=()
     local warnings=()
 
+    verbose "Validating ticket structure: ${ticket_name}"
+
     # Check README exists
     if [[ ! -f "$ticket_path/README.md" ]]; then
         issues+=("Missing README.md")
+        verbose "Checking README.md... MISSING"
+    else
+        verbose "Checking README.md... OK"
     fi
 
     # Check planning directory
     if [[ ! -d "$ticket_path/planning" ]]; then
         issues+=("Missing planning/ directory")
+        verbose "Checking planning/ directory... MISSING"
     else
+        verbose "Checking planning/ directory... OK"
         # Resolve required planning files dynamically
         if ! resolve_required_files "$ticket_path"; then
             if [ ${#MANIFEST_ERRORS[@]} -gt 0 ]; then
@@ -279,7 +289,9 @@ validate_ticket() {
     # Check tasks directory
     if [[ ! -d "$ticket_path/tasks" ]]; then
         issues+=("Missing tasks/ directory")
+        verbose "Checking tasks/ directory... MISSING"
     else
+        verbose "Checking tasks/ directory... OK"
         # Count tasks
         local task_count
         task_count=$(find "$ticket_path/tasks" -name "*.md" -type f 2>/dev/null | wc -l)
@@ -313,6 +325,9 @@ validate_ticket() {
     local valid="true"
     if [[ ${#issues[@]} -gt 0 ]]; then
         valid="false"
+        verbose "Validation result: FAIL (${#issues[@]} issue(s))"
+    else
+        verbose "Validation result: OK"
     fi
 
     echo "  {"
@@ -457,11 +472,11 @@ validate_ticket_tasks() {
 
 # Main execution
 main() {
-    # Strip --no-color and --debug from positional args (already handled before sourcing common.sh)
+    # Strip --no-color, --debug, and --verbose from positional args (already handled before sourcing common.sh)
     local ticket_id=""
     for arg in "$@"; do
         case "$arg" in
-            --no-color|--debug) ;;
+            --no-color|--debug|--verbose) ;;
             *) ticket_id="$arg" ;;
         esac
     done

@@ -42,6 +42,12 @@
 #  39. Non-conflicting overrides pass - no false positives
 #  40. Valid manifest passes schema validation (jq-based checks against schema rules)
 #  41. Manifest with invalid "action" value fails validation
+#  42. --verbose flag produces human-readable progress on stderr
+#  43. VERBOSE=1 env var produces human-readable progress on stderr
+#  44. --verbose shows keyword match details
+#  45. --verbose and --debug work together
+#  46. No verbose output without --verbose flag (backward compatible)
+#  47. --verbose shows override details
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -1486,6 +1492,204 @@ else
 fi
 
 rm -f "$INVALID_MANIFEST"
+
+# =============================================
+# Test 42: --verbose flag produces expected output
+# Run triage with --verbose and valid description
+# Capture stderr; verify it contains verbose progress messages
+# =============================================
+
+printf -- "\n${CYAN}--- Verbose Flag Tests ---${NC}\n\n"
+
+run_triage_with_stderr "--verbose" "backend API caching layer"
+
+test_name="--verbose flag: produces human-readable progress on stderr"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # Check for key verbose messages
+    has_jq_msg=false
+    has_registry_msg=false
+    has_manifest_msg=false
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Checking jq availability... OK"; then
+        has_jq_msg=true
+    fi
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Loaded document registry:"; then
+        has_registry_msg=true
+    fi
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Generating manifest:"; then
+        has_manifest_msg=true
+    fi
+
+    if $has_jq_msg && $has_registry_msg && $has_manifest_msg; then
+        # Also verify stdout JSON is still clean
+        if printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "stdout JSON is invalid (verbose output leaked to stdout)"
+        fi
+    else
+        log_fail "$test_name" "missing verbose messages (jq=$has_jq_msg, registry=$has_registry_msg, manifest=$has_manifest_msg)"
+    fi
+fi
+
+# =============================================
+# Test 43: VERBOSE=1 env var produces expected output
+# Run triage with VERBOSE=1 environment variable
+# Capture stderr; verify it contains verbose progress messages
+# =============================================
+
+stderr_file_43=$(mktemp)
+set +e
+VERBOSE_ENV_OUTPUT=$(VERBOSE=1 bash "$TRIAGE_SCRIPT" "backend API caching layer" 2>"$stderr_file_43")
+VERBOSE_ENV_EXIT=$?
+set -e
+VERBOSE_ENV_STDERR=$(cat "$stderr_file_43")
+rm -f "$stderr_file_43"
+
+test_name="VERBOSE=1 env var: produces human-readable progress on stderr"
+test_ok=true
+
+if [ "$VERBOSE_ENV_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $VERBOSE_ENV_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    if printf '%s' "$VERBOSE_ENV_STDERR" | grep -qF "Checking jq availability... OK"; then
+        # Also verify stdout JSON is still clean
+        if printf '%s' "$VERBOSE_ENV_OUTPUT" | jq empty 2>/dev/null; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "stdout JSON is invalid (verbose output leaked to stdout)"
+        fi
+    else
+        log_fail "$test_name" "stderr does not contain verbose messages"
+    fi
+fi
+
+# =============================================
+# Test 44: --verbose shows keyword match details
+# Run triage with --verbose and a description that triggers conditional docs
+# Verify stderr contains "Matched <doc>: keywords" message
+# =============================================
+
+run_triage_with_stderr "--verbose" "backend API caching layer"
+
+test_name="--verbose shows keyword match details"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # "backend API" should trigger observability and api-contract
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Matched"; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "stderr missing keyword match details"
+    fi
+fi
+
+# =============================================
+# Test 45: --verbose and --debug work together
+# Run triage with both flags; verify both verbose and debug output present
+# =============================================
+
+run_triage_with_stderr "--verbose" "--debug" "backend API caching layer"
+
+test_name="--verbose and --debug work together"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    has_verbose=false
+    has_debug=false
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "[VERBOSE]"; then
+        has_verbose=true
+    fi
+    if printf '%s' "$TRIAGE_STDERR" | grep -q '^+ '; then
+        has_debug=true
+    fi
+
+    if $has_verbose && $has_debug; then
+        # Verify stdout JSON is still clean
+        if printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "stdout JSON is invalid"
+        fi
+    else
+        log_fail "$test_name" "expected both verbose and debug output (verbose=$has_verbose, debug=$has_debug)"
+    fi
+fi
+
+# =============================================
+# Test 46: No verbose output without --verbose flag
+# Run triage without --verbose and verify no [VERBOSE] messages on stderr
+# =============================================
+
+run_triage_with_stderr "backend API caching layer"
+
+test_name="No verbose output without --verbose flag (backward compatible)"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "[VERBOSE]"; then
+        log_fail "$test_name" "verbose output found without --verbose flag"
+    else
+        log_pass "$test_name"
+    fi
+fi
+
+# =============================================
+# Test 47: --verbose shows override details
+# Run triage with --verbose and overrides
+# Verify stderr contains override messages
+# =============================================
+
+run_triage_with_stderr "--verbose" "simple task" "+accessibility" "-runbook"
+
+test_name="--verbose shows override details"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    has_plus_override=false
+    has_minus_override=false
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Override: +accessibility (force include)"; then
+        has_plus_override=true
+    fi
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Override: -runbook (force exclude)"; then
+        has_minus_override=true
+    fi
+
+    if $has_plus_override && $has_minus_override; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "missing override messages (plus=$has_plus_override, minus=$has_minus_override)"
+    fi
+fi
 
 # --- Summary ---
 
