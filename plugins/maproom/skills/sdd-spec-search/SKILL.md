@@ -157,6 +157,38 @@ Use the Grep tool searching for "Decision" or "Rationale" in `planning/architect
 
 The fallback approach is slower and less precise than maproom search but works without any indexing setup.
 
+### Troubleshooting Common Issues
+
+#### "command not found: crewchief-maproom"
+
+- **Symptom**: Shell returns "command not found" when running `crewchief-maproom`
+- **Cause**: CLI not installed or not in PATH
+- **Solution**: Install via npm (`npm install -g @crewchief/maproom`) or use fallback Grep/Glob search as described in the Fallback section above. See `maproom-search` skill (`plugins/maproom/skills/maproom-search/SKILL.md`) for full installation and setup guidance.
+
+#### "repository not found" or "repository 'X' not found"
+
+- **Symptom**: Search returns a "repository not found" error
+- **Cause**: Incorrect repo name or repo not indexed
+- **Solution**: Run `crewchief-maproom status` to list all indexed repositories and find the correct name matching your `SDD_ROOT_DIR` path. The repo name is assigned during `crewchief-maproom scan --repo <name>` and does not follow a fixed formula.
+
+#### "no results found" / empty results
+
+- **Symptom**: Search returns no matches for a query that should have results
+- **Cause**: Query too specific, wrong search mode, or content not yet indexed
+- **Solution**: Try `vector-search` instead of FTS (or vice versa) based on the FTS vs Vector Search table above. Broaden query terms, remove overly specific identifiers, and verify the repo is indexed with `crewchief-maproom status`. If the repo shows zero chunks, re-run `crewchief-maproom scan`.
+
+#### SDD_ROOT_DIR unset or incorrect
+
+- **Symptom**: Cannot determine the spec directory path; `echo "$SDD_ROOT_DIR"` returns empty or an incorrect path
+- **Cause**: Environment variable not configured by the SDD plugin's `setup-sdd-env.js` hook
+- **Solution**: Check `.claude/settings.json` for the `SDD_ROOT_DIR` setting. The hook (`plugins/sdd/hooks/setup-sdd-env.js`) reads this value at session start and exports it. If the setting is missing, ask the developer to add it to their project's `.claude/settings.json`.
+
+#### Permission denied on spec directory
+
+- **Symptom**: Error accessing spec files when reading search results or browsing the spec directory
+- **Cause**: File permission issue on the spec directory or its contents
+- **Solution**: Check directory permissions with `ls -la "$SDD_ROOT_DIR"`. Ensure the current user has read access to the directory tree. In containerized environments, verify the volume mount includes appropriate permissions.
+
 ## Examples
 
 ### Example 1: Find a Ticket's Planning Documents by ID
