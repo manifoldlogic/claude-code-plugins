@@ -120,6 +120,7 @@ For each log file, extract the transcript reference and assess availability.
 ```json
 {
   "session_id": "abc123",
+  "schema_version": "1.0",
   "transcript_path": "/home/user/.claude/projects/.../session.jsonl",
   "cwd": "/workspace/repos/project",
   "hook_event_name": "PreCompact",
@@ -409,7 +410,7 @@ If none of these steps reveal the issue, check Claude Code's internal logs for h
 - **Session transcript log directory:**
   - `${SDD_ROOT_DIR}/logs/session-transcripts/` -- Location where Phase 1 hooks write session transcript log entries
   - File naming: `{session_id}_{event}_{timestamp}.json`
-  - Format: JSON log entries containing `transcript_path`, `session_id`, `cwd`, `hook_event_name`, `timestamp`, `trigger`, `status`
+  - Format: JSON log entries containing `session_id`, `schema_version`, `transcript_path`, `cwd`, `hook_event_name`, `timestamp`, `trigger`, `status`
 
 - **Transcript format:**
   - JSONL (JSON Lines) with one JSON object per line

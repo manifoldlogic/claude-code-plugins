@@ -20,6 +20,9 @@ import re
 import sys
 import datetime
 
+# Schema version for log entry format (semver: major.minor)
+LOG_SCHEMA_VERSION = "1.0"
+
 # Maximum length for sanitized session IDs to prevent filesystem issues
 MAX_SESSION_ID_LENGTH = 128
 
@@ -106,6 +109,7 @@ def main():
     # Build log entry with common fields
     log_entry = {
         'session_id': session_id,
+        'schema_version': LOG_SCHEMA_VERSION,
         'transcript_path': transcript_path,
         'cwd': cwd,
         'hook_event_name': hook_event_name,

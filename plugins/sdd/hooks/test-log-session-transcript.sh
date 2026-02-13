@@ -175,7 +175,14 @@ if [ -n "$T1_FILE" ]; then
   fi
 
   # Check required fields
-  if ! validate_json_fields "$T1_FILE" "session_id transcript_path cwd hook_event_name timestamp status trigger custom_instructions"; then
+  if ! validate_json_fields "$T1_FILE" "session_id schema_version transcript_path cwd hook_event_name timestamp status trigger custom_instructions"; then
+    T1_PASS=false
+  fi
+
+  # Check schema_version value
+  T1_SCHEMA_VER=$(jq -r '.schema_version' "$T1_FILE")
+  if [ "$T1_SCHEMA_VER" != "1.0" ]; then
+    printf "  ${RED}FAIL: schema_version='%s', expected '1.0'${NC}\n" "$T1_SCHEMA_VER"
     T1_PASS=false
   fi
 
@@ -264,7 +271,14 @@ fi
 
 if [ -n "$T2_FILE" ]; then
   # Check required fields exist and are not null/empty
-  if ! validate_json_fields "$T2_FILE" "session_id transcript_path cwd hook_event_name timestamp status reason"; then
+  if ! validate_json_fields "$T2_FILE" "session_id schema_version transcript_path cwd hook_event_name timestamp status reason"; then
+    T2_PASS=false
+  fi
+
+  # Check schema_version value
+  T2_SCHEMA_VER=$(jq -r '.schema_version' "$T2_FILE")
+  if [ "$T2_SCHEMA_VER" != "1.0" ]; then
+    printf "  ${RED}FAIL: schema_version='%s', expected '1.0'${NC}\n" "$T2_SCHEMA_VER"
     T2_PASS=false
   fi
 
@@ -756,7 +770,7 @@ if [ -z "$T11_FILE" ]; then
   T11_PASS=false
 else
   # Validate all required fields exist and are not null/empty
-  if ! validate_json_fields "$T11_FILE" "session_id transcript_path cwd hook_event_name timestamp status trigger custom_instructions"; then
+  if ! validate_json_fields "$T11_FILE" "session_id schema_version transcript_path cwd hook_event_name timestamp status trigger custom_instructions"; then
     T11_PASS=false
   fi
 
