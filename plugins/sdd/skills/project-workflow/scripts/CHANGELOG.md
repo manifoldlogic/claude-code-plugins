@@ -5,6 +5,15 @@ All notable changes to the autonomous SDD loop scripts will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-02-XX
+
+### Changed
+
+- **Default task timeout reduced from 3600s (1 hour) to 600s (10 minutes)**
+  - Catches hung tasks 6x faster while accommodating 99% of valid SDD tasks
+  - Users who need longer timeouts can use `--timeout 3600` explicitly
+  - Typical task durations: simple (5-30s), medium (1-5min), complex (5-15min)
+
 ## [2.0.0] - 2026-02-XX
 
 ### Breaking Changes

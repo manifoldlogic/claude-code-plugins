@@ -107,6 +107,25 @@ assert_contains() {
 }
 
 #######################################
+# Assert that string does NOT contain substring
+# Arguments:
+#   $1 - Haystack (full string)
+#   $2 - Needle (substring that should NOT be present)
+#   $3 - Test name
+#######################################
+assert_not_contains() {
+    local haystack="$1"
+    local needle="$2"
+    local test_name="$3"
+
+    if [[ "$haystack" == *"$needle"* ]]; then
+        log_result "$test_name" "fail" "String should not contain: '$needle'"
+    else
+        log_result "$test_name" "pass"
+    fi
+}
+
+#######################################
 # Assert exit code
 # Arguments:
 #   $1 - Expected exit code
@@ -2923,6 +2942,882 @@ test_recommended_action_empty_input() {
     assert_contains "$output" '"reason":' "Reason field is present"
 }
 
+# =============================================================================
+# Root Structure Validation Tests (SDDLOOP-6.3003)
+# =============================================================================
+
+#######################################
+# Test: Warning when specs-root is empty
+# Verifies that a warning is logged when specs-root has no subdirectories
+# and that execution continues (non-blocking, exit code 0)
+#######################################
+test_empty_specs_root_warning() {
+    echo "--- Test: Empty specs-root warning ---"
+
+    # Create empty specs root and repos root
+    local specs_root="$TEST_TMP_DIR/empty_specs_warn"
+    local repos_root="$TEST_TMP_DIR/repos_warn"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script continues despite empty specs-root"
+    assert_contains "$output" "specs-root is empty" "Warning about empty specs-root emitted"
+    assert_contains "$output" "Expected structure:" "Warning includes expected structure hint"
+}
+
+#######################################
+# Test: Warning when specs-root and repos-root are identical
+# Verifies that a warning is logged when both roots point to the same path
+# and that execution continues (non-blocking, exit code 0)
+#######################################
+test_identical_roots_warning() {
+    echo "--- Test: Identical specs/repos roots warning ---"
+
+    # Create a directory that will serve as both specs and repos root
+    local shared_root="$TEST_TMP_DIR/shared_root_warn"
+    mkdir -p "$shared_root/test-repo/tickets"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$shared_root" --repos-root "$shared_root" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script continues despite identical roots"
+    assert_contains "$output" "specs-root and repos-root are identical" "Warning about identical roots emitted"
+    assert_contains "$output" "unexpected behavior" "Warning includes explanation"
+}
+
+#######################################
+# Test: No warning when specs-root has subdirectories
+# Verifies that no empty-specs warning is logged for non-empty specs root
+#######################################
+test_no_warning_for_populated_specs_root() {
+    echo "--- Test: No warning for populated specs-root ---"
+
+    local specs_root="$TEST_TMP_DIR/populated_specs_warn"
+    local repos_root="$TEST_TMP_DIR/repos_populated_warn"
+    mkdir -p "$specs_root/test-repo/tickets"
+    mkdir -p "$repos_root"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script completes successfully"
+    # Check that the empty specs-root warning is NOT present
+    if [[ "$output" == *"specs-root is empty"* ]]; then
+        log_result "No empty specs-root warning for populated directory" "fail" "Warning found when it should not be"
+    else
+        log_result "No empty specs-root warning for populated directory" "pass"
+    fi
+}
+
+#######################################
+# Test: No warning when roots are different paths
+# Verifies that no identical-roots warning is logged for distinct paths
+#######################################
+test_no_warning_for_different_roots() {
+    echo "--- Test: No warning for different roots ---"
+
+    local specs_root="$TEST_TMP_DIR/specs_diff_warn"
+    local repos_root="$TEST_TMP_DIR/repos_diff_warn"
+    mkdir -p "$specs_root/test-repo/tickets"
+    mkdir -p "$repos_root"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Script completes successfully"
+    if [[ "$output" == *"specs-root and repos-root are identical"* ]]; then
+        log_result "No identical-roots warning for different paths" "fail" "Warning found when it should not be"
+    else
+        log_result "No identical-roots warning for different paths" "pass"
+    fi
+}
+
+#######################################
+# Test: Help text documents expected directory structure
+#######################################
+test_help_shows_directory_structure() {
+    echo "--- Test: Help shows directory structure ---"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help option exits with code 0"
+    assert_contains "$output" "Expected Directory Structure" "Help documents expected directory structure"
+    assert_contains "$output" "specs-root/" "Help shows specs-root structure"
+    assert_contains "$output" "repos-root/" "Help shows repos-root structure"
+}
+
+#######################################
+# Test: Empty --specs-root is rejected with clear error
+#######################################
+test_empty_specs_root_rejected() {
+    echo "--- Test: Empty --specs-root rejected ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Empty --specs-root exits with code 1"
+    assert_contains "$output" "--specs-root cannot be empty" "Error message mentions --specs-root cannot be empty"
+}
+
+#######################################
+# Test: Empty --repos-root is rejected with clear error
+#######################################
+test_empty_repos_root_rejected() {
+    echo "--- Test: Empty --repos-root rejected ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --repos-root "" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Empty --repos-root exits with code 1"
+    assert_contains "$output" "--repos-root cannot be empty" "Error message mentions --repos-root cannot be empty"
+}
+
+#######################################
+# Test: Progress messages appear with >= 10 repos
+#######################################
+test_progress_with_many_repos() {
+    echo "--- Test: Progress messages with >= 10 repos ---"
+
+    local specs_root="$TEST_TMP_DIR/progress_many_specs"
+    local repos_root="$TEST_TMP_DIR/progress_many_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    # Create 15 spec directories to trigger progress (threshold is 10)
+    local i=1
+    while [ $i -le 15 ]; do
+        mkdir -p "$specs_root/repo-$(printf '%02d' $i)"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Progress with many repos exits with code 0"
+
+    # Should contain progress message at 10/15
+    assert_contains "$stderr_output" "[INFO] Discovering repos... (10/15)" "Progress logged at 10/15"
+
+    # Should contain final progress message at 15/15
+    assert_contains "$stderr_output" "[INFO] Discovering repos... (15/15)" "Final progress logged at 15/15"
+}
+
+#######################################
+# Test: No progress messages in quiet mode
+#######################################
+test_progress_quiet_mode() {
+    echo "--- Test: No progress in quiet mode ---"
+
+    local specs_root="$TEST_TMP_DIR/progress_quiet_specs"
+    local repos_root="$TEST_TMP_DIR/progress_quiet_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    # Create 15 spec directories (above threshold)
+    local i=1
+    while [ $i -le 15 ]; do
+        mkdir -p "$specs_root/repo-$(printf '%02d' $i)"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" --quiet --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Quiet mode exits with code 0"
+
+    # Should NOT contain any progress messages
+    if echo "$stderr_output" | grep -q "Discovering repos"; then
+        log_result "Quiet mode suppresses progress" "fail" "Found progress messages in quiet mode"
+    else
+        log_result "Quiet mode suppresses progress" "pass"
+    fi
+}
+
+#######################################
+# Test: No progress messages with < 10 repos
+#######################################
+test_progress_with_few_repos() {
+    echo "--- Test: No progress with < 10 repos ---"
+
+    local specs_root="$TEST_TMP_DIR/progress_few_specs"
+    local repos_root="$TEST_TMP_DIR/progress_few_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    # Create only 5 spec directories (below threshold of 10)
+    local i=1
+    while [ $i -le 5 ]; do
+        mkdir -p "$specs_root/repo-$(printf '%02d' $i)"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Few repos exits with code 0"
+
+    # Should NOT contain any progress messages (below threshold)
+    if echo "$stderr_output" | grep -q "Discovering repos"; then
+        log_result "No progress below threshold" "fail" "Found progress messages with < 10 repos"
+    else
+        log_result "No progress below threshold" "pass"
+    fi
+}
+
+# =============================================================================
+# Startup Health Check Tests (SDDLOOP-6.3010)
+# =============================================================================
+
+#######################################
+# Test: check_dependencies fails when jq unavailable
+#######################################
+test_health_check_fails_missing_jq() {
+    echo "--- Test: Health check fails when jq unavailable ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a minimal bin directory without jq but with realpath and timeout
+    local fake_bin="$TEST_TMP_DIR/health_jq_bin"
+    mkdir -p "$fake_bin"
+
+    # Link realpath and timeout so they're available
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when jq missing"
+
+    if [[ "$output" == *"Required dependency not found: jq"* ]]; then
+        log_result "Error message mentions jq" "pass"
+    else
+        log_result "Error message mentions jq" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install with:"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Exiting due to missing required dependencies"* ]]; then
+        log_result "Error message includes exit reason" "pass"
+    else
+        log_result "Error message includes exit reason" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies fails when realpath unavailable
+#######################################
+test_health_check_fails_missing_realpath() {
+    echo "--- Test: Health check fails when realpath unavailable ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a minimal bin directory with jq and timeout but not realpath
+    local fake_bin="$TEST_TMP_DIR/health_rp_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when realpath missing"
+
+    if [[ "$output" == *"Required dependency not found: realpath"* ]]; then
+        log_result "Error message mentions realpath" "pass"
+    else
+        log_result "Error message mentions realpath" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies fails when timeout unavailable
+#######################################
+test_health_check_fails_missing_timeout() {
+    echo "--- Test: Health check fails when timeout unavailable ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a minimal bin directory with jq and realpath but not timeout
+    local fake_bin="$TEST_TMP_DIR/health_timeout_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "Health check exits with 1 when timeout missing"
+
+    if [[ "$output" == *"Required command 'timeout' not found"* ]]; then
+        log_result "Error message mentions timeout" "pass"
+    else
+        log_result "Error message mentions timeout" "fail" "Output: $output"
+    fi
+
+    if [[ "$output" == *"Install GNU coreutils"* ]]; then
+        log_result "Error message includes install instructions" "pass"
+    else
+        log_result "Error message includes install instructions" "fail" "Output: $output"
+    fi
+}
+
+#######################################
+# Test: check_dependencies passes when all tools available
+#######################################
+test_health_check_passes_all_available() {
+    echo "--- Test: Health check passes when all tools available ---"
+
+    source "$MASTER_SCRIPT"
+
+    # Create a bin directory with all required tools
+    local fake_bin="$TEST_TMP_DIR/health_all_bin"
+    mkdir -p "$fake_bin"
+
+    if command -v jq >/dev/null 2>&1; then
+        ln -sf "$(command -v jq)" "$fake_bin/jq"
+    fi
+    if command -v realpath >/dev/null 2>&1; then
+        ln -sf "$(command -v realpath)" "$fake_bin/realpath"
+    fi
+    if command -v timeout >/dev/null 2>&1; then
+        ln -sf "$(command -v timeout)" "$fake_bin/timeout"
+    fi
+    for tool in date echo; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            ln -sf "$(command -v "$tool")" "$fake_bin/$tool"
+        fi
+    done
+
+    local output
+    local exit_code=0
+    output=$(PATH="$fake_bin" check_dependencies 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "Health check exits with 0 when all tools available"
+
+    if [[ "$output" != *"Required dependency not found"* ]]; then
+        log_result "No error messages when all tools available" "pass"
+    else
+        log_result "No error messages when all tools available" "fail" "Output: $output"
+    fi
+}
+
+# =============================================================================
+# Filesystem Operation Timeout Tests (SDDLOOP-6.4003)
+# =============================================================================
+
+#######################################
+# Test: scan_repo times out with slow find
+# Uses a mock find script that sleeps to simulate NFS stale handle
+#######################################
+test_scan_repo_timeout_handling() {
+    echo "--- Test: scan_repo timeout handling ---"
+
+    local sdd_root="$TEST_TMP_DIR/timeout_sdd/test-repo"
+    local tickets_dir="$sdd_root/tickets"
+    mkdir -p "$tickets_dir/TICKET-1_test/tasks"
+
+    # Create a mock find that sleeps longer than our timeout
+    local mock_bin="$TEST_TMP_DIR/timeout_sdd/mock_bin"
+    mkdir -p "$mock_bin"
+
+    # Use absolute path for sleep so mock find works with restricted PATH
+    local sleep_path
+    sleep_path="$(command -v sleep)"
+    cat > "$mock_bin/find" << MOCKFIND
+#!/bin/sh
+# Simulate a slow/hung filesystem by sleeping longer than timeout
+"$sleep_path" 10
+MOCKFIND
+    chmod +x "$mock_bin/find"
+
+    # Symlink essential tools from real PATH
+    ln -sf "$(command -v timeout)" "$mock_bin/timeout"
+    ln -sf "$(command -v sort)" "$mock_bin/sort"
+    ln -sf "$(command -v mktemp)" "$mock_bin/mktemp"
+    ln -sf "$(command -v rm)" "$mock_bin/rm"
+    ln -sf "$(command -v date)" "$mock_bin/date"
+    ln -sf "$(command -v echo)" "$mock_bin/echo"
+    ln -sf "$(command -v cat)" "$mock_bin/cat"
+    ln -sf "$(command -v wc)" "$mock_bin/wc"
+    ln -sf "$(command -v basename)" "$mock_bin/basename"
+    ln -sf "$(command -v head)" "$mock_bin/head"
+    ln -sf "$(command -v sed)" "$mock_bin/sed"
+    ln -sf "$(command -v jq)" "$mock_bin/jq"
+    ln -sf "$(command -v grep)" "$mock_bin/grep"
+    ln -sf "$(command -v printf)" "$mock_bin/printf" 2>/dev/null || true
+    ln -sf "$(command -v awk)" "$mock_bin/awk"
+    ln -sf "$(command -v tr)" "$mock_bin/tr"
+    ln -sf "$(command -v readlink)" "$mock_bin/readlink"
+    ln -sf "$(command -v realpath)" "$mock_bin/realpath"
+    ln -sf "$(command -v ls)" "$mock_bin/ls"
+    ln -sf "$(command -v test)" "$mock_bin/test" 2>/dev/null || true
+
+    # Run in a fresh bash process to avoid readonly FILESYSTEM_TIMEOUT_SECONDS
+    # from prior sourcing in the parent shell. Export the 2-second timeout
+    # so the sourced script picks it up via its guard clause.
+    # We create a helper script to avoid quoting complications with bash -c.
+    local helper_script="$TEST_TMP_DIR/timeout_sdd/run_test.sh"
+    cat > "$helper_script" << HELPEREOF
+#!/usr/bin/env bash
+set -uo pipefail
+export FILESYSTEM_TIMEOUT_SECONDS=2
+source "$MASTER_SCRIPT"
+PATH="$mock_bin" scan_repo "$sdd_root" ""
+exit \$?
+HELPEREOF
+    chmod +x "$helper_script"
+
+    local output=""
+    local exit_code=0
+    output=$(bash "$helper_script" 2>&1) || exit_code=$?
+
+    assert_equals 1 "$exit_code" "scan_repo returns 1 on find timeout"
+    assert_contains "$output" "timed out" "scan_repo timeout error mentions 'timed out'"
+}
+
+#######################################
+# Test: scan_repo works normally with timeout wrapper
+# Verifies timeout doesn't interfere with normal operation
+#######################################
+test_scan_repo_normal_with_timeout() {
+    echo "--- Test: scan_repo normal operation with timeout ---"
+
+    source "$MASTER_SCRIPT"
+
+    local sdd_root="$TEST_TMP_DIR/timeout_normal/test-repo"
+    local tickets_dir="$sdd_root/tickets"
+    local ticket_dir="$tickets_dir/TICKET-1_test"
+    mkdir -p "$ticket_dir/tasks"
+    # Create a task file
+    cat > "$ticket_dir/tasks/TICKET-1.1001_do-something.md" << 'TASKMD'
+# Task: [TICKET-1.1001]: Do Something
+
+## Status
+- [ ] **Task completed** - acceptance criteria met
+- [ ] **Tests pass** - tests executed and passing
+- [ ] **Verified** - by the verify-task agent
+TASKMD
+
+    local output=""
+    local exit_code=0
+    output=$(scan_repo "$sdd_root" "" 2>&1) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "scan_repo exits 0 with timeout wrapper in normal case"
+    assert_contains "$output" "TICKET-1_test" "scan_repo output contains ticket directory"
+    assert_contains "$output" "TICKET-1.1001" "scan_repo output contains task ID"
+}
+
+# =============================================================================
+# JSON Log Format Tests (SDDLOOP-6.5004)
+# =============================================================================
+
+#######################################
+# Test: --log-format json produces JSON log output
+# Validates that JSON format contains timestamp, level, message fields
+#######################################
+test_log_format_json_flag() {
+    echo "--- Test: --log-format json flag ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-test-specs"
+    local repos_dir="$TEST_TMP_DIR/json-test-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "--log-format json exits with code 0"
+    # JSON format should contain timestamp field
+    assert_contains "$output" '"timestamp"' "--log-format json contains timestamp field"
+    # JSON format should contain level field
+    assert_contains "$output" '"level"' "--log-format json contains level field"
+    # JSON format should contain message field
+    assert_contains "$output" '"message"' "--log-format json contains message field"
+    # Should NOT have text [INFO] prefix
+    assert_not_contains "$output" "[INFO]" "--log-format json does not have [INFO] prefix"
+}
+
+#######################################
+# Test: LOG_FORMAT=json environment variable produces JSON log output
+# Validates that environment variable sets format
+#######################################
+test_log_format_json_env_var() {
+    echo "--- Test: LOG_FORMAT=json environment variable ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-env-specs"
+    local repos_dir="$TEST_TMP_DIR/json-env-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local output
+    local exit_code=0
+    output=$(LOG_FORMAT=json bash "$MASTER_SCRIPT" --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "LOG_FORMAT=json exits with code 0"
+    assert_contains "$output" '"timestamp"' "LOG_FORMAT=json produces JSON format"
+    assert_not_contains "$output" "[INFO]" "LOG_FORMAT=json format is not text"
+}
+
+#######################################
+# Test: JSON log lines are valid JSON (parseable by jq)
+# Validates that each JSON log line is valid JSON
+#######################################
+test_log_format_json_valid_json() {
+    echo "--- Test: JSON log lines are valid JSON ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-valid-specs"
+    local repos_dir="$TEST_TMP_DIR/json-valid-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    local exit_code=0
+    # Capture stderr only (JSON logs go to stderr, JSON data goes to stdout)
+    stderr_output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Check that we got at least one JSON log line
+    local json_line_count=0
+    local invalid_lines=0
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        json_line_count=$((json_line_count + 1))
+        if ! echo "$line" | jq empty 2>/dev/null; then
+            invalid_lines=$((invalid_lines + 1))
+        fi
+    done <<< "$stderr_output"
+
+    if [ "$json_line_count" -gt 0 ]; then
+        log_result "At least one JSON log line produced" "pass"
+    else
+        log_result "At least one JSON log line produced" "fail" "No JSON log lines found in stderr"
+    fi
+
+    if [ "$invalid_lines" -eq 0 ]; then
+        log_result "All JSON log lines are valid JSON" "pass"
+    else
+        log_result "All JSON log lines are valid JSON" "fail" "$invalid_lines invalid JSON lines found"
+    fi
+}
+
+#######################################
+# Test: JSON log contains ISO 8601 timestamp
+# Validates timestamp format is UTC ISO 8601
+#######################################
+test_log_format_json_timestamp() {
+    echo "--- Test: JSON log contains ISO 8601 timestamp ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-ts-specs"
+    local repos_dir="$TEST_TMP_DIR/json-ts-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    local exit_code=0
+    stderr_output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Extract timestamp from first JSON log line and validate format
+    local first_line
+    first_line=$(echo "$stderr_output" | head -1)
+    local timestamp
+    timestamp=$(echo "$first_line" | jq -r '.timestamp' 2>/dev/null)
+
+    # Validate ISO 8601 UTC format: YYYY-MM-DDTHH:MM:SSZ
+    if echo "$timestamp" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+        log_result "JSON timestamp is ISO 8601 UTC format" "pass"
+    else
+        log_result "JSON timestamp is ISO 8601 UTC format" "fail" "Got: $timestamp"
+    fi
+}
+
+#######################################
+# Test: JSON log has correct level field
+# Validates the level field matches expected values
+#######################################
+test_log_format_json_level() {
+    echo "--- Test: JSON log has correct level field ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-level-specs"
+    local repos_dir="$TEST_TMP_DIR/json-level-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    local exit_code=0
+    stderr_output=$(bash "$MASTER_SCRIPT" --log-format json --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
+
+    # Extract level from first JSON log line
+    local first_line
+    first_line=$(echo "$stderr_output" | head -1)
+    local level
+    level=$(echo "$first_line" | jq -r '.level' 2>/dev/null)
+
+    if [ "$level" = "INFO" ]; then
+        log_result "JSON level field is INFO for log_info output" "pass"
+    else
+        log_result "JSON level field is INFO for log_info output" "fail" "Got: $level"
+    fi
+}
+
+#######################################
+# Test: CLI --log-format overrides LOG_FORMAT environment variable
+# Validates CLI flag takes precedence over environment variable
+#######################################
+test_log_format_cli_overrides_env() {
+    echo "--- Test: CLI --log-format overrides LOG_FORMAT env var ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-override-specs"
+    local repos_dir="$TEST_TMP_DIR/json-override-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    # Capture stderr separately to check log format (stdout has JSON data with "timestamp")
+    local stderr_output
+    local exit_code=0
+    # Set env to json but CLI to text - CLI should win
+    stderr_output=$(LOG_FORMAT=json bash "$MASTER_SCRIPT" --log-format text --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1 1>/dev/null) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "CLI override exits with code 0"
+    # Should be text format (CLI override) - stderr should have [INFO] prefix
+    assert_contains "$stderr_output" "[INFO]" "CLI --log-format text overrides LOG_FORMAT=json"
+    # stderr should NOT have JSON log lines (no {"timestamp":...)
+    assert_not_contains "$stderr_output" '{"timestamp"' "CLI override - no JSON log lines in stderr"
+}
+
+#######################################
+# Test: Default log format is text
+# Validates that without --log-format or LOG_FORMAT, text format is used
+#######################################
+test_log_format_default_text() {
+    echo "--- Test: Default log format is text ---"
+
+    # Create a specs root with enough repos to trigger progress logging (>= 10)
+    local specs_dir="$TEST_TMP_DIR/json-default-specs"
+    local repos_dir="$TEST_TMP_DIR/json-default-repos"
+    mkdir -p "$specs_dir" "$repos_dir"
+    local i=0
+    while [ $i -lt 11 ]; do
+        mkdir -p "$specs_dir/repo-$i"
+        i=$((i + 1))
+    done
+
+    local output
+    local exit_code=0
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_dir" --repos-root "$repos_dir" 2>&1) || exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Default format exits with code 0"
+    assert_contains "$output" "[INFO]" "Default format uses text [INFO] prefix"
+}
+
+#######################################
+# Test: --log-format appears in help text
+# Validates that help text documents the new option
+#######################################
+test_log_format_in_help() {
+    echo "--- Test: --log-format in help text ---"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --help 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Help exits with code 0"
+    assert_contains "$output" "--log-format" "Help documents --log-format option"
+    assert_contains "$output" "LOG_FORMAT" "Help documents LOG_FORMAT env var"
+    assert_contains "$output" "json" "Help mentions json format"
+}
+
+#######################################
+# Test: format_json_log function produces valid JSON structure
+# Sources the script and tests format_json_log directly
+#######################################
+test_format_json_log_function() {
+    echo "--- Test: format_json_log function ---"
+
+    # Source the script to access the function
+    local json_output
+    json_output=$(source "$MASTER_SCRIPT" && format_json_log "INFO" "test message" 2>&1)
+
+    # Validate it parses as JSON
+    local jq_exit=0
+    echo "$json_output" | jq empty 2>/dev/null || jq_exit=$?
+
+    if [ "$jq_exit" -eq 0 ]; then
+        log_result "format_json_log produces valid JSON" "pass"
+    else
+        log_result "format_json_log produces valid JSON" "fail" "jq failed to parse: $json_output"
+    fi
+
+    # Validate fields
+    local ts level msg
+    ts=$(echo "$json_output" | jq -r '.timestamp' 2>/dev/null)
+    level=$(echo "$json_output" | jq -r '.level' 2>/dev/null)
+    msg=$(echo "$json_output" | jq -r '.message' 2>/dev/null)
+
+    assert_equals "INFO" "$level" "format_json_log level field is correct"
+    assert_equals "test message" "$msg" "format_json_log message field is correct"
+
+    # Validate timestamp format
+    if echo "$ts" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+        log_result "format_json_log timestamp is ISO 8601 UTC" "pass"
+    else
+        log_result "format_json_log timestamp is ISO 8601 UTC" "fail" "Got: $ts"
+    fi
+}
+
+#######################################
+# Test: format_json_log handles special characters in messages
+# Validates that jq properly escapes quotes and backslashes
+#######################################
+test_format_json_log_special_chars() {
+    echo "--- Test: format_json_log special characters ---"
+
+    # Source the script and test with special characters
+    local json_output
+    json_output=$(source "$MASTER_SCRIPT" && format_json_log "WARN" 'Message with "quotes" and \backslash' 2>&1)
+
+    # Validate it parses as JSON (special chars properly escaped)
+    local jq_exit=0
+    echo "$json_output" | jq empty 2>/dev/null || jq_exit=$?
+
+    if [ "$jq_exit" -eq 0 ]; then
+        log_result "format_json_log escapes special characters" "pass"
+    else
+        log_result "format_json_log escapes special characters" "fail" "jq failed to parse: $json_output"
+    fi
+
+    # Validate the message round-trips correctly
+    local msg
+    msg=$(echo "$json_output" | jq -r '.message' 2>/dev/null)
+    if [[ "$msg" == *'"quotes"'* ]] && [[ "$msg" == *'\backslash'* ]]; then
+        log_result "format_json_log message preserves special chars" "pass"
+    else
+        log_result "format_json_log message preserves special chars" "fail" "Got: $msg"
+    fi
+}
+
+# =============================================================================
+# Shellcheck Static Analysis (SDDLOOP-6.5002)
+# =============================================================================
+
+#######################################
+# Test: shellcheck static analysis on master-status-board.sh
+# Runs shellcheck --severity=style to prevent regressions.
+# Skips with a warning if shellcheck is not installed.
+#
+# To run shellcheck locally:
+#   shellcheck --severity=style master-status-board.sh
+# Install shellcheck:
+#   Ubuntu/Debian: apt-get install shellcheck
+#   macOS: brew install shellcheck
+#######################################
+test_shellcheck_static_analysis() {
+    echo "--- Test: shellcheck static analysis ---"
+
+    if ! command -v shellcheck >/dev/null 2>&1; then
+        echo "  SKIP: shellcheck not installed (install with: apt-get install shellcheck)"
+        log_result "shellcheck static analysis (master-status-board.sh)" "pass" "SKIPPED - shellcheck not available"
+        return
+    fi
+
+    local output=""
+    local exit_code=0
+    output=$(shellcheck --severity=style "$MASTER_SCRIPT" 2>&1) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        log_result "shellcheck static analysis (master-status-board.sh)" "pass"
+    else
+        echo "$output"
+        log_result "shellcheck static analysis (master-status-board.sh)" "fail" "shellcheck found issues (exit code $exit_code)"
+    fi
+}
+
 #######################################
 # Main test runner
 #######################################
@@ -3156,6 +4051,96 @@ main() {
     test_recommended_action_valid_json_output
     echo ""
     test_recommended_action_empty_input
+    echo ""
+
+    # Run root structure validation tests
+    echo "====================================="
+    echo "Root Structure Validation Tests (SDDLOOP-6.3003)"
+    echo "====================================="
+    echo ""
+    test_empty_specs_root_warning
+    echo ""
+    test_identical_roots_warning
+    echo ""
+    test_no_warning_for_populated_specs_root
+    echo ""
+    test_no_warning_for_different_roots
+    echo ""
+    test_help_shows_directory_structure
+    echo ""
+    test_empty_specs_root_rejected
+    echo ""
+    test_empty_repos_root_rejected
+    echo ""
+
+    # Run discovery progress tests
+    echo "====================================="
+    echo "Discovery Progress Tests (SDDLOOP-6.3008)"
+    echo "====================================="
+    echo ""
+    test_progress_with_many_repos
+    echo ""
+    test_progress_quiet_mode
+    echo ""
+    test_progress_with_few_repos
+    echo ""
+
+    # Run startup health check tests
+    echo "====================================="
+    echo "Startup Health Check Tests (SDDLOOP-6.3010)"
+    echo "====================================="
+    echo ""
+    test_health_check_fails_missing_jq
+    echo ""
+    test_health_check_fails_missing_realpath
+    echo ""
+    test_health_check_fails_missing_timeout
+    echo ""
+    test_health_check_passes_all_available
+    echo ""
+
+    # Run filesystem timeout tests
+    echo "====================================="
+    echo "Filesystem Operation Timeout Tests (SDDLOOP-6.4003)"
+    echo "====================================="
+    echo ""
+    test_scan_repo_timeout_handling
+    echo ""
+    test_scan_repo_normal_with_timeout
+    echo ""
+
+    # Run JSON log format tests
+    echo "====================================="
+    echo "JSON Log Format Tests (SDDLOOP-6.5004)"
+    echo "====================================="
+    echo ""
+    test_log_format_json_flag
+    echo ""
+    test_log_format_json_env_var
+    echo ""
+    test_log_format_json_valid_json
+    echo ""
+    test_log_format_json_timestamp
+    echo ""
+    test_log_format_json_level
+    echo ""
+    test_log_format_cli_overrides_env
+    echo ""
+    test_log_format_default_text
+    echo ""
+    test_log_format_in_help
+    echo ""
+    test_format_json_log_function
+    echo ""
+    test_format_json_log_special_chars
+    echo ""
+
+    # Run shellcheck static analysis tests
+    echo "====================================="
+    echo "Shellcheck Static Analysis (SDDLOOP-6.5002)"
+    echo "====================================="
+    echo ""
+    test_shellcheck_static_analysis
     echo ""
 
     # Summary
