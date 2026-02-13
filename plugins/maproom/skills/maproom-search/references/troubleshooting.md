@@ -123,3 +123,138 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
    - **Lang values:** `py`, `ts`, `rs`, `go`, `md`, `json`
 
 **Prevention:** Use lowercase values for all filter flags. See the Filtering and Tuning section in [SKILL.md](../SKILL.md) for the complete valid value tables.
+
+---
+
+## Common Error Messages
+
+This section catalogs verbatim CLI error messages with their causes and recovery steps. Match the error text you see against the entries below.
+
+### Repository Not Found
+
+```
+Error: Repository not found: <repo-name>
+```
+
+**Cause:** The `--repo` value does not match any repository name in the maproom database. The name may be misspelled, or the repository has not been scanned.
+
+**Recovery:**
+```bash
+# List all indexed repositories and their names
+crewchief-maproom status
+
+# If the repository is not listed, scan it
+crewchief-maproom scan
+```
+
+### Command Not Found
+
+```
+command not found: crewchief-maproom
+```
+
+**Cause:** The `crewchief-maproom` binary is not installed or is not on the shell `PATH`.
+
+**Recovery:**
+```bash
+# Check if the binary exists anywhere
+command -v crewchief-maproom
+
+# If not found, verify installation method (npm or cargo)
+# The binary may also be available via the crewchief CLI alias:
+command -v crewchief
+```
+
+### No Repositories Indexed
+
+```
+No repositories indexed (example)
+```
+
+**Cause:** The maproom database is empty. No repositories have been scanned, so there is nothing to search against. This error appears when running `search` or `vector-search` before any `scan` has been performed.
+
+**Recovery:**
+```bash
+# Check current database state
+crewchief-maproom status
+
+# Initialize the database if needed
+crewchief-maproom db migrate
+
+# Scan the repository to populate the index
+crewchief-maproom scan
+
+# Verify the scan succeeded
+crewchief-maproom status
+```
+
+See also the [No Repositories Indexed](#no-repositories-indexed) scenario earlier in this document for full root cause analysis and prevention steps.
+
+### Missing Required Arguments
+
+```
+error: the following required arguments were not provided:
+  --repo <REPO>
+  --query <QUERY>
+
+Usage: crewchief-maproom search --repo <REPO> --query <QUERY>
+
+For more information, try '--help'.
+```
+
+**Cause:** One or more required flags were omitted from the command. Both `--repo` and `--query` are required for `search` and `vector-search`.
+
+**Recovery:**
+```bash
+# Include both required flags
+crewchief-maproom search --repo <repo-name> --query "<search terms>"
+
+# Check help for the full flag list
+crewchief-maproom search --help
+```
+
+### Embedding Service Configuration Error
+
+```
+Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
+
+Caused by:
+    0: Configuration error: Invalid configuration value for credentials:
+       Failed to create token provider from ADC
+```
+
+**Cause:** The `vector-search` subcommand requires an embedding API key to convert queries into vectors. Either `OPENAI_API_KEY` is not set or GCP Application Default Credentials (ADC) are not configured.
+
+**Recovery:**
+```bash
+# Check if the environment variable is set
+echo "$OPENAI_API_KEY"
+
+# Set it for the current session
+export OPENAI_API_KEY="<your-key>"
+
+# If you do not have an API key, use full-text search instead
+crewchief-maproom search --repo <repo-name> --query "<search terms>"
+```
+
+### Invalid Flag Value
+
+```
+error: invalid value 'invalid' for '--format <FORMAT>'
+  [possible values: json, agent]
+
+For more information, try '--help'.
+```
+
+**Cause:** A flag was given a value outside its allowed set. The CLI validates enum-type flags (`--format`) and rejects unrecognized values.
+
+**Recovery:**
+```bash
+# Check valid values for the flag in question
+crewchief-maproom search --help
+
+# Use one of the accepted values
+crewchief-maproom search --repo <repo-name> --query "<terms>" --format agent
+```
+
+**Note on silent failures:** Some invalid values do not produce errors but return empty results. In particular, `--kind` and `--lang` accept any string without validation — an incorrect value like `--kind Func` (uppercase) silently matches nothing. See [Zero Results with Valid Query](#zero-results-with-valid-query) above for details.
