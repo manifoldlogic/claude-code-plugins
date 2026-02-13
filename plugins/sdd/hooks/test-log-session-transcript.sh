@@ -17,6 +17,7 @@
 #   9.  Session ID truncation (>128 chars truncated)
 #   10. Concurrent uniqueness (two rapid calls, two files)
 #   11. JSON schema validation (field type checks)
+#   12. Unknown hook event name (sanitization, status: unknown_event)
 #
 # Usage: ./test-log-session-transcript.sh
 
@@ -185,7 +186,7 @@ if [ -n "$T1_FILE" ]; then
 
   # Check filename pattern: {session_id}_{event}_{timestamp}.json
   T1_BASENAME=$(basename "$T1_FILE")
-  if ! echo "$T1_BASENAME" | grep -qE '^test-session-001_PreCompact_[0-9]{8}T[0-9]{12}\.json$'; then
+  if ! echo "$T1_BASENAME" | grep -qE '^test-session-001_precompact_[0-9]{8}T[0-9]{12}\.json$'; then
     printf "  ${RED}FAIL: filename '%s' does not match expected pattern${NC}\n" "$T1_BASENAME"
     T1_PASS=false
   fi
@@ -257,7 +258,7 @@ if [ -n "$T2_FILE" ]; then
 
   # Check filename pattern
   T2_BASENAME=$(basename "$T2_FILE")
-  if ! echo "$T2_BASENAME" | grep -qE '^test-session-002_SessionEnd_[0-9]{8}T[0-9]{12}\.json$'; then
+  if ! echo "$T2_BASENAME" | grep -qE '^test-session-002_sessionend_[0-9]{8}T[0-9]{12}\.json$'; then
     printf "  ${RED}FAIL: filename '%s' does not match expected pattern${NC}\n" "$T2_BASENAME"
     T2_PASS=false
   fi
@@ -625,7 +626,7 @@ if [ -d "$T9_LOG_DIR" ]; then
   T9_FILENAME=$(ls -1 "$T9_LOG_DIR" | head -1)
   # Filename format: {sanitized_session_id}_{event}_{timestamp}.json
   # Extract the session_id portion (everything before the first _PreCompact)
-  T9_SID_PART=$(echo "$T9_FILENAME" | sed 's/_PreCompact_.*//')
+  T9_SID_PART=$(echo "$T9_FILENAME" | sed 's/_precompact_.*//')
   T9_SID_LEN=${#T9_SID_PART}
   if [ "$T9_SID_LEN" -gt 128 ]; then
     printf "  ${RED}FAIL: session_id in filename is %d chars, expected <= 128${NC}\n" "$T9_SID_LEN"
@@ -752,6 +753,83 @@ else
 fi
 
 if [ "$T11_PASS" = "true" ]; then
+  printf "  ${GREEN}PASS${NC}\n"
+  PASSED=$((PASSED + 1))
+else
+  FAILED=$((FAILED + 1))
+fi
+
+# ============================================================
+# Test 12: Unknown hook event name
+# ============================================================
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test ${TESTS_RUN}: Unknown event name handling"
+
+T12_DIR="${TEST_DIR}/t12"
+mkdir -p "$T12_DIR"
+
+T12_JSON=$(cat <<'ENDJSON'
+{
+  "session_id": "test-session-012",
+  "transcript_path": "/tmp/transcript-012.jsonl",
+  "cwd": "/workspace/repos/my-project",
+  "hook_event_name": "NewEventType-With Spaces!!!"
+}
+ENDJSON
+)
+
+set +e
+echo "$T12_JSON" | SDD_ROOT_DIR="$T12_DIR" python3 "$HOOK_SCRIPT"
+T12_EXIT=$?
+set -e
+
+T12_PASS=true
+
+if [ "$T12_EXIT" -ne 0 ]; then
+  printf "  ${RED}FAIL: exit code %d, expected 0${NC}\n" "$T12_EXIT"
+  T12_PASS=false
+fi
+
+# Verify file created with sanitized event name (lowercase, special chars removed)
+T12_LOG_DIR=$(log_dir_path "$T12_DIR")
+T12_COUNT=$(count_log_files "$T12_DIR")
+
+if [ "$T12_COUNT" -ne 1 ]; then
+  printf "  ${RED}FAIL: expected 1 log file, found %s${NC}\n" "$T12_COUNT"
+  T12_PASS=false
+fi
+
+if [ -d "$T12_LOG_DIR" ]; then
+  T12_FILENAME=$(ls -1 "$T12_LOG_DIR" | head -1)
+  # Event "NewEventType-With Spaces!!!" -> strip non-alnum except -/_ -> "NewEventType-WithSpaces"
+  # -> truncate to 20 chars -> "NewEventType-WithSpa" -> lowercase -> "neweventtype-withspa"
+  if ! echo "$T12_FILENAME" | grep -qE '^test-session-012_neweventtype-withspa_[0-9]{8}T[0-9]{12}\.json$'; then
+    printf "  ${RED}FAIL: filename '%s' does not match expected sanitized pattern${NC}\n" "$T12_FILENAME"
+    T12_PASS=false
+  fi
+fi
+
+# Verify status indicates unknown event
+T12_FILE=$(get_log_file "$T12_DIR")
+if [ -n "$T12_FILE" ]; then
+  T12_STATUS=$(jq -r '.status' "$T12_FILE")
+  if [ "$T12_STATUS" != "unknown_event" ]; then
+    printf "  ${RED}FAIL: status='%s', expected 'unknown_event'${NC}\n" "$T12_STATUS"
+    T12_PASS=false
+  fi
+
+  # Verify original event name is preserved in the JSON
+  T12_EVENT=$(jq -r '.hook_event_name' "$T12_FILE")
+  if [ "$T12_EVENT" != "NewEventType-With Spaces!!!" ]; then
+    printf "  ${RED}FAIL: hook_event_name='%s', expected original unsanitized value${NC}\n" "$T12_EVENT"
+    T12_PASS=false
+  fi
+else
+  printf "  ${RED}FAIL: no log file found${NC}\n"
+  T12_PASS=false
+fi
+
+if [ "$T12_PASS" = "true" ]; then
   printf "  ${GREEN}PASS${NC}\n"
   PASSED=$((PASSED + 1))
 else

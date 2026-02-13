@@ -16,11 +16,15 @@ Exit code 0 = always (passive logging, never blocks)
 """
 import json
 import os
+import re
 import sys
 import datetime
 
 # Maximum length for sanitized session IDs to prevent filesystem issues
 MAX_SESSION_ID_LENGTH = 128
+
+# Known hook events this script handles
+KNOWN_EVENTS = {"PreCompact", "SessionEnd"}
 
 
 def sanitize_session_id(session_id):
@@ -43,6 +47,24 @@ def sanitize_session_id(session_id):
     """
     sanitized = session_id.replace('/', '').replace('\\', '').replace('..', '').replace('\0', '')[:MAX_SESSION_ID_LENGTH]
     return os.path.basename(sanitized)
+
+
+def sanitize_event_name(event_name):
+    """
+    Sanitize hook event name for safe use in filenames.
+
+    Removes non-alphanumeric characters (except hyphen/underscore) and
+    truncates to 20 characters to prevent filesystem issues.
+
+    Args:
+        event_name: Raw event name from hook input
+
+    Returns:
+        Sanitized event name safe for filename use
+    """
+    # Remove special characters, keep alphanumeric + hyphen + underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '', event_name)
+    return sanitized[:20].lower()
 
 
 def main():
@@ -97,12 +119,17 @@ def main():
     elif hook_event_name == 'SessionEnd':
         log_entry['reason'] = input_data.get('reason', '')
 
+    # Check if event is recognized
+    if hook_event_name not in KNOWN_EVENTS:
+        log_entry['status'] = 'unknown_event'
+
     # Sanitize session_id for filename
     sanitized_session_id = sanitize_session_id(session_id) if session_id else 'unknown'
 
-    # Construct filename
+    # Construct filename with sanitized event name
     event = hook_event_name if hook_event_name else 'unknown'
-    filename = f"{sanitized_session_id}_{event}_{compact_timestamp}.json"
+    sanitized_event = sanitize_event_name(event)
+    filename = f"{sanitized_session_id}_{sanitized_event}_{compact_timestamp}.json"
     filepath = os.path.join(log_dir, filename)
 
     # Set umask for 0600 file permissions before writing
