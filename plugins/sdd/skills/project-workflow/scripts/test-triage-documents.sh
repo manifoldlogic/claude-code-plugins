@@ -17,6 +17,13 @@
 #  10. No duplicate documents - each document ID appears exactly once
 #  11. Core documents always generated - analysis, architecture, plan always action=generate
 #  12. Standard documents always generated - prd, quality-strategy, security-review always action=generate
+#  17. Shell injection - command substitution $(whoami) with marker file
+#  18. Shell injection - pipe operator
+#  19. Shell injection - semicolon
+#  20. Legitimate special characters preserved
+#  21. Shell injection - backtick execution with marker file
+#  22. Shell injection - redirect injection with marker file
+#  23. Shell injection - combined injection vectors with marker file
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -33,6 +40,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRIAGE_SCRIPT="$SCRIPT_DIR/triage-documents.sh"
 REGISTRY_FILE="$SCRIPT_DIR/../templates/document-registry.json"
+
+# --- Marker File Cleanup ---
+# Shell injection tests use marker files to detect command execution.
+# Clean up on exit to avoid leaving files behind even if tests fail.
+
+cleanup_markers() {
+    rm -f /tmp/smrting-test-marker-* 2>/dev/null
+}
+trap cleanup_markers EXIT
+
+# Pre-clean any leftover marker files from prior runs
+cleanup_markers
 
 # --- Test Counters ---
 
@@ -545,23 +564,32 @@ fi
 # =============================================
 # Test 17: Shell injection - command substitution
 # Description contains $(whoami) - should be sanitized, not executed
+# Also uses a marker file to prove the command was not executed
 # =============================================
 
 printf -- "\n${CYAN}--- Shell Injection Tests ---${NC}\n\n"
 
-run_triage 'test$(whoami)'
+run_triage 'test$(touch /tmp/smrting-test-marker-17)$(whoami)'
 
 test_name="Shell injection: command substitution \$(whoami) is treated as literal"
 if [ "$TRIAGE_EXIT" -ne 0 ]; then
     log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
 else
-    # The description in the JSON output should NOT contain the current username
+    test_ok=true
+    # Check 1: The description in the JSON output should NOT contain the current username
     # from executing whoami - it should contain the escaped/literal form
     actual_user=$(whoami)
     desc_in_output=$(printf '%s' "$TRIAGE_OUTPUT" | jq -r '.ticket_description')
     if printf '%s' "$desc_in_output" | grep -qF "$actual_user"; then
         log_fail "$test_name" "command substitution was executed (found '$actual_user' in output)"
-    else
+        test_ok=false
+    fi
+    # Check 2: Marker file should NOT exist - proves touch was not executed
+    if [ -f /tmp/smrting-test-marker-17 ]; then
+        log_fail "$test_name" "marker file /tmp/smrting-test-marker-17 was created (command executed!)"
+        test_ok=false
+    fi
+    if $test_ok; then
         log_pass "$test_name"
     fi
 fi
@@ -622,6 +650,96 @@ else
         log_pass "$test_name"
     else
         log_fail "$test_name" "api-contract='$api_action', observability='$obs_action' (both should be 'generate')"
+    fi
+fi
+
+# =============================================
+# Test 21: Shell injection - backtick execution
+# Description: "test `touch /tmp/smrting-test-marker-21`"
+# Backticks should be sanitized, marker file must NOT be created
+# =============================================
+
+run_triage 'test `touch /tmp/smrting-test-marker-21`'
+
+test_name="Shell injection: backtick execution is sanitized"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    test_ok=true
+    # Verify valid JSON output
+    if ! printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+        log_fail "$test_name" "output is not valid JSON (backtick may have broken execution)"
+        test_ok=false
+    fi
+    # Verify marker file was NOT created (proves backtick command was not executed)
+    if [ -f /tmp/smrting-test-marker-21 ]; then
+        log_fail "$test_name" "marker file /tmp/smrting-test-marker-21 was created (backtick command executed!)"
+        test_ok=false
+    fi
+    if $test_ok; then
+        log_pass "$test_name"
+    fi
+fi
+
+# =============================================
+# Test 22: Shell injection - redirect injection
+# Description: "test > /tmp/smrting-test-marker-22"
+# Redirect operator should be sanitized, file must NOT be created
+# =============================================
+
+run_triage 'test > /tmp/smrting-test-marker-22'
+
+test_name="Shell injection: redirect operator is sanitized"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    test_ok=true
+    # Verify valid JSON output
+    if ! printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+        log_fail "$test_name" "output is not valid JSON (redirect may have broken execution)"
+        test_ok=false
+    fi
+    # Verify marker file was NOT created (proves redirect was not executed)
+    if [ -f /tmp/smrting-test-marker-22 ]; then
+        log_fail "$test_name" "marker file /tmp/smrting-test-marker-22 was created (redirect was executed!)"
+        test_ok=false
+    fi
+    if $test_ok; then
+        log_pass "$test_name"
+    fi
+fi
+
+# =============================================
+# Test 23: Shell injection - combined injection with marker file
+# Description contains multiple injection vectors with a marker file
+# $(touch /tmp/smrting-test-marker-23); `id` | cat
+# =============================================
+
+run_triage 'deploy $(touch /tmp/smrting-test-marker-23); `id` | cat'
+
+test_name="Shell injection: combined vectors with marker file detection"
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+else
+    test_ok=true
+    # Verify valid JSON output
+    if ! printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+        log_fail "$test_name" "output is not valid JSON (combined injection broke execution)"
+        test_ok=false
+    fi
+    # Verify marker file was NOT created
+    if [ -f /tmp/smrting-test-marker-23 ]; then
+        log_fail "$test_name" "marker file /tmp/smrting-test-marker-23 was created (command executed!)"
+        test_ok=false
+    fi
+    # Verify keyword matching still works - "deploy" should trigger observability
+    if $test_ok; then
+        obs_action=$(get_action "observability")
+        if [ "$obs_action" = "generate" ]; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "keyword matching broken: observability='$obs_action', expected 'generate' for 'deploy'"
+        fi
     fi
 fi
 
