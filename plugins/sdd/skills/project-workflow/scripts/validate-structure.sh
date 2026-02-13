@@ -30,16 +30,8 @@ done
 # shellcheck source=common.sh
 . "$SCRIPT_DIR/common.sh"
 
-# Check for required dependencies
-if ! command -v jq >/dev/null 2>&1; then
-    printf "[ERROR] jq is required but not installed.\n" >&2
-    printf "\n" >&2
-    printf "Install jq using your package manager:\n" >&2
-    printf "  apt-get install jq    # Debian/Ubuntu\n" >&2
-    printf "  brew install jq       # macOS\n" >&2
-    printf "  yum install jq        # RHEL/CentOS\n" >&2
-    exit 1
-fi
+# Check for required dependencies (uses check_jq_version from common.sh)
+check_jq_version || exit 1
 
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 

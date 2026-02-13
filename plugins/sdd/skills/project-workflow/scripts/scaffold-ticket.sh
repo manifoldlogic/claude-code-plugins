@@ -18,17 +18,6 @@
 
 set -euo pipefail
 
-# Check for required dependencies
-if ! command -v jq >/dev/null 2>&1; then
-    printf "[ERROR] jq is required but not installed.\n" >&2
-    printf "\n" >&2
-    printf "Install jq using your package manager:\n" >&2
-    printf "  apt-get install jq    # Debian/Ubuntu\n" >&2
-    printf "  brew install jq       # macOS\n" >&2
-    printf "  yum install jq        # RHEL/CentOS\n" >&2
-    exit 1
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/../templates/ticket"
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
@@ -43,6 +32,9 @@ done
 
 # shellcheck source=common.sh
 . "$SCRIPT_DIR/common.sh"
+
+# Check for required dependencies (after sourcing common.sh for check_jq_version)
+check_jq_version || exit 1
 
 # Cleanup state: tracks whether this invocation created the ticket directory
 CREATED_TICKET_DIR=false

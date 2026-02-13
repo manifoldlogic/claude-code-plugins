@@ -21,6 +21,16 @@ Epic (research/discovery)
 3. **Sonnet for reasoning** - Planning, review, verification
 4. **Strict delegation** - Orchestrator NEVER does work itself. This principle preserves context conservation by maximizing token efficiency (delegating work to fresh contexts instead of consuming orchestrator tokens), maintaining sharp attention focus (orchestrator coordinates rather than gets buried in implementation details), and extending session longevity (avoiding context exhaustion from doing work directly). For general-purpose implementation work, use the Task tool with `subagent_type: "general-purpose"` to spawn fresh subagent contexts. See [delegation-patterns.md](references/delegation-patterns.md) for detailed decision criteria on when and how to delegate.
 
+## Prerequisites
+
+- **jq 1.5+**: JSON processor used by scaffolding, triage, and validation scripts. Install with your package manager:
+  - `apt-get install jq` (Debian/Ubuntu)
+  - `brew install jq` (macOS)
+  - `yum install jq` (RHEL/CentOS)
+  - `apk add jq` (Alpine)
+
+  Scripts validate the jq version on startup and exit with a clear error if the requirement is not met.
+
 ## Workflow Hierarchy
 
 ### Epics
