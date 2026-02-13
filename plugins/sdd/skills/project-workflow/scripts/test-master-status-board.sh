@@ -3037,6 +3037,101 @@ test_help_shows_directory_structure() {
 }
 
 #######################################
+# Test: Progress messages appear with >= 10 repos
+#######################################
+test_progress_with_many_repos() {
+    echo "--- Test: Progress messages with >= 10 repos ---"
+
+    local specs_root="$TEST_TMP_DIR/progress_many_specs"
+    local repos_root="$TEST_TMP_DIR/progress_many_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    # Create 15 spec directories to trigger progress (threshold is 10)
+    local i=1
+    while [ $i -le 15 ]; do
+        mkdir -p "$specs_root/repo-$(printf '%02d' $i)"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Progress with many repos exits with code 0"
+
+    # Should contain progress message at 10/15
+    assert_contains "$stderr_output" "[INFO] Discovering repos... (10/15)" "Progress logged at 10/15"
+
+    # Should contain final progress message at 15/15
+    assert_contains "$stderr_output" "[INFO] Discovering repos... (15/15)" "Final progress logged at 15/15"
+}
+
+#######################################
+# Test: No progress messages in quiet mode
+#######################################
+test_progress_quiet_mode() {
+    echo "--- Test: No progress in quiet mode ---"
+
+    local specs_root="$TEST_TMP_DIR/progress_quiet_specs"
+    local repos_root="$TEST_TMP_DIR/progress_quiet_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    # Create 15 spec directories (above threshold)
+    local i=1
+    while [ $i -le 15 ]; do
+        mkdir -p "$specs_root/repo-$(printf '%02d' $i)"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" --quiet --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Quiet mode exits with code 0"
+
+    # Should NOT contain any progress messages
+    if echo "$stderr_output" | grep -q "Discovering repos"; then
+        log_result "Quiet mode suppresses progress" "fail" "Found progress messages in quiet mode"
+    else
+        log_result "Quiet mode suppresses progress" "pass"
+    fi
+}
+
+#######################################
+# Test: No progress messages with < 10 repos
+#######################################
+test_progress_with_few_repos() {
+    echo "--- Test: No progress with < 10 repos ---"
+
+    local specs_root="$TEST_TMP_DIR/progress_few_specs"
+    local repos_root="$TEST_TMP_DIR/progress_few_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
+
+    # Create only 5 spec directories (below threshold of 10)
+    local i=1
+    while [ $i -le 5 ]; do
+        mkdir -p "$specs_root/repo-$(printf '%02d' $i)"
+        i=$((i + 1))
+    done
+
+    local stderr_output
+    stderr_output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Few repos exits with code 0"
+
+    # Should NOT contain any progress messages (below threshold)
+    if echo "$stderr_output" | grep -q "Discovering repos"; then
+        log_result "No progress below threshold" "fail" "Found progress messages with < 10 repos"
+    else
+        log_result "No progress below threshold" "pass"
+    fi
+}
+
+#######################################
 # Main test runner
 #######################################
 main() {
@@ -3285,6 +3380,18 @@ main() {
     test_no_warning_for_different_roots
     echo ""
     test_help_shows_directory_structure
+    echo ""
+
+    # Run discovery progress tests
+    echo "====================================="
+    echo "Discovery Progress Tests (SDDLOOP-6.3008)"
+    echo "====================================="
+    echo ""
+    test_progress_with_many_repos
+    echo ""
+    test_progress_quiet_mode
+    echo ""
+    test_progress_with_few_repos
     echo ""
 
     # Summary

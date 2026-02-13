@@ -20,6 +20,7 @@
 #
 # Options:
 #   -h, --help          Show this help message and exit
+#   -q, --quiet         Suppress progress messages (to stderr)
 #   -s, --summary-only  Output only summary section (no per-repo details)
 #   -v, --verbose       Include timing output for each repo scan (to stderr)
 #   --specs-root PATH   Root directory containing SDD spec directories
@@ -109,6 +110,7 @@ VERSION="2.0.0"
 DEBUG="${DEBUG:-false}"
 SUMMARY_ONLY="${SUMMARY_ONLY:-false}"
 VERBOSE="${VERBOSE:-false}"
+QUIET="${QUIET:-false}"
 
 #######################################
 # Print debug message to stderr
@@ -120,6 +122,19 @@ VERBOSE="${VERBOSE:-false}"
 debug_log() {
     if [[ "$DEBUG" == "true" ]]; then
         echo "[DEBUG] $*" >&2
+    fi
+}
+
+#######################################
+# Print info message to stderr (suppressed by --quiet)
+# Arguments:
+#   $@ - Message to print
+# Outputs:
+#   Writes message to stderr if QUIET is not enabled
+#######################################
+log_info() {
+    if [ "$QUIET" != "true" ]; then
+        echo "[INFO] $*" >&2
     fi
 }
 
@@ -592,6 +607,7 @@ Examples:
 
 Options:
   -h, --help          Show this help message and exit
+  -q, --quiet         Suppress progress messages (to stderr)
   -s, --summary-only  Output only summary section (no per-repo details)
   -v, --verbose       Include timing output for each repo scan (to stderr)
   --specs-root PATH   Root directory containing SDD spec directories
@@ -772,6 +788,10 @@ main() {
                 show_usage
                 exit 0
                 ;;
+            --quiet|-q)
+                QUIET="true"
+                shift
+                ;;
             --summary-only|-s)
                 SUMMARY_ONLY="true"
                 shift
@@ -813,6 +833,7 @@ main() {
                     while [ $i -lt ${#opts} ]; do
                         local opt="${opts:$i:1}"
                         case "$opt" in
+                            q) QUIET="true" ;;
                             s) SUMMARY_ONLY="true" ;;
                             v) VERBOSE="true" ;;
                             h) show_usage; exit 0 ;;
@@ -946,6 +967,12 @@ main() {
     local repos_json=""
     local first_repo=true
 
+    # Count total specs directories before discovery loop (for progress indication)
+    local discovery_total
+    discovery_total=$(find "$specs_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    discovery_total=$(echo "$discovery_total" | tr -d ' ')
+    local discovery_current=0
+
     # Iterate direct children of specs root
     for sdd_path in "$specs_root"*/; do
         [ -d "$sdd_path" ] || continue
@@ -956,6 +983,12 @@ main() {
             debug_log "Skipping invalid path: $sdd_path"
             continue
         }
+
+        # Increment discovery counter and log progress every 10 repos
+        discovery_current=$((discovery_current + 1))
+        if [ "$discovery_total" -ge 10 ] && [ $((discovery_current % 10)) -eq 0 ]; then
+            log_info "Discovering repos... ($discovery_current/$discovery_total)"
+        fi
 
         debug_log "Found SDD spec dir: $resolved_path"
 
@@ -1023,6 +1056,11 @@ main() {
         total_tested=$((total_tested + repo_tested))
         total_verified=$((total_verified + repo_verified))
     done
+
+    # Final discovery progress (only if >= 10 repos)
+    if [ "$discovery_total" -ge 10 ]; then
+        log_info "Discovering repos... ($discovery_total/$discovery_total)"
+    fi
 
     # Output total timing if verbose
     if [ "$VERBOSE" = "true" ]; then
