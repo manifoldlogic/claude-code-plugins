@@ -27,23 +27,16 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 1
 fi
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/../templates/ticket"
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 
+# shellcheck source=common.sh
+. "$SCRIPT_DIR/common.sh"
+
 # Cleanup state: tracks whether this invocation created the ticket directory
 CREATED_TICKET_DIR=false
 CLEANUP_TICKET_PATH=""
-
-error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
-info() { echo -e "${GREEN}[INFO]${NC} $1" >&2; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
 
 # Cleanup partial ticket directory on failure.
 # Only removes directory if it was created by THIS invocation (not pre-existing).

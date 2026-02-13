@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+# Source shared helper functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+. "$SCRIPT_DIR/common.sh"
+
 # Check for required dependencies
 if ! command -v jq >/dev/null 2>&1; then
     printf "[ERROR] jq is required but not installed.\n" >&2

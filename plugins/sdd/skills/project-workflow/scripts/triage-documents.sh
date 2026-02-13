@@ -38,16 +38,11 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 1
 fi
 
-# Colors (stderr only)
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REGISTRY_FILE="$SCRIPT_DIR/../templates/document-registry.json"
 
-error() { printf "${RED}[ERROR]${NC} %s\n" "$1" >&2; }
-warn() { printf "${YELLOW}[WARN]${NC} %s\n" "$1" >&2; }
+# shellcheck source=common.sh
+. "$SCRIPT_DIR/common.sh"
 
 # Sanitize user-provided description to prevent shell injection.
 # Escapes shell metacharacters: backticks, $, (), {}, ;, <, >, |, &
