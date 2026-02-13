@@ -77,12 +77,13 @@ validate_name() {
 
 check_ticket_id_unique() {
     local ticket_id="$1"
-    # Check active tickets
+    # Pre-check: detect reuse of ticket ID with any name (non-atomic, defense-in-depth)
+    # The atomic mkdir below is the authoritative duplicate guard
     if ls -d "$SDD_ROOT_DIR/tickets/${ticket_id}_"* 2>/dev/null | grep -q .; then
         error "TICKET_ID '$ticket_id' already exists in active tickets"
         exit 1
     fi
-    # Check archived tickets
+    # Check archived tickets (advisory warning only)
     if ls -d "$SDD_ROOT_DIR/archive/tickets/${ticket_id}_"* 2>/dev/null | grep -q .; then
         warn "TICKET_ID '$ticket_id' exists in archived tickets - proceeding with caution"
     fi
@@ -244,15 +245,19 @@ main() {
         fi
     fi
 
-    # Check if already exists
-    if [[ -d "$ticket_path" ]]; then
+    info "Creating ticket: $folder_name"
+
+    # Ensure parent directory exists
+    mkdir -p "$SDD_ROOT_DIR/tickets"
+
+    # Atomic create-or-fail (no TOCTOU race window)
+    # mkdir without -p fails if directory already exists, combining check + create atomically
+    if ! mkdir "$ticket_path" 2>/dev/null; then
         error "Ticket already exists: $ticket_path"
         exit 1
     fi
 
-    info "Creating ticket: $folder_name"
-
-    # Create directory structure
+    # Create subdirectories (ticket_path now guaranteed to exist and be ours)
     mkdir -p "$ticket_path"/{planning,tasks,deliverables}
 
     # --- Determine which documents to generate ---
