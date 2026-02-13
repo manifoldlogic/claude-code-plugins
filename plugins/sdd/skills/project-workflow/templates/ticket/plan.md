@@ -11,8 +11,11 @@ This document outlines the execution plan for the ticket.
 **Objective:** [What this phase achieves]
 
 **Deliverables:**
-- [Concrete deliverable 1]
-- [Concrete deliverable 2]
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| [deliverable-1.md] | [Purpose] | [extract: path/ | archive | external: Location] |
+| [deliverable-2.md] | [Purpose] | [extract: path/ | archive | external: Location] |
 
 **Agent Assignments:**
 - [agent-name]: [responsibility]
@@ -25,8 +28,11 @@ This document outlines the execution plan for the ticket.
 **Objective:** [What this phase achieves]
 
 **Deliverables:**
-- [Concrete deliverable 1]
-- [Concrete deliverable 2]
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| [deliverable-1.md] | [Purpose] | [extract: path/ | archive | external: Location] |
+| [deliverable-2.md] | [Purpose] | [extract: path/ | archive | external: Location] |
 
 **Agent Assignments:**
 - [agent-name]: [responsibility]
@@ -38,7 +44,10 @@ This document outlines the execution plan for the ticket.
 **Objective:** [What this phase achieves]
 
 **Deliverables:**
-- [Concrete deliverable 1]
+<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
+| Deliverable | Purpose | Disposition |
+|-------------|---------|-------------|
+| [deliverable-1.md] | [Purpose] | [extract: path/ | archive | external: Location] |
 
 **Agent Assignments:**
 - [agent-name]: [responsibility]
