@@ -24,6 +24,7 @@
 #  21. Shell injection - backtick execution with marker file
 #  22. Shell injection - redirect injection with marker file
 #  23. Shell injection - combined injection vectors with marker file
+#  24. jq dependency check - exits 1 with actionable error when jq not in PATH
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -752,6 +753,51 @@ else
         else
             log_fail "$test_name" "keyword matching broken: observability='$obs_action', expected 'generate' for 'deploy'"
         fi
+    fi
+fi
+
+# =============================================
+# Test 24: jq dependency check
+# Run triage-documents.sh with jq removed from PATH
+# Expect: exit code 1, error message contains "jq is required"
+# =============================================
+
+printf -- "\n${CYAN}--- Dependency Check Tests ---${NC}\n\n"
+
+test_name="jq dependency check: exits 1 with actionable error when jq missing"
+
+# Create a temporary bin directory with symlinks to all essential commands EXCEPT jq.
+# This is more reliable than removing directories from PATH, because jq may share
+# directories with bash, printf, grep, sed, and other tools the script needs.
+NO_JQ_BIN=$(mktemp -d)
+for cmd in bash printf grep sed cat cd dirname pwd mkdir wc find head sort ls rm cp; do
+    cmd_path=$(command -v "$cmd" 2>/dev/null || true)
+    if [ -n "$cmd_path" ] && [ -x "$cmd_path" ]; then
+        ln -sf "$cmd_path" "$NO_JQ_BIN/$cmd"
+    fi
+done
+# Explicitly do NOT link jq
+
+set +e
+# JQ_CHECK_OUTPUT captures stderr where the error message is printed
+# shellcheck disable=SC2034
+JQ_CHECK_OUTPUT=$(PATH="$NO_JQ_BIN" bash "$TRIAGE_SCRIPT" "test description" 2>&1)
+JQ_CHECK_EXIT=$?
+set -e
+
+# Clean up temporary bin directory
+rm -rf "$NO_JQ_BIN"
+
+test_ok=true
+if [ "$JQ_CHECK_EXIT" -ne 1 ]; then
+    log_fail "$test_name" "exit code was $JQ_CHECK_EXIT, expected 1"
+    test_ok=false
+fi
+if $test_ok; then
+    if printf '%s' "$JQ_CHECK_OUTPUT" | grep -q "jq is required"; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "error message does not contain 'jq is required'"
     fi
 fi
 

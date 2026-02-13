@@ -27,6 +27,17 @@
 
 set -euo pipefail
 
+# Check for required dependencies
+if ! command -v jq >/dev/null 2>&1; then
+    printf "[ERROR] jq is required but not installed.\n" >&2
+    printf "\n" >&2
+    printf "Install jq using your package manager:\n" >&2
+    printf "  apt-get install jq    # Debian/Ubuntu\n" >&2
+    printf "  brew install jq       # macOS\n" >&2
+    printf "  yum install jq        # RHEL/CentOS\n" >&2
+    exit 1
+fi
+
 # Colors (stderr only)
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
