@@ -1,0 +1,111 @@
+name: Monthly CLI Verification
+
+# Automates the monthly CLI flag verification procedure documented in
+# plugins/maproom/README.md (Maintenance > Monthly CLI Verification).
+#
+# Schedule: First Friday of each month at 10:00 AM UTC
+# Manual: Use workflow_dispatch to run on demand
+#
+# On drift detection, creates a GitHub issue with remediation instructions.
+#
+# Reference: MAPAGENT.5001 (automate-monthly-verification)
+
+on:
+  schedule:
+    - cron: '0 10 * * 5'  # Every Friday at 10:00 AM UTC
+  workflow_dispatch:       # Manual trigger for ad-hoc verification
+
+jobs:
+  verify-cli:
+    name: Verify CLI flags
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if first Friday of month
+        id: check-date
+        run: |
+          DAY=$(date +%d)
+          if [ "$DAY" -ge 1 ] && [ "$DAY" -le 7 ]; then
+            echo "is_first_friday=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_first_friday=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.check-date.outputs.is_first_friday == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install crewchief-maproom
+        if: steps.check-date.outputs.is_first_friday == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          npm install -g crewchief-maproom || {
+            echo "::warning::crewchief-maproom npm install failed, attempting cargo install"
+            if command -v cargo >/dev/null 2>&1; then
+              cargo install crewchief-maproom
+            else
+              echo "::error::Neither npm nor cargo install succeeded for crewchief-maproom"
+              exit 1
+            fi
+          }
+
+      - name: Run verification script
+        if: steps.check-date.outputs.is_first_friday == 'true' || github.event_name == 'workflow_dispatch'
+        id: verify
+        run: bash plugins/maproom/scripts/monthly-cli-verification.sh
+        continue-on-error: true
+
+      - name: Create issue on drift detection
+        if: steps.verify.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERIFICATION_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          gh issue create \
+            --title "CLI Drift Detected - Monthly Verification Failed" \
+            --label "maintenance,cli-verification,urgent" \
+            --body "$(cat <<EOF
+          ## CLI Drift Detected
+
+          **Date:** ${VERIFICATION_DATE}
+          **Workflow Run:** [View logs](${RUN_URL})
+
+          ### What happened
+
+          The monthly CLI verification workflow detected changes in the
+          \`crewchief-maproom\` CLI flags or behavior that differ from the
+          documented baseline.
+
+          ### Impact
+
+          52 command examples across plugin documentation depend on 6 CLI flags.
+          If flags have been renamed or removed, agents will learn deprecated
+          syntax and encounter command failures.
+
+          ### Remediation
+
+          1. Review the [workflow run logs](${RUN_URL}) for specific drift details
+          2. Run the verification script locally for detailed output:
+             \`\`\`bash
+             bash plugins/maproom/scripts/monthly-cli-verification.sh
+             \`\`\`
+          3. Create a ticket to update all affected documentation:
+             - \`plugins/maproom/skills/maproom-search/SKILL.md\`
+             - \`plugins/maproom/skills/maproom-search/references/multi-repo-guide.md\`
+             - \`plugins/maproom/README.md\`
+             - Baseline deliverable (\`cli-flag-verification.md\`)
+          4. Follow the escalation path documented in README.md (Maintenance section)
+
+          ### Reference
+
+          - MAPAGENT.4001: Monthly CLI verification procedure
+          - MAPAGENT.5001: Automation of monthly verification
+          - Baseline: \`planning/deliverables/cli-flag-verification.md\`
+          EOF
+          )"

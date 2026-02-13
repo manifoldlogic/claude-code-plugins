@@ -146,6 +146,11 @@ Uses context expansion to show where validateCart is called throughout the codeb
 
 **Purpose:** Detect crewchief-maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
 
+**Automation:** This procedure is automated via GitHub Actions (see `.github/workflows/monthly-cli-verification.yml`). The workflow runs on the first Friday of each month and creates a GitHub issue if drift is detected. Manual execution is still supported for ad-hoc verification using the `workflow_dispatch` trigger or by running the script directly:
+```bash
+bash plugins/maproom/scripts/monthly-cli-verification.sh
+```
+
 **Cadence:** First Friday of each month
 
 **Owner:** Maproom plugin maintainer
