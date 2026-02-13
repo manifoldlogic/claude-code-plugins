@@ -84,6 +84,16 @@ fi
 description=$(sanitize_description "$1")
 shift
 
+# Validate description length (prevent jq OOM on very large inputs)
+DESCRIPTION_MAX_LENGTH=10240  # 10KB
+desc_length=${#description}
+if [ "$desc_length" -gt "$DESCRIPTION_MAX_LENGTH" ]; then
+    printf "[ERROR] Ticket description exceeds %d-byte limit (current: %d bytes).\n" "$DESCRIPTION_MAX_LENGTH" "$desc_length" >&2
+    printf "\n" >&2
+    printf "Please provide a concise description. Move detailed requirements to planning documents.\n" >&2
+    exit 1
+fi
+
 # --- Parse Overrides ---
 
 overrides_plus=""

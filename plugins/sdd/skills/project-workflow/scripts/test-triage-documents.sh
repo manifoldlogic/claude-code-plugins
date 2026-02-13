@@ -25,6 +25,8 @@
 #  22. Shell injection - redirect injection with marker file
 #  23. Shell injection - combined injection vectors with marker file
 #  24. jq dependency check - exits 1 with actionable error when jq not in PATH
+#  25. Description length at limit (10240 bytes) - accepted
+#  26. Description length over limit (11000 bytes) - rejected with exit 1
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -798,6 +800,53 @@ if $test_ok; then
         log_pass "$test_name"
     else
         log_fail "$test_name" "error message does not contain 'jq is required'"
+    fi
+fi
+
+# =============================================
+# Test 25: Description length at limit (10240 bytes)
+# A description of exactly 10240 bytes should be accepted
+# =============================================
+
+printf -- "\n${CYAN}--- Description Length Limit Tests ---${NC}\n\n"
+
+# Generate a description of exactly 10240 bytes
+desc_at_limit=$(dd if=/dev/zero bs=1 count=10240 2>/dev/null | tr '\0' 'a')
+
+run_triage "$desc_at_limit"
+
+test_name="Description length at limit (10240 bytes): accepted"
+if [ "$TRIAGE_EXIT" -eq 0 ]; then
+    log_pass "$test_name"
+else
+    log_fail "$test_name" "exit code was $TRIAGE_EXIT, expected 0"
+fi
+
+# =============================================
+# Test 26: Description length over limit (11000 bytes)
+# A description of 11000 bytes should be rejected with exit 1
+# and error message containing "exceeds"
+# =============================================
+
+# Generate a description of 11000 bytes
+desc_over_limit=$(dd if=/dev/zero bs=1 count=11000 2>/dev/null | tr '\0' 'a')
+
+set +e
+OVERLIMIT_OUTPUT=$(bash "$TRIAGE_SCRIPT" "$desc_over_limit" 2>&1)
+OVERLIMIT_EXIT=$?
+set -e
+
+test_name="Description length over limit (11000 bytes): rejected with exit 1"
+test_ok=true
+if [ "$OVERLIMIT_EXIT" -ne 1 ]; then
+    log_fail "$test_name" "exit code was $OVERLIMIT_EXIT, expected 1"
+    test_ok=false
+fi
+if $test_ok; then
+    if printf '%s' "$OVERLIMIT_OUTPUT" | grep -q "exceeds"; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "error message does not contain 'exceeds'"
     fi
 fi
 
