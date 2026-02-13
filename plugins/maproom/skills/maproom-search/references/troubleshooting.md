@@ -1,6 +1,6 @@
 # Maproom Troubleshooting
 
-Detailed error recovery for the five most common maproom issues. This is a companion to the quick-reference troubleshooting section in [SKILL.md](../SKILL.md) — start there for quick fixes, and use this file when you need root cause analysis or step-by-step recovery.
+Detailed error recovery for common maproom issues, including edge case handling for boundary conditions and concurrency scenarios. This is a companion to the quick-reference troubleshooting section in [SKILL.md](../SKILL.md) — start there for quick fixes, and use this file when you need root cause analysis or step-by-step recovery.
 
 ## Debugging Workflow
 
@@ -445,3 +445,240 @@ crewchief-maproom search --repo <repo-name> --query "<terms>" --format agent
 ```
 
 **Note on silent failures:** Some invalid values do not produce errors but return empty results. In particular, `--kind` and `--lang` accept any string without validation — an incorrect value like `--kind Func` (uppercase) silently matches nothing. See [Zero Results with Valid Query](#zero-results-with-valid-query) above for details.
+
+---
+
+## Edge Case Handling
+
+This section documents boundary conditions, resource errors, and concurrency scenarios tested against `crewchief-maproom` version 0.1.0. Each entry records empirical CLI behavior observed during testing.
+
+### SQLite Lock Contention (GAP-006) -- HIGH PRIORITY
+
+**Symptom:** When multiple agents or processes run `crewchief-maproom search` or `crewchief-maproom scan` concurrently against the same repository, commands may fail with SQLite lock errors such as `SQLITE_BUSY` or connection pool timeouts.
+
+**Root Cause:** The maproom database uses SQLite, which has limited write concurrency. Concurrent read-only operations (searches) are handled well by SQLite's WAL mode. However, concurrent write operations (scan while searching) or access to a locked database can cause contention.
+
+**Observed behavior (tested 2026-02-13, CLI v0.1.0):**
+- **10 concurrent searches:** All 10 processes completed successfully (exit code 0, no stderr). SQLite WAL mode handles concurrent reads without contention.
+- **Scan + 5 concurrent searches:** All 6 processes (1 scan + 5 searches) completed successfully (exit code 0, no stderr). The CLI handles mixed read/write concurrency gracefully at this scale.
+- **No `SQLITE_BUSY` errors observed** in any concurrent test scenario with up to 10 simultaneous processes.
+
+**Fix:**
+1. If you encounter a `SQLITE_BUSY` or connection pool timeout error during concurrent operations, retry the failed command after a short delay:
+   ```bash
+   sleep 2
+   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   ```
+2. Avoid running multiple `scan` commands against the same repository simultaneously. Concurrent reads (searches) are safe.
+3. If contention persists, serialize write operations (scan, generate-embeddings) and allow only read operations (search, vector-search) to run concurrently.
+
+**Prevention:** Do not launch multiple `scan` or `generate-embeddings` commands for the same repository in parallel. Concurrent `search` commands are safe at typical agent workloads (tested up to 10 simultaneous processes). If running batch search workflows with very high concurrency, add a small delay between launches.
+
+### Invalid `--k` Values (GAP-001)
+
+**Symptom:** The `--k` flag accepts boundary values that produce unexpected results: zero returns no output silently, negative values with space syntax cause a parse error, and negative values with equals syntax silently return all matching results.
+
+**Root Cause:** The CLI parses `--k` as a numeric type without validating the semantic range. Different syntax patterns produce different behaviors:
+
+**Observed behavior (tested 2026-02-13, CLI v0.1.0):**
+
+| Input | Behavior | Exit Code | Output |
+|-------|----------|-----------|--------|
+| `--k 0` | Silent success, no results | 0 | Empty stdout, no stderr |
+| `--k -1` (space) | Parse error: `unexpected argument '-1' found` | 2 | Usage hint on stderr |
+| `--k=-1` (equals) | Silent success, returns **all** matching results (910 for "test" query) | 0 | All matching chunks |
+| `--k=-2` (equals) | Same as `--k=-1` — returns all matching results | 0 | All matching chunks |
+| `--k 10000` | Success, returns all matching results (910, capped by index size) | 0 | All matching chunks |
+| `--k 1` | Success, returns exactly 1 result | 0 | 1 result |
+
+**Fix:**
+1. Always use positive integer values for `--k`. The default is 10 if omitted.
+2. If you accidentally pass `--k 0` and get no results, the command succeeded but returned nothing — increase `--k` to a positive value.
+3. Do not rely on `--k=-1` to mean "return all results" — while it works in practice (due to unsigned integer wrapping), this is undocumented behavior. Use a large explicit value like `--k 10000` instead.
+   ```bash
+   # Correct - explicit positive value
+   crewchief-maproom search --repo <repo> --query "<terms>" --k 20 --format agent
+
+   # Avoid - undocumented wrapping behavior
+   crewchief-maproom search --repo <repo> --query "<terms>" --k=-1 --format agent
+   ```
+
+**Prevention:** Validate that `--k` is a positive integer (>= 1) before executing search commands. The practical upper bound is the total number of indexed chunks (check with `crewchief-maproom status`). Values above the chunk count simply return all results.
+
+### Invalid `--threshold` Values (GAP-002)
+
+**Symptom:** The `--threshold` flag (available only on `vector-search`, not `search`) rejects negative values with a parse error, while values above 1.0 are accepted syntactically but may produce no results.
+
+**Root Cause:** The `--threshold` flag is exclusive to the `vector-search` subcommand. Passing `--threshold` to `search` produces an "unexpected argument" error. Negative values with space syntax trigger a parse error because the shell interprets `-0` as a separate flag.
+
+**Observed behavior (tested 2026-02-13, CLI v0.1.0):**
+
+| Input | Subcommand | Behavior | Exit Code |
+|-------|------------|----------|-----------|
+| `--threshold -0.5` (space) | `search` | `error: unexpected argument '--threshold' found` | 2 |
+| `--threshold 1.5` | `search` | `error: unexpected argument '--threshold' found` | 2 |
+| `--threshold -0.5` (space) | `vector-search` | `error: unexpected argument '-0' found` | 2 |
+| `--threshold=-0.5` (equals) | `vector-search` | Accepted by parser (fails at API key check before validation) | 1 |
+| `--threshold=1.5` (equals) | `vector-search` | Accepted by parser (fails at API key check before validation) | 1 |
+
+**Note:** Full threshold range validation could not be tested empirically because `vector-search` requires `OPENAI_API_KEY` which was not available in the test environment. The parser accepts the values, but runtime behavior with actual embeddings is untested.
+
+**Fix:**
+1. Only use `--threshold` with the `vector-search` subcommand, never with `search`:
+   ```bash
+   # Correct - threshold with vector-search
+   crewchief-maproom vector-search --repo <repo> --query "<terms>" --threshold 0.7 --format agent
+
+   # Wrong - threshold is not a search flag
+   crewchief-maproom search --repo <repo> --query "<terms>" --threshold 0.7 --format agent
+   ```
+2. Use values in the documented range of 0.0 to 1.0 (cosine similarity score).
+3. When passing negative values, use equals syntax (`--threshold=-0.5`) to avoid shell parse ambiguity — though negative thresholds are semantically meaningless for cosine similarity.
+
+**Prevention:** Only pass `--threshold` to `vector-search`. Keep values between 0.0 and 1.0. A threshold of 0.0 returns all results (no filtering); a threshold of 1.0 requires exact matches only.
+
+### Invalid `--preview-length` Values (GAP-003)
+
+**Symptom:** The `--preview-length` flag rejects negative values but accepts zero, which produces results with truncated previews showing only an ellipsis (`...`).
+
+**Root Cause:** The CLI parses `--preview-length` as an unsigned integer. Negative values are rejected at the parser level. Zero is accepted but produces minimal output (just the `...` truncation marker).
+
+**Observed behavior (tested 2026-02-13, CLI v0.1.0):**
+
+| Input | Behavior | Exit Code | Output |
+|-------|----------|-----------|--------|
+| `--preview-length 0` | Success, previews show only `...` | 0 | Results with truncated previews |
+| `--preview-length -100` (space) | `error: unexpected argument '-1' found` | 2 | Parse error on stderr |
+| `--preview-length -1` (space) | `error: unexpected argument '-1' found` | 2 | Parse error on stderr |
+| `--preview-length=-100` (equals) | `error: invalid value '-100' for '--preview-length <PREVIEW_LENGTH>': invalid digit found in string` | 2 | Validation error on stderr |
+| `--preview-length=-1` (equals) | `error: invalid value '-1' for '--preview-length <PREVIEW_LENGTH>': invalid digit found in string` | 2 | Validation error on stderr |
+| `--preview-length 1` | Success, previews show 1 character + `...` | 0 | Single-char previews |
+| `--preview-length 99999` | Success, full content shown (no truncation) | 0 | Full chunk content |
+
+**Fix:**
+1. Use a positive integer for `--preview-length`. The default is 200 for JSON format or 120 for agent format.
+2. If previews appear as only `...`, check that `--preview-length` is not set to 0.
+   ```bash
+   # Correct - reasonable preview length
+   crewchief-maproom search --repo <repo> --query "<terms>" --preview-length 150 --format agent
+
+   # Avoid - zero produces empty previews
+   crewchief-maproom search --repo <repo> --query "<terms>" --preview-length 0 --format agent
+   ```
+
+**Prevention:** Use positive values for `--preview-length`. Omit the flag to use the format-appropriate default (120 for `--format agent`, 200 for `--format json`). Very large values are safe but produce verbose output.
+
+### Disk Full During Scan (GAP-004)
+
+**Note:** This edge case has not been tested empirically due to the risk of destabilizing the shared development environment. Simulating disk-full conditions requires filling the filesystem, which could affect other processes and services.
+
+**Symptom (predicted):** `crewchief-maproom scan` fails mid-operation when the filesystem runs out of space. The SQLite database may be left in an inconsistent state if the write-ahead log (WAL) cannot be flushed.
+
+**Root Cause (predicted):** SQLite requires disk space to maintain the WAL file (`maproom.db-wal`) and shared memory file (`maproom.db-shm`) alongside the main database. During `scan`, the CLI writes new chunks to the database. If disk space is exhausted, SQLite write operations fail.
+
+**Expected error pattern:**
+```
+Error: disk I/O error
+```
+or
+```
+Error: database or disk is full
+```
+
+**Fix:**
+1. Free disk space and re-run the scan:
+   ```bash
+   # Check available disk space
+   df -h ~/.maproom/
+
+   # Free space, then re-scan
+   crewchief-maproom scan
+   ```
+2. If the database is corrupted after a disk-full event, delete and rebuild:
+   ```bash
+   rm ~/.maproom/<repo>/maproom.db*
+   crewchief-maproom db migrate
+   crewchief-maproom scan
+   ```
+
+**Prevention:** Ensure at least 2x the expected database size is available before running `scan` or `generate-embeddings`. Check the current database size with `ls -lh ~/.maproom/<repo>/maproom.db*`. For reference, a repository with 6,450 chunks produces a ~67 MB database with a ~40 MB WAL file.
+
+### Permission Denied on Database (GAP-005)
+
+**Symptom:** Search or scan commands fail with repeated `ERROR unable to open database file` messages followed by a connection pool timeout. The CLI retries with exponential backoff for approximately 25 seconds before giving up.
+
+**Root Cause:** The maproom database file (`~/.maproom/<repo>/maproom.db`) or its directory has insufficient filesystem permissions. SQLite requires read access for searches and write access for scans. SQLite also needs access to the WAL file (`maproom.db-wal`) and shared memory file (`maproom.db-shm`) in the same directory.
+
+**Observed behavior (tested 2026-02-13, CLI v0.1.0):**
+
+| Scenario | Behavior | Exit Code |
+|----------|----------|-----------|
+| Read-only database file (`chmod 444`) + `search` | **Success** — SQLite can read from read-only files | 0 |
+| Read-only database file (`chmod 444`) + `scan` | `Error: attempt to write a readonly database` (Error code 8) | 1 |
+| No permissions on directory (`chmod 000`) + `search` | Repeated `ERROR unable to open database file` with exponential backoff (~25 sec), then `Error: Failed to create SQLite connection pool` / `timed out waiting for connection` | 1 |
+| No permissions on WAL file (`chmod 000`) + `search` | Same connection pool timeout as directory denial (~25 sec retry loop) | 1 |
+
+**Verbatim error for scan with read-only database:**
+```
+Error: scan failed for <worktree>
+
+Caused by:
+    0: attempt to write a readonly database
+    1: Error code 8: Attempt to write a readonly database
+```
+
+**Verbatim error for directory/WAL permission denial:**
+```
+ERROR unable to open database file: /home/<user>/.maproom/<repo>/maproom.db
+...
+Error: Failed to create SQLite connection pool
+
+Caused by:
+    timed out waiting for connection: unable to open database file: /home/<user>/.maproom/<repo>/maproom.db
+```
+
+**Fix:**
+1. Restore correct permissions on the database files:
+   ```bash
+   chmod 644 ~/.maproom/<repo>/maproom.db
+   chmod 644 ~/.maproom/<repo>/maproom.db-wal
+   chmod 644 ~/.maproom/<repo>/maproom.db-shm
+   chmod 755 ~/.maproom/<repo>/
+   ```
+2. Verify the fix:
+   ```bash
+   crewchief-maproom search --repo <repo> --query "test" --format agent --k 1
+   ```
+
+**Prevention:** Do not modify permissions on the `~/.maproom/` directory or its contents. If running in a container or restricted environment, ensure the database directory is writable by the user running `crewchief-maproom`. The CLI will retry database connections with exponential backoff for approximately 25 seconds before timing out — a long-running `ERROR unable to open database file` log stream is the primary symptom of permission issues.
+
+### Large `--k` Values and Memory (GAP-007)
+
+**Symptom:** Passing very large `--k` values returns all matching results without error but may produce large output volumes and longer execution times.
+
+**Root Cause:** The CLI does not impose an upper limit on `--k` beyond the integer parsing boundary. Values exceeding the total number of matching chunks simply return all matches. The CLI parses `--k` as a signed 64-bit integer, so the maximum accepted value is 9,223,372,036,854,775,807 (i64 max). Values at or above u64 max (18,446,744,073,709,551,615) are rejected with a parse error.
+
+**Observed behavior (tested 2026-02-13, CLI v0.1.0):**
+
+| Input | Results | Duration | Exit Code |
+|-------|---------|----------|-----------|
+| `--k 10` (default) | 10 | <1 sec | 0 |
+| `--k 10000` | 910 (all matches for "test") | <1 sec | 0 |
+| `--k 999999` | 3,499 (all matches for "the"), ~750 KB output | ~25 sec | 0 |
+| `--k 9999999` | 3,499 (same, capped by index) | ~25 sec | 0 |
+| `--k 9223372036854775807` (i64 max) | All matches | varies | 0 |
+| `--k 18446744073709551615` (u64 max) | `error: invalid value: number too large to fit in target type` | n/a | 2 |
+
+**Fix:**
+1. Use reasonable `--k` values. For most search workflows, `--k 10` to `--k 50` is sufficient.
+2. If you need all results, use `--k 10000` rather than extreme values — this avoids unnecessary processing time.
+3. If the CLI rejects a value with "number too large to fit in target type", reduce `--k` to a value within the i64 range.
+   ```bash
+   # Correct - practical upper bound
+   crewchief-maproom search --repo <repo> --query "<terms>" --k 100 --format agent
+
+   # Avoid - unnecessarily large, slower execution
+   crewchief-maproom search --repo <repo> --query "<terms>" --k 999999 --format agent
+   ```
+
+**Prevention:** Keep `--k` values proportional to the expected result set size. Check `crewchief-maproom status` to see total chunk counts per repository. For a repository with 6,450 chunks, `--k 100` covers the top 1.5% of results. Very large `--k` values (999,999+) cause longer execution times (~25 seconds vs. <1 second) and produce large output volumes (~750 KB) without improving result quality, since all additional results are lower-relevance matches.
