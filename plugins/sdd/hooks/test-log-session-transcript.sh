@@ -97,6 +97,30 @@ get_log_file() {
   fi
 }
 
+# Helper function: Validate required fields exist in JSON file
+# Usage: validate_json_fields "/path/to/file.json" "field1 field2 field3"
+# Returns: 0 on success, 1 if any field is missing or null
+validate_json_fields() {
+    local json_file="$1"
+    local fields="$2"
+
+    if [ ! -f "$json_file" ]; then
+        echo "FAIL: JSON file not found: $json_file"
+        return 1
+    fi
+
+    for field in $fields; do
+        local value
+        value=$(jq -r ".$field" "$json_file")
+        if [ "$value" = "null" ] || [ -z "$value" ]; then
+            echo "FAIL: Missing or null field '$field' in $json_file"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
 # ============================================================
 # Test 1: PreCompact happy path
 # ============================================================
@@ -151,12 +175,9 @@ if [ -n "$T1_FILE" ]; then
   fi
 
   # Check required fields
-  for field in session_id transcript_path cwd hook_event_name timestamp status trigger custom_instructions; do
-    if ! jq -e "has(\"$field\")" "$T1_FILE" >/dev/null 2>&1; then
-      printf "  ${RED}FAIL: missing field '%s'${NC}\n" "$field"
-      T1_PASS=false
-    fi
-  done
+  if ! validate_json_fields "$T1_FILE" "session_id transcript_path cwd hook_event_name timestamp status trigger custom_instructions"; then
+    T1_PASS=false
+  fi
 
   # Check field values
   T1_STATUS=$(jq -r '.status' "$T1_FILE")
@@ -242,14 +263,19 @@ if [ "$T2_COUNT" -ne 1 ]; then
 fi
 
 if [ -n "$T2_FILE" ]; then
-  # Check status
+  # Check required fields exist and are not null/empty
+  if ! validate_json_fields "$T2_FILE" "session_id transcript_path cwd hook_event_name timestamp status reason"; then
+    T2_PASS=false
+  fi
+
+  # Check status value
   T2_STATUS=$(jq -r '.status' "$T2_FILE")
   if [ "$T2_STATUS" != "ok" ]; then
     printf "  ${RED}FAIL: status='%s', expected 'ok'${NC}\n" "$T2_STATUS"
     T2_PASS=false
   fi
 
-  # Check reason field (SessionEnd-specific)
+  # Check reason field value (SessionEnd-specific)
   T2_REASON=$(jq -r '.reason' "$T2_FILE")
   if [ "$T2_REASON" != "user_exit" ]; then
     printf "  ${RED}FAIL: reason='%s', expected 'user_exit'${NC}\n" "$T2_REASON"
@@ -729,13 +755,10 @@ if [ -z "$T11_FILE" ]; then
   printf "  ${RED}FAIL: no log file created for schema validation${NC}\n"
   T11_PASS=false
 else
-  # Validate each field type using jq
-  for field in session_id transcript_path cwd hook_event_name timestamp status trigger custom_instructions; do
-    if ! jq -e ".${field} | type == \"string\"" "$T11_FILE" >/dev/null 2>&1; then
-      printf "  ${RED}FAIL: field '%s' is not a string type${NC}\n" "$field"
-      T11_PASS=false
-    fi
-  done
+  # Validate all required fields exist and are not null/empty
+  if ! validate_json_fields "$T11_FILE" "session_id transcript_path cwd hook_event_name timestamp status trigger custom_instructions"; then
+    T11_PASS=false
+  fi
 
   # Validate timestamp looks like an ISO format
   T11_TS=$(jq -r '.timestamp' "$T11_FILE")
