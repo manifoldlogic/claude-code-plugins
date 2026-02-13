@@ -274,6 +274,75 @@ For candidates that survive all gates and validation, prepare skill proposals.
 
 **Why it was NOT proposed as a standalone skill:** This pattern was already captured as `.claude/skills/skill-md-structure/SKILL.md` during the ISKIM ticket. This example demonstrates that Step 5 (Validate Against Existing Criteria) correctly filters out duplicates, even when the pattern is observed frequently in transcripts.
 
+## Troubleshooting
+
+If log files are not being created in `${SDD_ROOT_DIR}/logs/session-transcripts/`, follow these verification steps:
+
+### 1. Verify SDD_ROOT_DIR is Set
+
+Check that the environment variable is configured:
+
+```bash
+echo "SDD_ROOT_DIR=${SDD_ROOT_DIR}"
+```
+
+Expected output: `/path/to/sdd/root` (not empty)
+
+If empty, the `setup-sdd-env.js` SessionStart hook may not have run. Check that the SDD plugin is installed.
+
+### 2. Verify Log Directory Exists and is Writable
+
+Check directory permissions:
+
+```bash
+ls -ld ${SDD_ROOT_DIR}/logs/session-transcripts/
+```
+
+Expected: Directory exists and is writable by current user.
+
+If directory is missing, create it manually:
+
+```bash
+mkdir -p ${SDD_ROOT_DIR}/logs/session-transcripts
+chmod 700 ${SDD_ROOT_DIR}/logs/session-transcripts
+```
+
+### 3. Verify Hook Registration
+
+Check that the hook is registered in plugin.json:
+
+```bash
+jq '.hooks.PreCompact, .hooks.SessionEnd' plugins/sdd/.claude-plugin/plugin.json
+```
+
+Expected: Both hooks list `log-session-transcript.py` with timeout 10.
+
+If missing, hook registration (SKILLLOG.1003) was not completed successfully.
+
+### 4. Test Hook Manually
+
+Execute the hook with test input to check for Python errors:
+
+```bash
+export SDD_ROOT_DIR=/path/to/your/sdd/root
+echo '{"session_id": "test123", "transcript_path": "/tmp/test.jsonl", "cwd": "/workspace", "hook_event_name": "SessionEnd", "reason": "test"}' | python3 plugins/sdd/hooks/log-session-transcript.py
+echo "Exit code: $?"
+```
+
+Expected: Exit code 0, no output. Check for new file in `${SDD_ROOT_DIR}/logs/session-transcripts/`.
+
+If Python errors appear, the hook script has a bug.
+
+### 5. Common Causes of Silent Failures
+
+- **Empty transcript_path**: PreCompact hook has known bug (#13668) where `transcript_path` is sometimes empty. Log entry is created with `status: "empty_path"`.
+- **Hook timeout**: If hook takes >10s (very unlikely), Claude Code kills it. Check for extremely slow disk I/O.
+- **Python not available**: Hook requires Python 3 in PATH. Check: `python3 --version`
+- **Permissions issue**: Hook creates files with 0600 permissions. If umask is restrictive, verify with: `umask`
+- **Disk full**: If disk is full, file creation fails silently. Check: `df -h ${SDD_ROOT_DIR}`
+
+If none of these steps reveal the issue, check Claude Code's internal logs for hook execution errors.
+
 ## References
 
 - **Skill curation infrastructure:**
