@@ -3,45 +3,50 @@
 # Master Status Board
 # Multi-repository SDD status aggregator
 #
-# Version: 1.0.0
-# Description: Discovers all _SDD directories across multiple repositories
-#              in a workspace and aggregates status information.
+# Version: 2.0.0
+# Description: Discovers all SDD spec directories under a specs root
+#              and maps them to repos under a repos root, aggregating
+#              status information across the two-root structure.
 #
 # Usage:
-#   bash master-status-board.sh [options] [workspace_root]
+#   bash master-status-board.sh [options]
 #
 # Examples:
-#   bash master-status-board.sh                         # Use default workspace
-#   bash master-status-board.sh /path/to/repos          # Use specific workspace
-#   bash master-status-board.sh --summary-only /workspace/repos/
-#   bash master-status-board.sh --verbose /workspace/repos/
-#   WORKSPACE_ROOT=/custom/path bash master-status-board.sh
-#
-# Arguments:
-#   workspace_root    Root directory containing repositories (optional)
-#                     Priority: argument > WORKSPACE_ROOT env var > default
-#                     Default: /workspace/repos/
+#   bash master-status-board.sh                                      # Use defaults
+#   bash master-status-board.sh --specs-root /workspace/_SPECS/      # Custom specs root
+#   bash master-status-board.sh --repos-root /workspace/repos/       # Custom repos root
+#   bash master-status-board.sh --summary-only --verbose
+#   SPECS_ROOT=/custom/_SPECS/ REPOS_ROOT=/custom/repos/ bash master-status-board.sh
 #
 # Options:
-#   -h, --help        Show this help message and exit
+#   -h, --help          Show this help message and exit
 #   -s, --summary-only  Output only summary section (no per-repo details)
-#   -v, --verbose     Include timing output for each repo scan (to stderr)
-#   --json            Output JSON format (default, explicit specification)
-#   --debug           Enable debug output to stderr
+#   -v, --verbose       Include timing output for each repo scan (to stderr)
+#   --specs-root PATH   Root directory containing SDD spec directories
+#                        Priority: --specs-root > SPECS_ROOT env var > default
+#                        Default: /workspace/_SPECS/
+#   --repos-root PATH   Root directory containing code repositories
+#                        Priority: --repos-root > REPOS_ROOT env var > default
+#                        Default: /workspace/repos/
+#   --json              Output JSON format (default, explicit specification)
+#   --debug             Enable debug output to stderr
 #
 # Environment Variables:
-#   WORKSPACE_ROOT    Alternative to passing workspace root as argument
+#   SPECS_ROOT        Alternative to passing --specs-root option
+#   REPOS_ROOT        Alternative to passing --repos-root option
+#   WORKSPACE_ROOT    Deprecated: maps to REPOS_ROOT with warning
 #   DEBUG             Set to "true" to enable debug output
 #
 # Output (JSON):
 #   {
-#     "version": "1.0.0",
+#     "version": "2.0.0",
 #     "timestamp": "2024-01-15T10:30:00+00:00",
-#     "workspace_root": "/workspace/repos/",
+#     "specs_root": "/workspace/_SPECS/",
+#     "repos_root": "/workspace/repos/",
 #     "repos": [
 #       {
 #         "name": "repo-name",
-#         "sdd_path": "/workspace/repos/repo-name/_SDD",
+#         "sdd_path": "/workspace/_SPECS/repo-name",
 #         "repo_path": "/workspace/repos/repo-name"
 #       }
 #     ]
@@ -49,7 +54,7 @@
 #
 # JSON Schema:
 #   type: object
-#   required: [version, timestamp, workspace_root, repos]
+#   required: [version, timestamp, specs_root, repos_root, repos]
 #   properties:
 #     version:
 #       type: string
@@ -59,39 +64,46 @@
 #       type: string
 #       format: date-time
 #       description: ISO 8601 timestamp of scan
-#     workspace_root:
+#     specs_root:
 #       type: string
-#       description: Absolute path to workspace root
+#       description: Absolute path to specs root directory
+#     repos_root:
+#       type: string
+#       description: Absolute path to repos root directory
 #     repos:
 #       type: array
 #       items:
 #         type: object
-#         required: [name, sdd_path, repo_path]
+#         required: [name, sdd_path]
 #         properties:
 #           name:
 #             type: string
 #             description: Repository directory name
 #           sdd_path:
 #             type: string
-#             description: Absolute path to _SDD directory
+#             description: Absolute path to SDD spec directory
 #           repo_path:
 #             type: string
-#             description: Absolute path to repository root
+#             nullable: true
+#             description: Absolute path to repository root, or null if not found
+#           repo_status:
+#             type: string
+#             description: Present only when repo_path is null, value is "repo_not_found"
 #
 # Exit Codes:
-#   0 - Success (including empty workspace)
-#   1 - Workspace directory does not exist
+#   0 - Success (including empty specs root)
+#   1 - Specs directory does not exist
 #   2 - Invalid arguments
 #
 
 set -euo pipefail
 
 # Version constant
-VERSION="1.0.0"
+VERSION="2.0.0"
 
 # Configuration defaults (guard against re-sourcing)
-[[ -z "${DEFAULT_WORKSPACE_ROOT:-}" ]] && readonly DEFAULT_WORKSPACE_ROOT="/workspace/repos/"
-[[ -z "${MAX_SEARCH_DEPTH:-}" ]] && readonly MAX_SEARCH_DEPTH=2
+[ -z "${DEFAULT_SPECS_ROOT:-}" ] && readonly DEFAULT_SPECS_ROOT="/workspace/_SPECS/"
+[ -z "${DEFAULT_REPOS_ROOT:-}" ] && readonly DEFAULT_REPOS_ROOT="/workspace/repos/"
 
 # Global flags
 DEBUG="${DEBUG:-false}"
@@ -404,9 +416,10 @@ scan_ticket() {
 }
 
 #######################################
-# Scan a repository's _SDD directory and aggregate all tickets
+# Scan a repository's SDD spec directory and aggregate all tickets
 # Arguments:
-#   $1 - Path to _SDD directory
+#   $1 - Path to SDD spec directory (under specs root)
+#   $2 - Path to code repository (under repos root), or empty if not found
 # Outputs:
 #   JSON object with repo status and ticket summaries to stdout
 # Returns:
@@ -415,13 +428,16 @@ scan_ticket() {
 #######################################
 scan_repo() {
     local sdd_root="$1"
+    local repo_path="${2:-}"
 
     # Validate directory exists
-    if [[ ! -d "$sdd_root" ]]; then
+    if [ ! -d "$sdd_root" ]; then
         debug_log "SDD root directory not found: $sdd_root"
         printf '{\n'
         printf '  "name": "",\n'
         printf '  "sdd_root": "%s",\n' "$(json_escape "$sdd_root")"
+        printf '  "repo_path": null,\n'
+        printf '  "repo_status": "repo_not_found",\n'
         printf '  "tickets": [],\n'
         printf '  "summary": {"total_tickets": 0, "total_tasks": 0, "pending": 0, "completed": 0, "tested": 0, "verified": 0},\n'
         printf '  "error": "Directory not found"\n'
@@ -429,9 +445,9 @@ scan_repo() {
         return 1
     fi
 
-    # Extract repo name from parent directory of _SDD
+    # Extract repo name from the SDD directory itself (basename of specs dir)
     local repo_name
-    repo_name=$(basename "$(dirname "$sdd_root")")
+    repo_name=$(basename "$sdd_root")
     debug_log "Scanning repo: $repo_name (SDD root: $sdd_root)"
 
     # Initialize aggregation counters
@@ -501,8 +517,14 @@ scan_repo() {
     printf '{\n'
     printf '  "name": "%s",\n' "$(json_escape "$repo_name")"
     printf '  "sdd_root": "%s",\n' "$(json_escape "$sdd_root")"
+    if [ -n "$repo_path" ] && [ -d "$repo_path" ]; then
+        printf '  "repo_path": "%s",\n' "$(json_escape "$repo_path")"
+    else
+        printf '  "repo_path": null,\n'
+        printf '  "repo_status": "repo_not_found",\n'
+    fi
     printf '  "tickets": ['
-    if [[ -n "$tickets_json" ]]; then
+    if [ -n "$tickets_json" ]; then
         printf '%s\n' "$tickets_json"
         printf '  ],\n'
     else
@@ -547,38 +569,44 @@ show_usage() {
 Master Status Board v${VERSION} - Multi-repository SDD status aggregator
 
 Usage:
-  bash master-status-board.sh [options] [workspace_root]
+  bash master-status-board.sh [options]
 
 Examples:
-  # Full output with all repo details
-  ./master-status-board.sh /workspace/repos/
+  # Full output with all repo details (using defaults)
+  ./master-status-board.sh
+
+  # Custom specs and repos roots
+  ./master-status-board.sh --specs-root /workspace/_SPECS/ --repos-root /workspace/repos/
 
   # Summary only (no per-repo details)
-  ./master-status-board.sh --summary-only /workspace/repos/
+  ./master-status-board.sh --summary-only
 
   # Verbose timing output
-  ./master-status-board.sh --verbose /workspace/repos/
+  ./master-status-board.sh --verbose
 
   # Combined options
-  ./master-status-board.sh -sv /workspace/repos/
+  ./master-status-board.sh -sv
 
-  # Use environment variable
-  WORKSPACE_ROOT=/custom/path ./master-status-board.sh
-
-Arguments:
-  workspace_root    Root directory containing repositories (optional)
-                    Priority: argument > WORKSPACE_ROOT env var > default
-                    Default: /workspace/repos/
+  # Use environment variables
+  SPECS_ROOT=/custom/_SPECS/ REPOS_ROOT=/custom/repos/ ./master-status-board.sh
 
 Options:
-  -h, --help        Show this help message and exit
+  -h, --help          Show this help message and exit
   -s, --summary-only  Output only summary section (no per-repo details)
-  -v, --verbose     Include timing output for each repo scan (to stderr)
-  --json            Output JSON format (default, explicit specification)
-  --debug           Enable debug output to stderr
+  -v, --verbose       Include timing output for each repo scan (to stderr)
+  --specs-root PATH   Root directory containing SDD spec directories
+                       Priority: --specs-root > SPECS_ROOT env var > default
+                       Default: /workspace/_SPECS/
+  --repos-root PATH   Root directory containing code repositories
+                       Priority: --repos-root > REPOS_ROOT env var > default
+                       Default: /workspace/repos/
+  --json              Output JSON format (default, explicit specification)
+  --debug             Enable debug output to stderr
 
 Environment Variables:
-  WORKSPACE_ROOT    Alternative to passing workspace root as argument
+  SPECS_ROOT        Root directory containing SDD spec directories
+  REPOS_ROOT        Root directory containing code repositories
+  WORKSPACE_ROOT    Deprecated: maps to REPOS_ROOT with warning
   DEBUG             Set to "true" to enable debug output
 
 Timing Output (with --verbose):
@@ -587,8 +615,8 @@ Timing Output (with --verbose):
   [0.38s] Total: 5 tickets, 23 tasks in 0.38s
 
 Exit Codes:
-  0 - Success (including empty workspace)
-  1 - Workspace directory does not exist
+  0 - Success (including empty specs root)
+  1 - Specs directory does not exist
   2 - Invalid arguments
 EOF
 }
@@ -602,25 +630,28 @@ show_help() {
 # Resolve path to absolute, following symlinks if safe
 # Arguments:
 #   $1 - Path to resolve
-#   $2 - Workspace root for symlink validation
+#   $2 - Specs root for symlink validation
 # Outputs:
-#   Absolute path, or empty string if symlink points outside workspace
+#   Absolute path, or empty string if symlink points outside specs root
 #######################################
 resolve_path() {
     local path="$1"
-    local workspace_root="$2"
+    local specs_root="$2"
     local resolved
 
     # Check if it's a symlink
-    if [[ -L "$path" ]]; then
+    if [ -L "$path" ]; then
         # Resolve the symlink target
         resolved=$(readlink -f "$path" 2>/dev/null) || return 1
 
-        # Validate symlink remains within workspace root
-        if [[ ! "$resolved" == "$workspace_root"* ]]; then
-            debug_log "Symlink $path points outside workspace: $resolved"
-            return 1
-        fi
+        # Validate symlink remains within specs root
+        case "$resolved" in
+            "$specs_root"*) ;;
+            *)
+                debug_log "Symlink $path points outside specs root: $resolved"
+                return 1
+                ;;
+        esac
         echo "$resolved"
     else
         # Not a symlink, just canonicalize
@@ -629,88 +660,63 @@ resolve_path() {
 }
 
 #######################################
-# Discover all _SDD directories under workspace root
+# Discover all SDD spec directories under specs root
 # Arguments:
-#   $1 - Workspace root directory
+#   $1 - Specs root directory
+#   $2 - Repos root directory
 # Outputs:
 #   JSON array of discovered repos to stdout
 #   Warnings to stderr for permission errors
 #######################################
 discover_sdd_directories() {
-    local workspace_root="$1"
+    local specs_root="$1"
+    local repos_root="$2"
     local first=true
 
-    debug_log "Discovering _SDD directories in: $workspace_root"
-
-    # Use find with maxdepth to limit search scope
-    # -type d: only directories
-    # -name "_SDD": exact match
-    # 2>/dev/null: suppress permission denied errors (we handle them)
-    local find_output
-    find_output=$(find "$workspace_root" -maxdepth "$MAX_SEARCH_DEPTH" -type d -name "_SDD" 2>&1) || true
-
-    # Separate actual results from errors
-    local sdd_dirs=""
-    local errors=""
-
-    while IFS= read -r line; do
-        if [[ "$line" == *"Permission denied"* ]]; then
-            errors+="$line"$'\n'
-        elif [[ -n "$line" && -d "$line" ]]; then
-            sdd_dirs+="$line"$'\n'
-        fi
-    done <<< "$find_output"
-
-    # Log permission errors to stderr
-    if [[ -n "$errors" ]]; then
-        echo "Warning: Some directories were not accessible:" >&2
-        echo "$errors" >&2
-    fi
+    debug_log "Discovering SDD spec directories in: $specs_root"
 
     # Output JSON array of repos
     echo "  \"repos\": ["
 
-    # Process discovered directories
-    if [[ -n "$sdd_dirs" ]]; then
-        # Sort for consistent output
-        local sorted_dirs
-        sorted_dirs=$(echo -n "$sdd_dirs" | sort)
+    # Iterate direct children of specs root
+    for sdd_path in "$specs_root"*/; do
+        [ -d "$sdd_path" ] || continue
 
-        while IFS= read -r sdd_path; do
-            [[ -z "$sdd_path" ]] && continue
+        # Resolve and validate the path
+        local resolved_path
+        resolved_path=$(resolve_path "$sdd_path" "$specs_root") || {
+            debug_log "Skipping invalid path: $sdd_path"
+            continue
+        }
 
-            # Resolve and validate the path
-            local resolved_path
-            resolved_path=$(resolve_path "$sdd_path" "$workspace_root") || {
-                debug_log "Skipping invalid path: $sdd_path"
-                continue
-            }
+        # Extract repo name from specs directory basename
+        local repo_name
+        repo_name=$(basename "$resolved_path")
+        local repo_path="${repos_root}${repo_name}/"
 
-            # Extract repo name (parent directory of _SDD)
-            local repo_path
-            repo_path=$(dirname "$resolved_path")
-            local repo_name
-            repo_name=$(basename "$repo_path")
+        debug_log "Found SDD spec dir: $repo_name"
 
-            debug_log "Found _SDD in repo: $repo_name"
+        # Output JSON object
+        if [ "$first" = "true" ]; then
+            first=false
+        else
+            # Print comma before next object (on same line as previous closing brace)
+            printf ",\n"
+        fi
 
-            # Output JSON object
-            if [[ "$first" == "true" ]]; then
-                first=false
-            else
-                # Print comma before next object (on same line as previous closing brace)
-                printf ",\n"
-            fi
-
-            printf '    {\n'
-            printf '      "name": "%s",\n' "$(json_escape "$repo_name")"
-            printf '      "sdd_path": "%s",\n' "$(json_escape "$resolved_path")"
+        printf '    {\n'
+        printf '      "name": "%s",\n' "$(json_escape "$repo_name")"
+        printf '      "sdd_path": "%s",\n' "$(json_escape "$resolved_path")"
+        if [ -d "$repo_path" ]; then
             printf '      "repo_path": "%s"\n' "$(json_escape "$repo_path")"
-            printf '    }'
-        done <<< "$sorted_dirs"
-        # Add newline after last object
-        echo ""
-    fi
+        else
+            printf '      "repo_path": null,\n'
+            printf '      "repo_status": "repo_not_found"\n'
+        fi
+        printf '    }'
+    done
+    # Add newline after last object
+    echo ""
 
     echo "  ]"
 }
@@ -738,11 +744,13 @@ format_elapsed_time() {
 #   $@ - Command line arguments
 #######################################
 main() {
-    local workspace_root=""
-    local positional_args=()
+    local specs_root=""
+    local repos_root=""
+    local arg_specs_root=""
+    local arg_repos_root=""
 
     # Parse arguments using getopts-style processing
-    while [[ $# -gt 0 ]]; do
+    while [ $# -gt 0 ]; do
         case "$1" in
             --help|-h)
                 show_usage
@@ -756,6 +764,22 @@ main() {
                 VERBOSE="true"
                 shift
                 ;;
+            --specs-root)
+                if [ $# -lt 2 ]; then
+                    echo "Error: --specs-root requires a PATH argument" >&2
+                    exit 2
+                fi
+                arg_specs_root="$2"
+                shift 2
+                ;;
+            --repos-root)
+                if [ $# -lt 2 ]; then
+                    echo "Error: --repos-root requires a PATH argument" >&2
+                    exit 2
+                fi
+                arg_repos_root="$2"
+                shift 2
+                ;;
             --json)
                 # JSON is the default output format, this is a no-op
                 shift
@@ -766,11 +790,11 @@ main() {
                 ;;
             -*)
                 # Check for combined short options like -sv
-                if [[ "$1" =~ ^-[a-zA-Z]+$ ]]; then
-                    local opts="${1:1}"
+                if echo "$1" | grep -qE '^-[a-zA-Z]+$'; then
+                    local opts="${1#-}"
                     local i=0
                     local unknown_opt=""
-                    while [[ $i -lt ${#opts} ]]; do
+                    while [ $i -lt ${#opts} ]; do
                         local opt="${opts:$i:1}"
                         case "$opt" in
                             s) SUMMARY_ONLY="true" ;;
@@ -783,7 +807,7 @@ main() {
                         esac
                         i=$((i + 1))
                     done
-                    if [[ -n "$unknown_opt" ]]; then
+                    if [ -n "$unknown_opt" ]; then
                         echo "Error: Unknown option: -$unknown_opt" >&2
                         echo "Use --help for usage information" >&2
                         exit 2
@@ -796,72 +820,78 @@ main() {
                 fi
                 ;;
             *)
-                positional_args+=("$1")
-                shift
+                echo "Error: Unexpected argument: $1" >&2
+                echo "Use --help for usage information" >&2
+                exit 2
                 ;;
         esac
     done
 
-    # Determine workspace root (priority: argument > env var > default)
-    if [[ ${#positional_args[@]} -gt 0 ]]; then
-        workspace_root="${positional_args[0]}"
-    elif [[ -n "${WORKSPACE_ROOT:-}" ]]; then
-        workspace_root="$WORKSPACE_ROOT"
-    else
-        workspace_root="$DEFAULT_WORKSPACE_ROOT"
+    # Deprecation handling: WORKSPACE_ROOT maps to REPOS_ROOT with warning
+    if [ -n "${WORKSPACE_ROOT:-}" ] && [ -z "${REPOS_ROOT:-}" ] && [ -z "$arg_repos_root" ]; then
+        echo "Warning: WORKSPACE_ROOT is deprecated; use REPOS_ROOT instead" >&2
+        REPOS_ROOT="$WORKSPACE_ROOT"
     fi
 
-    debug_log "Workspace root: $workspace_root"
+    # Determine specs root (priority: --specs-root > SPECS_ROOT env var > default)
+    if [ -n "$arg_specs_root" ]; then
+        specs_root="$arg_specs_root"
+    elif [ -n "${SPECS_ROOT:-}" ]; then
+        specs_root="$SPECS_ROOT"
+    else
+        specs_root="$DEFAULT_SPECS_ROOT"
+    fi
 
-    # Expand to absolute path
-    if [[ ! "$workspace_root" = /* ]]; then
-        workspace_root="$(cd "$workspace_root" 2>/dev/null && pwd)" || {
-            echo "Error: Cannot resolve workspace root path: $workspace_root" >&2
+    # Determine repos root (priority: --repos-root > REPOS_ROOT env var > default)
+    if [ -n "$arg_repos_root" ]; then
+        repos_root="$arg_repos_root"
+    elif [ -n "${REPOS_ROOT:-}" ]; then
+        repos_root="$REPOS_ROOT"
+    else
+        repos_root="$DEFAULT_REPOS_ROOT"
+    fi
+
+    debug_log "Specs root: $specs_root"
+    debug_log "Repos root: $repos_root"
+
+    # Expand specs root to absolute path
+    if [ "${specs_root#/}" = "$specs_root" ]; then
+        specs_root="$(cd "$specs_root" 2>/dev/null && pwd)" || {
+            echo "Error: Cannot resolve specs root path: $specs_root" >&2
+            exit 1
+        }
+    fi
+
+    # Expand repos root to absolute path
+    if [ "${repos_root#/}" = "$repos_root" ]; then
+        repos_root="$(cd "$repos_root" 2>/dev/null && pwd)" || {
+            echo "Error: Cannot resolve repos root path: $repos_root" >&2
             exit 1
         }
     fi
 
     # Ensure trailing slash for consistent path handling
-    workspace_root="${workspace_root%/}/"
+    specs_root="${specs_root%/}/"
+    repos_root="${repos_root%/}/"
 
-    # Validate workspace directory exists
-    if [[ ! -d "$workspace_root" ]]; then
-        echo "Error: Workspace directory does not exist: $workspace_root" >&2
+    # Validate specs directory exists
+    if [ ! -d "$specs_root" ]; then
+        echo "Error: Specs directory does not exist: $specs_root" >&2
         exit 1
     fi
 
-    debug_log "Resolved workspace root: $workspace_root"
+    debug_log "Resolved specs root: $specs_root"
+    debug_log "Resolved repos root: $repos_root"
     debug_log "SUMMARY_ONLY: $SUMMARY_ONLY"
     debug_log "VERBOSE: $VERBOSE"
 
-    # Discover all _SDD directories
-    debug_log "Discovering _SDD directories in: $workspace_root"
+    # Discover all SDD spec directories
+    debug_log "Discovering SDD spec directories in: $specs_root"
 
     # Record total start time for verbose mode
     local total_start_ns
-    if [[ "$VERBOSE" == "true" ]]; then
+    if [ "$VERBOSE" = "true" ]; then
         total_start_ns=$(date +%s%N)
-    fi
-
-    local find_output
-    find_output=$(find "$workspace_root" -maxdepth "$MAX_SEARCH_DEPTH" -type d -name "_SDD" 2>&1) || true
-
-    # Separate actual results from errors
-    local sdd_dirs=""
-    local errors=""
-
-    while IFS= read -r line; do
-        if [[ "$line" == *"Permission denied"* ]]; then
-            errors+="$line"$'\n'
-        elif [[ -n "$line" && -d "$line" ]]; then
-            sdd_dirs+="$line"$'\n'
-        fi
-    done <<< "$find_output"
-
-    # Log permission errors to stderr
-    if [[ -n "$errors" ]]; then
-        echo "Warning: Some directories were not accessible:" >&2
-        echo "$errors" >&2
     fi
 
     # Initialize workspace-level aggregation counters
@@ -877,84 +907,86 @@ main() {
     local repos_json=""
     local first_repo=true
 
-    # Process discovered directories
-    if [[ -n "$sdd_dirs" ]]; then
-        # Sort for consistent output
-        local sorted_dirs
-        sorted_dirs=$(echo -n "$sdd_dirs" | sort)
+    # Iterate direct children of specs root
+    for sdd_path in "$specs_root"*/; do
+        [ -d "$sdd_path" ] || continue
 
-        while IFS= read -r sdd_path; do
-            [[ -z "$sdd_path" ]] && continue
+        # Resolve and validate the path
+        local resolved_path
+        resolved_path=$(resolve_path "$sdd_path" "$specs_root") || {
+            debug_log "Skipping invalid path: $sdd_path"
+            continue
+        }
 
-            # Resolve and validate the path
-            local resolved_path
-            resolved_path=$(resolve_path "$sdd_path" "$workspace_root") || {
-                debug_log "Skipping invalid path: $sdd_path"
-                continue
-            }
+        debug_log "Found SDD spec dir: $resolved_path"
 
-            debug_log "Found _SDD: $resolved_path"
+        # Derive repo name and repo path
+        local repo_name
+        repo_name=$(basename "$resolved_path")
+        local repo_path="${repos_root}${repo_name}/"
 
-            # Record start time for this repo if verbose
-            local repo_start_ns
-            if [[ "$VERBOSE" == "true" ]]; then
-                repo_start_ns=$(date +%s%N)
-            fi
+        # Record start time for this repo if verbose
+        local repo_start_ns
+        if [ "$VERBOSE" = "true" ]; then
+            repo_start_ns=$(date +%s%N)
+        fi
 
-            # Scan the repo using scan_repo function
-            local repo_json
-            repo_json=$(scan_repo "$resolved_path")
+        # Scan the repo using scan_repo function
+        # Pass repo_path only if the directory exists
+        local repo_json
+        if [ -d "$repo_path" ]; then
+            repo_json=$(scan_repo "$resolved_path" "$repo_path")
+        else
+            repo_json=$(scan_repo "$resolved_path" "")
+        fi
 
-            # Add comma separator between repos
-            if [[ "$first_repo" == "true" ]]; then
-                first_repo=false
-            else
-                repos_json+=","
-            fi
-            repos_json+=$'\n'"    $repo_json"
+        # Add comma separator between repos
+        if [ "$first_repo" = "true" ]; then
+            first_repo=false
+        else
+            repos_json+=","
+        fi
+        repos_json+=$'\n'"    $repo_json"
 
-            # Extract summary values for workspace-level aggregation
-            # Use tail -1 to get the repo-level summary (last occurrence) instead of ticket summaries
-            local repo_tickets repo_tasks repo_pending repo_completed repo_tested repo_verified
-            repo_tickets=$(echo "$repo_json" | grep -o '"total_tickets": [0-9]*' | tail -1 | grep -o '[0-9]*')
-            repo_tasks=$(echo "$repo_json" | grep -o '"total_tasks": [0-9]*' | tail -1 | grep -o '[0-9]*')
-            repo_pending=$(echo "$repo_json" | grep -o '"pending": [0-9]*' | tail -1 | grep -o '[0-9]*')
-            repo_completed=$(echo "$repo_json" | grep -o '"completed": [0-9]*' | tail -1 | grep -o '[0-9]*')
-            repo_tested=$(echo "$repo_json" | grep -o '"tested": [0-9]*' | tail -1 | grep -o '[0-9]*')
-            repo_verified=$(echo "$repo_json" | grep -o '"verified": [0-9]*' | tail -1 | grep -o '[0-9]*')
+        # Extract summary values for workspace-level aggregation
+        # Use tail -1 to get the repo-level summary (last occurrence) instead of ticket summaries
+        local repo_tickets repo_tasks repo_pending repo_completed repo_tested repo_verified
+        repo_tickets=$(echo "$repo_json" | grep -o '"total_tickets": [0-9]*' | tail -1 | grep -o '[0-9]*')
+        repo_tasks=$(echo "$repo_json" | grep -o '"total_tasks": [0-9]*' | tail -1 | grep -o '[0-9]*')
+        repo_pending=$(echo "$repo_json" | grep -o '"pending": [0-9]*' | tail -1 | grep -o '[0-9]*')
+        repo_completed=$(echo "$repo_json" | grep -o '"completed": [0-9]*' | tail -1 | grep -o '[0-9]*')
+        repo_tested=$(echo "$repo_json" | grep -o '"tested": [0-9]*' | tail -1 | grep -o '[0-9]*')
+        repo_verified=$(echo "$repo_json" | grep -o '"verified": [0-9]*' | tail -1 | grep -o '[0-9]*')
 
-            # Handle empty values (default to 0)
-            repo_tickets=${repo_tickets:-0}
-            repo_tasks=${repo_tasks:-0}
-            repo_pending=${repo_pending:-0}
-            repo_completed=${repo_completed:-0}
-            repo_tested=${repo_tested:-0}
-            repo_verified=${repo_verified:-0}
+        # Handle empty values (default to 0)
+        repo_tickets=${repo_tickets:-0}
+        repo_tasks=${repo_tasks:-0}
+        repo_pending=${repo_pending:-0}
+        repo_completed=${repo_completed:-0}
+        repo_tested=${repo_tested:-0}
+        repo_verified=${repo_verified:-0}
 
-            # Output timing for this repo if verbose
-            if [[ "$VERBOSE" == "true" ]]; then
-                local repo_end_ns
-                repo_end_ns=$(date +%s%N)
-                local repo_elapsed
-                repo_elapsed=$(format_elapsed_time "$repo_start_ns" "$repo_end_ns")
-                local repo_name
-                repo_name=$(basename "$(dirname "$resolved_path")")
-                echo "[${repo_elapsed}s] Scanned $repo_name ($repo_tickets tickets, $repo_tasks tasks)" >&2
-            fi
+        # Output timing for this repo if verbose
+        if [ "$VERBOSE" = "true" ]; then
+            local repo_end_ns
+            repo_end_ns=$(date +%s%N)
+            local repo_elapsed
+            repo_elapsed=$(format_elapsed_time "$repo_start_ns" "$repo_end_ns")
+            echo "[${repo_elapsed}s] Scanned $repo_name ($repo_tickets tickets, $repo_tasks tasks)" >&2
+        fi
 
-            # Aggregate at workspace level
-            total_repos=$((total_repos + 1))
-            total_tickets=$((total_tickets + repo_tickets))
-            total_tasks=$((total_tasks + repo_tasks))
-            total_pending=$((total_pending + repo_pending))
-            total_completed=$((total_completed + repo_completed))
-            total_tested=$((total_tested + repo_tested))
-            total_verified=$((total_verified + repo_verified))
-        done <<< "$sorted_dirs"
-    fi
+        # Aggregate at workspace level
+        total_repos=$((total_repos + 1))
+        total_tickets=$((total_tickets + repo_tickets))
+        total_tasks=$((total_tasks + repo_tasks))
+        total_pending=$((total_pending + repo_pending))
+        total_completed=$((total_completed + repo_completed))
+        total_tested=$((total_tested + repo_tested))
+        total_verified=$((total_verified + repo_verified))
+    done
 
     # Output total timing if verbose
-    if [[ "$VERBOSE" == "true" ]]; then
+    if [ "$VERBOSE" = "true" ]; then
         local total_end_ns
         total_end_ns=$(date +%s%N)
         local total_elapsed
@@ -967,12 +999,13 @@ main() {
     full_json+="{"$'\n'
     full_json+="  \"version\": \"$VERSION\","$'\n'
     full_json+="  \"timestamp\": \"$(date -Iseconds)\","$'\n'
-    full_json+="  \"workspace_root\": \"$(json_escape "$workspace_root")\","$'\n'
+    full_json+="  \"specs_root\": \"$(json_escape "$specs_root")\","$'\n'
+    full_json+="  \"repos_root\": \"$(json_escape "$repos_root")\","$'\n'
 
     # Include repos array only if not summary-only mode
-    if [[ "$SUMMARY_ONLY" != "true" ]]; then
+    if [ "$SUMMARY_ONLY" != "true" ]; then
         full_json+="  \"repos\": ["$'\n'
-        if [[ -n "$repos_json" ]]; then
+        if [ -n "$repos_json" ]; then
             full_json+="$repos_json"$'\n'
         fi
         full_json+="  ],"$'\n'
@@ -989,11 +1022,11 @@ main() {
     full_json+="  },"$'\n'
 
     # Compute recommended action (only if we have full repo details)
-    if [[ "$SUMMARY_ONLY" != "true" ]]; then
+    if [ "$SUMMARY_ONLY" != "true" ]; then
         # Build temporary JSON with repos for action computation
         local temp_json="{"
         temp_json+="\"repos\": ["
-        if [[ -n "$repos_json" ]]; then
+        if [ -n "$repos_json" ]; then
             temp_json+="$repos_json"
         fi
         temp_json+="]}"

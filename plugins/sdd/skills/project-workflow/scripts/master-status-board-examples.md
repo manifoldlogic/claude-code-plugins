@@ -7,18 +7,19 @@ Multi-repository SDD status aggregator with recommended actions for autonomous w
 ### Scan Default Workspace
 
 ```bash
-# Scan /workspace/repos/ (default)
+# Uses defaults: --specs-root /workspace/_SPECS/ --repos-root /workspace/repos/
 ./master-status-board.sh
 
-# Or specify workspace explicitly
-./master-status-board.sh /workspace/repos/
+# Or specify roots explicitly
+./master-status-board.sh --specs-root /workspace/_SPECS/ --repos-root /workspace/repos/
 ```
 
 ### Output Fields
 
 The script outputs JSON with these top-level fields:
 - `timestamp` - ISO 8601 timestamp of scan
-- `workspace_root` - Absolute path to workspace root
+- `specs_root` - Absolute path to specs root (SDD data)
+- `repos_root` - Absolute path to repos root (code repositories)
 - `repos` - Array of repository objects with SDD directories
 - `summary` - Aggregated counts across all repos
 - `recommended_action` - Next action for autonomous workflow
@@ -28,14 +29,15 @@ The script outputs JSON with these top-level fields:
 Use `--summary-only` or `-s` for just the summary without per-repo details:
 
 ```bash
-./master-status-board.sh --summary-only /workspace/repos/
+./master-status-board.sh --summary-only
 ```
 
 Output:
 ```json
 {
   "timestamp": "2026-01-15T10:30:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "summary": {
     "total_repos": 3,
     "total_tickets": 12,
@@ -59,7 +61,7 @@ Note: In summary-only mode, `recommended_action` cannot compute a specific task 
 Use `--verbose` or `-v` to see timing information on stderr:
 
 ```bash
-./master-status-board.sh --verbose /workspace/repos/
+./master-status-board.sh --verbose
 ```
 
 Stderr output:
@@ -71,7 +73,7 @@ Stderr output:
 
 Combined with jq for clean stdout:
 ```bash
-./master-status-board.sh --verbose /workspace/repos/ 2>&1 | tee /dev/stderr | head -1 | jq .summary
+./master-status-board.sh --verbose 2>&1 | tee /dev/stderr | head -1 | jq .summary
 ```
 
 ## Debug Mode
@@ -79,10 +81,34 @@ Combined with jq for clean stdout:
 Use `--debug` or set `DEBUG=true` for detailed internal logging:
 
 ```bash
-./master-status-board.sh --debug /workspace/repos/ 2>&1 | grep '\[DEBUG\]'
+./master-status-board.sh --debug 2>&1 | grep '\[DEBUG\]'
 
 # Or via environment variable
-DEBUG=true ./master-status-board.sh /workspace/repos/
+DEBUG=true ./master-status-board.sh
+```
+
+## Custom Root Directories
+
+### Named Options
+
+```bash
+# Custom specs and repos locations
+./master-status-board.sh --specs-root /custom/_SPECS/ --repos-root /custom/repos/
+```
+
+### Environment Variables
+
+```bash
+# New env vars
+SPECS_ROOT=/custom/_SPECS REPOS_ROOT=/custom/repos bash master-status-board.sh
+
+# Deprecated env var (still works but logs warning)
+WORKSPACE_ROOT=/custom/repos bash master-status-board.sh
+```
+
+When using the deprecated `WORKSPACE_ROOT` variable, a warning is logged to stderr:
+```
+[WARN] WORKSPACE_ROOT is deprecated. Use SPECS_ROOT and REPOS_ROOT instead.
 ```
 
 ## Extracting Specific Data
@@ -90,13 +116,13 @@ DEBUG=true ./master-status-board.sh /workspace/repos/
 ### Get Summary Only
 
 ```bash
-./master-status-board.sh /workspace/repos/ | jq '.summary'
+./master-status-board.sh | jq '.summary'
 ```
 
 ### Get Recommended Action
 
 ```bash
-./master-status-board.sh /workspace/repos/ | jq '.recommended_action'
+./master-status-board.sh | jq '.recommended_action'
 ```
 
 Example output:
@@ -106,8 +132,8 @@ Example output:
   "repo": "my-project",
   "ticket": "AUTH-123",
   "task": "AUTH-123.1002",
-  "task_file": "/workspace/repos/my-project/_SDD/tickets/AUTH-123/tasks/AUTH-123.1002_implement-oauth.md",
-  "sdd_root": "/workspace/repos/my-project/_SDD",
+  "task_file": "/workspace/_SPECS/my-project/tickets/AUTH-123/tasks/AUTH-123.1002_implement-oauth.md",
+  "sdd_root": "/workspace/_SPECS/my-project",
   "reason": "Next pending task in highest priority ticket"
 }
 ```
@@ -115,19 +141,19 @@ Example output:
 ### List All Repos with SDD
 
 ```bash
-./master-status-board.sh /workspace/repos/ | jq '.repos[].name'
+./master-status-board.sh | jq '.repos[].name'
 ```
 
 ### Find Repos with Pending Work
 
 ```bash
-./master-status-board.sh /workspace/repos/ | jq '.repos[] | select(.summary.pending > 0) | {name, pending: .summary.pending}'
+./master-status-board.sh | jq '.repos[] | select(.summary.pending > 0) | {name, pending: .summary.pending}'
 ```
 
 ### Get Agent-Ready Tickets
 
 ```bash
-./master-status-board.sh /workspace/repos/ | jq '[.repos[].tickets[] | select(.autogate.agent_ready == true)] | .[].ticket_id'
+./master-status-board.sh | jq '[.repos[].tickets[] | select(.autogate.agent_ready == true)] | .[].ticket_id'
 ```
 
 ## SDDLOOP-3 Integration (Ralph Loop Controller)
@@ -141,7 +167,7 @@ The `recommended_action` field is designed for integration with autonomous loop 
 # Example: ralph-loop-controller.sh
 
 # Get the full status
-status=$(./master-status-board.sh /workspace/repos/)
+status=$(./master-status-board.sh)
 
 # Extract action type
 action=$(echo "$status" | jq -r '.recommended_action.action')
@@ -178,13 +204,14 @@ When working across multiple repositories, extract `sdd_root` from the recommend
 
 ```bash
 # Get recommended action with sdd_root
-recommended=$(./master-status-board.sh /workspace/repos/ | jq '.recommended_action')
+recommended=$(./master-status-board.sh | jq '.recommended_action')
 
 # Extract and export SDD_ROOT_DIR
 export SDD_ROOT_DIR=$(echo "$recommended" | jq -r '.sdd_root')
 
 # Now SDD commands will use the correct repo's SDD directory
 echo "Working in: $SDD_ROOT_DIR"
+# Example output: Working in: /workspace/_SPECS/claude-code-plugins
 ```
 
 ### Handling "none" Action
@@ -203,8 +230,8 @@ Possible reasons for "none":
 
 Example handling:
 ```bash
-action=$(./master-status-board.sh /workspace/repos/ | jq -r '.recommended_action.action')
-reason=$(./master-status-board.sh /workspace/repos/ | jq -r '.recommended_action.reason')
+action=$(./master-status-board.sh | jq -r '.recommended_action.action')
+reason=$(./master-status-board.sh | jq -r '.recommended_action.reason')
 
 if [ "$action" = "none" ]; then
     echo "Loop pausing: $reason"
@@ -231,14 +258,13 @@ fi
 #!/bin/bash
 # ralph-loop.sh - Simple autonomous loop controller
 
-WORKSPACE="/workspace/repos/"
 POLL_INTERVAL=30
 
 while true; do
     echo "Polling for work at $(date -Iseconds)..."
 
-    # Get status
-    status=$(./master-status-board.sh "$WORKSPACE")
+    # Get status (uses default --specs-root and --repos-root)
+    status=$(./master-status-board.sh)
     action=$(echo "$status" | jq -r '.recommended_action.action')
 
     if [ "$action" = "do-task" ]; then
@@ -260,6 +286,39 @@ while true; do
 done
 ```
 
+## Handling Missing Repos
+
+In the two-root model, a specs directory may exist without a matching code repository. The status board handles this gracefully:
+
+```json
+{
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
+  "repos": [
+    {
+      "name": "claude-code-plugins",
+      "sdd_path": "/workspace/_SPECS/claude-code-plugins",
+      "repo_path": "/workspace/repos/claude-code-plugins/",
+      "tickets": ["..."],
+      "summary": {"total_tickets": 3, "total_tasks": 12, "...": "..."}
+    },
+    {
+      "name": "dev-container",
+      "sdd_path": "/workspace/_SPECS/dev-container",
+      "repo_path": null,
+      "repo_status": "repo_not_found",
+      "tickets": [],
+      "tasks": []
+    }
+  ]
+}
+```
+
+When `repo_path` is `null` and `repo_status` is `"repo_not_found"`:
+- The specs directory exists but no matching code repository was found under `repos_root`
+- Tickets and tasks are still listed (they exist in the specs directory)
+- The repo will not be recommended for task execution since there is no working directory
+
 ## JSON Output Schema
 
 ### Top-Level Schema
@@ -267,7 +326,8 @@ done
 ```json
 {
   "timestamp": "string (ISO 8601)",
-  "workspace_root": "string (absolute path)",
+  "specs_root": "string (absolute path to specs root)",
+  "repos_root": "string (absolute path to repos root)",
   "repos": ["array of repo objects"],
   "summary": {"object with aggregated counts"},
   "recommended_action": {"object with next action"}
@@ -278,8 +338,10 @@ done
 
 ```json
 {
-  "name": "string (repo directory name)",
-  "sdd_root": "string (path to _SDD directory)",
+  "name": "string (specs directory name)",
+  "sdd_path": "string (path to specs directory, e.g. /workspace/_SPECS/my-project)",
+  "repo_path": "string or null (path to code repo, null if not found)",
+  "repo_status": "string (present only when repo_path is null: 'repo_not_found')",
   "tickets": ["array of ticket objects"],
   "summary": {
     "total_tickets": "integer",
@@ -338,7 +400,7 @@ When work is available (`action: "do-task"`):
   "ticket": "string (ticket ID)",
   "task": "string (task ID)",
   "task_file": "string (absolute path to task file)",
-  "sdd_root": "string (absolute path to _SDD directory)",
+  "sdd_root": "string (absolute path to specs directory)",
   "reason": "string (human-readable explanation)"
 }
 ```
@@ -370,14 +432,14 @@ When no work is available (`action: "none"`):
 
 ```bash
 # Validate JSON
-./master-status-board.sh /workspace/repos/ | jq . > /dev/null
+./master-status-board.sh | jq . > /dev/null
 echo $?  # Should be 0
 ```
 
 ### Missing recommended_action
 
 If `recommended_action` is null:
-1. Check if `jq` is installed: `which jq`
+1. Check if `jq` is installed: `command -v jq`
 2. Run with `--debug` to see internal processing
 3. Verify repos have valid ticket structures
 
@@ -385,25 +447,67 @@ If `recommended_action` is null:
 
 ```bash
 # Check for permission issues
-./master-status-board.sh /workspace/repos/ 2>&1 | grep -i permission
+./master-status-board.sh 2>&1 | grep -i permission
 ```
 
 ### No Repos Found
 
 ```bash
-# Verify _SDD directories exist
-find /workspace/repos/ -maxdepth 2 -type d -name "_SDD" -print
+# Verify specs directories exist under _SPECS root
+ls /workspace/_SPECS/
 
-# Check search depth
-./master-status-board.sh --debug /workspace/repos/ 2>&1 | grep "Found _SDD"
+# Check that matching repos exist under repos root
+ls /workspace/repos/
+
+# Run with debug mode to trace discovery
+./master-status-board.sh --debug 2>&1 | grep "Found"
 ```
+
+### Missing Repo for Specs Directory
+
+If a specs directory exists but the matching repo is not found:
+
+```bash
+# Check the JSON output for repo_not_found entries
+./master-status-board.sh | jq '.repos[] | select(.repo_status == "repo_not_found")'
+```
+
+Possible causes:
+1. **Repo not cloned** - Clone the repository into `/workspace/repos/`
+2. **Name mismatch** - The specs directory name must match the repo directory name
+3. **Repo path incorrect** - Verify `--repos-root` points to the correct directory
+
+### Git Root Discovery Issues
+
+If the working directory is incorrect for task execution:
+
+```bash
+# Check what git root was discovered for a repo
+./master-status-board.sh --debug 2>&1 | grep "git root"
+```
+
+In the two-root model, the script discovers the git root within the repo directory. For repos where the git root differs from the parent directory name (e.g., a monorepo), the working directory is set to the git root path rather than the parent.
+
+### Path Bounds Validation Errors
+
+If you see path bounds validation errors:
+
+```bash
+# Verify both roots are absolute paths
+./master-status-board.sh --specs-root /workspace/_SPECS/ --repos-root /workspace/repos/
+
+# Check that paths exist
+ls -d /workspace/_SPECS/ /workspace/repos/
+```
+
+Both `--specs-root` and `--repos-root` must be absolute paths to existing directories.
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success (including empty workspace) |
-| 1 | Workspace directory does not exist |
+| 1 | Specs root or repos root directory does not exist |
 | 2 | Invalid arguments |
 
 ## Related Documentation

@@ -3,7 +3,7 @@
 # SDD Loop Controller ("Ralph Wiggum Loop")
 # Autonomous SDD workflow controller for multi-repository development
 #
-# Version: 1.0.0
+# Version: 2.0.0
 #
 # DESCRIPTION
 #   Polls master-status-board.sh for recommended tasks and executes them via
@@ -12,7 +12,7 @@
 #   phase boundary is hit.
 #
 # USAGE
-#   sdd-loop.sh [options] [workspace_root]
+#   sdd-loop.sh [options]
 #
 # OPTIONS
 #   -h, --help              Show full help message and exit
@@ -21,19 +21,18 @@
 #   -v, --verbose           Enable verbose output with progress details
 #   -q, --quiet             Suppress informational messages (errors only)
 #   --debug                 Enable debug-level logging (very verbose)
+#   --specs-root DIR        Root directory for SDD specs (default: /workspace/_SPECS/)
+#   --repos-root DIR        Root directory for git repositories (default: /workspace/repos/)
 #   --max-iterations N      Maximum task iterations before stopping (default: 50)
 #   --max-errors N          Maximum consecutive errors before stopping (default: 3)
 #   --timeout SECONDS       Task execution timeout in seconds (default: 3600)
 #   --poll-interval SECONDS Interval between status polls (default: 5)
 #   --metrics-file FILE     Write JSON metrics to FILE at end of execution
 #
-# ARGUMENTS
-#   workspace_root    Root directory containing repositories with _SDD directories
-#                     Priority: CLI argument > SDD_LOOP_WORKSPACE_ROOT env var > default
-#                     Default: /workspace/repos/
-#
 # ENVIRONMENT VARIABLES
-#   SDD_LOOP_WORKSPACE_ROOT   Default workspace root directory
+#   SDD_LOOP_SPECS_ROOT       Root directory for SDD specs (default: /workspace/_SPECS/)
+#   SDD_LOOP_REPOS_ROOT       Root directory for git repositories (default: /workspace/repos/)
+#   SDD_LOOP_WORKSPACE_ROOT   [DEPRECATED] Maps to SDD_LOOP_REPOS_ROOT with warning
 #   SDD_LOOP_MAX_ITERATIONS   Maximum iterations (default: 50)
 #   SDD_LOOP_MAX_ERRORS       Maximum consecutive errors (default: 3)
 #   SDD_LOOP_TIMEOUT          Task timeout in seconds (default: 3600)
@@ -51,28 +50,30 @@
 #   143 - Terminated by SIGTERM
 #
 # EXAMPLES
-#   # Basic usage - run against default workspace
+#   # Basic usage - run against default roots
 #   sdd-loop.sh
 #
 #   # Dry-run mode to preview actions without executing
-#   sdd-loop.sh --dry-run /workspace/repos/
+#   sdd-loop.sh --dry-run
+#
+#   # Custom roots
+#   sdd-loop.sh --specs-root /data/_SPECS/ --repos-root /data/repos/
 #
 #   # Custom safety limits for testing
-#   sdd-loop.sh --max-iterations 10 --max-errors 5 /workspace/repos/
+#   sdd-loop.sh --max-iterations 10 --max-errors 5
 #
 #   # Configure via environment variables
-#   export SDD_LOOP_MAX_ITER=100
 #   export SDD_LOOP_TIMEOUT=7200
-#   sdd-loop.sh /workspace/repos/
+#   sdd-loop.sh
 #
 #   # CI/CD integration with quiet mode
-#   sdd-loop.sh --quiet --max-iterations 50 /workspace/repos/ || {
+#   sdd-loop.sh --quiet --max-iterations 50 || {
 #       echo "Loop failed with exit code $?"
 #       exit 1
 #   }
 #
 #   # Write metrics file for monitoring
-#   sdd-loop.sh --metrics-file /tmp/metrics.json /workspace/repos/
+#   sdd-loop.sh --metrics-file /tmp/metrics.json
 #
 # INTEGRATION
 #   The loop controller integrates with:
@@ -89,14 +90,17 @@
 set -euo pipefail
 
 # Version constant
-VERSION="1.0.0"
+VERSION="2.0.0"
 
 # =============================================================================
 # Configuration Defaults
 # =============================================================================
 
-# Default workspace root for repository scanning
-[[ -z "${SDD_LOOP_DEFAULT_WORKSPACE_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_WORKSPACE_ROOT="/workspace/repos/"
+# Default specs root for SDD data directories
+[[ -z "${SDD_LOOP_DEFAULT_SPECS_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_SPECS_ROOT="/workspace/_SPECS/"
+
+# Default repos root for git repository scanning
+[[ -z "${SDD_LOOP_DEFAULT_REPOS_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_REPOS_ROOT="/workspace/repos/"
 
 # Maximum number of task iterations before stopping (safety limit)
 [[ -z "${SDD_LOOP_DEFAULT_MAX_ITERATIONS:-}" ]] && readonly SDD_LOOP_DEFAULT_MAX_ITERATIONS=50
@@ -114,8 +118,11 @@ VERSION="1.0.0"
 # Global State (configurable via env vars and CLI args)
 # =============================================================================
 
-# Workspace root directory
-SDD_LOOP_WORKSPACE_ROOT="${SDD_LOOP_WORKSPACE_ROOT:-}"
+# Specs root directory (SDD data)
+SDD_LOOP_SPECS_ROOT="${SDD_LOOP_SPECS_ROOT:-}"
+
+# Repos root directory (git repositories)
+SDD_LOOP_REPOS_ROOT="${SDD_LOOP_REPOS_ROOT:-}"
 
 # Maximum iterations (0 = unlimited)
 SDD_LOOP_MAX_ITERATIONS="${SDD_LOOP_MAX_ITERATIONS:-}"
@@ -385,6 +392,64 @@ parse_json_field() {
 }
 
 # =============================================================================
+# Git Root Discovery
+# =============================================================================
+
+#######################################
+# Find the git root directory under repos/<name>/
+# Selection: Alphabetically first .git directory, fallback to .git file (worktree)
+#
+# Arguments:
+#   $1 - repos_root: Root directory for repositories (e.g., "/workspace/repos/")
+#   $2 - repo_name: Name of the repository (e.g., "claude-code-plugins")
+#
+# Outputs:
+#   Path to the git root directory on stdout
+#
+# Returns:
+#   0 - Found a git root
+#   1 - No git root found (repo_parent doesn't exist or no .git entries)
+#######################################
+find_git_root() {
+    local repos_root="$1"
+    local repo_name="$2"
+    local repo_parent="${repos_root}${repo_name}"
+
+    [[ -d "$repo_parent" ]] || return 1
+
+    # Prefer main checkout (.git is a directory) over worktree (.git is a file)
+    # Use ls -1 for alphabetical sort to ensure deterministic selection
+    local candidate
+    local git_dir_count=0
+    for candidate in $(ls -1 "$repo_parent"); do
+        candidate="$repo_parent/$candidate"
+        [[ -d "$candidate" ]] || continue
+        if [[ -d "$candidate/.git" ]]; then
+            git_dir_count=$((git_dir_count + 1))
+            if [[ $git_dir_count -gt 1 ]]; then
+                log_warn "Multiple git roots found in $repo_parent; using first alphabetically"
+            fi
+            if [[ $git_dir_count -eq 1 ]]; then
+                echo "${candidate%/}"
+                return 0
+            fi
+        fi
+    done
+
+    # Fallback: worktree (.git is a file)
+    for candidate in $(ls -1 "$repo_parent"); do
+        candidate="$repo_parent/$candidate"
+        [[ -d "$candidate" ]] || continue
+        if [[ -f "$candidate/.git" ]]; then
+            echo "${candidate%/}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# =============================================================================
 # Core Functions (Skeletons for Phase 1)
 # =============================================================================
 
@@ -394,7 +459,7 @@ parse_json_field() {
 # determine the next recommended task based on autogate configuration.
 #
 # Arguments:
-#   $1 - Workspace root directory
+#   None (uses SDD_LOOP_SPECS_ROOT and SDD_LOOP_REPOS_ROOT globals)
 #
 # Globals Set:
 #   POLL_ACTION   - Recommended action (e.g., "do-task", "none")
@@ -421,9 +486,7 @@ parse_json_field() {
 #   - PATCH changes indicate bug fixes with no schema changes
 #######################################
 poll_status() {
-    local workspace_root="$1"
-
-    log_debug "poll_status: Polling status board for workspace: $workspace_root"
+    log_debug "poll_status: Polling status board for specs_root=$SDD_LOOP_SPECS_ROOT, repos_root=$SDD_LOOP_REPOS_ROOT"
 
     # Reset poll result state
     POLL_ACTION=""
@@ -453,12 +516,12 @@ poll_status() {
         log_debug "poll_status: master-status-board.sh not executable, will invoke with bash"
     fi
 
-    log_debug "poll_status: Executing: bash $status_board_script --json $workspace_root"
+    log_debug "poll_status: Executing: bash $status_board_script --json --specs-root $SDD_LOOP_SPECS_ROOT --repos-root $SDD_LOOP_REPOS_ROOT"
 
-    # Execute master-status-board.sh with --json flag and capture output
+    # Execute master-status-board.sh with --json flag and two-root arguments
     local status_output
     local exit_code=0
-    status_output=$(bash "$status_board_script" --json "$workspace_root" 2>&1) || exit_code=$?
+    status_output=$(bash "$status_board_script" --json --specs-root "$SDD_LOOP_SPECS_ROOT" --repos-root "$SDD_LOOP_REPOS_ROOT" 2>&1) || exit_code=$?
 
     # Check if master-status-board.sh failed
     if [[ $exit_code -ne 0 ]]; then
@@ -527,7 +590,7 @@ poll_status() {
 #
 # Environment:
 #   SDD_ROOT_DIR is set to the sdd_root parameter for Claude Code
-#   Working directory is set to the repo root (parent of _SDD)
+#   Working directory is set to the git root (discovered via find_git_root)
 #
 # Outputs:
 #   Logs execution progress to stderr
@@ -567,76 +630,76 @@ execute_task() {
     fi
 
     # ==========================================================================
-    # Step 2.5: Validate sdd_root is within workspace boundaries (defense in depth)
+    # Step 2.5: Derive repo path via find_git_root()
+    # Maps SDD root name to git root under repos/<name>/
+    # ==========================================================================
+    local repo_name
+    repo_name=$(basename "$sdd_root")
+    local repo_path
+    repo_path=$(find_git_root "$SDD_LOOP_REPOS_ROOT" "$repo_name") || {
+        log_error "Cannot find git root for repo: $repo_name (under $SDD_LOOP_REPOS_ROOT$repo_name/)"
+        return 1
+    }
+
+    log_debug "execute_task: repo_name=$repo_name, repo_path=$repo_path"
+
+    # ==========================================================================
+    # Step 2.6: Dual path bounds validation (defense in depth)
+    # Validates sdd_root within specs root AND repo_path within repos root.
     # Prevents path traversal attacks if master-status-board returns malformed data
     # ==========================================================================
-    local canonical_workspace
+    local canonical_specs_root
+    local canonical_repos_root
     local canonical_sdd_root
+    local canonical_repo_path
 
-    # Resolve canonical paths using realpath (preferred) or readlink -f (fallback)
-    if command -v realpath &>/dev/null; then
-        canonical_workspace="$(realpath "$SDD_LOOP_WORKSPACE_ROOT" 2>/dev/null)" || {
-            log_error "Failed to resolve canonical path for workspace: $SDD_LOOP_WORKSPACE_ROOT"
-            return 1
-        }
-        canonical_sdd_root="$(realpath "$sdd_root" 2>/dev/null)" || {
-            log_error "Failed to resolve canonical path for SDD root: $sdd_root"
-            return 1
-        }
-    elif command -v readlink &>/dev/null && readlink -f / &>/dev/null; then
-        # readlink -f is available (GNU coreutils)
-        canonical_workspace="$(readlink -f "$SDD_LOOP_WORKSPACE_ROOT" 2>/dev/null)" || {
-            log_error "Failed to resolve canonical path for workspace: $SDD_LOOP_WORKSPACE_ROOT"
-            return 1
-        }
-        canonical_sdd_root="$(readlink -f "$sdd_root" 2>/dev/null)" || {
-            log_error "Failed to resolve canonical path for SDD root: $sdd_root"
-            return 1
-        }
-    else
-        log_error "Neither realpath nor readlink -f available for path canonicalization"
+    canonical_specs_root="$(realpath "$SDD_LOOP_SPECS_ROOT" 2>/dev/null)" || {
+        log_error "Failed to resolve canonical path for specs root: $SDD_LOOP_SPECS_ROOT"
         return 1
-    fi
+    }
+    canonical_repos_root="$(realpath "$SDD_LOOP_REPOS_ROOT" 2>/dev/null)" || {
+        log_error "Failed to resolve canonical path for repos root: $SDD_LOOP_REPOS_ROOT"
+        return 1
+    }
+    canonical_sdd_root="$(realpath "$sdd_root" 2>/dev/null)" || {
+        log_error "Failed to resolve canonical path for SDD root: $sdd_root"
+        return 1
+    }
+    canonical_repo_path="$(realpath "$repo_path" 2>/dev/null)" || {
+        log_error "Failed to resolve canonical path for repo path: $repo_path"
+        return 1
+    }
 
     # Remove trailing slashes for consistent comparison
-    canonical_workspace="${canonical_workspace%/}"
+    canonical_specs_root="${canonical_specs_root%/}"
+    canonical_repos_root="${canonical_repos_root%/}"
     canonical_sdd_root="${canonical_sdd_root%/}"
+    canonical_repo_path="${canonical_repo_path%/}"
 
-    log_debug "execute_task: canonical_workspace=$canonical_workspace"
+    log_debug "execute_task: canonical_specs_root=$canonical_specs_root"
+    log_debug "execute_task: canonical_repos_root=$canonical_repos_root"
     log_debug "execute_task: canonical_sdd_root=$canonical_sdd_root"
+    log_debug "execute_task: canonical_repo_path=$canonical_repo_path"
 
-    # Validate sdd_root is a proper subdirectory of workspace (not equal to workspace)
-    # Pattern: sdd_root must start with workspace path followed by "/"
-    if [[ "$canonical_sdd_root" != "$canonical_workspace"/* ]]; then
-        log_error "SDD root outside workspace bounds: $sdd_root (workspace: $SDD_LOOP_WORKSPACE_ROOT)"
-        log_debug "execute_task: Canonical paths - sdd_root=$canonical_sdd_root, workspace=$canonical_workspace"
+    if [[ "$canonical_sdd_root" != "$canonical_specs_root"/* ]]; then
+        log_error "SDD root outside specs bounds: $sdd_root"
+        return 1
+    fi
+    if [[ "$canonical_repo_path" != "$canonical_repos_root"/* ]]; then
+        log_error "Repo path outside repos bounds: $repo_path"
         return 1
     fi
 
-    log_debug "execute_task: Path bounds validation passed"
-
-    # ==========================================================================
-    # Step 3: Extract repo path from sdd_root (remove /_SDD suffix)
-    # ==========================================================================
-    local repo_path
-    repo_path="${sdd_root%/_SDD}"
-    repo_path="${repo_path%/}"  # Remove trailing slash if present
-
-    # Validate repo path exists
-    if [[ ! -d "$repo_path" ]]; then
-        log_error "Repository directory does not exist: $repo_path"
-        return 1
-    fi
-
-    log_debug "execute_task: repo_path=$repo_path"
+    log_debug "execute_task: Dual path bounds validation passed"
 
     # ==========================================================================
     # Step 4: Check dry-run mode (skip execution, just log)
     # ==========================================================================
     if [[ "$SDD_LOOP_DRY_RUN" == "true" ]]; then
         log_info "[DRY-RUN] Would execute task: $task_id"
-        log_info "[DRY-RUN] Command: SDD_ROOT_DIR=\"$sdd_root\" claude --dangerously-skip-permissions -p \"/sdd:do-task $task_id\""
+        log_info "[DRY-RUN] SDD_ROOT_DIR: $sdd_root"
         log_info "[DRY-RUN] Working directory: $repo_path"
+        log_info "[DRY-RUN] Command: SDD_ROOT_DIR=\"$sdd_root\" claude --dangerously-skip-permissions -p \"/sdd:do-task $task_id\""
         return 0
     fi
 
@@ -851,7 +914,8 @@ check_phase_boundary() {
 #   ITERATION_COUNT - Number of iterations completed
 #   TASKS_COMPLETED - Number of successful task executions
 #   TASKS_FAILED - Number of failed task executions
-#   SDD_LOOP_WORKSPACE_ROOT - Workspace root directory
+#   SDD_LOOP_SPECS_ROOT - Specs root directory
+#   SDD_LOOP_REPOS_ROOT - Repos root directory
 #   SDD_LOOP_MAX_ITERATIONS - Max iterations configuration
 #   SDD_LOOP_MAX_ERRORS - Max errors configuration
 #   SDD_LOOP_TIMEOUT - Timeout configuration
@@ -909,7 +973,8 @@ write_metrics() {
 {
   "version": "$VERSION",
   "timestamp": "$timestamp",
-  "workspace_root": "$SDD_LOOP_WORKSPACE_ROOT",
+  "specs_root": "$SDD_LOOP_SPECS_ROOT",
+  "repos_root": "$SDD_LOOP_REPOS_ROOT",
   "exit_code": $exit_code,
   "iterations": $ITERATION_COUNT,
   "tasks_completed": $TASKS_COMPLETED,
@@ -1143,12 +1208,16 @@ circuit_breaker_check() {
 #######################################
 show_usage() {
     cat << 'EOF'
-SDD Loop Controller v1.0.0 - Autonomous SDD workflow controller
+SDD Loop Controller v2.0.0 - Autonomous SDD workflow controller
 
 DESCRIPTION
     The SDD Loop Controller ("Ralph Wiggum Loop") is an autonomous workflow
     controller that polls master-status-board.sh for recommended tasks and
     executes them via Claude Code CLI.
+
+    The controller uses a two-root model:
+    - Specs root: Contains SDD data directories (_SPECS/<name>/)
+    - Repos root: Contains git repositories (repos/<name>/<git-dir>/)
 
     The controller continues processing tasks until:
     - No more agent-ready work remains (action: "none")
@@ -1158,13 +1227,7 @@ DESCRIPTION
     - Interrupted by signal (SIGINT/SIGTERM)
 
 USAGE
-    sdd-loop.sh [options] [workspace_root]
-
-ARGUMENTS
-    workspace_root
-        Root directory containing repositories with _SDD directories.
-        Priority: CLI argument > SDD_LOOP_WORKSPACE_ROOT env var > default
-        Default: /workspace/repos/
+    sdd-loop.sh [options]
 
 OPTIONS
     -h, --help
@@ -1182,6 +1245,16 @@ OPTIONS
 
     -q, --quiet
         Suppress informational messages, show only errors.
+
+    --specs-root DIR
+        Root directory for SDD specs data.
+        Priority: --specs-root > SDD_LOOP_SPECS_ROOT env var > default
+        Default: /workspace/_SPECS/
+
+    --repos-root DIR
+        Root directory for git repositories.
+        Priority: --repos-root > SDD_LOOP_REPOS_ROOT env var > default
+        Default: /workspace/repos/
 
     --max-iterations N
         Maximum number of task iterations before stopping.
@@ -1225,9 +1298,17 @@ OPTIONS
         Useful for log aggregation systems (ELK, CloudWatch, Datadog).
 
 ENVIRONMENT VARIABLES
+    SDD_LOOP_SPECS_ROOT
+        Root directory for SDD specs data (default: /workspace/_SPECS/).
+        Overridden by --specs-root.
+
+    SDD_LOOP_REPOS_ROOT
+        Root directory for git repositories (default: /workspace/repos/).
+        Overridden by --repos-root.
+
     SDD_LOOP_WORKSPACE_ROOT
-        Default workspace root directory.
-        Overridden by CLI argument.
+        [DEPRECATED] Maps to SDD_LOOP_REPOS_ROOT with a deprecation warning.
+        Use SDD_LOOP_REPOS_ROOT instead.
 
     SDD_LOOP_MAX_ITERATIONS
         Maximum task iterations (default: 50).
@@ -1279,11 +1360,11 @@ EXIT CODES
     143 - Terminated: Received SIGTERM
 
 EXAMPLES
-    # Basic usage with default workspace
+    # Basic usage with default roots
     sdd-loop.sh
 
-    # Specify workspace root
-    sdd-loop.sh /workspace/repos/my-project/
+    # Specify custom roots
+    sdd-loop.sh --specs-root /data/_SPECS/ --repos-root /data/repos/
 
     # Dry-run mode to preview actions
     sdd-loop.sh --dry-run
@@ -1320,7 +1401,7 @@ INTEGRATION
 
     Typical workflow:
     1. Enable agent mode: sdd:mark-ready TICKET --agent
-    2. Run loop: sdd-loop.sh /workspace/repos/
+    2. Run loop: sdd-loop.sh
     3. Monitor logs for progress
     4. Review completed work
 
@@ -1372,8 +1453,6 @@ show_version() {
 #   $@ - Command line arguments
 #######################################
 main() {
-    local workspace_root=""
-    local positional_args=()
 
     # Set up signal handlers
     trap handle_sigint SIGINT
@@ -1418,6 +1497,22 @@ main() {
                     exit 2
                 fi
                 SDD_LOOP_LOG_FORMAT="$2"
+                shift 2
+                ;;
+            --specs-root)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "Option --specs-root requires a directory path"
+                    exit 2
+                fi
+                SDD_LOOP_SPECS_ROOT="$2"
+                shift 2
+                ;;
+            --repos-root)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "Option --repos-root requires a directory path"
+                    exit 2
+                fi
+                SDD_LOOP_REPOS_ROOT="$2"
                 shift 2
                 ;;
             --max-iterations)
@@ -1533,8 +1628,9 @@ main() {
                 fi
                 ;;
             *)
-                positional_args+=("$1")
-                shift
+                log_error "Unexpected argument: $1 (use --specs-root and --repos-root instead)"
+                echo "Use --help for usage information" >&2
+                exit 2
                 ;;
         esac
     done
@@ -1542,13 +1638,20 @@ main() {
     # Apply configuration hierarchy: defaults < env vars < CLI args
     # (CLI args already set above, now apply defaults for unset values)
 
-    # Workspace root: CLI arg > env var > default
-    if [[ ${#positional_args[@]} -gt 0 ]]; then
-        workspace_root="${positional_args[0]}"
-    elif [[ -n "${SDD_LOOP_WORKSPACE_ROOT:-}" ]]; then
-        workspace_root="$SDD_LOOP_WORKSPACE_ROOT"
-    else
-        workspace_root="$SDD_LOOP_DEFAULT_WORKSPACE_ROOT"
+    # Deprecation handling: SDD_LOOP_WORKSPACE_ROOT maps to SDD_LOOP_REPOS_ROOT
+    if [[ -n "${SDD_LOOP_WORKSPACE_ROOT:-}" && -z "$SDD_LOOP_REPOS_ROOT" ]]; then
+        log_warn "SDD_LOOP_WORKSPACE_ROOT is deprecated; use SDD_LOOP_REPOS_ROOT instead"
+        SDD_LOOP_REPOS_ROOT="$SDD_LOOP_WORKSPACE_ROOT"
+    fi
+
+    # Specs root: --specs-root > SDD_LOOP_SPECS_ROOT env var > default
+    if [[ -z "$SDD_LOOP_SPECS_ROOT" ]]; then
+        SDD_LOOP_SPECS_ROOT="$SDD_LOOP_DEFAULT_SPECS_ROOT"
+    fi
+
+    # Repos root: --repos-root > SDD_LOOP_REPOS_ROOT env var > default
+    if [[ -z "$SDD_LOOP_REPOS_ROOT" ]]; then
+        SDD_LOOP_REPOS_ROOT="$SDD_LOOP_DEFAULT_REPOS_ROOT"
     fi
 
     # Apply defaults for numeric options if not set
@@ -1565,32 +1668,45 @@ main() {
         SDD_LOOP_POLL_INTERVAL="$SDD_LOOP_DEFAULT_POLL_INTERVAL"
     fi
 
-    # Expand workspace root to absolute path
-    if [[ ! "$workspace_root" = /* ]]; then
-        workspace_root="$(cd "$workspace_root" 2>/dev/null && pwd)" || {
-            log_error "Cannot resolve workspace root path: $workspace_root"
+    # Expand specs root to absolute path
+    if [[ ! "$SDD_LOOP_SPECS_ROOT" = /* ]]; then
+        SDD_LOOP_SPECS_ROOT="$(cd "$SDD_LOOP_SPECS_ROOT" 2>/dev/null && pwd)" || {
+            log_error "Cannot resolve specs root path: $SDD_LOOP_SPECS_ROOT"
             exit 1
         }
     fi
 
-    # Ensure trailing slash for consistent path handling
-    workspace_root="${workspace_root%/}/"
+    # Expand repos root to absolute path
+    if [[ ! "$SDD_LOOP_REPOS_ROOT" = /* ]]; then
+        SDD_LOOP_REPOS_ROOT="$(cd "$SDD_LOOP_REPOS_ROOT" 2>/dev/null && pwd)" || {
+            log_error "Cannot resolve repos root path: $SDD_LOOP_REPOS_ROOT"
+            exit 1
+        }
+    fi
 
-    # Validate workspace directory exists
-    if [[ ! -d "$workspace_root" ]]; then
-        log_error "Workspace directory does not exist: $workspace_root"
+    # Ensure trailing slashes for consistent path handling
+    SDD_LOOP_SPECS_ROOT="${SDD_LOOP_SPECS_ROOT%/}/"
+    SDD_LOOP_REPOS_ROOT="${SDD_LOOP_REPOS_ROOT%/}/"
+
+    # Validate specs directory exists
+    if [[ ! -d "$SDD_LOOP_SPECS_ROOT" ]]; then
+        log_error "Specs directory does not exist: $SDD_LOOP_SPECS_ROOT"
         exit 1
     fi
 
-    # Update global SDD_LOOP_WORKSPACE_ROOT with resolved value for use in execute_task()
-    SDD_LOOP_WORKSPACE_ROOT="$workspace_root"
+    # Validate repos directory exists
+    if [[ ! -d "$SDD_LOOP_REPOS_ROOT" ]]; then
+        log_error "Repos directory does not exist: $SDD_LOOP_REPOS_ROOT"
+        exit 1
+    fi
 
     # Track start time for metrics duration calculation
     START_TIME=$(date +%s)
 
     # Log startup configuration
     log_debug "Configuration:"
-    log_debug "  Workspace root: $workspace_root"
+    log_debug "  Specs root: $SDD_LOOP_SPECS_ROOT"
+    log_debug "  Repos root: $SDD_LOOP_REPOS_ROOT"
     log_debug "  Max iterations: $SDD_LOOP_MAX_ITERATIONS"
     log_debug "  Max errors: $SDD_LOOP_MAX_ERRORS"
     log_debug "  Timeout: $SDD_LOOP_TIMEOUT"
@@ -1601,7 +1717,8 @@ main() {
     log_debug "  Log format: $SDD_LOOP_LOG_FORMAT"
 
     log_info "SDD Loop Controller v$VERSION starting..."
-    log_info "Workspace: $workspace_root"
+    log_info "Specs root: $SDD_LOOP_SPECS_ROOT"
+    log_info "Repos root: $SDD_LOOP_REPOS_ROOT"
 
     if [[ "$SDD_LOOP_DRY_RUN" == "true" ]]; then
         log_info "Running in DRY-RUN mode - no tasks will be executed"
@@ -1654,7 +1771,7 @@ main() {
         # Poll status board for recommended action
         # Redirect stdout to /dev/null since poll_status outputs JSON to stdout
         # but we only need the global variables it sets
-        if ! poll_status "$workspace_root" >/dev/null; then
+        if ! poll_status >/dev/null; then
             log_error "Polling failed at iteration $ITERATION_COUNT"
             log_info "Loop stopped: polling error"
             EXIT_CODE=1

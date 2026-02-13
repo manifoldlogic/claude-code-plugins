@@ -185,7 +185,7 @@ create_mock_status_board() {
     local task="${2:-TEST.1001}"
     local ticket="${3:-TEST}"
     local reason="${4:-Test reason}"
-    local sdd_root="$TEST_TMP_DIR/test-repo/_SDD"
+    local sdd_root="$TEST_TMP_DIR/specs/test-repo"
 
     # Create in scripts directory where sdd-loop.sh lives
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << EOF
@@ -215,7 +215,7 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le $iterations ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Task '\$COUNTER'"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
@@ -241,14 +241,14 @@ EOF
 #######################################
 create_mock_status_board_with_phase() {
     local phase="$1"
-    local ticket_dir="$TEST_TMP_DIR/test-repo/_SDD/tickets/TEST_test-ticket"
+    local ticket_dir="$TEST_TMP_DIR/specs/test-repo/tickets/TEST_test-ticket"
 
     # Ensure ticket directory exists
     mkdir -p "$ticket_dir/tasks"
 
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.${phase}001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Test phase $phase"}}'
+echo '{"recommended_action":{"action":"do-task","task":"TEST.${phase}001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase $phase"}}'
 EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 }
@@ -280,11 +280,13 @@ EOF
 }
 
 #######################################
-# Create workspace structure for tests
+# Create workspace structure for tests (two-root model)
+# Creates specs/<repo>/tickets and repos/<repo>/<repo>/.git
 #######################################
 create_test_workspace() {
-    mkdir -p "$TEST_TMP_DIR/test-repo/_SDD/tickets/TEST_test-ticket/tasks"
-    echo "# Test Ticket" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/TEST_test-ticket/README.md"
+    mkdir -p "$TEST_TMP_DIR/specs/test-repo/tickets/TEST_test-ticket/tasks"
+    echo "# Test Ticket" > "$TEST_TMP_DIR/specs/test-repo/tickets/TEST_test-ticket/README.md"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
 }
 
 #######################################
@@ -294,7 +296,7 @@ create_test_workspace() {
 #######################################
 create_autogate_file() {
     local stop_at_phase="$1"
-    local ticket_dir="$TEST_TMP_DIR/test-repo/_SDD/tickets/TEST_test-ticket"
+    local ticket_dir="$TEST_TMP_DIR/specs/test-repo/tickets/TEST_test-ticket"
 
     mkdir -p "$ticket_dir"
     cat > "$ticket_dir/.autogate.json" << EOF
@@ -351,7 +353,7 @@ test_no_work_available() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "No work available exits with code 0"
     assert_contains "$output" "No more work available" "Shows no work message"
@@ -371,7 +373,7 @@ test_max_iterations_limit() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Max iterations limit exits with code 1"
     assert_contains "$output" "maximum iterations" "Shows max iterations reached"
@@ -392,7 +394,7 @@ test_max_errors_limit() {
 
     local output
     local exit_code=0
-    output=$(PATH="$TEST_TMP_DIR/bin:$PATH" bash "$SDD_LOOP" --max-errors 3 --max-iterations 10 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(PATH="$TEST_TMP_DIR/bin:$PATH" bash "$SDD_LOOP" --max-errors 3 --max-iterations 10 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Max errors limit exits with code 1"
     assert_contains "$output" "maximum consecutive errors" "Shows max errors reached"
@@ -414,7 +416,7 @@ test_timeout_enforcement() {
     local output
     local exit_code=0
     # Use very short timeout (1 second)
-    output=$(PATH="$TEST_TMP_DIR/bin:$PATH" bash "$SDD_LOOP" --timeout 1 --max-errors 2 --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(PATH="$TEST_TMP_DIR/bin:$PATH" bash "$SDD_LOOP" --timeout 1 --max-errors 2 --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     # Task timeout should cause the loop to exit with error
     assert_exit_code 1 "$exit_code" "Timeout exits with code 1"
@@ -436,11 +438,12 @@ test_phase_boundary_detection() {
 
     # Create a specific ticket structure that matches the expected naming
     # The ticket_id in JSON should match the prefix before _ in the directory name
-    mkdir -p "$TEST_TMP_DIR/test-repo/_SDD/tickets/PHASE_boundary-test/tasks"
-    echo "# Phase Boundary Test" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/PHASE_boundary-test/README.md"
+    mkdir -p "$TEST_TMP_DIR/specs/test-repo/tickets/PHASE_boundary-test/tasks"
+    echo "# Phase Boundary Test" > "$TEST_TMP_DIR/specs/test-repo/tickets/PHASE_boundary-test/README.md"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
 
     # Create autogate file with stop_at_phase=2
-    cat > "$TEST_TMP_DIR/test-repo/_SDD/tickets/PHASE_boundary-test/.autogate.json" << 'EOF'
+    cat > "$TEST_TMP_DIR/specs/test-repo/tickets/PHASE_boundary-test/.autogate.json" << 'EOF'
 {
     "ready": true,
     "agent_ready": true,
@@ -452,13 +455,13 @@ EOF
     # The ticket ID in the JSON must match the prefix of the ticket directory (PHASE)
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"PHASE.2001","ticket":"PHASE","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Test phase 2"}}'
+echo '{"recommended_action":{"action":"do-task","task":"PHASE.2001","ticket":"PHASE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Test phase 2"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     # Phase boundary detection should result in a successful (exit 0) exit
     # We can verify phase boundary detection by checking:
@@ -491,7 +494,7 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Task 1"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task 1"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
@@ -500,7 +503,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Dry run exits with code 0"
     assert_contains "$output" "[DRY-RUN]" "Shows dry-run prefix"
@@ -534,7 +537,7 @@ test_missing_claude() {
     local output
     local exit_code=0
     # Use PATH that doesn't include claude but has essential commands
-    output=$(PATH="$TEST_TMP_DIR/no_claude_bin:/usr/bin:/bin" bash "$SDD_LOOP" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(PATH="$TEST_TMP_DIR/no_claude_bin:/usr/bin:/bin" bash "$SDD_LOOP" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Missing claude exits with code 1"
     assert_contains "$output" "claude CLI not found" "Shows claude not found error"
@@ -564,7 +567,7 @@ fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 4 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Task"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
@@ -590,7 +593,7 @@ EOF
 
     local output
     local exit_code=0
-    output=$(PATH="$TEST_TMP_DIR/bin:$PATH" bash "$SDD_LOOP" --max-errors 5 --max-iterations 10 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(PATH="$TEST_TMP_DIR/bin:$PATH" bash "$SDD_LOOP" --max-errors 5 --max-iterations 10 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     # Should show error counts
     assert_contains "$output" "consecutive errors: 1/5" "Shows error count increasing"
@@ -610,7 +613,7 @@ test_invalid_json_from_status() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Invalid JSON exits with code 1"
     assert_contains "$output" "invalid JSON" "Shows invalid JSON error"
@@ -660,7 +663,7 @@ test_verbose_mode() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --verbose --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --verbose --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Verbose mode exits with code 0"
     assert_contains "$output" "[VERBOSE]" "Shows verbose messages"
@@ -680,7 +683,7 @@ test_quiet_mode() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --quiet --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --quiet --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Quiet mode exits with code 0"
     # In quiet mode, INFO messages should be suppressed
@@ -700,7 +703,7 @@ test_environment_variables() {
 
     local output
     local exit_code=0
-    output=$(SDD_LOOP_MAX_ITERATIONS=2 SDD_LOOP_DRY_RUN=true bash "$SDD_LOOP" "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(SDD_LOOP_MAX_ITERATIONS=2 SDD_LOOP_DRY_RUN=true bash "$SDD_LOOP" --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Env var max iterations exits with code 1 when limit reached"
     assert_contains "$output" "Iteration 2/2" "Env var max iterations is respected"
@@ -719,7 +722,7 @@ test_cli_overrides_env() {
 
     local output
     local exit_code=0
-    output=$(SDD_LOOP_MAX_ITERATIONS=5 bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(SDD_LOOP_MAX_ITERATIONS=5 bash "$SDD_LOOP" --dry-run --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "CLI override exits with code 1"
     # The script shows "Iteration X/Y" where Y is the max iterations
@@ -770,7 +773,7 @@ test_combined_short_options() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" -nv --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" -nv --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Combined -nv exits with code 0"
     # Dry run mode shows DRY-RUN in output (with task execution)
@@ -801,7 +804,7 @@ test_missing_workspace() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP_ORIGINAL" "/nonexistent/path/that/does/not/exist" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP_ORIGINAL" --specs-root "/nonexistent/path/specs" --repos-root "/nonexistent/path/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Missing workspace exits with code 1"
     assert_contains "$output" "does not exist" "Shows workspace not found error"
@@ -820,7 +823,7 @@ test_debug_mode() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Debug mode exits with code 0"
     assert_contains "$output" "[DEBUG]" "Shows debug messages"
@@ -848,7 +851,7 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 2 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Task '\$COUNTER'"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
@@ -857,7 +860,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 10 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 10 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Iteration count test exits with code 0"
     assert_contains "$output" "Iteration 1/" "Shows iteration 1"
@@ -887,7 +890,7 @@ COUNTER=\$(cat "\$COUNTER_FILE")
 COUNTER=\$((COUNTER + 1))
 echo "\$COUNTER" > "\$COUNTER_FILE"
 if [[ \$COUNTER -le 3 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Task '\$COUNTER'"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.'\$COUNTER'001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Task '\$COUNTER'"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"No more work"}}'
 fi
@@ -896,7 +899,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 10 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 10 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Tasks completed test exits with code 0"
     # In dry run mode, tasks are counted as completed
@@ -920,7 +923,7 @@ test_max_iterations_valid() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Valid --max-iterations exits with code 1 (limit reached)"
     assert_contains "$output" "/5" "Max iterations value 5 is applied"
@@ -1059,7 +1062,7 @@ test_poll_interval_zero() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --poll-interval 0 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --poll-interval 0 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Zero --poll-interval exits with code 0 (zero is allowed)"
     assert_not_contains "$output" "requires a" "No validation error for zero poll-interval"
@@ -1118,13 +1121,13 @@ test_max_iterations_missing_value() {
 # Validates that tasks with sdd_root inside workspace execute successfully
 #######################################
 test_path_bounds_valid_path() {
-    echo "--- Test: Path bounds - valid path within workspace ---"
+    echo "--- Test: Path bounds - valid path within specs root ---"
 
     setup_test_env
     reset_counters
     create_test_workspace
 
-    # Create mock status board returning path inside workspace
+    # Create mock status board returning path inside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
 COUNTER_FILE="$TEST_TMP_DIR/valid_path_counter"
@@ -1132,7 +1135,7 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Valid path test"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid path test"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
@@ -1141,11 +1144,11 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
-    assert_exit_code 0 "$exit_code" "Valid path within workspace exits with code 0"
+    assert_exit_code 0 "$exit_code" "Valid path within specs root exits with code 0"
     assert_contains "$output" "[DRY-RUN] Would execute task" "Shows dry-run task execution"
-    assert_not_contains "$output" "outside workspace bounds" "No path bounds error"
+    assert_not_contains "$output" "outside" "No path bounds error"
 }
 
 #######################################
@@ -1153,28 +1156,28 @@ MOCK_EOF
 # Validates that tasks with sdd_root outside workspace are rejected
 #######################################
 test_path_bounds_outside_workspace() {
-    echo "--- Test: Path bounds - path outside workspace ---"
+    echo "--- Test: Path bounds - sdd_root outside specs root ---"
 
     setup_test_env
     reset_counters
     create_test_workspace
 
-    # Create a directory outside the workspace (still in temp for safety)
-    mkdir -p "$TEST_TMP_DIR/outside/_SDD"
+    # Create a directory outside the specs root (still in temp for safety)
+    mkdir -p "$TEST_TMP_DIR/outside/test-repo"
 
-    # Create mock status board returning path outside workspace
+    # Create mock status board returning sdd_root outside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/_SDD","reason":"Outside workspace test"}}'
+echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/outside/test-repo","reason":"Outside specs root test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
-    assert_exit_code 1 "$exit_code" "Path outside workspace exits with code 1"
-    assert_contains "$output" "outside workspace bounds" "Shows path bounds error message"
+    assert_exit_code 1 "$exit_code" "Path outside specs root exits with code 1"
+    assert_contains "$output" "outside specs bounds" "Shows path bounds error message"
 }
 
 #######################################
@@ -1188,23 +1191,23 @@ test_path_bounds_traversal_attack() {
     reset_counters
     create_test_workspace
 
-    # Create a directory outside workspace that could be reached via traversal
-    mkdir -p "$TEST_TMP_DIR/outside-target/_SDD"
+    # Create a directory outside specs root that could be reached via traversal
+    mkdir -p "$TEST_TMP_DIR/outside-target/test-repo"
 
     # Create mock status board returning path with ".." traversal
-    # Path: test-repo/../outside-target/_SDD canonicalizes to outside workspace
+    # Path: specs/../outside-target/test-repo canonicalizes to outside specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/../outside-target/_SDD","reason":"Traversal attack test"}}'
+echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/../outside-target/test-repo","reason":"Traversal attack test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Traversal attack exits with code 1"
-    assert_contains "$output" "outside workspace bounds" "Shows path bounds error for traversal"
+    assert_contains "$output" "outside specs bounds" "Shows path bounds error for traversal"
 }
 
 #######################################
@@ -1212,25 +1215,29 @@ MOCK_EOF
 # Validates that sdd_root cannot be the workspace itself
 #######################################
 test_path_bounds_equals_workspace() {
-    echo "--- Test: Path bounds - path equals workspace ---"
+    echo "--- Test: Path bounds - sdd_root equals specs root ---"
 
     setup_test_env
     reset_counters
     create_test_workspace
 
-    # Create mock status board returning workspace itself as sdd_root
+    # Create mock status board returning specs root itself as sdd_root (must be subdirectory)
+    # The basename of specs root would be "specs", so find_git_root looks for repos/specs/
+    # which doesn't exist, causing a failure before path bounds check
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
-echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo","reason":"Equals workspace test"}}'
+echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs","reason":"Equals specs root test"}}'
 MOCK_EOF
     chmod +x "$TEST_TMP_DIR/scripts/master-status-board.sh"
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
-    assert_exit_code 1 "$exit_code" "Path equals workspace exits with code 1"
-    assert_contains "$output" "outside workspace bounds" "Shows path bounds error when equals workspace"
+    assert_exit_code 1 "$exit_code" "Path equals specs root exits with code 1"
+    # sdd_root=specs means basename="specs" -> find_git_root fails (no repos/specs/)
+    # This effectively blocks using specs root as sdd_root
+    assert_contains "$output" "Cannot find git root" "Shows git root not found error"
 }
 
 #######################################
@@ -1238,16 +1245,17 @@ MOCK_EOF
 # Validates that symlinks are resolved before comparison
 #######################################
 test_path_bounds_symlink_valid() {
-    echo "--- Test: Path bounds - symlink to valid path ---"
+    echo "--- Test: Path bounds - symlink specs root resolves correctly ---"
 
     setup_test_env
     reset_counters
     create_test_workspace
 
-    # Create a symlink inside workspace pointing to the real _SDD
-    ln -sf "$TEST_TMP_DIR/test-repo/_SDD" "$TEST_TMP_DIR/test-repo/symlink_sdd"
+    # Create a symlink that serves as the specs root, pointing to the actual specs dir
+    # Both the specs root (symlink) and sdd_root resolve to the same real path tree
+    ln -sf "$TEST_TMP_DIR/specs" "$TEST_TMP_DIR/specs-link"
 
-    # Create mock status board returning symlink path
+    # Create mock status board returning path via symlinked specs root
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
 #!/usr/bin/env bash
 COUNTER_FILE="$TEST_TMP_DIR/symlink_counter"
@@ -1255,7 +1263,7 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/symlink_sdd","reason":"Symlink test"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs-link/test-repo","reason":"Symlink test"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
@@ -1264,10 +1272,11 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    # Use the symlink as specs root - both it and sdd_root resolve to same real path tree
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs-link" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
-    assert_exit_code 0 "$exit_code" "Symlink to valid path exits with code 0"
-    assert_not_contains "$output" "outside workspace bounds" "No path bounds error for symlink"
+    assert_exit_code 0 "$exit_code" "Symlink specs root exits with code 0"
+    assert_not_contains "$output" "outside" "No path bounds error when specs root is symlink"
 }
 
 #######################################
@@ -1289,7 +1298,7 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Debug test"}}'
+    echo '{"recommended_action":{"action":"do-task","task":"TEST.1001","ticket":"TEST","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Debug test"}}'
 else
     echo '{"recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
@@ -1298,12 +1307,12 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Debug mode with valid path exits with code 0"
-    assert_contains "$output" "canonical_workspace=" "Debug shows canonical workspace path"
+    assert_contains "$output" "canonical_specs_root=" "Debug shows canonical specs root path"
     assert_contains "$output" "canonical_sdd_root=" "Debug shows canonical sdd_root path"
-    assert_contains "$output" "Path bounds validation passed" "Debug confirms validation passed"
+    assert_contains "$output" "Dual path bounds validation passed" "Debug confirms validation passed"
 }
 
 # =============================================================================
@@ -1330,7 +1339,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --debug --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Version matching exits with code 0"
     assert_not_contains "$output" "version mismatch" "No version mismatch warning when version matches"
@@ -1357,7 +1366,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Version mismatch still exits with code 0 (graceful degradation)"
     assert_contains "$output" "version mismatch" "Shows version mismatch warning"
@@ -1385,7 +1394,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Missing version still exits with code 0 (backward compatible)"
     assert_contains "$output" "version mismatch" "Shows version mismatch warning for missing version"
@@ -1407,12 +1416,13 @@ test_autogate_invalid_json_quiet_mode() {
     setup_test_env
     reset_counters
 
-    # Create ticket structure
-    mkdir -p "$TEST_TMP_DIR/test-repo/_SDD/tickets/AUTOGATE_test-ticket/tasks"
-    echo "# Autogate Test" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/AUTOGATE_test-ticket/README.md"
+    # Create ticket structure in specs
+    mkdir -p "$TEST_TMP_DIR/specs/test-repo/tickets/AUTOGATE_test-ticket/tasks"
+    echo "# Autogate Test" > "$TEST_TMP_DIR/specs/test-repo/tickets/AUTOGATE_test-ticket/README.md"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
 
     # Create INVALID .autogate.json (malformed JSON)
-    echo "{invalid json" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/AUTOGATE_test-ticket/.autogate.json"
+    echo "{invalid json" > "$TEST_TMP_DIR/specs/test-repo/tickets/AUTOGATE_test-ticket/.autogate.json"
 
     # Create mock that returns a task for the AUTOGATE ticket
     cat > "$TEST_TMP_DIR/scripts/master-status-board.sh" << MOCK_EOF
@@ -1422,7 +1432,7 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Autogate test"}}'
+    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"AUTOGATE.1001","ticket":"AUTOGATE","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Autogate test"}}'
 else
     echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
@@ -1432,7 +1442,7 @@ MOCK_EOF
     local output
     local exit_code=0
     # Run in QUIET mode - only errors should be visible
-    output=$(bash "$SDD_LOOP" --dry-run --quiet --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --quiet --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Invalid autogate exits with code 0 (graceful degradation)"
     # The key assertion: ERROR message should appear even in quiet mode
@@ -1455,12 +1465,13 @@ test_autogate_valid_json_no_error() {
     setup_test_env
     reset_counters
 
-    # Create ticket structure
-    mkdir -p "$TEST_TMP_DIR/test-repo/_SDD/tickets/VALIDAUTO_test-ticket/tasks"
-    echo "# Valid Autogate Test" > "$TEST_TMP_DIR/test-repo/_SDD/tickets/VALIDAUTO_test-ticket/README.md"
+    # Create ticket structure in specs
+    mkdir -p "$TEST_TMP_DIR/specs/test-repo/tickets/VALIDAUTO_test-ticket/tasks"
+    echo "# Valid Autogate Test" > "$TEST_TMP_DIR/specs/test-repo/tickets/VALIDAUTO_test-ticket/README.md"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
 
     # Create VALID .autogate.json
-    cat > "$TEST_TMP_DIR/test-repo/_SDD/tickets/VALIDAUTO_test-ticket/.autogate.json" << 'EOF'
+    cat > "$TEST_TMP_DIR/specs/test-repo/tickets/VALIDAUTO_test-ticket/.autogate.json" << 'EOF'
 {
     "ready": true,
     "agent_ready": true,
@@ -1476,7 +1487,7 @@ if [[ ! -f "\$COUNTER_FILE" ]]; then echo "0" > "\$COUNTER_FILE"; fi
 COUNTER=\$(cat "\$COUNTER_FILE")
 echo "\$((COUNTER + 1))" > "\$COUNTER_FILE"
 if [[ \$COUNTER -lt 1 ]]; then
-    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/test-repo/_SDD","reason":"Valid autogate test"}}'
+    echo '{"version":"1.0.0","recommended_action":{"action":"do-task","task":"VALIDAUTO.1001","ticket":"VALIDAUTO","sdd_root":"$TEST_TMP_DIR/specs/test-repo","reason":"Valid autogate test"}}'
 else
     echo '{"version":"1.0.0","recommended_action":{"action":"none","task":"","ticket":"","sdd_root":"","reason":"Done"}}'
 fi
@@ -1485,7 +1496,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 5 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Valid autogate exits with code 0"
     # Should NOT contain the parse error
@@ -1513,7 +1524,7 @@ test_log_format_text_default() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Default text format exits with code 0"
     # Text format should have [LEVEL] format
@@ -1536,7 +1547,7 @@ test_log_format_text_explicit() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --log-format text --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --log-format text --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Explicit text format exits with code 0"
     assert_contains "$output" "[INFO]" "Explicit text format shows [INFO] prefix"
@@ -1557,7 +1568,7 @@ test_log_format_json() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
     # JSON format should contain timestamp field
@@ -1584,7 +1595,7 @@ test_log_format_json_valid() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
 
@@ -1616,7 +1627,7 @@ test_log_format_json_timestamp() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
 
@@ -1648,7 +1659,7 @@ test_log_format_json_context_iteration() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "JSON format exits with code 0"
 
@@ -1674,7 +1685,7 @@ test_log_format_env_var() {
 
     local output
     local exit_code=0
-    output=$(SDD_LOOP_LOG_FORMAT=json bash "$SDD_LOOP" --dry-run --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(SDD_LOOP_LOG_FORMAT=json bash "$SDD_LOOP" --dry-run --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Env var JSON format exits with code 0"
     assert_contains "$output" '"timestamp"' "Env var produces JSON format"
@@ -1749,7 +1760,7 @@ MOCK_EOF
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --log-format json --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "JSON with special chars exits with code 0"
 
@@ -1785,7 +1796,7 @@ test_log_format_cli_overrides_env() {
     local output
     local exit_code=0
     # Set env to json but CLI to text - CLI should win
-    output=$(SDD_LOOP_LOG_FORMAT=json bash "$SDD_LOOP" --dry-run --log-format text --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(SDD_LOOP_LOG_FORMAT=json bash "$SDD_LOOP" --dry-run --log-format text --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "CLI override exits with code 0"
     # Should be text format (CLI override)
@@ -1813,7 +1824,7 @@ test_metrics_file_valid_json() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Metrics file creation exits with code 0"
 
@@ -1849,16 +1860,17 @@ test_metrics_file_required_fields() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Metrics file creation exits with code 0"
 
     # Check required fields exist
-    local version timestamp workspace_root exit_code_field iterations tasks_completed tasks_failed duration configuration
+    local version timestamp specs_root repos_root exit_code_field iterations tasks_completed tasks_failed duration configuration
 
     version=$(jq -r '.version' "$metrics_file" 2>/dev/null)
     timestamp=$(jq -r '.timestamp' "$metrics_file" 2>/dev/null)
-    workspace_root=$(jq -r '.workspace_root' "$metrics_file" 2>/dev/null)
+    specs_root=$(jq -r '.specs_root' "$metrics_file" 2>/dev/null)
+    repos_root=$(jq -r '.repos_root' "$metrics_file" 2>/dev/null)
     exit_code_field=$(jq -r '.exit_code' "$metrics_file" 2>/dev/null)
     iterations=$(jq -r '.iterations' "$metrics_file" 2>/dev/null)
     tasks_completed=$(jq -r '.tasks_completed' "$metrics_file" 2>/dev/null)
@@ -1878,10 +1890,16 @@ test_metrics_file_required_fields() {
         log_result "Metrics has timestamp field" "fail" "timestamp is missing or null"
     fi
 
-    if [[ -n "$workspace_root" && "$workspace_root" != "null" ]]; then
-        log_result "Metrics has workspace_root field" "pass"
+    if [[ -n "$specs_root" && "$specs_root" != "null" ]]; then
+        log_result "Metrics has specs_root field" "pass"
     else
-        log_result "Metrics has workspace_root field" "fail" "workspace_root is missing or null"
+        log_result "Metrics has specs_root field" "fail" "specs_root is missing or null"
+    fi
+
+    if [[ -n "$repos_root" && "$repos_root" != "null" ]]; then
+        log_result "Metrics has repos_root field" "pass"
+    else
+        log_result "Metrics has repos_root field" "fail" "repos_root is missing or null"
     fi
 
     if [[ "$exit_code_field" =~ ^[0-9]+$ ]]; then
@@ -1937,7 +1955,7 @@ test_metrics_dry_run_flag() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Dry-run mode exits with code 0"
 
@@ -2023,7 +2041,7 @@ test_metrics_timestamp_format() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
 
@@ -2054,7 +2072,7 @@ test_metrics_configuration_complete() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 5 --max-errors 2 --timeout 100 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 5 --max-errors 2 --timeout 100 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
 
@@ -2122,7 +2140,7 @@ test_metrics_exit_code_accurate() {
     local output
     local exit_code=0
     # Limit iterations to cause exit with code 1
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 3 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 3 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "Max iterations exits with code 1"
 
@@ -2152,7 +2170,7 @@ test_metrics_iterations_accurate() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 10 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 10 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Completed work exits with code 0"
 
@@ -2199,7 +2217,7 @@ test_metrics_duration_reasonable() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
 
@@ -2421,7 +2439,7 @@ test_metrics_circuit_breaker_section() {
 
     local output
     local exit_code=0
-    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 "$TEST_TMP_DIR/test-repo" 2>&1) || exit_code=$?
+    output=$(bash "$SDD_LOOP" --dry-run --metrics-file "$metrics_file" --max-iterations 1 --specs-root "$TEST_TMP_DIR/specs" --repos-root "$TEST_TMP_DIR/repos" 2>&1) || exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Metrics creation exits with code 0"
 
@@ -2490,6 +2508,122 @@ test_circuit_breaker_warning_iterations_tracking() {
     else
         log_result "Total warnings count is 2" "fail" "Got: $CIRCUIT_BREAKER_WARNINGS_LOGGED"
     fi
+}
+
+# =============================================================================
+# PRIORITY 10 TESTS (find_git_root Unit Tests - SDDLOOP-6.2002)
+# =============================================================================
+
+#######################################
+# Test: find_git_root with matching name (repos/foo/foo/.git)
+#######################################
+test_find_git_root_matching_name() {
+    echo "--- Test: find_git_root with matching name ---"
+
+    setup_test_env
+
+    # Source sdd-loop.sh to get access to find_git_root function
+    source "$SDD_LOOP"
+
+    # Use isolated subdirectory to avoid cross-test contamination
+    local test_repos="$TEST_TMP_DIR/fgr_match/repos"
+    mkdir -p "$test_repos/foo/foo/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/foo" "$result" "find_git_root returns matching git root"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for matching name"
+}
+
+#######################################
+# Test: find_git_root with non-matching name (repos/mattermost/mattermost-webapp/.git)
+#######################################
+test_find_git_root_nonmatching_name() {
+    echo "--- Test: find_git_root with non-matching name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_nonmatch/repos"
+    mkdir -p "$test_repos/mattermost/mattermost-webapp/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "mattermost") || exit_code=$?
+
+    assert_equals "$test_repos/mattermost/mattermost-webapp" "$result" "find_git_root returns non-matching git root"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for non-matching name"
+}
+
+#######################################
+# Test: find_git_root with no git root found
+#######################################
+test_find_git_root_no_git() {
+    echo "--- Test: find_git_root with no git root ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_nogit/repos"
+    mkdir -p "$test_repos/foo/subdir"
+    # No .git anywhere
+
+    local exit_code=0
+    find_git_root "$test_repos/" "foo" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "find_git_root exits with 1 when no git root found"
+}
+
+#######################################
+# Test: find_git_root with multiple git directories (uses first alphabetically)
+# Note: The production code returns immediately on the first match found via
+# alphabetical ls -1 scan, so only the first git root is discovered.
+#######################################
+test_find_git_root_multiple_git_dirs() {
+    echo "--- Test: find_git_root with multiple git dirs ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_multi/repos"
+    mkdir -p "$test_repos/foo/aaa/.git"
+    mkdir -p "$test_repos/foo/zzz/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    # Should select first alphabetically (aaa) since ls -1 sorts alphabetically
+    assert_equals "$test_repos/foo/aaa" "$result" "find_git_root returns first alphabetically (aaa)"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 when multiple git dirs exist"
+}
+
+#######################################
+# Test: find_git_root with worktree (.git file instead of directory)
+#######################################
+test_find_git_root_worktree() {
+    echo "--- Test: find_git_root with worktree fallback ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_repos="$TEST_TMP_DIR/fgr_worktree/repos"
+    mkdir -p "$test_repos/foo/worktree"
+    # .git is a file (worktree), not a directory
+    echo "gitdir: /some/other/path/.git/worktrees/worktree" > "$test_repos/foo/worktree/.git"
+
+    local result
+    local exit_code=0
+    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+
+    assert_equals "$test_repos/foo/worktree" "$result" "find_git_root returns worktree path"
+    assert_equals 0 "$exit_code" "find_git_root exits with 0 for worktree"
 }
 
 # =============================================================================
@@ -2749,6 +2883,25 @@ main() {
     test_metrics_circuit_breaker_section
     echo ""
     test_circuit_breaker_warning_iterations_tracking
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 10 TESTS (find_git_root Unit Tests - SDDLOOP-6.2002)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 10 Tests (find_git_root)"
+    echo "====================================="
+    echo ""
+
+    test_find_git_root_matching_name
+    echo ""
+    test_find_git_root_nonmatching_name
+    echo ""
+    test_find_git_root_no_git
+    echo ""
+    test_find_git_root_multiple_git_dirs
+    echo ""
+    test_find_git_root_worktree
     echo ""
 
     # Summary
