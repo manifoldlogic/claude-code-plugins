@@ -90,144 +90,682 @@
 
 set -euo pipefail
 
-# Version constant
+# =============================================================================
+# Global Variables
+# =============================================================================
+#
+# This section declares all global variables used by sdd-loop.sh, organized
+# into four categories:
+#
+#   1. Script Metadata    - VERSION
+#   2. Configuration Defaults - Readonly constants with fallback values
+#   3. Runtime Configuration  - Configurable via env vars and CLI args
+#   4. Internal State         - Runtime counters, flags, and process tracking
+#
+# All configuration defaults are readonly after initialization. Runtime
+# configuration variables are set during main() argument parsing. Internal
+# state variables are modified during loop execution and reset on exit.
+# =============================================================================
+
+#######################################
+# PURPOSE: Script version identifier for --version output and metrics.
+#
+# Lifecycle:
+#   - Initialized: At script load (constant)
+#   - Modified: Never (update manually when releasing)
+#   - Cleared: Never
+#
+# Type: string
+# Constraints: Semver format (MAJOR.MINOR.PATCH). Immutable at runtime.
+# Example: "2.0.0"
+#######################################
 VERSION="2.0.0"
 
 # =============================================================================
 # Configuration Defaults
 # =============================================================================
+#
+# Readonly constants that provide fallback values when neither environment
+# variables nor CLI arguments override them. Each default supports pre-setting
+# via environment variable (checked with [[ -z ... ]]) to allow test fixtures
+# and CI/CD pipelines to inject values before the script loads.
+#
+# All defaults become readonly after assignment. They are never modified
+# during script execution.
+# =============================================================================
 
-# Default specs root for SDD data directories
+#######################################
+# PURPOSE: Default root directory for SDD spec data (epics, tickets, tasks).
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_SPECS_ROOT env var before script load.
+# Example: "/workspace/_SPECS/"
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_SPECS_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_SPECS_ROOT="/workspace/_SPECS/"
 
-# Default repos root for git repository scanning
+#######################################
+# PURPOSE: Default root directory for git repository scanning.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_REPOS_ROOT env var before script load.
+# Example: "/workspace/repos/"
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_REPOS_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_REPOS_ROOT="/workspace/repos/"
 
-# Maximum number of task iterations before stopping (safety limit)
+#######################################
+# PURPOSE: Default safety limit for maximum task iterations before the loop
+#   stops to prevent runaway execution.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_MAX_ITERATIONS env var before script load.
+# Example: 50
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_MAX_ITERATIONS:-}" ]] && readonly SDD_LOOP_DEFAULT_MAX_ITERATIONS=50
 
-# Maximum consecutive errors before stopping
+#######################################
+# PURPOSE: Default maximum number of consecutive task execution errors
+#   before the loop stops to prevent repeated failures.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_MAX_ERRORS env var before script load.
+# Example: 3
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_MAX_ERRORS:-}" ]] && readonly SDD_LOOP_DEFAULT_MAX_ERRORS=3
 
-# Task execution timeout in seconds
+#######################################
+# PURPOSE: Default task execution timeout in seconds. Claude Code invocations
+#   that exceed this timeout are killed.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_TIMEOUT env var before script load.
+# Example: 600
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_TIMEOUT:-}" ]] && readonly SDD_LOOP_DEFAULT_TIMEOUT=600
 
-# Poll interval in seconds between status board checks
+#######################################
+# PURPOSE: Default interval in seconds between master-status-board.sh polls.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Non-negative integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_POLL_INTERVAL env var before script load.
+# Example: 5
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_POLL_INTERVAL:-}" ]] && readonly SDD_LOOP_DEFAULT_POLL_INTERVAL=5
 
-# Filesystem operation timeout in seconds for find commands.
-# 30 seconds is generous for local filesystem operations (typically <1 second)
-# but prevents indefinite hangs on NFS mounts with stale handles or network issues.
-# If a find command does not complete within this timeout, it is killed and a
-# clear error is logged. This protects the loop from becoming unresponsive when
-# _SPECS/ or repos/ are on network-mounted filesystems.
+#######################################
+# PURPOSE: Timeout in seconds for filesystem operations (find commands).
+#   Prevents indefinite hangs on NFS mounts with stale handles or network
+#   issues. 30 seconds is generous for local filesystem operations (typically
+#   <1 second) but protects the loop from becoming unresponsive when _SPECS/
+#   or repos/ are on network-mounted filesystems.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via FILESYSTEM_TIMEOUT_SECONDS env var before script load.
+# Example: 30
+#######################################
 [[ -z "${FILESYSTEM_TIMEOUT_SECONDS:-}" ]] && readonly FILESYSTEM_TIMEOUT_SECONDS=30
 
-# Lock/temp file directory: Override via SDD_LOOP_DEFAULT_LOCK_DIR to place lock
-# files and cache files on a different filesystem (e.g., RAM disk, shared volume).
-# Default: /tmp (standard POSIX temporary directory)
+#######################################
+# PURPOSE: Directory for lock files and cache files. Override to place
+#   temporary files on a different filesystem (e.g., RAM disk, shared volume).
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path to an existing, writable directory.
+#   Readonly. Pre-settable via SDD_LOOP_DEFAULT_LOCK_DIR env var.
+# Example: "/tmp"
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_LOCK_DIR:-}" ]] && readonly SDD_LOOP_DEFAULT_LOCK_DIR="/tmp"
 
-# Circuit breaker advisory thresholds: iteration counts at which warnings fire.
-# Threshold 1 indicates longer-than-typical execution.
-# Threshold 2 indicates approaching the default max_iterations limit (50).
+#######################################
+# PURPOSE: Circuit breaker advisory thresholds. Iteration counts at which
+#   warning messages are logged. CIRCUIT_BREAKER_WARN_THRESHOLD indicates
+#   longer-than-typical execution. CIRCUIT_BREAKER_CRITICAL_THRESHOLD
+#   indicates approaching the default max_iterations limit (50). These are
+#   advisory only and never abort the loop.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (iteration count)
+# Constraints: Positive integers. WARN < CRITICAL < DEFAULT_MAX_ITERATIONS.
+#   Readonly. Pre-settable via env vars before script load.
+# Example: CIRCUIT_BREAKER_WARN_THRESHOLD=25, CIRCUIT_BREAKER_CRITICAL_THRESHOLD=40
+#######################################
 [[ -z "${CIRCUIT_BREAKER_WARN_THRESHOLD:-}" ]] && readonly CIRCUIT_BREAKER_WARN_THRESHOLD=25
 [[ -z "${CIRCUIT_BREAKER_CRITICAL_THRESHOLD:-}" ]] && readonly CIRCUIT_BREAKER_CRITICAL_THRESHOLD=40
 
 # =============================================================================
-# Global State (configurable via env vars and CLI args)
+# Runtime Configuration (configurable via env vars and CLI args)
+# =============================================================================
+#
+# These variables follow a three-tier precedence hierarchy:
+#   CLI args (highest) > environment variables > configuration defaults (lowest)
+#
+# All are initialized from their environment variable (if set) at script load,
+# then potentially overridden by CLI argument parsing in main(). After main()
+# applies defaults, these variables are treated as effectively immutable for
+# the duration of the loop.
 # =============================================================================
 
-# Specs root directory (SDD data)
+#######################################
+# PURPOSE: Root directory containing SDD spec data for all repositories.
+#   Each subdirectory under this root corresponds to a repository's spec data
+#   (epics, tickets, tasks).
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_SPECS_ROOT env var (may be empty)
+#   - Modified: In main() via --specs-root CLI arg or default fallback
+#   - Cleared: Never (always has a value after main() initialization)
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash after main()
+#   resolves it. Must point to an existing directory. Trailing slash is
+#   enforced by main() for consistent path concatenation.
+# Example: "/workspace/_SPECS/"
+#######################################
 SDD_LOOP_SPECS_ROOT="${SDD_LOOP_SPECS_ROOT:-}"
 
-# Repos root directory (git repositories)
+#######################################
+# PURPOSE: Root directory containing git repositories. Each subdirectory
+#   under this root is a repository parent (e.g., repos/<name>/<worktree>).
+#   Used by find_git_root() to locate .git directories.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_REPOS_ROOT env var (may be empty)
+#   - Modified: In main() via --repos-root CLI arg, deprecated
+#     SDD_LOOP_WORKSPACE_ROOT env var, or default fallback
+#   - Cleared: Never (always has a value after main() initialization)
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash after main()
+#   resolves it. Must point to an existing directory.
+# Example: "/workspace/repos/"
+#######################################
 SDD_LOOP_REPOS_ROOT="${SDD_LOOP_REPOS_ROOT:-}"
 
-# Maximum iterations (0 = unlimited)
+#######################################
+# PURPOSE: Maximum number of task iterations before the loop stops.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_MAX_ITERATIONS env var (may be empty)
+#   - Modified: In main() via --max-iterations CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer (must be > 0). Validated in main().
+# Example: 50
+#######################################
 SDD_LOOP_MAX_ITERATIONS="${SDD_LOOP_MAX_ITERATIONS:-}"
 
-# Maximum consecutive errors
+#######################################
+# PURPOSE: Maximum number of consecutive task execution errors before
+#   the loop stops.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_MAX_ERRORS env var (may be empty)
+#   - Modified: In main() via --max-errors CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer (must be > 0). Validated in main().
+# Example: 3
+#######################################
 SDD_LOOP_MAX_ERRORS="${SDD_LOOP_MAX_ERRORS:-}"
 
-# Task timeout in seconds
+#######################################
+# PURPOSE: Timeout in seconds for each Claude Code task execution.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_TIMEOUT env var (may be empty)
+#   - Modified: In main() via --timeout CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Positive integer (must be > 0). Validated in main().
+# Example: 600
+#######################################
 SDD_LOOP_TIMEOUT="${SDD_LOOP_TIMEOUT:-}"
 
-# Poll interval in seconds
+#######################################
+# PURPOSE: Interval in seconds between master-status-board.sh polls.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_POLL_INTERVAL env var (may be empty)
+#   - Modified: In main() via --poll-interval CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Non-negative integer (0 = no delay). Validated in main().
+# Example: 5
+#######################################
 SDD_LOOP_POLL_INTERVAL="${SDD_LOOP_POLL_INTERVAL:-}"
 
-# Dry run mode - log actions without executing
+#######################################
+# PURPOSE: Dry-run mode flag. When "true", the loop logs actions that would
+#   be taken without actually invoking Claude Code.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_DRY_RUN env var (default: "false")
+#   - Modified: In main() via -n/--dry-run CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_DRY_RUN="${SDD_LOOP_DRY_RUN:-false}"
 
-# Verbose mode - extra logging
+#######################################
+# PURPOSE: Verbose mode flag. When "true", enables additional progress
+#   detail in log output.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_VERBOSE env var (default: "false")
+#   - Modified: In main() via -v/--verbose CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_VERBOSE="${SDD_LOOP_VERBOSE:-false}"
 
-# Quiet mode - minimal output
+#######################################
+# PURPOSE: Quiet mode flag. When "true", suppresses informational messages
+#   (errors only).
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_QUIET env var (default: "false")
+#   - Modified: In main() via -q/--quiet CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_QUIET="${SDD_LOOP_QUIET:-false}"
 
-# Debug mode - debug-level logging
+#######################################
+# PURPOSE: Debug mode flag. When "true", enables debug-level logging
+#   (very verbose output useful for troubleshooting).
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_DEBUG env var (default: "false")
+#   - Modified: In main() via --debug CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_DEBUG="${SDD_LOOP_DEBUG:-false}"
 
-# Log format - "text" (default) or "json" for structured logging
+#######################################
+# PURPOSE: Log output format selector. Controls whether log messages are
+#   emitted as human-readable text or machine-parseable JSON.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_LOG_FORMAT env var (default: "text")
+#   - Modified: In main() via --log-format CLI option
+#   - Cleared: Never
+#
+# Type: string (enum)
+# Constraints: Must be "text" or "json". Validated in main().
+# Example: "text"
+#######################################
 SDD_LOOP_LOG_FORMAT="${SDD_LOOP_LOG_FORMAT:-text}"
 
 # =============================================================================
 # Internal State
 # =============================================================================
+#
+# Runtime variables that track loop execution progress, process management,
+# and inter-function communication. These are initialized at script load and
+# modified during loop execution. All are reset or cleaned up on script exit
+# via the cleanup() and signal handler functions.
+# =============================================================================
 
-# Script directory for locating master-status-board.sh
+#######################################
+# PURPOSE: Absolute path to the directory containing this script. Used to
+#   locate sibling scripts (e.g., master-status-board.sh) via $SCRIPT_DIR/.
+#
+# Lifecycle:
+#   - Initialized: At script load via dirname/pwd resolution
+#   - Modified: Never
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Always an absolute path. Never null. Immutable after init.
+# Example: "/workspace/repos/claude-code-plugins/plugins/sdd/skills/project-workflow/scripts"
+#######################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Iteration counter
+#######################################
+# PURPOSE: Counts the number of main loop iterations completed. Used for
+#   safety limit enforcement, circuit breaker thresholds, and metrics output.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by 1 at the start of each loop iteration in main()
+#   - Cleared: Never (reported in cleanup summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 12
+#######################################
 ITERATION_COUNT=0
 
-# Consecutive error counter
+#######################################
+# PURPOSE: Tracks the number of consecutive task execution errors. Used
+#   to detect persistent failure conditions and stop the loop. Currently
+#   initialized but reserved for future error-tracking logic.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Referenced in JSON log context output
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Non-negative.
+# Example: 0
+#######################################
 CONSECUTIVE_ERRORS=0
 
-# Exit flag for signal handling
+#######################################
+# PURPOSE: Signal-driven exit request flag. Set to "true" by SIGINT/SIGTERM
+#   handlers to request a graceful loop exit at the next iteration boundary.
+#
+# Lifecycle:
+#   - Initialized: At script load ("false")
+#   - Modified: Set to "true" by handle_sigint() or handle_sigterm()
+#   - Cleared: Never (once set, the loop exits)
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Once set to "true", never reverts.
+# Example: "false"
+#######################################
 EXIT_REQUESTED=false
 
-# Exit code to use when exiting
+#######################################
+# PURPOSE: Exit code to use when the script terminates. Allows signal
+#   handlers to set a specific exit code (e.g., 130 for SIGINT, 143 for
+#   SIGTERM) that persists through cleanup.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Set by signal handlers or main loop on error conditions
+#   - Cleared: Never (used at script exit)
+#
+# Type: integer
+# Constraints: Valid POSIX exit code (0-255). See EXIT CODES in script header.
+# Example: 0 (success), 130 (SIGINT), 143 (SIGTERM)
+#######################################
 EXIT_CODE=0
 
-# Tasks completed counter
+#######################################
+# PURPOSE: Counter for successfully completed task executions. Used in
+#   cleanup summary output and metrics reporting.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by 1 in main loop after successful task execution
+#   - Cleared: Never (reported in cleanup summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 5
+#######################################
 TASKS_COMPLETED=0
 
-# Tasks failed counter
+#######################################
+# PURPOSE: Counter for failed task executions. Used in metrics reporting.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by 1 in main loop after failed task execution
+#   - Cleared: Never (reported in metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 1
+#######################################
 TASKS_FAILED=0
 
-# Circuit breaker tracking (for metrics output)
+#######################################
+# PURPOSE: Count of circuit breaker advisory warnings logged during
+#   execution. Used in metrics output to report how many threshold
+#   warnings were emitted.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by check_circuit_breaker() when thresholds are hit
+#   - Cleared: Never (reported in metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 2
+#######################################
 CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+
+#######################################
+# PURPOSE: Comma-separated list of iteration numbers at which circuit
+#   breaker warnings were logged. Used in metrics output JSON array.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string)
+#   - Modified: Appended to by check_circuit_breaker() when thresholds are hit
+#   - Cleared: Never (reported in metrics)
+#
+# Type: string (comma-separated integers)
+# Constraints: Empty string or comma-space separated integers.
+#   Format must be valid for JSON array embedding: [${value}].
+# Example: "25, 40"
+#######################################
 CIRCUIT_BREAKER_WARNING_ITERATIONS=""
 
-# Metrics output file path (optional)
+#######################################
+# PURPOSE: File path for optional JSON metrics output. When set, the
+#   write_metrics() function writes execution statistics to this file
+#   on exit.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string = disabled)
+#   - Modified: Set in main() via --metrics-file CLI option
+#   - Cleared: Never
+#
+# Type: string (file path)
+# Constraints: Empty string (disabled) or absolute path to a writable
+#   file location. Parent directory must exist and be writable.
+# Example: "/tmp/metrics.json"
+#######################################
 METRICS_FILE=""
 
-# Start time for duration tracking (set in main())
+#######################################
+# PURPOSE: Unix epoch timestamp marking when main() began execution.
+#   Used to calculate total loop duration in metrics output.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string)
+#   - Modified: Set once in main() via $(date +%s) after lock acquisition
+#   - Cleared: Never
+#
+# Type: string (integer epoch seconds)
+# Constraints: Empty until main() sets it. Once set, never modified.
+# Example: "1707840000"
+#######################################
 START_TIME=""
 
-# Flag to suppress cleanup output during help/version
+#######################################
+# PURPOSE: Flag to suppress cleanup output during --help/--version.
+#   When set, the cleanup() function returns immediately without logging
+#   the "Exiting after N iterations" summary.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string)
+#   - Modified: Set to "true" in main() when -h/--help or -V/--version is parsed
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: Empty string (show cleanup) or "true" (suppress cleanup).
+# Example: "" (normal operation), "true" (help/version shown)
+#######################################
 HELP_SHOWN=""
 
-# Poll result state (set by poll_status function)
+#######################################
+# PURPOSE: Poll result state variables. Set by poll_status() to communicate
+#   the master-status-board.sh recommended action to the main loop.
+#   These five variables form a logical group representing one poll result.
+#
+#   POLL_ACTION  - The recommended action (e.g., "do-task", "idle", "stop")
+#   POLL_TASK    - Task ID to execute (e.g., "SDDLOOP-3.1001")
+#   POLL_TICKET  - Ticket ID the task belongs to (e.g., "SDDLOOP-3")
+#   POLL_SDD_ROOT - SDD root directory for the task's repository
+#   POLL_REASON  - Human-readable reason for the recommendation
+#
+# Lifecycle:
+#   - Initialized: At script load (all empty strings)
+#   - Modified: Reset to empty at the start of each poll_status() call,
+#     then populated from master-status-board.sh JSON output
+#   - Cleared: Reset at the start of each poll_status() call
+#
+# Type: string
+# Constraints: POLL_ACTION is empty or one of the action strings from
+#   master-status-board.sh. POLL_TASK follows the TICKET-ID.NNNN format
+#   when set. POLL_SDD_ROOT is an absolute path when set.
+# Example:
+#   POLL_ACTION="do-task"
+#   POLL_TASK="SDDLOOP-3.1001"
+#   POLL_TICKET="SDDLOOP-3"
+#   POLL_SDD_ROOT="/workspace/_SPECS/claude-code-plugins"
+#   POLL_REASON="Next agent-ready task"
+#######################################
 POLL_ACTION=""
 POLL_TASK=""
 POLL_TICKET=""
 POLL_SDD_ROOT=""
 POLL_REASON=""
 
-# Phase boundary state (set by check_phase_boundary function)
+#######################################
+# PURPOSE: Phase boundary limit from .autogate.json. When set, the loop
+#   stops before executing tasks beyond this phase number.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string = no phase limit)
+#   - Modified: Reset to empty at the start of each check_phase_boundary()
+#     call, then set if .autogate.json contains a stop_at_phase value
+#   - Cleared: Reset at the start of each check_phase_boundary() call
+#
+# Type: string (integer when set)
+# Constraints: Empty string (no limit) or positive integer (1-9).
+#   Phase numbers are extracted from task IDs (TICKET.XYYY where X is phase).
+# Example: "" (no limit), "1" (stop after phase 1)
+#######################################
 STOP_AT_PHASE=""
 
-# Claude Code process PID (for cleanup on signal)
+#######################################
+# PURPOSE: PID of the currently running Claude Code child process. Used
+#   by signal handlers to terminate the Claude process during graceful
+#   shutdown (SIGINT/SIGTERM).
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string = no active process)
+#   - Modified: Set to background PID ($!) when Claude Code is launched
+#     in execute_task(). Cleared after Claude process terminates or is killed.
+#   - Cleared: Set to empty string by cleanup_claude_process() after
+#     process termination, and after normal process completion
+#
+# Type: string (integer PID when set)
+# Constraints: Empty string or valid PID. Used with kill -0 to check
+#   if process is still running.
+# Example: "" (no process), "12345" (active Claude process)
+#######################################
 CLAUDE_PID=""
 
-# Flag to prevent re-entry into cleanup function
+#######################################
+# PURPOSE: Re-entry guard for cleanup_claude_process(). Prevents multiple
+#   rapid signals (e.g., double Ctrl+C) from causing concurrent cleanup
+#   attempts that could race on PID management.
+#
+# Lifecycle:
+#   - Initialized: At script load ("false")
+#   - Modified: Set to "true" at entry to cleanup_claude_process(),
+#     reset to "false" before each return path
+#   - Cleared: Reset to "false" after cleanup completes
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Must be "false" when not inside
+#   cleanup_claude_process().
+# Example: "false"
+#######################################
 CLEANUP_IN_PROGRESS=false
 
-# Git root discovery cache file (temp file, one entry per line: repo_name=path)
-# Initialized eagerly with a PID-based path so subshells can access it.
-# Uses SDD_LOOP_DEFAULT_LOCK_DIR for consistent temp file placement.
+#######################################
+# PURPOSE: Path to the temporary file used for caching find_git_root()
+#   results. Maps repository names to their discovered git root paths
+#   to avoid redundant filesystem scans when multiple tasks share a repo.
+#
+# Lifecycle:
+#   - Initialized: At script load with PID-based path so subshells can
+#     access it (e.g., "/tmp/sdd-loop-git-cache.12345")
+#   - Modified: File created on disk by init_git_root_cache(). Entries
+#     appended by find_git_root_cached() on cache misses.
+#   - Cleared: File removed and variable set to empty by
+#     cleanup_git_root_cache(), called from cleanup() and signal handlers
+#
+# Type: string (file path)
+# Constraints: Absolute path under SDD_LOOP_DEFAULT_LOCK_DIR. PID suffix
+#   ensures uniqueness per process. File format is one entry per line:
+#   repo_name=absolute_path (e.g., "myproject=/workspace/repos/myproject/main")
+# Example: "/tmp/sdd-loop-git-cache.12345"
+#######################################
 GIT_ROOT_CACHE_FILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-git-cache.$$"
 
 # =============================================================================
