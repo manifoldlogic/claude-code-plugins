@@ -8,6 +8,7 @@ The Maproom plugin provides semantic code search capabilities powered by the cre
 
 - **Full-Text Search (FTS)**: Fast, precise keyword-based search for exact matches, identifiers, and specific terms
 - **Vector Semantic Search**: Find code by meaning and concept, even when exact keywords differ
+- **Agent-Optimized Output**: Compact `--format agent` mode designed for LLM context efficiency
 - **Hybrid Search**: Combines FTS and vector search for optimal relevance ranking
 - **Context Expansion**: Automatically retrieve related code including imports, callers, callees, and tests
 - **Graph Relationships**: Navigate code relationships through call graphs and dependency analysis
@@ -33,8 +34,12 @@ See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) 
 Before using the Maproom plugin, ensure you have:
 
 1. **crewchief-maproom CLI installed**: The plugin requires the `crewchief-maproom` command-line tool to be available in your system PATH
-2. **Indexed database**: Your codebase must be scanned using `crewchief-maproom scan` before searching
-3. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
+2. **Minimum crewchief-maproom version**: 0.1.0. Verify your version:
+   ```bash
+   crewchief-maproom --version
+   ```
+3. **Indexed database**: Your codebase must be scanned using `crewchief-maproom scan` before searching
+4. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
 
 To verify your setup:
 ```bash
@@ -134,3 +139,54 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Use FTS mode for exact keyword matches (faster than semantic search)
 - Check database size: large databases may need optimization
 - Ensure SQLite isn't locked by another process
+
+## Maintenance
+
+### Monthly CLI Verification
+
+**Purpose:** Detect crewchief-maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
+
+**Automation:** This procedure is automated via GitHub Actions (see `.github/workflows/monthly-cli-verification.yml`). The workflow runs on the first Friday of each month and creates a GitHub issue if drift is detected. Manual execution is still supported for ad-hoc verification using the `workflow_dispatch` trigger or by running the script directly:
+```bash
+bash plugins/maproom/scripts/monthly-cli-verification.sh
+```
+
+**Automated Baseline Diff:** Run `bash plugins/maproom/scripts/compare-cli-flags.sh` to automatically detect flag drift against the baseline verification document. The script extracts flags from both the baseline (`cli-flag-verification.md`) and the current CLI help output, then reports any added or removed flags. Exit 0 = no drift, exit 1 = drift detected, exit 2 = usage error.
+
+**Cadence:** First Friday of each month
+
+**Owner:** Maproom plugin maintainer
+
+**Procedure:**
+
+- [ ] Navigate to the maproom plugin directory:
+  ```bash
+  cd plugins/maproom
+  ```
+- [ ] Run `crewchief-maproom --version` and verify the version matches the documented version (currently 0.1.0):
+  ```bash
+  crewchief-maproom --version
+  ```
+- [ ] Run `crewchief-maproom search --help` and verify all expected flags are present:
+  ```bash
+  crewchief-maproom search --help
+  ```
+  Confirm these 5 flags exist in the `search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`
+- [ ] Run `crewchief-maproom vector-search --help` and verify all expected flags are present:
+  ```bash
+  crewchief-maproom vector-search --help
+  ```
+  Confirm all 6 flags exist in the `vector-search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`, `--threshold`
+- [ ] Compare output against the baseline verification deliverable and check for any discrepancies (new flags, removed flags, renamed flags, changed defaults, changed accepted values):
+  - **Baseline deliverable:** `planning/deliverables/cli-flag-verification.md` (located at the ticket level in the specs directory)
+  - **Full path:** `/workspace/_SPECS/claude-code-plugins/tickets/MAPAGENT_format-agent-skill/planning/deliverables/cli-flag-verification.md`
+- [ ] Record the verification result:
+  - **No discrepancies:** Mark this month's verification as complete. No further action needed.
+  - **Discrepancies found:** Create a ticket to update all affected documentation (SKILL.md, multi-repo-guide.md, README.md, and the baseline deliverable itself).
+
+**Task Reference:** The verification procedure follows the steps originally defined in MAPAGENT.0001 (verify-cli-flags task):
+`/workspace/_SPECS/claude-code-plugins/tickets/MAPAGENT_format-agent-skill/tasks/MAPAGENT.0001_verify-cli-flags.md`
+
+**Success Criteria:** CLI drift is detected within 30 days of occurrence, before a significant number of agent sessions encounter deprecated flags.
+
+**Escalation Path:** If discrepancies are found between the current CLI output and the baseline deliverable, create a new ticket under the maproom plugin to update all documentation files that reference the affected flags. The ticket should enumerate every file and line that needs updating.

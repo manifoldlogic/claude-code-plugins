@@ -61,7 +61,7 @@ FTS search works immediately after scan. Vector search requires embeddings to co
 
 ### Vector Search Syntax
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "<query>"
+crewchief-maproom vector-search --repo <repo> --query "<query>" --format agent
 ```
 Requires embeddings (see First-Time Setup step 2).
 
@@ -74,6 +74,73 @@ Requires embeddings (see First-Time Setup step 2).
 | `"validate schema json"` | Found exact functions | Found related validation concepts |
 
 For query optimization, see [search-best-practices.md](./references/search-best-practices.md).
+
+## Output Formats
+
+The `search` and `vector-search` commands support two output formats via `--format`:
+
+**JSON (default):** Verbose structured output with full metadata. Preview requires explicit `--preview` flag.
+**Agent (`--format agent`):** Compact one-line-per-result optimized for agent context windows. Preview is implicit (120 chars).
+
+### JSON Format Example
+```bash
+$ crewchief-maproom search --repo <repo> --query "test" --format json --k 2
+```
+```
+{"hits":[{"chunk_id":4722,"end_line":159,"file_relpath":"plugins/.../README.md","kind":"code_block","score":3.60,"start_line":150,"symbol_name":"Code: text"}]}
+```
+
+### Agent Format Example
+```bash
+$ crewchief-maproom search --repo <repo> --query "test" --format agent
+```
+```
+plugins/.../README.md:150 | code_block Code: text | 3.60 | ```text tests/ ├── integration-test-sdd-loop.sh...
+```
+Structure: `{file}:{line} | {kind} {symbol} | {score} | {preview}...`
+
+### Preview Behavior
+Agent format implicitly enables preview — adding `--preview` is redundant. Use `--preview-length` to adjust (default: 120 chars for agent, 200 for json). For JSON format, `--preview` must be explicitly passed to include a `"preview"` field.
+
+### Recommendation
+For agent use, always pass `--format agent`. It conserves context window tokens while preserving essential location, kind, score, and preview information.
+
+## Filtering and Tuning
+
+All filter values are **case-sensitive**. Combine multiple values with commas for OR logic. Filters are AND-combined across flags: `--kind func --lang py` returns only Python functions.
+
+| Flag | Value | Matches |
+|------|-------|---------|
+| `--kind` | `func` | Function definitions |
+| `--kind` | `class` | Class definitions |
+| `--kind` | `method` | Class methods |
+| `--kind` | `heading_2` / `heading_3` | Markdown headings |
+| `--kind` | `code_block` | Fenced code blocks |
+| `--kind` | `markdown_section` | Markdown sections (lists, tables) |
+| `--kind` | `json_key` | JSON key-value pairs |
+| `--lang` | `py` | Python (.py) |
+| `--lang` | `ts` | TypeScript (.ts) |
+| `--lang` | `rs` | Rust (.rs) |
+| `--lang` | `go` | Go (.go) |
+| `--lang` | `md` | Markdown (.md) |
+| `--lang` | `json` | JSON (.json) |
+
+```bash
+$ crewchief-maproom search --repo <repo> --query "auth" --kind func --lang py --format agent
+$ crewchief-maproom vector-search --repo <repo> --query "error handling" --threshold 0.7 --format agent
+```
+
+**`--preview-length <N>`** — Adjust preview character limit (default: 120 for agent, 200 for json). See [Output Formats](#output-formats) for preview behavior details.
+**`--threshold <N>`** — Vector-search only. Cosine similarity filter (0.0-1.0); only results >= threshold are returned. Omit for no filtering.
+
+| Task | Recommended Flags |
+|------|-------------------|
+| Find Python functions | `--kind func --lang py --format agent` |
+| Find TypeScript classes | `--kind class --lang ts --format agent` |
+| Browse markdown docs | `--kind heading_2 --lang md --format agent` |
+| High-precision semantic | `--threshold 0.8 --format agent` (vector-search) |
+| Find all class hierarchies | `--kind class --format agent` |
+| Scan JSON config keys | `--kind json_key --lang json --format agent` |
 
 ## Context Command Reference
 
@@ -97,7 +164,7 @@ Flags combine freely: `context --chunk-id <id> --callers --callees --max-depth 3
 Find a feature and trace its call relationships (depth-first).
 1. Search by concept:
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "authentication login flow"
+crewchief-maproom vector-search --repo <repo> --query "authentication login flow" --format agent
 ```
 2. Expand context around a relevant result:
 ```bash
@@ -109,7 +176,7 @@ _(Vector search because we know the concept but not exact function names.)_
 Locate error handling patterns across the codebase.
 1. Search for error-related terms:
 ```bash
-crewchief-maproom search --repo <repo> --query "error exception handler"
+crewchief-maproom search --repo <repo> --query "error exception handler" --format agent
 ```
 2. Get context with a constrained budget:
 ```bash
@@ -121,7 +188,7 @@ _(FTS appropriate since "error" and "exception" are known keywords.)_
 Follow a function's callers up the call stack to find entry points.
 1. Find the function:
 ```bash
-crewchief-maproom search --repo <repo> --query "process_payment"
+crewchief-maproom search --repo <repo> --query "process_payment" --kind func --format agent
 ```
 2. Trace callers with increased depth:
 ```bash
@@ -133,7 +200,7 @@ _(FTS used to locate an exact function name.)_
 Explore iteratively (breadth-first) when you don't know the terminology yet.
 1. Broad concept search:
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "data processing pipeline"
+crewchief-maproom vector-search --repo <repo> --query "data processing pipeline" --format agent
 ```
 2. Read context on an interesting result:
 ```bash
@@ -141,7 +208,7 @@ crewchief-maproom context --chunk-id <id>
 ```
 3. Refine using terms discovered in step 2:
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "transform stage batch worker"
+crewchief-maproom vector-search --repo <repo> --query "transform stage batch worker" --format agent
 ```
 _(Vector search for exploring concepts when terminology is unknown.)_
 
@@ -149,7 +216,7 @@ _(Vector search for exploring concepts when terminology is unknown.)_
 Locate where configuration values are defined and how they're consumed.
 1. Search for config terms:
 ```bash
-crewchief-maproom search --repo <repo> --query "config settings env"
+crewchief-maproom search --repo <repo> --query "config settings env" --format agent
 ```
 2. See what the config drives:
 ```bash
@@ -197,11 +264,11 @@ When a question spans both design and implementation, search across repos sequen
 
 1. Check the specs repo for design rationale:
 ```bash
-crewchief-maproom vector-search --repo specs --query "authentication design decisions"
+crewchief-maproom vector-search --repo specs --query "authentication design decisions" --format agent
 ```
 2. Then check the code repo for implementation:
 ```bash
-crewchief-maproom vector-search --repo code --query "authentication login flow"
+crewchief-maproom vector-search --repo code --query "authentication login flow" --format agent
 ```
 3. Expand context on a relevant code result:
 ```bash
