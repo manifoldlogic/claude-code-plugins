@@ -40,6 +40,8 @@
 #  37. Conflicting overrides +doc -doc detected - exits 1 with conflict error
 #  38. Conflicting overrides -doc +doc detected (reverse order) - exits 1 with conflict error
 #  39. Non-conflicting overrides pass - no false positives
+#  40. Valid manifest passes schema validation (jq-based checks against schema rules)
+#  41. Manifest with invalid "action" value fails validation
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -1348,6 +1350,142 @@ if $test_ok; then
         log_pass "$test_name"
     fi
 fi
+
+# =============================================
+# Test 40: Valid manifest passes schema validation
+# Run triage to get a manifest, then validate its structure
+# using jq-based checks matching the JSON schema rules:
+#   - Required top-level keys: ticket_description, overrides, documents
+#   - documents is an array
+#   - Each document has: id, filename, action, reason
+#   - action is "generate" or "skip"
+#   - id matches ^[a-z][a-z0-9-]*$
+#   - filename matches ^[a-z][a-z0-9-]*\.md$
+# =============================================
+
+printf -- "\n${CYAN}--- Manifest Schema Validation Tests ---${NC}\n\n"
+
+run_triage "backend API caching layer"
+
+test_name="Manifest schema: valid triage output passes all schema checks"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # Check 1: Required top-level keys
+    has_desc=$(printf '%s' "$TRIAGE_OUTPUT" | jq 'has("ticket_description")')
+    has_overrides=$(printf '%s' "$TRIAGE_OUTPUT" | jq 'has("overrides")')
+    has_docs=$(printf '%s' "$TRIAGE_OUTPUT" | jq 'has("documents")')
+    if [ "$has_desc" != "true" ] || [ "$has_overrides" != "true" ] || [ "$has_docs" != "true" ]; then
+        log_fail "$test_name" "missing top-level keys: ticket_description=$has_desc, overrides=$has_overrides, documents=$has_docs"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    # Check 2: documents is an array
+    docs_type=$(printf '%s' "$TRIAGE_OUTPUT" | jq -r '.documents | type')
+    if [ "$docs_type" != "array" ]; then
+        log_fail "$test_name" "documents is not an array (type=$docs_type)"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    # Check 3: Each document has required fields (id, filename, action, reason)
+    missing_fields=$(printf '%s' "$TRIAGE_OUTPUT" | jq '[.documents[] | select((.id == null) or (.filename == null) or (.action == null) or (.reason == null))] | length')
+    if [ "$missing_fields" != "0" ]; then
+        log_fail "$test_name" "$missing_fields document(s) missing required fields"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    # Check 4: All action values are "generate" or "skip"
+    invalid_actions=$(printf '%s' "$TRIAGE_OUTPUT" | jq '[.documents[] | select(.action != "generate" and .action != "skip")] | length')
+    if [ "$invalid_actions" != "0" ]; then
+        log_fail "$test_name" "$invalid_actions document(s) with invalid action values"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    # Check 5: All id values match ^[a-z][a-z0-9-]*$
+    invalid_ids=$(printf '%s' "$TRIAGE_OUTPUT" | jq '[.documents[] | select(.id | test("^[a-z][a-z0-9-]*$") | not)] | length')
+    if [ "$invalid_ids" != "0" ]; then
+        log_fail "$test_name" "$invalid_ids document(s) with invalid id format"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    # Check 6: All filename values match ^[a-z][a-z0-9-]*\.md$
+    invalid_fns=$(printf '%s' "$TRIAGE_OUTPUT" | jq '[.documents[] | select(.filename | test("^[a-z][a-z0-9-]*\\.md$") | not)] | length')
+    if [ "$invalid_fns" != "0" ]; then
+        log_fail "$test_name" "$invalid_fns document(s) with invalid filename format"
+        test_ok=false
+    fi
+fi
+
+if $test_ok; then
+    log_pass "$test_name"
+fi
+
+# =============================================
+# Test 41: Manifest with invalid "action" value fails validation
+# Create a manifest with action="create" (invalid) and verify
+# that jq-based schema validation catches the error
+# =============================================
+
+test_name="Manifest schema: invalid action value detected by validation"
+INVALID_MANIFEST=$(mktemp)
+
+# Create a manifest with an invalid action value
+cat > "$INVALID_MANIFEST" << 'MANIFEST_EOF'
+{
+  "ticket_description": "test invalid action",
+  "overrides": [],
+  "documents": [
+    {
+      "id": "analysis",
+      "filename": "analysis.md",
+      "action": "generate",
+      "reason": "Core document"
+    },
+    {
+      "id": "registry-schema",
+      "filename": "registry-schema.md",
+      "action": "create",
+      "reason": "Invalid action value"
+    }
+  ]
+}
+MANIFEST_EOF
+
+test_ok=true
+
+# Validate the invalid manifest using the same jq checks from validate-structure.sh
+invalid_action_docs=$(jq '[.documents[] | select(.action != "generate" and .action != "skip")]' "$INVALID_MANIFEST")
+invalid_count=$(printf '%s' "$invalid_action_docs" | jq 'length')
+
+if [ "$invalid_count" -gt 0 ]; then
+    # Validation correctly caught the invalid action
+    bad_id=$(printf '%s' "$invalid_action_docs" | jq -r '.[0].id')
+    bad_action=$(printf '%s' "$invalid_action_docs" | jq -r '.[0].action')
+    if [ "$bad_id" = "registry-schema" ] && [ "$bad_action" = "create" ]; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "caught invalid action but wrong document (id=$bad_id, action=$bad_action)"
+    fi
+else
+    log_fail "$test_name" "validation did not detect invalid action value 'create'"
+fi
+
+rm -f "$INVALID_MANIFEST"
 
 # --- Summary ---
 

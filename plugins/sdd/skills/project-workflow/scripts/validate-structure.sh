@@ -67,6 +67,91 @@ REQUIRED_TICKET_SECTIONS=(
     "Acceptance Criteria"
 )
 
+# Validate triage manifest structure using jq-based schema checks.
+# Checks required top-level keys, documents array, and per-document fields.
+# Arguments:
+#   $1 - path to the .triage-manifest.json file
+# Sets global: MANIFEST_ERRORS (array of error strings)
+# Returns 0 if valid, 1 if validation errors found
+validate_manifest_schema() {
+    local manifest_path="$1"
+    MANIFEST_ERRORS=()
+
+    # Check required top-level keys: ticket_description, overrides, documents
+    local has_desc has_overrides has_docs
+    has_desc=$(jq 'has("ticket_description")' "$manifest_path" 2>/dev/null)
+    has_overrides=$(jq 'has("overrides")' "$manifest_path" 2>/dev/null)
+    has_docs=$(jq 'has("documents")' "$manifest_path" 2>/dev/null)
+
+    if [ "$has_desc" != "true" ]; then
+        MANIFEST_ERRORS+=("Missing required property: \"ticket_description\"")
+    fi
+    if [ "$has_overrides" != "true" ]; then
+        MANIFEST_ERRORS+=("Missing required property: \"overrides\"")
+    fi
+    if [ "$has_docs" != "true" ]; then
+        MANIFEST_ERRORS+=("Missing required property: \"documents\"")
+        # Cannot validate documents array if it doesn't exist
+        if [ ${#MANIFEST_ERRORS[@]} -gt 0 ]; then
+            return 1
+        fi
+    fi
+
+    # Validate "documents" is an array
+    local docs_type
+    docs_type=$(jq -r '.documents | type' "$manifest_path" 2>/dev/null)
+    if [ "$docs_type" != "array" ]; then
+        MANIFEST_ERRORS+=("Property \"documents\" must be an array, got \"$docs_type\"")
+        return 1
+    fi
+
+    # Validate each document entry has required fields and valid action values
+    local doc_count
+    doc_count=$(jq '.documents | length' "$manifest_path" 2>/dev/null)
+
+    local i=0
+    while [ "$i" -lt "$doc_count" ]; do
+        local doc_id
+        doc_id=$(jq -r ".documents[$i].id // \"(index $i)\"" "$manifest_path" 2>/dev/null)
+
+        # Check required fields: id, filename, action, reason
+        local has_id has_fn has_act has_rsn
+        has_id=$(jq ".documents[$i] | has(\"id\")" "$manifest_path" 2>/dev/null)
+        has_fn=$(jq ".documents[$i] | has(\"filename\")" "$manifest_path" 2>/dev/null)
+        has_act=$(jq ".documents[$i] | has(\"action\")" "$manifest_path" 2>/dev/null)
+        has_rsn=$(jq ".documents[$i] | has(\"reason\")" "$manifest_path" 2>/dev/null)
+
+        if [ "$has_id" != "true" ]; then
+            MANIFEST_ERRORS+=("Document at index $i: missing required field \"id\"")
+        fi
+        if [ "$has_fn" != "true" ]; then
+            MANIFEST_ERRORS+=("Document \"$doc_id\": missing required field \"filename\"")
+        fi
+        if [ "$has_act" != "true" ]; then
+            MANIFEST_ERRORS+=("Document \"$doc_id\": missing required field \"action\"")
+        fi
+        if [ "$has_rsn" != "true" ]; then
+            MANIFEST_ERRORS+=("Document \"$doc_id\": missing required field \"reason\"")
+        fi
+
+        # Validate action enum: must be "generate" or "skip"
+        if [ "$has_act" = "true" ]; then
+            local action_val
+            action_val=$(jq -r ".documents[$i].action" "$manifest_path" 2>/dev/null)
+            if [ "$action_val" != "generate" ] && [ "$action_val" != "skip" ]; then
+                MANIFEST_ERRORS+=("Invalid value for property \"action\" in document \"$doc_id\": \"$action_val\". Expected one of: [\"generate\", \"skip\"]")
+            fi
+        fi
+
+        i=$((i + 1))
+    done
+
+    if [ ${#MANIFEST_ERRORS[@]} -gt 0 ]; then
+        return 1
+    fi
+    return 0
+}
+
 # Resolve required planning files for a ticket directory
 # Sets RESOLVED_REQUIRED_FILES array and VALIDATION_MODE string
 # Returns 1 if manifest is invalid JSON (caller should handle)
@@ -82,6 +167,12 @@ resolve_required_files() {
     if [[ -f "$manifest_path" ]]; then
         # Manifest exists - validate it is parseable JSON
         if ! jq empty "$manifest_path" 2>/dev/null; then
+            VALIDATION_MODE="invalid"
+            return 1
+        fi
+
+        # Validate manifest structure against schema rules
+        if ! validate_manifest_schema "$manifest_path"; then
             VALIDATION_MODE="invalid"
             return 1
         fi
@@ -159,8 +250,16 @@ validate_ticket() {
     else
         # Resolve required planning files dynamically
         if ! resolve_required_files "$ticket_path"; then
-            # Invalid manifest JSON
-            issues+=("Error: Manifest file exists but contains invalid JSON")
+            if [ ${#MANIFEST_ERRORS[@]} -gt 0 ]; then
+                # Schema validation errors - report each one
+                issues+=("Error: triage-manifest.json validation failed")
+                for merr in "${MANIFEST_ERRORS[@]}"; do
+                    issues+=("  - $merr")
+                done
+            else
+                # Invalid manifest JSON (unparseable)
+                issues+=("Error: Manifest file exists but contains invalid JSON")
+            fi
         fi
 
         if [[ "$VALIDATION_MODE" != "invalid" ]]; then
