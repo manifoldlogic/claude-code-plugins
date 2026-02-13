@@ -768,6 +768,75 @@ CLEANUP_IN_PROGRESS=false
 #######################################
 GIT_ROOT_CACHE_FILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-git-cache.$$"
 
+#######################################
+# PURPOSE: Path to the file-based cache metrics log. Each line records a
+#   cache event: "H" for hit, "M" for miss. File-based approach is used
+#   because find_git_root_cached() runs inside $() subshells, so in-memory
+#   counters would not persist to the parent shell.
+#
+# Lifecycle:
+#   - Initialized: At script load with PID-based path
+#   - Modified: Lines appended by find_git_root_cached() on each lookup
+#   - Cleared: File removed by cleanup_git_root_cache()
+#
+# Type: string (file path)
+# Constraints: Absolute path under SDD_LOOP_DEFAULT_LOCK_DIR. PID suffix
+#   ensures uniqueness per process. Format: one character per line (H or M).
+# Example: "/tmp/sdd-loop-cache-metrics.12345"
+#######################################
+CACHE_METRICS_FILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-cache-metrics.$$"
+
+#######################################
+# PURPOSE: Cache hit count, read from CACHE_METRICS_FILE by
+#   read_cache_metrics(). Initialized to 0 at script load for
+#   safe use in write_metrics() even if read_cache_metrics() has
+#   not yet been called.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Set by read_cache_metrics() from file-based metrics
+#   - Cleared: Never (reported in session summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative.
+# Example: 18
+#######################################
+CACHE_HITS=0
+
+#######################################
+# PURPOSE: Cache miss count, read from CACHE_METRICS_FILE by
+#   read_cache_metrics(). Initialized to 0 at script load for
+#   safe use in write_metrics() even if read_cache_metrics() has
+#   not yet been called.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Set by read_cache_metrics() from file-based metrics
+#   - Cleared: Never (reported in session summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative.
+# Example: 2
+#######################################
+CACHE_MISSES=0
+
+#######################################
+# PURPOSE: Counter for cache invalidations. Tracks when cached entries
+#   are cleared during cleanup. Unlike hits/misses, this counter only
+#   increments in the parent shell (cleanup_git_root_cache), so an
+#   in-memory variable is sufficient.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by cleanup_git_root_cache() when entries exist
+#   - Cleared: Never (reported in session summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 0
+#######################################
+CACHE_INVALIDATIONS=0
+
 # =============================================================================
 # Logging Functions
 # =============================================================================
@@ -1210,19 +1279,85 @@ init_git_root_cache() {
 }
 
 #######################################
-# Clean up the git root cache file
-# Removes the temporary cache file if it exists.
+# Clean up the git root cache file and cache metrics file
+# Removes the temporary files if they exist. Counts cache entries
+# before removal to track invalidations.
 # Idempotent - safe to call multiple times.
 #
 # Globals:
 #   GIT_ROOT_CACHE_FILE - Path to the cache temp file
+#   CACHE_METRICS_FILE - Path to the cache metrics log file
+#   CACHE_INVALIDATIONS - Incremented by number of cached entries removed
 #######################################
 cleanup_git_root_cache() {
     if [ -n "$GIT_ROOT_CACHE_FILE" ] && [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local entry_count
+        entry_count=$(wc -l < "$GIT_ROOT_CACHE_FILE" 2>/dev/null || echo 0)
+        entry_count=$(echo "$entry_count" | tr -d ' ')
+        if [ "$entry_count" -gt 0 ] 2>/dev/null; then
+            CACHE_INVALIDATIONS=$((CACHE_INVALIDATIONS + entry_count))
+            log_debug "cleanup_git_root_cache: Invalidated $entry_count cache entries"
+        fi
         rm -f "$GIT_ROOT_CACHE_FILE"
         log_debug "cleanup_git_root_cache: Removed cache file: $GIT_ROOT_CACHE_FILE"
     fi
     GIT_ROOT_CACHE_FILE=""
+
+    # Clean up metrics file
+    if [ -n "$CACHE_METRICS_FILE" ] && [ -f "$CACHE_METRICS_FILE" ]; then
+        rm -f "$CACHE_METRICS_FILE"
+        log_debug "cleanup_git_root_cache: Removed metrics file: $CACHE_METRICS_FILE"
+    fi
+    CACHE_METRICS_FILE=""
+}
+
+#######################################
+# Read cache hit/miss counts from the file-based metrics log.
+# Sets CACHE_HITS and CACHE_MISSES variables by counting H and M lines
+# in CACHE_METRICS_FILE. These variables are set in the calling shell
+# scope for use by print_cache_metrics() and write_metrics().
+#
+# Globals Set:
+#   CACHE_HITS - Number of cache hits (from file)
+#   CACHE_MISSES - Number of cache misses (from file)
+#
+# Returns:
+#   0 - Always succeeds
+#######################################
+read_cache_metrics() {
+    CACHE_HITS=0
+    CACHE_MISSES=0
+    if [ -n "$CACHE_METRICS_FILE" ] && [ -f "$CACHE_METRICS_FILE" ]; then
+        CACHE_HITS=$(grep -c "^H$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        CACHE_MISSES=$(grep -c "^M$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+    fi
+}
+
+#######################################
+# Print cache performance metrics to log
+# Reads metrics from the file-based log, calculates hit rate, and displays
+# summary. Uses awk for floating-point percentage calculation (POSIX-compatible).
+# Handles division by zero when no lookups have occurred.
+#
+# Globals:
+#   CACHE_METRICS_FILE - Path to cache metrics log file
+#   CACHE_INVALIDATIONS - Number of cache invalidations
+#
+# Outputs:
+#   Cache metrics logged via log_info to stderr
+#
+# Returns:
+#   0 - Always succeeds
+#######################################
+print_cache_metrics() {
+    read_cache_metrics
+    local total_lookups=$((CACHE_HITS + CACHE_MISSES))
+    local hit_rate="0.0"
+    if [ "$total_lookups" -gt 0 ]; then
+        hit_rate=$(awk "BEGIN {printf \"%.1f\", ($CACHE_HITS / $total_lookups) * 100}")
+    fi
+
+    log_info "Cache metrics: $CACHE_HITS/$total_lookups hits ($hit_rate%), $CACHE_MISSES misses, $CACHE_INVALIDATIONS invalidations"
 }
 
 #######################################
@@ -1251,12 +1386,14 @@ find_git_root_cached() {
     local cached
     cached=$(grep "^${repo_name}=" "$GIT_ROOT_CACHE_FILE" 2>/dev/null | head -1 | cut -d= -f2-)
     if [ -n "$cached" ]; then
+        echo "H" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
         log_debug "find_git_root_cached: Cache hit for repo: $repo_name"
         echo "$cached"
         return 0
     fi
 
     # Cache miss - call original function
+    echo "M" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
     local result
     if result=$(find_git_root "$repos_root" "$repo_name"); then
         echo "${repo_name}=${result}" >> "$GIT_ROOT_CACHE_FILE"
@@ -1766,6 +1903,9 @@ check_phase_boundary() {
 #   SDD_LOOP_POLL_INTERVAL - Poll interval configuration
 #   SDD_LOOP_DRY_RUN - Dry run mode flag
 #   SDD_LOOP_VERBOSE - Verbose mode flag
+#   CACHE_HITS - Number of cache hits
+#   CACHE_MISSES - Number of cache misses
+#   CACHE_INVALIDATIONS - Number of cache invalidations
 #
 # Outputs:
 #   Writes JSON file to METRICS_FILE path
@@ -1835,6 +1975,13 @@ write_metrics() {
   "circuit_breaker": {
     "warnings_logged": $CIRCUIT_BREAKER_WARNINGS_LOGGED,
     "warning_iterations": [${CIRCUIT_BREAKER_WARNING_ITERATIONS}]
+  },
+  "cache": {
+    "hits": $CACHE_HITS,
+    "misses": $CACHE_MISSES,
+    "invalidations": $CACHE_INVALIDATIONS,
+    "total_lookups": $((CACHE_HITS + CACHE_MISSES)),
+    "hit_rate_percent": $(if [ $((CACHE_HITS + CACHE_MISSES)) -gt 0 ]; then awk "BEGIN {printf \"%.1f\", ($CACHE_HITS / $((CACHE_HITS + CACHE_MISSES))) * 100}"; else echo "0.0"; fi)
   }
 }
 EOF
@@ -1950,7 +2097,10 @@ cleanup() {
     # Clean up any running Claude process
     cleanup_claude_process
 
-    # Clean up git root cache
+    # Report cache performance metrics (must run before cache cleanup)
+    print_cache_metrics
+
+    # Clean up git root cache and metrics files
     cleanup_git_root_cache
 
     # Clean up lock file (if we created it)
@@ -1974,6 +2124,7 @@ handle_sigint() {
     EXIT_CODE=130
     log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
     cleanup_claude_process
+    print_cache_metrics
     cleanup_git_root_cache
     # Clean up lock file
     if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
@@ -1992,6 +2143,7 @@ handle_sigterm() {
     EXIT_CODE=143
     log_info "Received SIGTERM, shutting down gracefully..."
     cleanup_claude_process
+    print_cache_metrics
     cleanup_git_root_cache
     # Clean up lock file
     if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then

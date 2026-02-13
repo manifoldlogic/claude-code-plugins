@@ -3818,6 +3818,261 @@ test_cleanup_git_root_cache() {
 }
 
 # =============================================================================
+# PRIORITY 13b TESTS (Cache Metrics - SDDLOOP-6.4009)
+# =============================================================================
+
+#######################################
+# Test: Cache metrics file records hits and misses
+#######################################
+test_cache_metrics_hit_miss_tracking() {
+    echo "--- Test: cache metrics hit/miss tracking ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics to test-specific files
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_tracking_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_tracking_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_tracking/repos"
+    mkdir -p "$test_repos/proj1/proj1/.git"
+
+    # First call - cache miss
+    find_git_root_cached "$test_repos/" "proj1" >/dev/null || true
+
+    # Second call - cache hit
+    find_git_root_cached "$test_repos/" "proj1" >/dev/null || true
+
+    # Third call - another cache hit
+    find_git_root_cached "$test_repos/" "proj1" >/dev/null || true
+
+    # Read metrics from file
+    read_cache_metrics
+
+    assert_equals "2" "$CACHE_HITS" "Cache metrics: 2 hits recorded"
+    assert_equals "1" "$CACHE_MISSES" "Cache metrics: 1 miss recorded"
+
+    # Verify metrics file content directly
+    if [ -f "$CACHE_METRICS_FILE" ]; then
+        local line_count
+        line_count=$(wc -l < "$CACHE_METRICS_FILE" | tr -d ' ')
+        assert_equals "3" "$line_count" "Cache metrics file has 3 entries"
+    else
+        log_result "Cache metrics file exists" "fail" "File not found: $CACHE_METRICS_FILE"
+    fi
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: print_cache_metrics outputs correct format
+#######################################
+test_print_cache_metrics_format() {
+    echo "--- Test: print_cache_metrics output format ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset cache and metrics
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_format_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_format_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_format/repos"
+    mkdir -p "$test_repos/repoA/repoA/.git"
+    mkdir -p "$test_repos/repoB/repoB/.git"
+
+    # Generate some hits and misses
+    find_git_root_cached "$test_repos/" "repoA" >/dev/null || true  # miss
+    find_git_root_cached "$test_repos/" "repoB" >/dev/null || true  # miss
+    find_git_root_cached "$test_repos/" "repoA" >/dev/null || true  # hit
+    find_git_root_cached "$test_repos/" "repoA" >/dev/null || true  # hit
+    find_git_root_cached "$test_repos/" "repoB" >/dev/null || true  # hit
+
+    # Capture print_cache_metrics output
+    local metrics_output
+    metrics_output=$(print_cache_metrics 2>&1)
+
+    assert_contains "$metrics_output" "3/5 hits" "print_cache_metrics shows 3/5 hits"
+    assert_contains "$metrics_output" "60.0%" "print_cache_metrics shows 60.0%"
+    assert_contains "$metrics_output" "2 misses" "print_cache_metrics shows 2 misses"
+    assert_contains "$metrics_output" "0 invalidations" "print_cache_metrics shows 0 invalidations"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: print_cache_metrics handles zero lookups (division by zero)
+#######################################
+test_print_cache_metrics_zero_lookups() {
+    echo "--- Test: print_cache_metrics zero lookups ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset metrics to test-specific file with no entries
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_zero_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_zero_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    # No lookups performed - capture output
+    local metrics_output
+    metrics_output=$(print_cache_metrics 2>&1)
+
+    assert_contains "$metrics_output" "0/0 hits" "Zero lookups shows 0/0 hits"
+    assert_contains "$metrics_output" "0.0%" "Zero lookups shows 0.0%"
+    assert_contains "$metrics_output" "0 misses" "Zero lookups shows 0 misses"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: cleanup_git_root_cache tracks invalidations
+#######################################
+test_cache_invalidation_tracking() {
+    echo "--- Test: cache invalidation tracking ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset counters and files
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_inval_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_inval_metrics"
+    CACHE_INVALIDATIONS=0
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_inval/repos"
+    mkdir -p "$test_repos/r1/r1/.git"
+    mkdir -p "$test_repos/r2/r2/.git"
+
+    # Populate cache with 2 entries
+    find_git_root_cached "$test_repos/" "r1" >/dev/null || true
+    find_git_root_cached "$test_repos/" "r2" >/dev/null || true
+
+    # Verify cache has entries before cleanup
+    if [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local entry_count
+        entry_count=$(wc -l < "$GIT_ROOT_CACHE_FILE" | tr -d ' ')
+        assert_equals "2" "$entry_count" "Cache has 2 entries before cleanup"
+    else
+        log_result "Cache file exists before invalidation" "fail"
+    fi
+
+    # Clean up should track invalidations
+    cleanup_git_root_cache
+
+    assert_equals "2" "$CACHE_INVALIDATIONS" "Cache invalidations counted correctly"
+}
+
+#######################################
+# Test: Cache metrics appear in write_metrics JSON output
+#######################################
+test_cache_metrics_in_json_output() {
+    echo "--- Test: cache metrics in JSON output ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Set up required globals for write_metrics
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_json_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_json_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+    METRICS_FILE="$TEST_TMP_DIR/cm_json_output.json"
+    ITERATION_COUNT=3
+    TASKS_COMPLETED=2
+    TASKS_FAILED=1
+    START_TIME=$(date +%s)
+    CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+    CIRCUIT_BREAKER_WARNING_ITERATIONS=""
+    SDD_LOOP_SPECS_ROOT="/tmp/specs/"
+    SDD_LOOP_REPOS_ROOT="/tmp/repos/"
+    SDD_LOOP_DRY_RUN="false"
+    SDD_LOOP_VERBOSE="false"
+
+    local test_repos="$TEST_TMP_DIR/cm_json/repos"
+    mkdir -p "$test_repos/x1/x1/.git"
+
+    # Generate metrics: 1 miss, 2 hits
+    find_git_root_cached "$test_repos/" "x1" >/dev/null || true  # miss
+    find_git_root_cached "$test_repos/" "x1" >/dev/null || true  # hit
+    find_git_root_cached "$test_repos/" "x1" >/dev/null || true  # hit
+
+    # Read metrics into globals (normally done by print_cache_metrics)
+    read_cache_metrics
+
+    # Write metrics
+    write_metrics 0
+
+    # Verify JSON output contains cache section
+    if [ -f "$METRICS_FILE" ]; then
+        local json_content
+        json_content=$(cat "$METRICS_FILE")
+        assert_contains "$json_content" '"hits": 2' "JSON contains cache hits"
+        assert_contains "$json_content" '"misses": 1' "JSON contains cache misses"
+        assert_contains "$json_content" '"total_lookups": 3' "JSON contains total_lookups"
+        assert_contains "$json_content" '"hit_rate_percent": 66.7' "JSON contains hit_rate_percent"
+        assert_contains "$json_content" '"invalidations": 0' "JSON contains invalidations"
+    else
+        log_result "Metrics JSON file created" "fail" "File not found: $METRICS_FILE"
+    fi
+
+    # Clean up
+    rm -f "$METRICS_FILE"
+    cleanup_git_root_cache
+}
+
+#######################################
+# Test: 100% cache hit rate
+#######################################
+test_cache_metrics_perfect_hit_rate() {
+    echo "--- Test: cache metrics 100% hit rate ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Reset
+    GIT_ROOT_CACHE_FILE="$TEST_TMP_DIR/cm_perfect_cache"
+    CACHE_METRICS_FILE="$TEST_TMP_DIR/cm_perfect_metrics"
+    rm -f "$GIT_ROOT_CACHE_FILE" "$CACHE_METRICS_FILE"
+
+    local test_repos="$TEST_TMP_DIR/cm_perfect/repos"
+    mkdir -p "$test_repos/p1/p1/.git"
+
+    # First call is a miss
+    find_git_root_cached "$test_repos/" "p1" >/dev/null || true
+
+    # 9 more calls are hits
+    local i=0
+    while [ "$i" -lt 9 ]; do
+        find_git_root_cached "$test_repos/" "p1" >/dev/null || true
+        i=$((i + 1))
+    done
+
+    # Read and check
+    read_cache_metrics
+
+    assert_equals "9" "$CACHE_HITS" "Perfect scenario: 9 hits"
+    assert_equals "1" "$CACHE_MISSES" "Perfect scenario: 1 miss"
+
+    local metrics_output
+    metrics_output=$(print_cache_metrics 2>&1)
+    assert_contains "$metrics_output" "90.0%" "Perfect scenario: 90.0% hit rate"
+
+    # Clean up
+    cleanup_git_root_cache
+}
+
+# =============================================================================
 # Startup Health Check Tests (SDDLOOP-6.3010)
 # =============================================================================
 
@@ -4505,6 +4760,27 @@ main() {
     test_find_git_root_cached_multiple_repos
     echo ""
     test_cleanup_git_root_cache
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 13b TESTS (Cache Metrics - SDDLOOP-6.4009)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 13b Tests (Cache Metrics)"
+    echo "====================================="
+    echo ""
+
+    test_cache_metrics_hit_miss_tracking
+    echo ""
+    test_print_cache_metrics_format
+    echo ""
+    test_print_cache_metrics_zero_lookups
+    echo ""
+    test_cache_invalidation_tracking
+    echo ""
+    test_cache_metrics_in_json_output
+    echo ""
+    test_cache_metrics_perfect_hit_rate
     echo ""
 
     # ==========================================================================
