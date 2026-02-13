@@ -20,6 +20,7 @@
 #
 # Options:
 #   -h, --help          Show this help message and exit
+#   -q, --quiet         Suppress progress messages (to stderr)
 #   -s, --summary-only  Output only summary section (no per-repo details)
 #   -v, --verbose       Include timing output for each repo scan (to stderr)
 #   --specs-root PATH   Root directory containing SDD spec directories
@@ -28,6 +29,8 @@
 #   --repos-root PATH   Root directory containing code repositories
 #                        Priority: --repos-root > REPOS_ROOT env var > default
 #                        Default: /workspace/repos/
+#   --log-format FORMAT Log output format: 'text' (default) or 'json'
+#                        Priority: --log-format > LOG_FORMAT env var > default
 #   --json              Output JSON format (default, explicit specification)
 #   --debug             Enable debug output to stderr
 #
@@ -35,6 +38,7 @@
 #   SPECS_ROOT        Alternative to passing --specs-root option
 #   REPOS_ROOT        Alternative to passing --repos-root option
 #   WORKSPACE_ROOT    Deprecated: maps to REPOS_ROOT with warning
+#   LOG_FORMAT        Log output format: 'text' (default) or 'json'
 #   DEBUG             Set to "true" to enable debug output
 #
 # Output (JSON):
@@ -105,10 +109,19 @@ VERSION="2.0.0"
 [ -z "${DEFAULT_SPECS_ROOT:-}" ] && readonly DEFAULT_SPECS_ROOT="/workspace/_SPECS/"
 [ -z "${DEFAULT_REPOS_ROOT:-}" ] && readonly DEFAULT_REPOS_ROOT="/workspace/repos/"
 
+# Filesystem operation timeout in seconds for find commands.
+# 30 seconds is generous for local filesystem operations (typically <1 second)
+# but prevents indefinite hangs on NFS mounts with stale handles or network issues.
+# If a find command does not complete within this timeout, it is killed and a
+# clear error is logged.
+[ -z "${FILESYSTEM_TIMEOUT_SECONDS:-}" ] && readonly FILESYSTEM_TIMEOUT_SECONDS=30
+
 # Global flags
 DEBUG="${DEBUG:-false}"
 SUMMARY_ONLY="${SUMMARY_ONLY:-false}"
 VERBOSE="${VERBOSE:-false}"
+QUIET="${QUIET:-false}"
+LOG_FORMAT="${LOG_FORMAT:-text}"
 
 #######################################
 # Print debug message to stderr
@@ -121,6 +134,98 @@ debug_log() {
     if [[ "$DEBUG" == "true" ]]; then
         echo "[DEBUG] $*" >&2
     fi
+}
+
+#######################################
+# Format a log message as a single-line JSON object
+#
+# Arguments:
+#   $1 - Log level (INFO, ERROR, WARN, DEBUG)
+#   $2 - Log message
+#
+# Outputs:
+#   Single-line JSON to stderr with format:
+#   {"timestamp":"ISO8601","level":"LEVEL","message":"..."}
+#
+# Notes:
+#   - Uses jq for safe JSON string escaping
+#   - Timestamp is UTC in ISO 8601 format
+#######################################
+format_json_log() {
+    local level="$1"
+    local message="$2"
+
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Use jq to safely escape the message string
+    local msg_json
+    msg_json=$(jq -n --arg msg "$message" '$msg')
+
+    # Construct JSON log entry
+    printf '{"timestamp":"%s","level":"%s","message":%s}\n' \
+        "$timestamp" "$level" "$msg_json" >&2
+}
+
+#######################################
+# Print info message to stderr (suppressed by --quiet)
+# Arguments:
+#   $@ - Message to print
+# Outputs:
+#   Writes message to stderr if QUIET is not enabled
+#######################################
+log_info() {
+    if [ "$QUIET" != "true" ]; then
+        if [ "$LOG_FORMAT" = "json" ]; then
+            format_json_log "INFO" "$*"
+        else
+            echo "[INFO] $*" >&2
+        fi
+    fi
+}
+
+#######################################
+# Validate required dependencies are available
+#
+# Checks for jq (required) and realpath (required).
+# Provides clear error messages with installation instructions.
+#
+# Outputs:
+#   Error messages to stderr if dependencies missing
+#
+# Returns:
+#   0 - All required dependencies available
+#   1 - Required dependency missing
+#######################################
+check_dependencies() {
+    local missing=0
+
+    # Check jq (required for JSON parsing)
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "Error: Required dependency not found: jq" >&2
+        echo "Error: Install with: sudo apt-get install jq (Ubuntu/Debian) or brew install jq (macOS)" >&2
+        missing=1
+    fi
+
+    # Check realpath (required for path canonicalization)
+    if ! command -v realpath >/dev/null 2>&1; then
+        echo "Error: Required dependency not found: realpath" >&2
+        echo "Error: Install with: sudo apt-get install coreutils (Ubuntu/Debian) or brew install coreutils (macOS)" >&2
+        missing=1
+    fi
+
+    # Check timeout (required for filesystem operation timeouts)
+    if ! command -v timeout >/dev/null 2>&1; then
+        echo "Error: Required command 'timeout' not found. Install GNU coreutils." >&2
+        missing=1
+    fi
+
+    if [ "$missing" -eq 1 ]; then
+        echo "Error: Exiting due to missing required dependencies" >&2
+        return 1
+    fi
+
+    return 0
 }
 
 #######################################
@@ -349,6 +454,17 @@ scan_ticket() {
         debug_log "  Scanning tasks directory: $tasks_dir"
 
         # Find all .md files in tasks directory (not recursive)
+        # Wrapped with timeout to prevent hangs on NFS mounts with stale handles
+        local tasks_tmp_file
+        tasks_tmp_file=$(mktemp)
+        local tasks_find_exit=0
+        timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$tasks_dir" -maxdepth 1 -type f -name "*.md" -print0 > "$tasks_tmp_file" 2>/dev/null || tasks_find_exit=$?
+        if [ "$tasks_find_exit" -eq 124 ]; then
+            echo "Error: Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $tasks_dir" >&2
+            rm -f "$tasks_tmp_file"
+            return 1
+        fi
+
         while IFS= read -r -d '' task_file; do
             debug_log "    Found task file: $task_file"
 
@@ -387,7 +503,8 @@ scan_ticket() {
             else
                 pending=$((pending + 1))
             fi
-        done < <(find "$tasks_dir" -maxdepth 1 -type f -name "*.md" -print0 2>/dev/null | sort -z)
+        done < <(sort -z < "$tasks_tmp_file")
+        rm -f "$tasks_tmp_file"
     else
         debug_log "  No tasks/ directory found"
     fi
@@ -468,6 +585,17 @@ scan_repo() {
         debug_log "  Scanning tickets directory: $tickets_dir"
 
         # Find all ticket directories (not recursive, one level only)
+        # Wrapped with timeout to prevent hangs on NFS mounts with stale handles
+        local tickets_tmp_file
+        tickets_tmp_file=$(mktemp)
+        local tickets_find_exit=0
+        timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$tickets_dir" -maxdepth 1 -mindepth 1 -type d -print0 > "$tickets_tmp_file" 2>/dev/null || tickets_find_exit=$?
+        if [ "$tickets_find_exit" -eq 124 ]; then
+            echo "Error: Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $tickets_dir" >&2
+            rm -f "$tickets_tmp_file"
+            return 1
+        fi
+
         while IFS= read -r -d '' ticket_dir; do
             # Skip if not a directory (shouldn't happen with -type d, but be safe)
             [[ ! -d "$ticket_dir" ]] && continue
@@ -508,7 +636,8 @@ scan_repo() {
             total_completed=$((total_completed + ticket_completed))
             total_tested=$((total_tested + ticket_tested))
             total_verified=$((total_verified + ticket_verified))
-        done < <(find "$tickets_dir" -maxdepth 1 -mindepth 1 -type d -print0 2>/dev/null | sort -z)
+        done < <(sort -z < "$tickets_tmp_file")
+        rm -f "$tickets_tmp_file"
     else
         debug_log "  No tickets/ directory found in $sdd_root"
     fi
@@ -592,6 +721,7 @@ Examples:
 
 Options:
   -h, --help          Show this help message and exit
+  -q, --quiet         Suppress progress messages (to stderr)
   -s, --summary-only  Output only summary section (no per-repo details)
   -v, --verbose       Include timing output for each repo scan (to stderr)
   --specs-root PATH   Root directory containing SDD spec directories
@@ -600,6 +730,8 @@ Options:
   --repos-root PATH   Root directory containing code repositories
                        Priority: --repos-root > REPOS_ROOT env var > default
                        Default: /workspace/repos/
+  --log-format FORMAT Log output format: 'text' (default) or 'json'
+                       Priority: --log-format > LOG_FORMAT env var > default
   --json              Output JSON format (default, explicit specification)
   --debug             Enable debug output to stderr
 
@@ -607,12 +739,29 @@ Environment Variables:
   SPECS_ROOT        Root directory containing SDD spec directories
   REPOS_ROOT        Root directory containing code repositories
   WORKSPACE_ROOT    Deprecated: maps to REPOS_ROOT with warning
+  LOG_FORMAT        Log output format: 'text' (default) or 'json'
   DEBUG             Set to "true" to enable debug output
 
 Timing Output (with --verbose):
   [0.12s] Scanned repo-a (3 tickets, 15 tasks)
   [0.25s] Scanned repo-b (2 tickets, 8 tasks)
   [0.38s] Total: 5 tickets, 23 tasks in 0.38s
+
+Expected Directory Structure:
+  specs-root/
+      <repo-name>/
+          tickets/
+              <TICKET-ID>_<slug>/
+                  tasks/
+                      <TASK-ID>_<slug>.md
+  repos-root/
+      <repo-name>/
+          <git-dir>/
+              .git/
+
+  Warnings are logged (non-blocking) if:
+  - specs-root is empty (no subdirectories found)
+  - specs-root and repos-root point to the same directory
 
 Exit Codes:
   0 - Success (including empty specs root)
@@ -744,6 +893,9 @@ format_elapsed_time() {
 #   $@ - Command line arguments
 #######################################
 main() {
+    # Validate required dependencies before proceeding
+    check_dependencies || exit 1
+
     local specs_root=""
     local repos_root=""
     local arg_specs_root=""
@@ -755,6 +907,10 @@ main() {
             --help|-h)
                 show_usage
                 exit 0
+                ;;
+            --quiet|-q)
+                QUIET="true"
+                shift
                 ;;
             --summary-only|-s)
                 SUMMARY_ONLY="true"
@@ -770,6 +926,10 @@ main() {
                     exit 2
                 fi
                 arg_specs_root="$2"
+                if [ -z "$arg_specs_root" ]; then
+                    echo "Error: --specs-root cannot be empty" >&2
+                    exit 1
+                fi
                 shift 2
                 ;;
             --repos-root)
@@ -778,6 +938,18 @@ main() {
                     exit 2
                 fi
                 arg_repos_root="$2"
+                if [ -z "$arg_repos_root" ]; then
+                    echo "Error: --repos-root cannot be empty" >&2
+                    exit 1
+                fi
+                shift 2
+                ;;
+            --log-format)
+                if [ $# -lt 2 ]; then
+                    echo "Error: --log-format requires a FORMAT argument" >&2
+                    exit 2
+                fi
+                LOG_FORMAT="$2"
                 shift 2
                 ;;
             --json)
@@ -797,6 +969,7 @@ main() {
                     while [ $i -lt ${#opts} ]; do
                         local opt="${opts:$i:1}"
                         case "$opt" in
+                            q) QUIET="true" ;;
                             s) SUMMARY_ONLY="true" ;;
                             v) VERBOSE="true" ;;
                             h) show_usage; exit 0 ;;
@@ -885,6 +1058,29 @@ main() {
     debug_log "SUMMARY_ONLY: $SUMMARY_ONLY"
     debug_log "VERBOSE: $VERBOSE"
 
+    # ==========================================================================
+    # Root Structure Validation (non-blocking warnings)
+    # Warns about common configuration errors after path canonicalization.
+    # These are advisory only - execution continues regardless.
+    # ==========================================================================
+
+    # Canonicalize paths for reliable comparison
+    local canonical_specs_root canonical_repos_root
+    canonical_specs_root="$(realpath "$specs_root" 2>/dev/null)" || canonical_specs_root="$specs_root"
+    canonical_repos_root="$(realpath "$repos_root" 2>/dev/null)" || canonical_repos_root="$repos_root"
+
+    # Check 1: Empty specs-root (no subdirectories)
+    if [ -z "$(ls -A "$canonical_specs_root" 2>/dev/null)" ]; then
+        echo "Warning: specs-root is empty (no subdirectories): $specs_root" >&2
+        echo "Warning: Expected structure: specs-root/<repo-name>/tickets/" >&2
+    fi
+
+    # Check 2: Identical specs-root and repos-root paths
+    if [ "$canonical_specs_root" = "$canonical_repos_root" ]; then
+        echo "Warning: specs-root and repos-root are identical: $canonical_specs_root" >&2
+        echo "Warning: This may cause unexpected behavior. Typically they should be separate directories." >&2
+    fi
+
     # Discover all SDD spec directories
     debug_log "Discovering SDD spec directories in: $specs_root"
 
@@ -907,6 +1103,18 @@ main() {
     local repos_json=""
     local first_repo=true
 
+    # Count total specs directories before discovery loop (for progress indication)
+    # Wrapped with timeout to prevent hangs on NFS mounts with stale handles
+    local discovery_total
+    discovery_total=$(timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$specs_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    local discovery_find_exit=${PIPESTATUS[0]:-0}
+    if [ "$discovery_find_exit" -eq 124 ]; then
+        echo "Error: Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $specs_root" >&2
+        exit 1
+    fi
+    discovery_total=$(echo "$discovery_total" | tr -d ' ')
+    local discovery_current=0
+
     # Iterate direct children of specs root
     for sdd_path in "$specs_root"*/; do
         [ -d "$sdd_path" ] || continue
@@ -917,6 +1125,12 @@ main() {
             debug_log "Skipping invalid path: $sdd_path"
             continue
         }
+
+        # Increment discovery counter and log progress every 10 repos
+        discovery_current=$((discovery_current + 1))
+        if [ "$discovery_total" -ge 10 ] && [ $((discovery_current % 10)) -eq 0 ]; then
+            log_info "Discovering repos... ($discovery_current/$discovery_total)"
+        fi
 
         debug_log "Found SDD spec dir: $resolved_path"
 
@@ -984,6 +1198,11 @@ main() {
         total_tested=$((total_tested + repo_tested))
         total_verified=$((total_verified + repo_verified))
     done
+
+    # Final discovery progress (only if >= 10 repos)
+    if [ "$discovery_total" -ge 10 ]; then
+        log_info "Discovering repos... ($discovery_total/$discovery_total)"
+    fi
 
     # Output total timing if verbose
     if [ "$VERBOSE" = "true" ]; then

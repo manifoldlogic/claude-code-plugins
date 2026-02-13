@@ -25,7 +25,7 @@
 #   --repos-root DIR        Root directory for git repositories (default: /workspace/repos/)
 #   --max-iterations N      Maximum task iterations before stopping (default: 50)
 #   --max-errors N          Maximum consecutive errors before stopping (default: 3)
-#   --timeout SECONDS       Task execution timeout in seconds (default: 3600)
+#   --timeout SECONDS       Task execution timeout in seconds (default: 600)
 #   --poll-interval SECONDS Interval between status polls (default: 5)
 #   --metrics-file FILE     Write JSON metrics to FILE at end of execution
 #
@@ -35,12 +35,13 @@
 #   SDD_LOOP_WORKSPACE_ROOT   [DEPRECATED] Maps to SDD_LOOP_REPOS_ROOT with warning
 #   SDD_LOOP_MAX_ITERATIONS   Maximum iterations (default: 50)
 #   SDD_LOOP_MAX_ERRORS       Maximum consecutive errors (default: 3)
-#   SDD_LOOP_TIMEOUT          Task timeout in seconds (default: 3600)
+#   SDD_LOOP_TIMEOUT          Task timeout in seconds (default: 600)
 #   SDD_LOOP_POLL_INTERVAL    Poll interval in seconds (default: 5)
 #   SDD_LOOP_DRY_RUN          Set to "true" for dry-run mode
 #   SDD_LOOP_VERBOSE          Set to "true" for verbose output
 #   SDD_LOOP_QUIET            Set to "true" for quiet mode
 #   SDD_LOOP_DEBUG            Set to "true" for debug output
+#   SDD_LOOP_DEFAULT_LOCK_DIR Directory for lock/cache files (default: /tmp)
 #
 # EXIT CODES
 #   0   - Success (all work completed or no work remaining)
@@ -89,121 +90,755 @@
 
 set -euo pipefail
 
-# Version constant
+# =============================================================================
+# Global Variables
+# =============================================================================
+#
+# This section declares all global variables used by sdd-loop.sh, organized
+# into four categories:
+#
+#   1. Script Metadata    - VERSION
+#   2. Configuration Defaults - Readonly constants with fallback values
+#   3. Runtime Configuration  - Configurable via env vars and CLI args
+#   4. Internal State         - Runtime counters, flags, and process tracking
+#
+# All configuration defaults are readonly after initialization. Runtime
+# configuration variables are set during main() argument parsing. Internal
+# state variables are modified during loop execution and reset on exit.
+# =============================================================================
+
+#######################################
+# PURPOSE: Script version identifier for --version output and metrics.
+#
+# Lifecycle:
+#   - Initialized: At script load (constant)
+#   - Modified: Never (update manually when releasing)
+#   - Cleared: Never
+#
+# Type: string
+# Constraints: Semver format (MAJOR.MINOR.PATCH). Immutable at runtime.
+# Example: "2.0.0"
+#######################################
 VERSION="2.0.0"
 
 # =============================================================================
 # Configuration Defaults
 # =============================================================================
+#
+# Readonly constants that provide fallback values when neither environment
+# variables nor CLI arguments override them. Each default supports pre-setting
+# via environment variable (checked with [[ -z ... ]]) to allow test fixtures
+# and CI/CD pipelines to inject values before the script loads.
+#
+# All defaults become readonly after assignment. They are never modified
+# during script execution.
+# =============================================================================
 
-# Default specs root for SDD data directories
+#######################################
+# PURPOSE: Default root directory for SDD spec data (epics, tickets, tasks).
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_SPECS_ROOT env var before script load.
+# Example: "/workspace/_SPECS/"
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_SPECS_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_SPECS_ROOT="/workspace/_SPECS/"
 
-# Default repos root for git repository scanning
+#######################################
+# PURPOSE: Default root directory for git repository scanning.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_REPOS_ROOT env var before script load.
+# Example: "/workspace/repos/"
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_REPOS_ROOT:-}" ]] && readonly SDD_LOOP_DEFAULT_REPOS_ROOT="/workspace/repos/"
 
-# Maximum number of task iterations before stopping (safety limit)
+#######################################
+# PURPOSE: Default safety limit for maximum task iterations before the loop
+#   stops to prevent runaway execution.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_MAX_ITERATIONS env var before script load.
+# Example: 50
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_MAX_ITERATIONS:-}" ]] && readonly SDD_LOOP_DEFAULT_MAX_ITERATIONS=50
 
-# Maximum consecutive errors before stopping
+#######################################
+# PURPOSE: Default maximum number of consecutive task execution errors
+#   before the loop stops to prevent repeated failures.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_MAX_ERRORS env var before script load.
+# Example: 3
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_MAX_ERRORS:-}" ]] && readonly SDD_LOOP_DEFAULT_MAX_ERRORS=3
 
-# Task execution timeout in seconds
-[[ -z "${SDD_LOOP_DEFAULT_TIMEOUT:-}" ]] && readonly SDD_LOOP_DEFAULT_TIMEOUT=3600
+#######################################
+# PURPOSE: Default task execution timeout in seconds. Claude Code invocations
+#   that exceed this timeout are killed.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_TIMEOUT env var before script load.
+# Example: 600
+#######################################
+[[ -z "${SDD_LOOP_DEFAULT_TIMEOUT:-}" ]] && readonly SDD_LOOP_DEFAULT_TIMEOUT=600
 
-# Poll interval in seconds between status board checks
+#######################################
+# PURPOSE: Default interval in seconds between master-status-board.sh polls.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Non-negative integer. Readonly.
+#   Pre-settable via SDD_LOOP_DEFAULT_POLL_INTERVAL env var before script load.
+# Example: 5
+#######################################
 [[ -z "${SDD_LOOP_DEFAULT_POLL_INTERVAL:-}" ]] && readonly SDD_LOOP_DEFAULT_POLL_INTERVAL=5
 
+#######################################
+# PURPOSE: Timeout in seconds for filesystem operations (find commands).
+#   Prevents indefinite hangs on NFS mounts with stale handles or network
+#   issues. 30 seconds is generous for local filesystem operations (typically
+#   <1 second) but protects the loop from becoming unresponsive when _SPECS/
+#   or repos/ are on network-mounted filesystems.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Positive integer. Readonly.
+#   Pre-settable via FILESYSTEM_TIMEOUT_SECONDS env var before script load.
+# Example: 30
+#######################################
+[[ -z "${FILESYSTEM_TIMEOUT_SECONDS:-}" ]] && readonly FILESYSTEM_TIMEOUT_SECONDS=30
+
+#######################################
+# PURPOSE: Directory for lock files and cache files. Override to place
+#   temporary files on a different filesystem (e.g., RAM disk, shared volume).
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path to an existing, writable directory.
+#   Readonly. Pre-settable via SDD_LOOP_DEFAULT_LOCK_DIR env var.
+# Example: "/tmp"
+#######################################
+[[ -z "${SDD_LOOP_DEFAULT_LOCK_DIR:-}" ]] && readonly SDD_LOOP_DEFAULT_LOCK_DIR="/tmp"
+
+#######################################
+# PURPOSE: Circuit breaker advisory thresholds. Iteration counts at which
+#   warning messages are logged. CIRCUIT_BREAKER_WARN_THRESHOLD indicates
+#   longer-than-typical execution. CIRCUIT_BREAKER_CRITICAL_THRESHOLD
+#   indicates approaching the default max_iterations limit (50). These are
+#   advisory only and never abort the loop.
+#
+# Lifecycle:
+#   - Initialized: At script load (readonly)
+#   - Modified: Never (readonly after assignment)
+#   - Cleared: Never
+#
+# Type: integer (iteration count)
+# Constraints: Positive integers. WARN < CRITICAL < DEFAULT_MAX_ITERATIONS.
+#   Readonly. Pre-settable via env vars before script load.
+# Example: CIRCUIT_BREAKER_WARN_THRESHOLD=25, CIRCUIT_BREAKER_CRITICAL_THRESHOLD=40
+#######################################
+[[ -z "${CIRCUIT_BREAKER_WARN_THRESHOLD:-}" ]] && readonly CIRCUIT_BREAKER_WARN_THRESHOLD=25
+[[ -z "${CIRCUIT_BREAKER_CRITICAL_THRESHOLD:-}" ]] && readonly CIRCUIT_BREAKER_CRITICAL_THRESHOLD=40
+
 # =============================================================================
-# Global State (configurable via env vars and CLI args)
+# Runtime Configuration (configurable via env vars and CLI args)
+# =============================================================================
+#
+# These variables follow a three-tier precedence hierarchy:
+#   CLI args (highest) > environment variables > configuration defaults (lowest)
+#
+# All are initialized from their environment variable (if set) at script load,
+# then potentially overridden by CLI argument parsing in main(). After main()
+# applies defaults, these variables are treated as effectively immutable for
+# the duration of the loop.
 # =============================================================================
 
-# Specs root directory (SDD data)
+#######################################
+# PURPOSE: Root directory containing SDD spec data for all repositories.
+#   Each subdirectory under this root corresponds to a repository's spec data
+#   (epics, tickets, tasks).
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_SPECS_ROOT env var (may be empty)
+#   - Modified: In main() via --specs-root CLI arg or default fallback
+#   - Cleared: Never (always has a value after main() initialization)
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash after main()
+#   resolves it. Must point to an existing directory. Trailing slash is
+#   enforced by main() for consistent path concatenation.
+# Example: "/workspace/_SPECS/"
+#######################################
 SDD_LOOP_SPECS_ROOT="${SDD_LOOP_SPECS_ROOT:-}"
 
-# Repos root directory (git repositories)
+#######################################
+# PURPOSE: Root directory containing git repositories. Each subdirectory
+#   under this root is a repository parent (e.g., repos/<name>/<worktree>).
+#   Used by find_git_root() to locate .git directories.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_REPOS_ROOT env var (may be empty)
+#   - Modified: In main() via --repos-root CLI arg, deprecated
+#     SDD_LOOP_WORKSPACE_ROOT env var, or default fallback
+#   - Cleared: Never (always has a value after main() initialization)
+#
+# Type: string (directory path)
+# Constraints: Must be an absolute path with trailing slash after main()
+#   resolves it. Must point to an existing directory.
+# Example: "/workspace/repos/"
+#######################################
 SDD_LOOP_REPOS_ROOT="${SDD_LOOP_REPOS_ROOT:-}"
 
-# Maximum iterations (0 = unlimited)
+#######################################
+# PURPOSE: Maximum number of task iterations before the loop stops.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_MAX_ITERATIONS env var (may be empty)
+#   - Modified: In main() via --max-iterations CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer (must be > 0). Validated in main().
+# Example: 50
+#######################################
 SDD_LOOP_MAX_ITERATIONS="${SDD_LOOP_MAX_ITERATIONS:-}"
 
-# Maximum consecutive errors
+#######################################
+# PURPOSE: Maximum number of consecutive task execution errors before
+#   the loop stops.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_MAX_ERRORS env var (may be empty)
+#   - Modified: In main() via --max-errors CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Positive integer (must be > 0). Validated in main().
+# Example: 3
+#######################################
 SDD_LOOP_MAX_ERRORS="${SDD_LOOP_MAX_ERRORS:-}"
 
-# Task timeout in seconds
+#######################################
+# PURPOSE: Timeout in seconds for each Claude Code task execution.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_TIMEOUT env var (may be empty)
+#   - Modified: In main() via --timeout CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Positive integer (must be > 0). Validated in main().
+# Example: 600
+#######################################
 SDD_LOOP_TIMEOUT="${SDD_LOOP_TIMEOUT:-}"
 
-# Poll interval in seconds
+#######################################
+# PURPOSE: Interval in seconds between master-status-board.sh polls.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_POLL_INTERVAL env var (may be empty)
+#   - Modified: In main() via --poll-interval CLI arg or default fallback
+#   - Cleared: Never
+#
+# Type: integer (seconds)
+# Constraints: Non-negative integer (0 = no delay). Validated in main().
+# Example: 5
+#######################################
 SDD_LOOP_POLL_INTERVAL="${SDD_LOOP_POLL_INTERVAL:-}"
 
-# Dry run mode - log actions without executing
+#######################################
+# PURPOSE: Dry-run mode flag. When "true", the loop logs actions that would
+#   be taken without actually invoking Claude Code.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_DRY_RUN env var (default: "false")
+#   - Modified: In main() via -n/--dry-run CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_DRY_RUN="${SDD_LOOP_DRY_RUN:-false}"
 
-# Verbose mode - extra logging
+#######################################
+# PURPOSE: Verbose mode flag. When "true", enables additional progress
+#   detail in log output.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_VERBOSE env var (default: "false")
+#   - Modified: In main() via -v/--verbose CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_VERBOSE="${SDD_LOOP_VERBOSE:-false}"
 
-# Quiet mode - minimal output
+#######################################
+# PURPOSE: Quiet mode flag. When "true", suppresses informational messages
+#   (errors only).
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_QUIET env var (default: "false")
+#   - Modified: In main() via -q/--quiet CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_QUIET="${SDD_LOOP_QUIET:-false}"
 
-# Debug mode - debug-level logging
+#######################################
+# PURPOSE: Debug mode flag. When "true", enables debug-level logging
+#   (very verbose output useful for troubleshooting).
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_DEBUG env var (default: "false")
+#   - Modified: In main() via --debug CLI flag
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Case-sensitive.
+# Example: "false"
+#######################################
 SDD_LOOP_DEBUG="${SDD_LOOP_DEBUG:-false}"
 
-# Log format - "text" (default) or "json" for structured logging
+#######################################
+# PURPOSE: Log output format selector. Controls whether log messages are
+#   emitted as human-readable text or machine-parseable JSON.
+#
+# Lifecycle:
+#   - Initialized: At script load from SDD_LOOP_LOG_FORMAT env var (default: "text")
+#   - Modified: In main() via --log-format CLI option
+#   - Cleared: Never
+#
+# Type: string (enum)
+# Constraints: Must be "text" or "json". Validated in main().
+# Example: "text"
+#######################################
 SDD_LOOP_LOG_FORMAT="${SDD_LOOP_LOG_FORMAT:-text}"
 
 # =============================================================================
 # Internal State
 # =============================================================================
+#
+# Runtime variables that track loop execution progress, process management,
+# and inter-function communication. These are initialized at script load and
+# modified during loop execution. All are reset or cleaned up on script exit
+# via the cleanup() and signal handler functions.
+# =============================================================================
 
-# Script directory for locating master-status-board.sh
+#######################################
+# PURPOSE: Absolute path to the directory containing this script. Used to
+#   locate sibling scripts (e.g., master-status-board.sh) via $SCRIPT_DIR/.
+#
+# Lifecycle:
+#   - Initialized: At script load via dirname/pwd resolution
+#   - Modified: Never
+#   - Cleared: Never
+#
+# Type: string (directory path)
+# Constraints: Always an absolute path. Never null. Immutable after init.
+# Example: "/workspace/repos/claude-code-plugins/plugins/sdd/skills/project-workflow/scripts"
+#######################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Iteration counter
+#######################################
+# PURPOSE: Counts the number of main loop iterations completed. Used for
+#   safety limit enforcement, circuit breaker thresholds, and metrics output.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by 1 at the start of each loop iteration in main()
+#   - Cleared: Never (reported in cleanup summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 12
+#######################################
 ITERATION_COUNT=0
 
-# Consecutive error counter
+#######################################
+# PURPOSE: Tracks the number of consecutive task execution errors. Used
+#   to detect persistent failure conditions and stop the loop. Currently
+#   initialized but reserved for future error-tracking logic.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Referenced in JSON log context output
+#   - Cleared: Never
+#
+# Type: integer
+# Constraints: Non-negative.
+# Example: 0
+#######################################
 CONSECUTIVE_ERRORS=0
 
-# Exit flag for signal handling
+#######################################
+# PURPOSE: Signal-driven exit request flag. Set to "true" by SIGINT/SIGTERM
+#   handlers to request a graceful loop exit at the next iteration boundary.
+#
+# Lifecycle:
+#   - Initialized: At script load ("false")
+#   - Modified: Set to "true" by handle_sigint() or handle_sigterm()
+#   - Cleared: Never (once set, the loop exits)
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Once set to "true", never reverts.
+# Example: "false"
+#######################################
 EXIT_REQUESTED=false
 
-# Exit code to use when exiting
+#######################################
+# PURPOSE: Exit code to use when the script terminates. Allows signal
+#   handlers to set a specific exit code (e.g., 130 for SIGINT, 143 for
+#   SIGTERM) that persists through cleanup.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Set by signal handlers or main loop on error conditions
+#   - Cleared: Never (used at script exit)
+#
+# Type: integer
+# Constraints: Valid POSIX exit code (0-255). See EXIT CODES in script header.
+# Example: 0 (success), 130 (SIGINT), 143 (SIGTERM)
+#######################################
 EXIT_CODE=0
 
-# Tasks completed counter
+#######################################
+# PURPOSE: Counter for successfully completed task executions. Used in
+#   cleanup summary output and metrics reporting.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by 1 in main loop after successful task execution
+#   - Cleared: Never (reported in cleanup summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 5
+#######################################
 TASKS_COMPLETED=0
 
-# Tasks failed counter
+#######################################
+# PURPOSE: Counter for failed task executions. Used in metrics reporting.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by 1 in main loop after failed task execution
+#   - Cleared: Never (reported in metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 1
+#######################################
 TASKS_FAILED=0
 
-# Circuit breaker tracking (for metrics output)
+#######################################
+# PURPOSE: Count of circuit breaker advisory warnings logged during
+#   execution. Used in metrics output to report how many threshold
+#   warnings were emitted.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by check_circuit_breaker() when thresholds are hit
+#   - Cleared: Never (reported in metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 2
+#######################################
 CIRCUIT_BREAKER_WARNINGS_LOGGED=0
+
+#######################################
+# PURPOSE: Comma-separated list of iteration numbers at which circuit
+#   breaker warnings were logged. Used in metrics output JSON array.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string)
+#   - Modified: Appended to by check_circuit_breaker() when thresholds are hit
+#   - Cleared: Never (reported in metrics)
+#
+# Type: string (comma-separated integers)
+# Constraints: Empty string or comma-space separated integers.
+#   Format must be valid for JSON array embedding: [${value}].
+# Example: "25, 40"
+#######################################
 CIRCUIT_BREAKER_WARNING_ITERATIONS=""
 
-# Metrics output file path (optional)
+#######################################
+# PURPOSE: File path for optional JSON metrics output. When set, the
+#   write_metrics() function writes execution statistics to this file
+#   on exit.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string = disabled)
+#   - Modified: Set in main() via --metrics-file CLI option
+#   - Cleared: Never
+#
+# Type: string (file path)
+# Constraints: Empty string (disabled) or absolute path to a writable
+#   file location. Parent directory must exist and be writable.
+# Example: "/tmp/metrics.json"
+#######################################
 METRICS_FILE=""
 
-# Start time for duration tracking (set in main())
+#######################################
+# PURPOSE: Unix epoch timestamp marking when main() began execution.
+#   Used to calculate total loop duration in metrics output.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string)
+#   - Modified: Set once in main() via $(date +%s) after lock acquisition
+#   - Cleared: Never
+#
+# Type: string (integer epoch seconds)
+# Constraints: Empty until main() sets it. Once set, never modified.
+# Example: "1707840000"
+#######################################
 START_TIME=""
 
-# Flag to suppress cleanup output during help/version
+#######################################
+# PURPOSE: Flag to suppress cleanup output during --help/--version.
+#   When set, the cleanup() function returns immediately without logging
+#   the "Exiting after N iterations" summary.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string)
+#   - Modified: Set to "true" in main() when -h/--help or -V/--version is parsed
+#   - Cleared: Never
+#
+# Type: string (boolean flag)
+# Constraints: Empty string (show cleanup) or "true" (suppress cleanup).
+# Example: "" (normal operation), "true" (help/version shown)
+#######################################
 HELP_SHOWN=""
 
-# Poll result state (set by poll_status function)
+#######################################
+# PURPOSE: Poll result state variables. Set by poll_status() to communicate
+#   the master-status-board.sh recommended action to the main loop.
+#   These five variables form a logical group representing one poll result.
+#
+#   POLL_ACTION  - The recommended action (e.g., "do-task", "idle", "stop")
+#   POLL_TASK    - Task ID to execute (e.g., "SDDLOOP-3.1001")
+#   POLL_TICKET  - Ticket ID the task belongs to (e.g., "SDDLOOP-3")
+#   POLL_SDD_ROOT - SDD root directory for the task's repository
+#   POLL_REASON  - Human-readable reason for the recommendation
+#
+# Lifecycle:
+#   - Initialized: At script load (all empty strings)
+#   - Modified: Reset to empty at the start of each poll_status() call,
+#     then populated from master-status-board.sh JSON output
+#   - Cleared: Reset at the start of each poll_status() call
+#
+# Type: string
+# Constraints: POLL_ACTION is empty or one of the action strings from
+#   master-status-board.sh. POLL_TASK follows the TICKET-ID.NNNN format
+#   when set. POLL_SDD_ROOT is an absolute path when set.
+# Example:
+#   POLL_ACTION="do-task"
+#   POLL_TASK="SDDLOOP-3.1001"
+#   POLL_TICKET="SDDLOOP-3"
+#   POLL_SDD_ROOT="/workspace/_SPECS/claude-code-plugins"
+#   POLL_REASON="Next agent-ready task"
+#######################################
 POLL_ACTION=""
 POLL_TASK=""
 POLL_TICKET=""
 POLL_SDD_ROOT=""
 POLL_REASON=""
 
-# Phase boundary state (set by check_phase_boundary function)
+#######################################
+# PURPOSE: Phase boundary limit from .autogate.json. When set, the loop
+#   stops before executing tasks beyond this phase number.
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string = no phase limit)
+#   - Modified: Reset to empty at the start of each check_phase_boundary()
+#     call, then set if .autogate.json contains a stop_at_phase value
+#   - Cleared: Reset at the start of each check_phase_boundary() call
+#
+# Type: string (integer when set)
+# Constraints: Empty string (no limit) or positive integer (1-9).
+#   Phase numbers are extracted from task IDs (TICKET.XYYY where X is phase).
+# Example: "" (no limit), "1" (stop after phase 1)
+#######################################
 STOP_AT_PHASE=""
 
-# Claude Code process PID (for cleanup on signal)
+#######################################
+# PURPOSE: PID of the currently running Claude Code child process. Used
+#   by signal handlers to terminate the Claude process during graceful
+#   shutdown (SIGINT/SIGTERM).
+#
+# Lifecycle:
+#   - Initialized: At script load (empty string = no active process)
+#   - Modified: Set to background PID ($!) when Claude Code is launched
+#     in execute_task(). Cleared after Claude process terminates or is killed.
+#   - Cleared: Set to empty string by cleanup_claude_process() after
+#     process termination, and after normal process completion
+#
+# Type: string (integer PID when set)
+# Constraints: Empty string or valid PID. Used with kill -0 to check
+#   if process is still running.
+# Example: "" (no process), "12345" (active Claude process)
+#######################################
 CLAUDE_PID=""
 
-# Flag to prevent re-entry into cleanup function
+#######################################
+# PURPOSE: Re-entry guard for cleanup_claude_process(). Prevents multiple
+#   rapid signals (e.g., double Ctrl+C) from causing concurrent cleanup
+#   attempts that could race on PID management.
+#
+# Lifecycle:
+#   - Initialized: At script load ("false")
+#   - Modified: Set to "true" at entry to cleanup_claude_process(),
+#     reset to "false" before each return path
+#   - Cleared: Reset to "false" after cleanup completes
+#
+# Type: string (boolean flag)
+# Constraints: "true" or "false". Must be "false" when not inside
+#   cleanup_claude_process().
+# Example: "false"
+#######################################
 CLEANUP_IN_PROGRESS=false
+
+#######################################
+# PURPOSE: Path to the temporary file used for caching find_git_root()
+#   results. Maps repository names to their discovered git root paths
+#   to avoid redundant filesystem scans when multiple tasks share a repo.
+#
+# Lifecycle:
+#   - Initialized: At script load with PID-based path so subshells can
+#     access it (e.g., "/tmp/sdd-loop-git-cache.12345")
+#   - Modified: File created on disk by init_git_root_cache(). Entries
+#     appended by find_git_root_cached() on cache misses.
+#   - Cleared: File removed and variable set to empty by
+#     cleanup_git_root_cache(), called from cleanup() and signal handlers
+#
+# Type: string (file path)
+# Constraints: Absolute path under SDD_LOOP_DEFAULT_LOCK_DIR. PID suffix
+#   ensures uniqueness per process. File format is one entry per line:
+#   repo_name=absolute_path (e.g., "myproject=/workspace/repos/myproject/main")
+# Example: "/tmp/sdd-loop-git-cache.12345"
+#######################################
+GIT_ROOT_CACHE_FILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-git-cache.$$"
+
+#######################################
+# PURPOSE: Path to the file-based cache metrics log. Each line records a
+#   cache event: "H" for hit, "M" for miss. File-based approach is used
+#   because find_git_root_cached() runs inside $() subshells, so in-memory
+#   counters would not persist to the parent shell.
+#
+# Lifecycle:
+#   - Initialized: At script load with PID-based path
+#   - Modified: Lines appended by find_git_root_cached() on each lookup
+#   - Cleared: File removed by cleanup_git_root_cache()
+#
+# Type: string (file path)
+# Constraints: Absolute path under SDD_LOOP_DEFAULT_LOCK_DIR. PID suffix
+#   ensures uniqueness per process. Format: one character per line (H or M).
+# Example: "/tmp/sdd-loop-cache-metrics.12345"
+#######################################
+CACHE_METRICS_FILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-cache-metrics.$$"
+
+#######################################
+# PURPOSE: Cache hit count, read from CACHE_METRICS_FILE by
+#   read_cache_metrics(). Initialized to 0 at script load for
+#   safe use in write_metrics() even if read_cache_metrics() has
+#   not yet been called.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Set by read_cache_metrics() from file-based metrics
+#   - Cleared: Never (reported in session summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative.
+# Example: 18
+#######################################
+CACHE_HITS=0
+
+#######################################
+# PURPOSE: Cache miss count, read from CACHE_METRICS_FILE by
+#   read_cache_metrics(). Initialized to 0 at script load for
+#   safe use in write_metrics() even if read_cache_metrics() has
+#   not yet been called.
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Set by read_cache_metrics() from file-based metrics
+#   - Cleared: Never (reported in session summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative.
+# Example: 2
+#######################################
+CACHE_MISSES=0
+
+#######################################
+# PURPOSE: Counter for cache invalidations. Tracks when cached entries
+#   are cleared during cleanup or when proactive validation detects a
+#   stale cached path. Cleanup invalidations increment the in-memory
+#   counter directly (parent shell). Proactive invalidations write "I"
+#   to CACHE_METRICS_FILE (subshell-safe) and are read by
+#   read_cache_metrics().
+#
+# Lifecycle:
+#   - Initialized: At script load (0)
+#   - Modified: Incremented by cleanup_git_root_cache() when entries exist;
+#     set by read_cache_metrics() from file-based "I" lines
+#   - Cleared: Never (reported in session summary and metrics)
+#
+# Type: integer
+# Constraints: Non-negative. Monotonically increasing.
+# Example: 0
+#######################################
+CACHE_INVALIDATIONS=0
 
 # =============================================================================
 # Logging Functions
@@ -295,7 +930,7 @@ log_info() {
         if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
             format_json_log "INFO" "$*"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*" >&2
+            echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [INFO] $*" >&2
         fi
     fi
 }
@@ -311,7 +946,7 @@ log_error() {
     if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
         format_json_log "ERROR" "$*"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2
+        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [ERROR] $*" >&2
     fi
 }
 
@@ -327,7 +962,7 @@ log_warn() {
         if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
             format_json_log "WARN" "$*"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >&2
+            echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [WARN] $*" >&2
         fi
     fi
 }
@@ -344,7 +979,7 @@ log_verbose() {
     if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
         format_json_log "VERBOSE" "$*"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [VERBOSE] $*" >&2
+        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [VERBOSE] $*" >&2
     fi
 }
 
@@ -360,9 +995,64 @@ log_debug() {
         if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
             format_json_log "DEBUG" "$*"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" >&2
+            echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [DEBUG] $*" >&2
         fi
     fi
+}
+
+# =============================================================================
+# Startup Health Check
+# =============================================================================
+
+#######################################
+# Validate required dependencies are available
+#
+# Checks for jq, realpath (required) and claude (warning only).
+# Provides clear error messages with installation instructions.
+#
+# Outputs:
+#   Error messages to stderr if dependencies missing
+#   Warning messages to stderr if optional tools missing
+#
+# Returns:
+#   0 - All required dependencies available
+#   1 - Required dependency missing
+#######################################
+check_dependencies() {
+    local missing=0
+
+    # Check jq (required for JSON parsing)
+    if ! command -v jq >/dev/null 2>&1; then
+        log_error "Required dependency not found: jq"
+        log_error "Install with: sudo apt-get install jq (Ubuntu/Debian) or brew install jq (macOS)"
+        missing=1
+    fi
+
+    # Check realpath (required for path canonicalization)
+    if ! command -v realpath >/dev/null 2>&1; then
+        log_error "Required dependency not found: realpath"
+        log_error "Install with: sudo apt-get install coreutils (Ubuntu/Debian) or brew install coreutils (macOS)"
+        missing=1
+    fi
+
+    # Check timeout (required for filesystem operation timeouts)
+    if ! command -v timeout >/dev/null 2>&1; then
+        log_error "Required command 'timeout' not found. Install GNU coreutils."
+        missing=1
+    fi
+
+    # Check claude (warn only - may be dry-run mode)
+    if ! command -v claude >/dev/null 2>&1; then
+        log_warn "Claude Code CLI not found in PATH"
+        log_warn "Script will work in dry-run mode but cannot execute tasks"
+    fi
+
+    if [ "$missing" -eq 1 ]; then
+        log_error "Exiting due to missing required dependencies"
+        return 1
+    fi
+
+    return 0
 }
 
 # =============================================================================
@@ -396,7 +1086,147 @@ parse_json_field() {
 # =============================================================================
 
 #######################################
+# List subdirectories under a parent directory, sorted alphabetically.
+# Returns a null-terminated list suitable for safe iteration over directory
+# names containing spaces, newlines, or other special characters.
+#
+# Arguments:
+#   $1 - parent_dir: Directory to list subdirectories under
+#
+# Outputs:
+#   Null-terminated paths to subdirectories on stdout (sorted alphabetically)
+#
+# Returns:
+#   0 - Success (even if no subdirectories found; output will be empty)
+#   1 - Parent directory doesn't exist
+#######################################
+list_subdirectories_sorted() {
+    local parent_dir="$1"
+
+    [ -d "$parent_dir" ] || return 1
+
+    # Use find -print0 | sort -z to produce a null-terminated, alphabetically
+    # sorted list. This avoids word-splitting on directory names that contain
+    # spaces, newlines, or other special characters.
+    #
+    # The find command is wrapped with timeout to prevent indefinite hangs
+    # when the filesystem is on an NFS mount with stale handles. Output is
+    # captured to a temp file so the timeout exit code is not lost to the pipe.
+    local tmp_file
+    tmp_file=$(mktemp) || return 1
+
+    local find_exit=0
+    timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$parent_dir" -mindepth 1 -maxdepth 1 -type d -print0 > "$tmp_file" 2>/dev/null || find_exit=$?
+
+    if [ "$find_exit" -eq 124 ]; then
+        log_error "Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $parent_dir"
+        rm -f "$tmp_file"
+        return 1
+    fi
+
+    if [ "$find_exit" -ne 0 ]; then
+        log_error "Filesystem operation failed (exit code $find_exit): $parent_dir"
+        rm -f "$tmp_file"
+        return 1
+    fi
+
+    sort -z < "$tmp_file"
+    rm -f "$tmp_file"
+}
+
+#######################################
+# Select the first git root from a null-terminated candidate list.
+# Prefers main checkouts (.git is a directory) over worktrees (.git is a file).
+# Logs enhanced warnings when multiple git directories are found.
+#
+# Selection algorithm (two-pass):
+#   Pass 1: Scan for .git directories (main checkouts). Since candidates arrive
+#           sorted alphabetically, the first match is the alphabetically-first
+#           main checkout. Alphabetical ordering guarantees deterministic,
+#           stable selection so repeated runs pick the same root.
+#   Pass 2: If no main checkout found, fall back to the first .git file
+#           (worktree). Worktrees are less preferred because they depend on
+#           a parent checkout and may have limited reflog history.
+#
+# Example scenario:
+#   Candidates: BUGFIX-456/ (.git dir), FEATURE-123/ (.git file), myproject/ (.git dir)
+#   Pass 1 finds: BUGFIX-456 (first), myproject (second) -- both are main checkouts
+#   Result: BUGFIX-456 (alphabetically first main checkout)
+#
+# Arguments:
+#   $1 - candidates_file: Path to file containing null-terminated directory paths
+#   $2 - repo_name: Repository name (used in warning messages)
+#
+# Outputs:
+#   Path to selected git root on stdout (or empty if none found)
+#
+# Returns:
+#   0 - Git root found
+#   1 - No git root found among candidates
+#######################################
+select_first_git_root() {
+    local candidates_file="$1"
+    local repo_name="$2"
+
+    # --- Pass 1: Search for main checkouts (.git is a directory) ---
+    # Main checkouts contain the full .git directory and are preferred because
+    # they own the repository data directly, unlike worktrees which reference
+    # a parent checkout via a .git file pointer.
+    local candidate
+    local found_root=""
+    local all_candidates=""
+    local git_dir_count=0
+    # Candidates are null-terminated and pre-sorted alphabetically by
+    # list_subdirectories_sorted(), so the first .git directory we find
+    # is the alphabetically-first main checkout -- giving deterministic selection.
+    while IFS= read -r -d '' candidate; do
+        if [[ -d "$candidate/.git" ]]; then
+            git_dir_count=$((git_dir_count + 1))
+            # Collect all main-checkout names for the multi-root warning message
+            if [ -n "$all_candidates" ]; then
+                all_candidates="$all_candidates, $(basename "$candidate")"
+            else
+                all_candidates="$(basename "$candidate")"
+            fi
+            # Keep only the first match (alphabetically first due to sorted input)
+            if [[ -z "$found_root" ]]; then
+                found_root="${candidate%/}"
+            fi
+        fi
+    done < "$candidates_file"
+
+    if [[ -n "$found_root" ]]; then
+        # Warn when multiple main checkouts exist so operators can investigate
+        # whether the extra roots are intentional or stale clones
+        if [ "$git_dir_count" -gt 1 ]; then
+            log_warn "Multiple git roots found for repo: $repo_name"
+            log_warn "Candidates: [$all_candidates]"
+            log_warn "Selected (alphabetically first): $(basename "$found_root")"
+        fi
+        echo "$found_root"
+        return 0
+    fi
+
+    # --- Pass 2: Fallback to worktrees (.git is a file) ---
+    # A .git file indicates a worktree linked to a main checkout elsewhere.
+    # Worktrees are acceptable when no main checkout exists under this repo
+    # (e.g., the main checkout lives in a different directory structure).
+    while IFS= read -r -d '' candidate; do
+        if [[ -f "$candidate/.git" ]]; then
+            echo "${candidate%/}"
+            return 0
+        fi
+    done < "$candidates_file"
+
+    # No git root found among any candidates
+    return 1
+}
+
+#######################################
 # Find the git root directory under repos/<name>/
+# Orchestrates list_subdirectories_sorted() and select_first_git_root()
+# to discover the git root within a repository parent directory.
+#
 # Selection: Alphabetically first .git directory, fallback to .git file (worktree)
 #
 # Arguments:
@@ -417,36 +1247,207 @@ find_git_root() {
 
     [[ -d "$repo_parent" ]] || return 1
 
-    # Prefer main checkout (.git is a directory) over worktree (.git is a file)
-    # Use ls -1 for alphabetical sort to ensure deterministic selection
-    local candidate
-    local git_dir_count=0
-    for candidate in $(ls -1 "$repo_parent"); do
-        candidate="$repo_parent/$candidate"
-        [[ -d "$candidate" ]] || continue
-        if [[ -d "$candidate/.git" ]]; then
-            git_dir_count=$((git_dir_count + 1))
-            if [[ $git_dir_count -gt 1 ]]; then
-                log_warn "Multiple git roots found in $repo_parent; using first alphabetically"
-            fi
-            if [[ $git_dir_count -eq 1 ]]; then
-                echo "${candidate%/}"
-                return 0
-            fi
-        fi
-    done
+    # Build sorted candidate list via helper
+    local candidates_file
+    candidates_file=$(mktemp) || return 1
 
-    # Fallback: worktree (.git is a file)
-    for candidate in $(ls -1 "$repo_parent"); do
-        candidate="$repo_parent/$candidate"
-        [[ -d "$candidate" ]] || continue
-        if [[ -f "$candidate/.git" ]]; then
-            echo "${candidate%/}"
-            return 0
-        fi
-    done
+    list_subdirectories_sorted "$repo_parent" > "$candidates_file"
 
+    # Select first git root from candidates via helper
+    local selected_root
+    if selected_root=$(select_first_git_root "$candidates_file" "$repo_name"); then
+        rm -f "$candidates_file"
+        echo "$selected_root"
+        return 0
+    fi
+
+    rm -f "$candidates_file"
     return 1
+}
+
+# =============================================================================
+# Git Root Cache Management
+# =============================================================================
+
+#######################################
+# Initialize the git root cache file
+# Creates a temporary file for caching find_git_root() results.
+# Idempotent - safe to call multiple times.
+#
+# Globals Set:
+#   GIT_ROOT_CACHE_FILE - Path to the cache temp file
+#
+# Returns:
+#   0 - Always succeeds
+#######################################
+init_git_root_cache() {
+    if [ ! -f "$GIT_ROOT_CACHE_FILE" ]; then
+        touch "$GIT_ROOT_CACHE_FILE"
+        log_debug "init_git_root_cache: Created cache file: $GIT_ROOT_CACHE_FILE"
+    fi
+}
+
+#######################################
+# Clean up the git root cache file and cache metrics file
+# Removes the temporary files if they exist. Counts cache entries
+# before removal to track invalidations.
+# Idempotent - safe to call multiple times.
+#
+# Globals:
+#   GIT_ROOT_CACHE_FILE - Path to the cache temp file
+#   CACHE_METRICS_FILE - Path to the cache metrics log file
+#   CACHE_INVALIDATIONS - Incremented by number of cached entries removed
+#######################################
+cleanup_git_root_cache() {
+    if [ -n "$GIT_ROOT_CACHE_FILE" ] && [ -f "$GIT_ROOT_CACHE_FILE" ]; then
+        local entry_count
+        entry_count=$(wc -l < "$GIT_ROOT_CACHE_FILE" 2>/dev/null || echo 0)
+        entry_count=$(echo "$entry_count" | tr -d ' ')
+        if [ "$entry_count" -gt 0 ] 2>/dev/null; then
+            CACHE_INVALIDATIONS=$((CACHE_INVALIDATIONS + entry_count))
+            log_debug "cleanup_git_root_cache: Invalidated $entry_count cache entries"
+        fi
+        rm -f "$GIT_ROOT_CACHE_FILE"
+        log_debug "cleanup_git_root_cache: Removed cache file: $GIT_ROOT_CACHE_FILE"
+    fi
+    GIT_ROOT_CACHE_FILE=""
+
+    # Clean up metrics file
+    if [ -n "$CACHE_METRICS_FILE" ] && [ -f "$CACHE_METRICS_FILE" ]; then
+        rm -f "$CACHE_METRICS_FILE"
+        log_debug "cleanup_git_root_cache: Removed metrics file: $CACHE_METRICS_FILE"
+    fi
+    CACHE_METRICS_FILE=""
+}
+
+#######################################
+# Read cache hit/miss/invalidation counts from the file-based metrics log.
+# Sets CACHE_HITS and CACHE_MISSES by counting H and M lines in
+# CACHE_METRICS_FILE. Also counts I (invalidation) lines from proactive
+# cache validation and adds them to CACHE_INVALIDATIONS. These variables
+# are set in the calling shell scope for use by print_cache_metrics()
+# and write_metrics().
+#
+# Note: CACHE_INVALIDATIONS accumulates from two sources:
+#   1. In-memory increments from cleanup_git_root_cache() (parent shell)
+#   2. File-based "I" lines from proactive validation in find_git_root_cached()
+#   This function adds the file-based count to the existing in-memory value,
+#   then clears the file-based entries to prevent double-counting on
+#   subsequent calls.
+#
+# Globals Set:
+#   CACHE_HITS - Number of cache hits (from file, reset each call)
+#   CACHE_MISSES - Number of cache misses (from file, reset each call)
+#   CACHE_INVALIDATIONS - Adds file-based invalidation count to existing value
+#
+# Returns:
+#   0 - Always succeeds
+#######################################
+read_cache_metrics() {
+    CACHE_HITS=0
+    CACHE_MISSES=0
+    if [ -n "$CACHE_METRICS_FILE" ] && [ -f "$CACHE_METRICS_FILE" ]; then
+        CACHE_HITS=$(grep -c "^H$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        CACHE_MISSES=$(grep -c "^M$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        local file_invalidations
+        file_invalidations=$(grep -c "^I$" "$CACHE_METRICS_FILE" 2>/dev/null || echo 0)
+        if [ "$file_invalidations" -gt 0 ] 2>/dev/null; then
+            CACHE_INVALIDATIONS=$((CACHE_INVALIDATIONS + file_invalidations))
+            # Remove I lines to prevent double-counting on subsequent calls
+            sed -i '/^I$/d' "$CACHE_METRICS_FILE" 2>/dev/null || true
+        fi
+    fi
+}
+
+#######################################
+# Print cache performance metrics to log
+# Reads metrics from the file-based log, calculates hit rate, and displays
+# summary. Uses awk for floating-point percentage calculation (POSIX-compatible).
+# Handles division by zero when no lookups have occurred.
+#
+# Globals:
+#   CACHE_METRICS_FILE - Path to cache metrics log file
+#   CACHE_INVALIDATIONS - Number of cache invalidations
+#
+# Outputs:
+#   Cache metrics logged via log_info to stderr
+#
+# Returns:
+#   0 - Always succeeds
+#######################################
+print_cache_metrics() {
+    read_cache_metrics
+    local total_lookups=$((CACHE_HITS + CACHE_MISSES))
+    local hit_rate="0.0"
+    if [ "$total_lookups" -gt 0 ]; then
+        hit_rate=$(awk "BEGIN {printf \"%.1f\", ($CACHE_HITS / $total_lookups) * 100}")
+    fi
+
+    log_info "Cache metrics: $CACHE_HITS/$total_lookups hits ($hit_rate%), $CACHE_MISSES misses, $CACHE_INVALIDATIONS invalidations"
+}
+
+#######################################
+# Find git root with caching (wrapper around find_git_root)
+# Caches successful find_git_root() results in a temp file to avoid
+# redundant filesystem operations when multiple tasks share a repo.
+#
+# Proactive cache validation: Before returning a cached result, verifies
+# the cached path still exists on disk. If the path is stale (deleted or
+# moved), clears the cache entry, logs a warning, records an "I"
+# (invalidation) event to CACHE_METRICS_FILE, and falls through to
+# re-lookup via find_git_root().
+#
+# Arguments:
+#   $1 - repos_root: Root directory for repositories
+#   $2 - repo_name: Name of the repository
+#
+# Outputs:
+#   Path to the git root directory on stdout (cached if available)
+#   Warning to stderr if stale cache detected
+#
+# Returns:
+#   0 - Found a git root (from cache or fresh lookup)
+#   1 - No git root found (including after stale cache re-lookup)
+#######################################
+find_git_root_cached() {
+    local repos_root="$1"
+    local repo_name="$2"
+
+    init_git_root_cache
+
+    # Check cache first
+    local cached
+    cached=$(grep "^${repo_name}=" "$GIT_ROOT_CACHE_FILE" 2>/dev/null | head -1 | cut -d= -f2-)
+    if [ -n "$cached" ]; then
+        # Proactive validation: verify cached path still exists
+        if [ -d "$cached" ]; then
+            echo "H" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
+            log_debug "find_git_root_cached: Cache hit for repo: $repo_name"
+            echo "$cached"
+            return 0
+        else
+            # Stale cache detected - clear entry and log warning
+            log_warn "Cached git root no longer exists: $cached"
+            echo "I" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
+            # Remove stale entry from cache file
+            local tmp_cache="${GIT_ROOT_CACHE_FILE}.tmp"
+            grep -v "^${repo_name}=" "$GIT_ROOT_CACHE_FILE" > "$tmp_cache" 2>/dev/null || true
+            mv -f "$tmp_cache" "$GIT_ROOT_CACHE_FILE" 2>/dev/null || true
+            # Fall through to cache miss logic for re-lookup
+        fi
+    fi
+
+    # Cache miss or stale cache - call original function
+    echo "M" >> "$CACHE_METRICS_FILE" 2>/dev/null || true
+    local result
+    if result=$(find_git_root "$repos_root" "$repo_name"); then
+        echo "${repo_name}=${result}" >> "$GIT_ROOT_CACHE_FILE"
+        log_debug "find_git_root_cached: Cache miss for repo: $repo_name, cached result: $result"
+        echo "$result"
+        return 0
+    else
+        return 1
+    fi
 }
 
 # =============================================================================
@@ -534,6 +1535,26 @@ poll_status() {
     if ! echo "$status_output" | jq empty 2>/dev/null; then
         log_error "master-status-board.sh returned invalid JSON"
         log_debug "poll_status: Output was: $status_output"
+        return 1
+    fi
+
+    # ==========================================================================
+    # JSON Schema Validation
+    # Validate required fields exist before attempting to parse them.
+    # Catches malformed status board output early with clear error messages
+    # instead of cryptic jq parse failures downstream.
+    # ==========================================================================
+
+    # Validate .version field exists (required for schema compatibility)
+    if ! echo "$status_output" | jq -e '.version' >/dev/null 2>&1; then
+        log_error "Invalid JSON from status board: missing .version field"
+        log_error "Status board may be running old version or returned corrupted output"
+        return 1
+    fi
+
+    # Validate .repos field exists and is an array (required for all parsing logic)
+    if ! echo "$status_output" | jq -e '.repos | type == "array"' >/dev/null 2>&1; then
+        log_error "Invalid JSON from status board: .repos field is not an array"
         return 1
     fi
 
@@ -636,7 +1657,7 @@ execute_task() {
     local repo_name
     repo_name=$(basename "$sdd_root")
     local repo_path
-    repo_path=$(find_git_root "$SDD_LOOP_REPOS_ROOT" "$repo_name") || {
+    repo_path=$(find_git_root_cached "$SDD_LOOP_REPOS_ROOT" "$repo_name") || {
         log_error "Cannot find git root for repo: $repo_name (under $SDD_LOOP_REPOS_ROOT$repo_name/)"
         return 1
     }
@@ -809,7 +1830,12 @@ check_phase_boundary() {
     # Step 1: Find ticket directory
     # ==========================================================================
     local ticket_dir
-    ticket_dir=$(find "$sdd_root/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -n1)
+    ticket_dir=$(timeout "$FILESYSTEM_TIMEOUT_SECONDS" find "$sdd_root/tickets" -maxdepth 1 -type d -name "${ticket_id}_*" 2>/dev/null | head -n1)
+    local find_exit=${PIPESTATUS[0]:-0}
+    if [ "$find_exit" -eq 124 ]; then
+        log_error "Filesystem operation timed out after ${FILESYSTEM_TIMEOUT_SECONDS} seconds: $sdd_root/tickets"
+        return 0  # Continue - treat timeout as "no phase boundary" (graceful)
+    fi
 
     if [[ -z "$ticket_dir" ]]; then
         log_verbose "check_phase_boundary: Ticket directory not found for $ticket_id"
@@ -922,6 +1948,9 @@ check_phase_boundary() {
 #   SDD_LOOP_POLL_INTERVAL - Poll interval configuration
 #   SDD_LOOP_DRY_RUN - Dry run mode flag
 #   SDD_LOOP_VERBOSE - Verbose mode flag
+#   CACHE_HITS - Number of cache hits
+#   CACHE_MISSES - Number of cache misses
+#   CACHE_INVALIDATIONS - Number of cache invalidations
 #
 # Outputs:
 #   Writes JSON file to METRICS_FILE path
@@ -991,6 +2020,13 @@ write_metrics() {
   "circuit_breaker": {
     "warnings_logged": $CIRCUIT_BREAKER_WARNINGS_LOGGED,
     "warning_iterations": [${CIRCUIT_BREAKER_WARNING_ITERATIONS}]
+  },
+  "cache": {
+    "hits": $CACHE_HITS,
+    "misses": $CACHE_MISSES,
+    "invalidations": $CACHE_INVALIDATIONS,
+    "total_lookups": $((CACHE_HITS + CACHE_MISSES)),
+    "hit_rate_percent": $(if [ $((CACHE_HITS + CACHE_MISSES)) -gt 0 ]; then awk "BEGIN {printf \"%.1f\", ($CACHE_HITS / $((CACHE_HITS + CACHE_MISSES))) * 100}"; else echo "0.0"; fi)
   }
 }
 EOF
@@ -1052,7 +2088,8 @@ cleanup_claude_process() {
     # Send SIGTERM for graceful shutdown
     kill -TERM "$CLAUDE_PID" 2>/dev/null
 
-    # Wait up to 3 seconds for graceful exit (30 iterations x 0.1 second)
+    # Wait up to 3 seconds for graceful exit (30 iterations x 0.1s poll)
+    # Note: These cleanup timing values are implementation details, not tunable constants.
     local wait_count=0
     while [[ $wait_count -lt 30 ]]; do
         if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
@@ -1105,6 +2142,18 @@ cleanup() {
     # Clean up any running Claude process
     cleanup_claude_process
 
+    # Report cache performance metrics (must run before cache cleanup)
+    print_cache_metrics
+
+    # Clean up git root cache and metrics files
+    cleanup_git_root_cache
+
+    # Clean up lock file (if we created it)
+    if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        rm -f "$SDD_LOOP_LOCKFILE"
+        log_debug "Removed lock file: $SDD_LOOP_LOCKFILE"
+    fi
+
     # Write metrics file if configured
     write_metrics "$EXIT_CODE"
 
@@ -1120,6 +2169,12 @@ handle_sigint() {
     EXIT_CODE=130
     log_info "Received SIGINT (Ctrl+C), shutting down gracefully..."
     cleanup_claude_process
+    print_cache_metrics
+    cleanup_git_root_cache
+    # Clean up lock file
+    if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        rm -f "$SDD_LOOP_LOCKFILE"
+    fi
     write_metrics "$EXIT_CODE"
     exit 130
 }
@@ -1133,6 +2188,12 @@ handle_sigterm() {
     EXIT_CODE=143
     log_info "Received SIGTERM, shutting down gracefully..."
     cleanup_claude_process
+    print_cache_metrics
+    cleanup_git_root_cache
+    # Clean up lock file
+    if [ -n "${SDD_LOOP_LOCKFILE:-}" ] && [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        rm -f "$SDD_LOOP_LOCKFILE"
+    fi
     write_metrics "$EXIT_CODE"
     exit 143
 }
@@ -1169,8 +2230,8 @@ circuit_breaker_check() {
     # Advisory warnings based on iteration count
     # Uses existing ITERATION_COUNT from main loop
 
-    # Threshold 1: 25 iterations - indicates longer-than-typical execution
-    if [ "$ITERATION_COUNT" -eq 25 ]; then
+    # Threshold 1: CIRCUIT_BREAKER_WARN_THRESHOLD iterations - indicates longer-than-typical execution
+    if [ "$ITERATION_COUNT" -eq "$CIRCUIT_BREAKER_WARN_THRESHOLD" ]; then
         log_warn "Circuit breaker: Long-running loop detected (iteration $ITERATION_COUNT)"
         # Track warning for metrics
         CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
@@ -1181,8 +2242,8 @@ circuit_breaker_check() {
         fi
     fi
 
-    # Threshold 2: 40 iterations - approaching default max_iterations (50)
-    if [ "$ITERATION_COUNT" -eq 40 ]; then
+    # Threshold 2: CIRCUIT_BREAKER_CRITICAL_THRESHOLD iterations - approaching default max_iterations
+    if [ "$ITERATION_COUNT" -eq "$CIRCUIT_BREAKER_CRITICAL_THRESHOLD" ]; then
         log_warn "Circuit breaker: Extended loop execution (iteration $ITERATION_COUNT, approaching max_iterations)"
         # Track warning for metrics
         CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
@@ -1218,6 +2279,22 @@ DESCRIPTION
     The controller uses a two-root model:
     - Specs root: Contains SDD data directories (_SPECS/<name>/)
     - Repos root: Contains git repositories (repos/<name>/<git-dir>/)
+
+    Expected directory structure:
+        specs-root/
+            <repo-name>/
+                tickets/
+                    <TICKET-ID>_<slug>/
+                        tasks/
+                            <TASK-ID>_<slug>.md
+        repos-root/
+            <repo-name>/
+                <git-dir>/
+                    .git/
+
+    Warnings are logged (non-blocking) if:
+    - specs-root is empty (no subdirectories found)
+    - specs-root and repos-root point to the same directory
 
     The controller continues processing tasks until:
     - No more agent-ready work remains (action: "none")
@@ -1269,7 +2346,7 @@ OPTIONS
 
     --timeout SECONDS
         Task execution timeout in seconds.
-        Default: 3600 (1 hour). Must be a positive integer.
+        Default: 600 (10 minutes). Must be a positive integer.
         Timeout uses GNU coreutils timeout command.
         Exit code 124 indicates timeout occurred.
 
@@ -1319,7 +2396,7 @@ ENVIRONMENT VARIABLES
         Overridden by --max-errors.
 
     SDD_LOOP_TIMEOUT
-        Task execution timeout in seconds (default: 3600).
+        Task execution timeout in seconds (default: 600).
         Overridden by --timeout.
 
     SDD_LOOP_POLL_INTERVAL
@@ -1405,6 +2482,14 @@ INTEGRATION
     3. Monitor logs for progress
     4. Review completed work
 
+SINGLE INSTANCE
+    Only one sdd-loop instance can run per specs-root at a time. If a
+    second instance is started against the same specs-root, it exits
+    immediately with exit code 1 and an error message. This prevents
+    race conditions such as executing the same task twice or concurrent
+    git modifications. Different specs-root paths use separate lockfiles,
+    so multiple instances with different roots can run concurrently.
+
 SAFETY FEATURES
     Circuit Breaker (Advisory-Only)
         Logs warnings at iteration thresholds but NEVER aborts automatically:
@@ -1458,6 +2543,9 @@ main() {
     trap handle_sigint SIGINT
     trap handle_sigterm SIGTERM
 
+    # Validate required dependencies before proceeding
+    check_dependencies || exit 1
+
     # Parse command-line arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -1500,19 +2588,27 @@ main() {
                 shift 2
                 ;;
             --specs-root)
-                if [[ -z "${2:-}" ]]; then
+                if [[ $# -lt 2 ]]; then
                     log_error "Option --specs-root requires a directory path"
                     exit 2
                 fi
                 SDD_LOOP_SPECS_ROOT="$2"
+                if [ -z "$SDD_LOOP_SPECS_ROOT" ]; then
+                    log_error "Error: --specs-root cannot be empty"
+                    exit 1
+                fi
                 shift 2
                 ;;
             --repos-root)
-                if [[ -z "${2:-}" ]]; then
+                if [[ $# -lt 2 ]]; then
                     log_error "Option --repos-root requires a directory path"
                     exit 2
                 fi
                 SDD_LOOP_REPOS_ROOT="$2"
+                if [ -z "$SDD_LOOP_REPOS_ROOT" ]; then
+                    log_error "Error: --repos-root cannot be empty"
+                    exit 1
+                fi
                 shift 2
                 ;;
             --max-iterations)
@@ -1552,13 +2648,13 @@ main() {
                     log_error "Option --timeout requires a value"
                     exit 2
                 fi
-                if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    log_error "Option --timeout requires a positive integer (got: '$2')"
-                    exit 2
+                if ! [[ "$2" =~ ^-?[0-9]+$ ]]; then
+                    log_error "Error: --timeout must be a positive integer"
+                    exit 1
                 fi
-                if [[ "$2" -eq 0 ]]; then
-                    log_error "Option --timeout requires a positive integer greater than zero (got: $2)"
-                    exit 2
+                if [ "$2" -le 0 ]; then
+                    log_error "Error: --timeout must be a positive integer"
+                    exit 1
                 fi
                 SDD_LOOP_TIMEOUT="$2"
                 shift 2
@@ -1700,6 +2796,92 @@ main() {
         exit 1
     fi
 
+    # ==========================================================================
+    # Root Structure Validation (non-blocking warnings)
+    # Warns about common configuration errors after path canonicalization.
+    # These are advisory only - execution continues regardless.
+    # ==========================================================================
+
+    # Canonicalize paths for reliable comparison
+    local canonical_specs_root canonical_repos_root
+    canonical_specs_root="$(realpath "$SDD_LOOP_SPECS_ROOT" 2>/dev/null)" || canonical_specs_root="$SDD_LOOP_SPECS_ROOT"
+    canonical_repos_root="$(realpath "$SDD_LOOP_REPOS_ROOT" 2>/dev/null)" || canonical_repos_root="$SDD_LOOP_REPOS_ROOT"
+
+    # Check 1: Empty specs-root (no subdirectories)
+    if [ -z "$(ls -A "$canonical_specs_root" 2>/dev/null)" ]; then
+        log_warn "specs-root is empty (no subdirectories): $SDD_LOOP_SPECS_ROOT"
+        log_warn "Expected structure: specs-root/<repo-name>/tickets/"
+    fi
+
+    # Check 2: Identical specs-root and repos-root paths
+    if [ "$canonical_specs_root" = "$canonical_repos_root" ]; then
+        log_warn "specs-root and repos-root are identical: $canonical_specs_root"
+        log_warn "This may cause unexpected behavior. Typically they should be separate directories."
+    fi
+
+    # ==========================================================================
+    # Concurrent Invocation Protection (atomic lock file creation)
+    # Prevents multiple sdd-loop instances from running against the same
+    # specs root, which could cause race conditions (e.g., executing the
+    # same task twice or concurrent git modifications).
+    #
+    # Uses two-layer protection:
+    #   1. Atomic file creation via `set -o noclobber` in a subshell
+    #      (prevents race where two processes both see no lock and both create one)
+    #   2. flock(2) advisory lock on the lock file descriptor
+    #      (kernel-level lock that auto-releases when process dies)
+    #
+    # Stale lock detection handles the case where a previous process was
+    # killed with SIGKILL (cannot be trapped, lock file left behind).
+    # ==========================================================================
+    readonly SDD_LOOP_LOCKFILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-${SDD_LOOP_SPECS_ROOT//\//_}.lock"
+
+    # Check for stale lock file before attempting atomic creation.
+    # A stale lock file is one whose PID no longer refers to a running process.
+    if [ -f "$SDD_LOOP_LOCKFILE" ]; then
+        local stale_pid
+        stale_pid=$(cat "$SDD_LOOP_LOCKFILE" 2>/dev/null) || stale_pid=""
+        if [ -n "$stale_pid" ] && ! kill -0 "$stale_pid" 2>/dev/null; then
+            log_warn "Removing stale lock file (PID $stale_pid no longer running): $SDD_LOOP_LOCKFILE"
+            rm -f "$SDD_LOOP_LOCKFILE"
+        fi
+    fi
+
+    # Atomic lock file creation using noclobber.
+    # The subshell isolates `set -o noclobber` so it does not affect the parent shell.
+    # If the file already exists, the redirection fails atomically (no race window).
+    if ( set -o noclobber; echo "$$" > "$SDD_LOOP_LOCKFILE" ) 2>/dev/null; then
+        log_debug "Lock file created successfully: $SDD_LOOP_LOCKFILE"
+    else
+        log_error "Failed to create lock file (already exists or disk full): $SDD_LOOP_LOCKFILE"
+        log_error "Another sdd-loop instance is already running for specs-root: $SDD_LOOP_SPECS_ROOT"
+        log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        exit 1
+    fi
+
+    # Validate that the lock file was actually written with our PID.
+    # Guards against silent write failures (e.g., disk full after file creation).
+    local written_pid
+    written_pid=$(cat "$SDD_LOOP_LOCKFILE" 2>/dev/null) || written_pid=""
+    if [ "$written_pid" != "$$" ]; then
+        log_error "Lock file validation failed: expected PID $$, found '$written_pid'"
+        log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        exit 1
+    fi
+
+    # Second layer: acquire flock on the lock file descriptor.
+    # This provides kernel-level locking that auto-releases when the process
+    # exits (even on SIGKILL), complementing the noclobber atomic creation.
+    # Uses append mode (>>) to preserve the PID content written by noclobber.
+    exec 200>>"$SDD_LOOP_LOCKFILE"
+    if ! flock -n 200; then
+        log_error "Another sdd-loop instance is already running for specs-root: $SDD_LOOP_SPECS_ROOT"
+        log_error "Lockfile: $SDD_LOOP_LOCKFILE"
+        rm -f "$SDD_LOOP_LOCKFILE"
+        exit 1
+    fi
+    log_debug "Acquired exclusive lock: $SDD_LOOP_LOCKFILE"
+
     # Track start time for metrics duration calculation
     START_TIME=$(date +%s)
 
@@ -1730,7 +2912,7 @@ main() {
     # Safety limits enforced:
     # - Max iteration limit (default: 50)
     # - Consecutive error tracking (default: 3)
-    # - Task execution timeout (default: 3600s)
+    # - Task execution timeout (default: 600s)
     # ==========================================================================
 
     local consecutive_errors=0
