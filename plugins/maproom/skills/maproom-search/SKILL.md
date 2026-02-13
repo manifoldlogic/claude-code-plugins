@@ -61,7 +61,7 @@ FTS search works immediately after scan. Vector search requires embeddings to co
 
 ### Vector Search Syntax
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "<query>"
+crewchief-maproom vector-search --repo <repo> --query "<query>" --format agent
 ```
 Requires embeddings (see First-Time Setup step 2).
 
@@ -169,7 +169,7 @@ Flags combine freely: `context --chunk-id <id> --callers --callees --max-depth 3
 Find a feature and trace its call relationships (depth-first).
 1. Search by concept:
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "authentication login flow"
+crewchief-maproom vector-search --repo <repo> --query "authentication login flow" --format agent
 ```
 2. Expand context around a relevant result:
 ```bash
@@ -181,7 +181,7 @@ _(Vector search because we know the concept but not exact function names.)_
 Locate error handling patterns across the codebase.
 1. Search for error-related terms:
 ```bash
-crewchief-maproom search --repo <repo> --query "error exception handler"
+crewchief-maproom search --repo <repo> --query "error exception handler" --format agent
 ```
 2. Get context with a constrained budget:
 ```bash
@@ -193,7 +193,7 @@ _(FTS appropriate since "error" and "exception" are known keywords.)_
 Follow a function's callers up the call stack to find entry points.
 1. Find the function:
 ```bash
-crewchief-maproom search --repo <repo> --query "process_payment"
+crewchief-maproom search --repo <repo> --query "process_payment" --kind func --format agent
 ```
 2. Trace callers with increased depth:
 ```bash
@@ -205,7 +205,7 @@ _(FTS used to locate an exact function name.)_
 Explore iteratively (breadth-first) when you don't know the terminology yet.
 1. Broad concept search:
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "data processing pipeline"
+crewchief-maproom vector-search --repo <repo> --query "data processing pipeline" --format agent
 ```
 2. Read context on an interesting result:
 ```bash
@@ -213,7 +213,7 @@ crewchief-maproom context --chunk-id <id>
 ```
 3. Refine using terms discovered in step 2:
 ```bash
-crewchief-maproom vector-search --repo <repo> --query "transform stage batch worker"
+crewchief-maproom vector-search --repo <repo> --query "transform stage batch worker" --format agent
 ```
 _(Vector search for exploring concepts when terminology is unknown.)_
 
@@ -221,7 +221,7 @@ _(Vector search for exploring concepts when terminology is unknown.)_
 Locate where configuration values are defined and how they're consumed.
 1. Search for config terms:
 ```bash
-crewchief-maproom search --repo <repo> --query "config settings env"
+crewchief-maproom search --repo <repo> --query "config settings env" --format agent
 ```
 2. See what the config drives:
 ```bash
@@ -269,11 +269,11 @@ When a question spans both design and implementation, search across repos sequen
 
 1. Check the specs repo for design rationale:
 ```bash
-crewchief-maproom vector-search --repo specs --query "authentication design decisions"
+crewchief-maproom vector-search --repo specs --query "authentication design decisions" --format agent
 ```
 2. Then check the code repo for implementation:
 ```bash
-crewchief-maproom vector-search --repo code --query "authentication login flow"
+crewchief-maproom vector-search --repo code --query "authentication login flow" --format agent
 ```
 3. Expand context on a relevant code result:
 ```bash
