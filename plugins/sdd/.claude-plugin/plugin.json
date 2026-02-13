@@ -1,6 +1,6 @@
 {
   "name": "sdd",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Spec Driven Development - workflow management system for structured epic planning, ticket execution, and task-based implementation",
   "author": {
     "name": "Daniel Bushman",
@@ -66,6 +66,28 @@
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/workflow-guidance.py",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/log-session-transcript.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/log-session-transcript.py",
+            "timeout": 10
           }
         ]
       }
