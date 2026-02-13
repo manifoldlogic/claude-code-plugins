@@ -165,6 +165,28 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 
 **Prevention:** Use lowercase values for all filter flags. See the Filtering and Tuning section in [SKILL.md](../SKILL.md) for the complete valid value tables.
 
+### Unexpected Results or Scores
+
+**Symptom:** Search returns results but they seem poorly ranked, irrelevant to the query intent, or the scores don't match expectations.
+
+**Root Cause:** The default search output shows only final results without the underlying scoring details. Without visibility into how results are scored and ranked, it is difficult to determine whether the issue is query formulation, search type selection, or index staleness.
+
+**Fix:**
+1. Re-run your search with the `--debug` flag to see the full score breakdown:
+   ```bash
+   crewchief-maproom search --repo <repo> --query "your query" --format agent --debug
+   ```
+2. Review the debug output, which shows:
+   - Score calculations for each result
+   - Ranking factors (FTS score, semantic similarity, etc.)
+   - Why certain chunks were ranked higher or lower than others
+3. Use the score breakdown to identify the issue:
+   - If scores are uniformly low, refine your query to use more specific terms
+   - If irrelevant results score high, check whether a different search type (`search` vs. `vector-search`) is more appropriate
+   - If expected results are missing entirely, verify the repository index is up to date with `crewchief-maproom status`
+
+**Prevention:** When investigating search quality issues, always start with `--debug` to get objective scoring data before adjusting queries or filters. See also the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for the full systematic troubleshooting sequence.
+
 ---
 
 ## Common Error Messages
