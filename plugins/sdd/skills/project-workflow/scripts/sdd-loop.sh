@@ -41,6 +41,7 @@
 #   SDD_LOOP_VERBOSE          Set to "true" for verbose output
 #   SDD_LOOP_QUIET            Set to "true" for quiet mode
 #   SDD_LOOP_DEBUG            Set to "true" for debug output
+#   SDD_LOOP_DEFAULT_LOCK_DIR Directory for lock/cache files (default: /tmp)
 #
 # EXIT CODES
 #   0   - Success (all work completed or no work remaining)
@@ -121,6 +122,17 @@ VERSION="2.0.0"
 # clear error is logged. This protects the loop from becoming unresponsive when
 # _SPECS/ or repos/ are on network-mounted filesystems.
 [[ -z "${FILESYSTEM_TIMEOUT_SECONDS:-}" ]] && readonly FILESYSTEM_TIMEOUT_SECONDS=30
+
+# Lock/temp file directory: Override via SDD_LOOP_DEFAULT_LOCK_DIR to place lock
+# files and cache files on a different filesystem (e.g., RAM disk, shared volume).
+# Default: /tmp (standard POSIX temporary directory)
+[[ -z "${SDD_LOOP_DEFAULT_LOCK_DIR:-}" ]] && readonly SDD_LOOP_DEFAULT_LOCK_DIR="/tmp"
+
+# Circuit breaker advisory thresholds: iteration counts at which warnings fire.
+# Threshold 1 indicates longer-than-typical execution.
+# Threshold 2 indicates approaching the default max_iterations limit (50).
+[[ -z "${CIRCUIT_BREAKER_WARN_THRESHOLD:-}" ]] && readonly CIRCUIT_BREAKER_WARN_THRESHOLD=25
+[[ -z "${CIRCUIT_BREAKER_CRITICAL_THRESHOLD:-}" ]] && readonly CIRCUIT_BREAKER_CRITICAL_THRESHOLD=40
 
 # =============================================================================
 # Global State (configurable via env vars and CLI args)
@@ -215,7 +227,8 @@ CLEANUP_IN_PROGRESS=false
 
 # Git root discovery cache file (temp file, one entry per line: repo_name=path)
 # Initialized eagerly with a PID-based path so subshells can access it.
-GIT_ROOT_CACHE_FILE="/tmp/sdd-loop-git-cache.$$"
+# Uses SDD_LOOP_DEFAULT_LOCK_DIR for consistent temp file placement.
+GIT_ROOT_CACHE_FILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-git-cache.$$"
 
 # =============================================================================
 # Logging Functions
@@ -1318,7 +1331,8 @@ cleanup_claude_process() {
     # Send SIGTERM for graceful shutdown
     kill -TERM "$CLAUDE_PID" 2>/dev/null
 
-    # Wait up to 3 seconds for graceful exit (30 iterations x 0.1 second)
+    # Wait up to 3 seconds for graceful exit (30 iterations x 0.1s poll)
+    # Note: These cleanup timing values are implementation details, not tunable constants.
     local wait_count=0
     while [[ $wait_count -lt 30 ]]; do
         if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
@@ -1454,8 +1468,8 @@ circuit_breaker_check() {
     # Advisory warnings based on iteration count
     # Uses existing ITERATION_COUNT from main loop
 
-    # Threshold 1: 25 iterations - indicates longer-than-typical execution
-    if [ "$ITERATION_COUNT" -eq 25 ]; then
+    # Threshold 1: CIRCUIT_BREAKER_WARN_THRESHOLD iterations - indicates longer-than-typical execution
+    if [ "$ITERATION_COUNT" -eq "$CIRCUIT_BREAKER_WARN_THRESHOLD" ]; then
         log_warn "Circuit breaker: Long-running loop detected (iteration $ITERATION_COUNT)"
         # Track warning for metrics
         CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
@@ -1466,8 +1480,8 @@ circuit_breaker_check() {
         fi
     fi
 
-    # Threshold 2: 40 iterations - approaching default max_iterations (50)
-    if [ "$ITERATION_COUNT" -eq 40 ]; then
+    # Threshold 2: CIRCUIT_BREAKER_CRITICAL_THRESHOLD iterations - approaching default max_iterations
+    if [ "$ITERATION_COUNT" -eq "$CIRCUIT_BREAKER_CRITICAL_THRESHOLD" ]; then
         log_warn "Circuit breaker: Extended loop execution (iteration $ITERATION_COUNT, approaching max_iterations)"
         # Track warning for metrics
         CIRCUIT_BREAKER_WARNINGS_LOGGED=$((CIRCUIT_BREAKER_WARNINGS_LOGGED + 1))
@@ -2058,7 +2072,7 @@ main() {
     # Stale lock detection handles the case where a previous process was
     # killed with SIGKILL (cannot be trapped, lock file left behind).
     # ==========================================================================
-    readonly SDD_LOOP_LOCKFILE="/tmp/sdd-loop-${SDD_LOOP_SPECS_ROOT//\//_}.lock"
+    readonly SDD_LOOP_LOCKFILE="${SDD_LOOP_DEFAULT_LOCK_DIR}/sdd-loop-${SDD_LOOP_SPECS_ROOT//\//_}.lock"
 
     # Check for stale lock file before attempting atomic creation.
     # A stale lock file is one whose PID no longer refers to a running process.
