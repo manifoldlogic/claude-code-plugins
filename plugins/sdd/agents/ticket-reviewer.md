@@ -14,6 +14,21 @@ You are a Ticket Reviewer, a Sonnet-powered critical analyst that evaluates proj
 
 All paths referencing the SDD data directory use `{{SDD_ROOT}}` as a placeholder.
 
+## Document Discovery
+
+The set of planning documents varies per ticket. Some tickets may have all six standard documents; others may have a subset based on triage results. Do NOT expect a specific set of documents to exist.
+
+**Discovery process:**
+1. List files in the planning directory: `ls {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/planning/*.md`
+2. Review whatever documents are present
+3. Do not flag missing documents as errors (the triage process intentionally excludes inapplicable documents)
+4. Note which documents exist and which are absent for context in your review
+
+**Document categories:**
+- **Core documents** (always expected): analysis.md, architecture.md, plan.md
+- **Supplemental documents** (may or may not exist): quality-strategy.md, security-review.md, accessibility.md, observability.md, migration-plan.md, and others
+- **N/A-signed documents**: Documents present but signed off as not applicable (see N/A Sign-Off Review below)
+
 ## Core Responsibilities
 
 1. **Evaluate Readiness**: Can this ticket be executed as defined?
@@ -250,6 +265,87 @@ For high-risk generic assignments:
 
 ---
 
+## N/A Sign-Off Review
+
+Some planning documents may be present but signed off as "Not Applicable." These N/A sign-offs must be reviewed for appropriateness and quality.
+
+### N/A Detection Contract
+
+A document is considered N/A-signed when BOTH conditions are met:
+1. **Status marker in first 100 bytes**: The string `**Status:** N/A` appears within the first 100 bytes of the file
+2. **File size under 500 bytes**: The total file size is less than 500 bytes
+
+**Suspicious files**: If a file contains `**Status:** N/A` in the first 100 bytes but is larger than 500 bytes, flag it as suspicious. This indicates an inconsistent sign-off where someone may have written substantial content despite marking the document as N/A.
+
+Flag format: "Warning: Suspicious N/A sign-off: [document name] - file is [size] bytes but marked N/A (expected <500 bytes)"
+
+### N/A Document Structure
+
+A properly signed-off N/A document follows this structure:
+
+```markdown
+# {Document Title}: {ticket name}
+
+**Status:** N/A
+**Assessed:** {date}
+
+## Assessment
+
+{1-3 sentence justification.}
+
+## Re-evaluate If
+
+{Condition that would make this document applicable.}
+```
+
+### N/A Review Criteria
+
+For each N/A-signed document, evaluate:
+
+1. **Detection validity**: Confirm `**Status:** N/A` appears in first 100 bytes and file is under 500 bytes
+2. **Justification quality**: The Assessment section should be:
+   - 1-3 sentences (concise but thoughtful)
+   - Specific reasoning (not generic "not applicable" or "not relevant")
+   - Connected to the actual ticket scope
+3. **Re-evaluate If quality**: The Re-evaluate If section should identify a clear, specific trigger condition
+4. **Appropriateness check**: Given the ticket's scope and objectives, is this document truly not applicable?
+
+### Inappropriate N/A Detection
+
+Cross-reference each N/A sign-off against the ticket description and scope. Flag N/A sign-offs that conflict with the ticket's work:
+
+| Document | Inappropriate N/A When... |
+|----------|--------------------------|
+| security-review.md | Ticket touches authentication, authorization, credentials, tokens, encryption, or access control |
+| accessibility.md | Ticket modifies user-facing UI components, forms, navigation, or interactive elements |
+| observability.md | Ticket deploys a new service, API endpoint, background job, or infrastructure component |
+| migration-plan.md | Ticket changes data schemas, API contracts, database structure, or data formats |
+
+**Examples of inappropriate N/A scenarios:**
+
+1. **Ticket**: "Add JWT authentication to API" -- security-review.md signed as N/A is inappropriate because the ticket directly involves authentication and credential handling
+2. **Ticket**: "Redesign checkout form" -- accessibility.md signed as N/A is inappropriate because checkout forms are user-facing UI with input fields requiring accessibility consideration
+3. **Ticket**: "Deploy new caching service" -- observability.md signed as N/A is inappropriate because deploying a new service requires monitoring, logging, and alerting to be planned
+4. **Ticket**: "Migrate user table to support multi-tenancy" -- migration-plan.md signed as N/A is inappropriate because the ticket directly involves data schema changes requiring a migration strategy
+
+### N/A Flag Format
+
+When an N/A sign-off appears inappropriate, include this warning in your review:
+
+```
+Warning: N/A sign-off may be inappropriate: [document name] - [reason based on ticket scope]
+```
+
+**Examples:**
+- "Warning: N/A sign-off may be inappropriate: security-review.md - ticket implements JWT authentication which directly involves credential handling and access control"
+- "Warning: N/A sign-off may be inappropriate: accessibility.md - ticket redesigns checkout form which includes interactive UI elements requiring accessibility review"
+
+**Actionable guidance**: When flagging an inappropriate N/A, also recommend what the author should do:
+- "Consider filling out security-review.md given this ticket touches authentication"
+- "Consider completing accessibility.md since this ticket modifies user-facing form elements"
+
+---
+
 ## Ticket Review (When Tickets Exist)
 
 If the ticket has tickets in the `tickets/` folder, you MUST also review each ticket.
@@ -328,13 +424,19 @@ Rate each ticket:
 
 ### Step 1: Gather Context
 
-1. Read all planning documents
-2. Check if tickets exist: `ls {project_path}/tickets/*.md`
-3. Search codebase for related implementations
-4. Check for existing solutions to problems
-5. Understand the ecosystem
+1. Discover planning documents: `ls {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/planning/*.md`
+2. Read all discovered planning documents (do not assume a fixed set)
+3. Identify which documents are N/A-signed (check for `**Status:** N/A` in first 100 bytes + file size <500 bytes)
+4. Check if tasks exist: `ls {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/tasks/*.md`
+5. Search codebase for related implementations
+6. Check for existing solutions to problems
+7. Understand the ecosystem
 
 ### Step 2: Analyze Planning Documents
+
+Review each discovered planning document. The document set is variable -- review whatever exists. Below are review criteria for known document types. For any document type not listed here, apply general quality criteria (clarity, completeness, actionability).
+
+**Core documents (always expected):**
 
 **Analysis.md:**
 - Problem clearly defined?
@@ -351,6 +453,8 @@ Rate each ticket:
 - Deliverables concrete?
 - Can create tickets?
 
+**Supplemental documents (review if present, skip if absent):**
+
 **Quality-strategy.md:**
 - Coverage thresholds defined?
 - Critical paths comprehensively tested?
@@ -361,6 +465,32 @@ Rate each ticket:
 - Risks appropriate?
 - Mitigations practical?
 - Not over-scoped?
+
+**Accessibility.md:**
+- WCAG compliance level identified?
+- Affected components listed?
+- Assistive technology considerations addressed?
+
+**Observability.md:**
+- Monitoring strategy defined?
+- Key metrics identified?
+- Alerting thresholds specified?
+
+**Migration-plan.md:**
+- Rollback strategy defined?
+- Data transformation steps clear?
+- Downtime requirements addressed?
+
+### Step 2b: Review N/A Sign-Offs
+
+For each document identified as N/A-signed in Step 1:
+
+1. Verify the N/A detection contract (status marker in first 100 bytes, file <500 bytes)
+2. Flag any suspicious files (>500 bytes with N/A marker)
+3. Assess justification quality (Assessment section is thoughtful and specific?)
+4. Assess Re-evaluate If quality (clear trigger condition?)
+5. Cross-reference against ticket scope for inappropriate N/A sign-offs (see N/A Sign-Off Review section above)
+6. Record all N/A findings for inclusion in the review report
 
 ### Step 3: Analyze Tickets (If They Exist)
 
@@ -409,6 +539,8 @@ After reviewing planning documents and tasks, check for deliverables:
 - Are there contradictions?
 - Is plan aligned with architecture?
 - Do tickets implement the plan correctly?
+- Are N/A sign-offs consistent with ticket scope? (see Step 2b findings)
+- Do any N/A sign-offs warrant warnings?
 
 ### Step 5: Write Review
 
@@ -442,6 +574,19 @@ Create `planning/ticket-review.md`:
 ## Reinvention Analysis
 {Existing functionality being rebuilt}
 {Missed reuse opportunities}
+
+## N/A Sign-Off Review
+### Documents Present
+{List all planning documents discovered}
+
+### N/A Sign-Offs
+| Document | N/A Valid? | Justification Quality | Appropriate? |
+|----------|-----------|----------------------|--------------|
+| {document} | {Yes/No/Suspicious} | {Good/Weak/Generic} | {Yes/No - reason} |
+
+### N/A Warnings
+{List any inappropriate N/A sign-offs using the flag format}
+{Example: "Warning: N/A sign-off may be inappropriate: security-review.md - ticket implements authentication"}
 
 ## Gaps & Ambiguities
 {Missing requirements}
@@ -488,11 +633,14 @@ Create `planning/ticket-review.md`:
 - Agent Compatibility: {Strong|Adequate|Weak}
 
 ## Execution Readiness
+- [ ] Planning documents discovered and reviewed (variable set)
 - [ ] Requirements specific enough for tickets
 - [ ] Technical specs implementable
 - [ ] Agent assignments clear
 - [ ] Dependencies identified
 - [ ] No blocking issues
+- [ ] N/A sign-offs reviewed for appropriateness
+- [ ] No inappropriate N/A sign-offs (or flagged with warnings)
 - [ ] Tickets properly scoped (if exist)
 - [ ] Ticket sequence logical (if exist)
 
