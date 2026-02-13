@@ -21,6 +21,12 @@ else
     NC='\033[0m'
 fi
 
+# Ticket ID length constraints
+# MIN: 2 characters (e.g., "TA")
+# MAX: 12 characters (readable, fits in file paths, allows Jira-style IDs)
+MIN_TICKET_ID_LENGTH=2
+MAX_TICKET_ID_LENGTH=12
+
 # Print error message to stderr in red
 error() { printf "${RED}[ERROR]${NC} %s\n" "$1" >&2; }
 

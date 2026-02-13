@@ -9,7 +9,7 @@
 # Arguments:
 #   --manifest <path>  Optional path to triage manifest JSON
 #   --no-color         Disable color output (also: NO_COLOR=1)
-#   TICKET_ID          Ticket identifier (2-12 chars, uppercase with optional dashes for Jira IDs like UIT-9819)
+#   TICKET_ID          Ticket identifier (uppercase with optional dashes for Jira IDs like UIT-9819)
 #   name               Ticket name (kebab-case)
 #
 # Output:
@@ -87,9 +87,9 @@ validate_ticket_id() {
         error "Valid formats: APIV2, DKRHUB (uppercase) or UIT-9819, PROJ-123 (Jira-style)"
         exit 1
     fi
-    # Check reasonable length (2-12 chars)
-    if [[ ${#ticket_id} -lt 2 ]] || [[ ${#ticket_id} -gt 12 ]]; then
-        error "TICKET_ID must be 2-12 characters. Got: ${#ticket_id}"
+    # Check reasonable length
+    if [[ ${#ticket_id} -lt $MIN_TICKET_ID_LENGTH ]] || [[ ${#ticket_id} -gt $MAX_TICKET_ID_LENGTH ]]; then
+        error "TICKET_ID must be ${MIN_TICKET_ID_LENGTH}-${MAX_TICKET_ID_LENGTH} characters. Got: ${#ticket_id}"
         exit 1
     fi
 }
