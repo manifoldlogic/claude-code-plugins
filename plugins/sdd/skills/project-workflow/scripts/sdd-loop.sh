@@ -858,7 +858,7 @@ log_info() {
         if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
             format_json_log "INFO" "$*"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*" >&2
+            echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [INFO] $*" >&2
         fi
     fi
 }
@@ -874,7 +874,7 @@ log_error() {
     if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
         format_json_log "ERROR" "$*"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2
+        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [ERROR] $*" >&2
     fi
 }
 
@@ -890,7 +890,7 @@ log_warn() {
         if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
             format_json_log "WARN" "$*"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >&2
+            echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [WARN] $*" >&2
         fi
     fi
 }
@@ -907,7 +907,7 @@ log_verbose() {
     if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
         format_json_log "VERBOSE" "$*"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [VERBOSE] $*" >&2
+        echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [VERBOSE] $*" >&2
     fi
 }
 
@@ -923,7 +923,7 @@ log_debug() {
         if [[ "$SDD_LOOP_LOG_FORMAT" == "json" ]]; then
             format_json_log "DEBUG" "$*"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" >&2
+            echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [DEBUG] $*" >&2
         fi
     fi
 }
