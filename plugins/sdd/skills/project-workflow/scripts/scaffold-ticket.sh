@@ -277,7 +277,8 @@ main() {
     fi
     CREATED_TICKET_DIR=true
 
-    # Create subdirectories (ticket_path now guaranteed to exist and be ours)
+    # Create directory structure
+    # IMPORTANT: If structure changes, update plugins/maproom/skills/sdd-spec-search/SKILL.md
     mkdir -p "$ticket_path"/{planning,tasks,deliverables}
 
     # --- Determine which documents to generate ---
