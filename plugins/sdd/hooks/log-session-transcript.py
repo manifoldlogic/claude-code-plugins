@@ -98,6 +98,7 @@ def main():
     status = 'ok' if transcript_path else 'empty_path'
 
     # Capture current time once and derive both formats from the same instant
+    # Compact format: no colons (filesystem compatibility), microseconds (uniqueness)
     now = datetime.datetime.now()
     compact_timestamp = now.strftime('%Y%m%dT%H%M%S%f')
     iso_timestamp = now.isoformat()
