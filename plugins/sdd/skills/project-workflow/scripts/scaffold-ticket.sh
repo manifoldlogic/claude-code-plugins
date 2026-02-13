@@ -4,11 +4,12 @@
 # Creates the folder structure for a new ticket
 #
 # Usage:
-#   bash scaffold-ticket.sh [--manifest <path>] [--no-color] <TICKET_ID> <name>
+#   bash scaffold-ticket.sh [--manifest <path>] [--no-color] [--debug] <TICKET_ID> <name>
 #
 # Arguments:
 #   --manifest <path>  Optional path to triage manifest JSON
 #   --no-color         Disable color output (also: NO_COLOR=1)
+#   --debug            Enable verbose command tracing (also: DEBUG=1)
 #   TICKET_ID          Ticket identifier (uppercase with optional dashes for Jira IDs like UIT-9819)
 #   name               Ticket name (kebab-case)
 #
@@ -32,10 +33,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/../templates/ticket"
 SDD_ROOT_DIR="${SDD_ROOT_DIR:-/app/.sdd}"
 
-# Parse color flag before sourcing common.sh
+# Parse flags before sourcing common.sh
 for arg in "$@"; do
     case "$arg" in
         --no-color) USE_COLOR=false ;;
+        --debug) SDD_DEBUG=true ;;
     esac
 done
 
@@ -59,11 +61,12 @@ cleanup_on_error() {
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--manifest <path>] [--no-color] <TICKET_ID> <name>
+Usage: $(basename "$0") [--manifest <path>] [--no-color] [--debug] <TICKET_ID> <name>
 
 Arguments:
   --manifest <path>  Optional triage manifest JSON (output of triage-documents.sh)
   --no-color         Disable color output (also: NO_COLOR=1)
+  --debug            Enable verbose command tracing (also: DEBUG=1)
   TICKET_ID          Ticket identifier (e.g., APIV2, DKRHUB, or Jira ID like UIT-9819)
   name               Ticket name (kebab-case, e.g., "api-redesign")
 
@@ -238,7 +241,7 @@ main() {
                 manifest_path="$2"
                 shift 2
                 ;;
-            --no-color)
+            --no-color|--debug)
                 # Already handled before sourcing common.sh; consume silently
                 shift
                 ;;

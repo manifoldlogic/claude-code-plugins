@@ -21,6 +21,12 @@ else
     NC='\033[0m'
 fi
 
+# Debug mode: enable verbose command tracing
+# Callers can set SDD_DEBUG=true before sourcing, or use --debug flag
+if [ "${SDD_DEBUG:-}" = "true" ] || [ "${DEBUG:-}" = "1" ]; then
+    set -x
+fi
+
 # Ticket ID length constraints
 # MIN: 2 characters (e.g., "TA")
 # MAX: 12 characters (readable, fits in file paths, allows Jira-style IDs)

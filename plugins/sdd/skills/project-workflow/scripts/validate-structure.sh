@@ -4,11 +4,12 @@
 # Validates ticket/task structure and reports issues
 #
 # Usage:
-#   bash validate-structure.sh [--no-color] <TICKET_ID> # Validate specific ticket
-#   bash validate-structure.sh [--no-color]             # Validate all tickets
+#   bash validate-structure.sh [--no-color] [--debug] <TICKET_ID> # Validate specific ticket
+#   bash validate-structure.sh [--no-color] [--debug]             # Validate all tickets
 #
 # Arguments:
 #   --no-color         Disable color output (also: NO_COLOR=1)
+#   --debug            Enable verbose command tracing (also: DEBUG=1)
 #
 # Output:
 #   JSON validation report
@@ -18,10 +19,11 @@ set -euo pipefail
 # Source shared helper functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Parse color flag before sourcing common.sh
+# Parse flags before sourcing common.sh
 for arg in "$@"; do
     case "$arg" in
         --no-color) USE_COLOR=false ;;
+        --debug) SDD_DEBUG=true ;;
     esac
 done
 
@@ -351,11 +353,11 @@ validate_ticket_tasks() {
 
 # Main execution
 main() {
-    # Strip --no-color from positional args (already handled before sourcing common.sh)
+    # Strip --no-color and --debug from positional args (already handled before sourcing common.sh)
     local ticket_id=""
     for arg in "$@"; do
         case "$arg" in
-            --no-color) ;;
+            --no-color|--debug) ;;
             *) ticket_id="$arg" ;;
         esac
     done

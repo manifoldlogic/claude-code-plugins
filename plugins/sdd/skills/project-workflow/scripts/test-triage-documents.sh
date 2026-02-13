@@ -34,6 +34,8 @@
 #  31. Mixed duplicates both detected - +accessibility +accessibility -observability -observability
 #  32. --no-color flag disables ANSI codes in stderr output
 #  33. NO_COLOR env var disables ANSI codes in stderr output
+#  34. --debug flag enables verbose tracing (set -x output on stderr)
+#  35. DEBUG=1 env var enables verbose tracing (set -x output on stderr)
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -1153,6 +1155,74 @@ else
         log_pass "$test_name"
     else
         log_fail "$test_name" "no output produced (cannot verify color was disabled)"
+    fi
+fi
+
+# =============================================
+# Test 34: --debug flag enables verbose tracing
+# Run triage with --debug and a valid description
+# Capture stderr; verify it contains "+ " prefixed lines (set -x output)
+# =============================================
+
+printf -- "\n${CYAN}--- Debug Flag Tests ---${NC}\n\n"
+
+run_triage_with_stderr "--debug" "backend API caching layer"
+
+test_name="--debug flag enables verbose tracing (set -x output on stderr)"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # set -x output produces lines starting with "+ " on stderr
+    if printf '%s' "$TRIAGE_STDERR" | grep -q '^+ '; then
+        # Also verify stdout JSON is still clean (no set -x pollution)
+        if printf '%s' "$TRIAGE_OUTPUT" | jq empty 2>/dev/null; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "stdout JSON is invalid (debug output leaked to stdout)"
+        fi
+    else
+        log_fail "$test_name" "stderr does not contain set -x trace lines (expected '+ ' prefix)"
+    fi
+fi
+
+# =============================================
+# Test 35: DEBUG=1 env var enables verbose tracing
+# Run DEBUG=1 triage-documents.sh with valid description
+# Capture stderr; verify it contains "+ " prefixed lines
+# =============================================
+
+stderr_file_35=$(mktemp)
+set +e
+DEBUG_ENV_OUTPUT=$(DEBUG=1 bash "$TRIAGE_SCRIPT" "backend API caching layer" 2>"$stderr_file_35")
+DEBUG_ENV_EXIT=$?
+set -e
+DEBUG_ENV_STDERR=$(cat "$stderr_file_35")
+rm -f "$stderr_file_35"
+
+test_name="DEBUG=1 env var enables verbose tracing (set -x output on stderr)"
+test_ok=true
+
+if [ "$DEBUG_ENV_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $DEBUG_ENV_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    # set -x output produces lines starting with "+ " on stderr
+    if printf '%s' "$DEBUG_ENV_STDERR" | grep -q '^+ '; then
+        # Also verify stdout JSON is still clean
+        if printf '%s' "$DEBUG_ENV_OUTPUT" | jq empty 2>/dev/null; then
+            log_pass "$test_name"
+        else
+            log_fail "$test_name" "stdout JSON is invalid (debug output leaked to stdout)"
+        fi
+    else
+        log_fail "$test_name" "stderr does not contain set -x trace lines (expected '+ ' prefix)"
     fi
 fi
 
