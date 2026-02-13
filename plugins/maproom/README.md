@@ -139,3 +139,47 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Use FTS mode for exact keyword matches (faster than semantic search)
 - Check database size: large databases may need optimization
 - Ensure SQLite isn't locked by another process
+
+## Maintenance
+
+### Monthly CLI Verification
+
+**Purpose:** Detect crewchief-maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
+
+**Cadence:** First Friday of each month
+
+**Owner:** Maproom plugin maintainer
+
+**Procedure:**
+
+- [ ] Navigate to the maproom plugin directory:
+  ```bash
+  cd plugins/maproom
+  ```
+- [ ] Run `crewchief-maproom --version` and verify the version matches the documented version (currently 0.1.0):
+  ```bash
+  crewchief-maproom --version
+  ```
+- [ ] Run `crewchief-maproom search --help` and verify all expected flags are present:
+  ```bash
+  crewchief-maproom search --help
+  ```
+  Confirm these 5 flags exist in the `search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`
+- [ ] Run `crewchief-maproom vector-search --help` and verify all expected flags are present:
+  ```bash
+  crewchief-maproom vector-search --help
+  ```
+  Confirm all 6 flags exist in the `vector-search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`, `--threshold`
+- [ ] Compare output against the baseline verification deliverable and check for any discrepancies (new flags, removed flags, renamed flags, changed defaults, changed accepted values):
+  - **Baseline deliverable:** `planning/deliverables/cli-flag-verification.md` (located at the ticket level in the specs directory)
+  - **Full path:** `/workspace/_SPECS/claude-code-plugins/tickets/MAPAGENT_format-agent-skill/planning/deliverables/cli-flag-verification.md`
+- [ ] Record the verification result:
+  - **No discrepancies:** Mark this month's verification as complete. No further action needed.
+  - **Discrepancies found:** Create a ticket to update all affected documentation (SKILL.md, multi-repo-guide.md, README.md, and the baseline deliverable itself).
+
+**Task Reference:** The verification procedure follows the steps originally defined in MAPAGENT.0001 (verify-cli-flags task):
+`/workspace/_SPECS/claude-code-plugins/tickets/MAPAGENT_format-agent-skill/tasks/MAPAGENT.0001_verify-cli-flags.md`
+
+**Success Criteria:** CLI drift is detected within 30 days of occurrence, before a significant number of agent sessions encounter deprecated flags.
+
+**Escalation Path:** If discrepancies are found between the current CLI output and the baseline deliverable, create a new ticket under the maproom plugin to update all documentation files that reference the affected flags. The ticket should enumerate every file and line that needs updating.
