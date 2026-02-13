@@ -137,8 +137,8 @@ test_help_option() {
 
     assert_exit_code 0 "$exit_code" "Help option exits with code 0"
     assert_contains "$output" "Usage:" "Help shows usage"
-    assert_contains "$output" "workspace_root" "Help mentions workspace_root"
-    assert_contains "$output" "WORKSPACE_ROOT" "Help mentions environment variable"
+    assert_contains "$output" "--specs-root" "Help mentions --specs-root"
+    assert_contains "$output" "--repos-root" "Help mentions --repos-root"
 }
 
 #######################################
@@ -156,72 +156,80 @@ test_short_help_option() {
 }
 
 #######################################
-# Test: Missing workspace directory exits with code 1
+# Test: Missing specs directory exits with code 1
 #######################################
 test_missing_workspace() {
-    echo "--- Test: Missing workspace directory ---"
+    echo "--- Test: Missing specs directory ---"
 
     local output
     local exit_code=0
-    output=$(bash "$MASTER_SCRIPT" "/nonexistent/path/that/does/not/exist" 2>&1) || exit_code=$?
+    output=$(bash "$MASTER_SCRIPT" --specs-root "/nonexistent/path/that/does/not/exist" 2>&1) || exit_code=$?
 
-    assert_exit_code 1 "$exit_code" "Missing workspace exits with code 1"
-    assert_contains "$output" "Error:" "Missing workspace shows error message"
+    assert_exit_code 1 "$exit_code" "Missing specs root exits with code 1"
+    assert_contains "$output" "Error:" "Missing specs root shows error message"
 }
 
 #######################################
-# Test: Empty workspace returns empty repos array
+# Test: Empty specs root returns empty repos array
 #######################################
 test_empty_workspace() {
-    echo "--- Test: Empty workspace ---"
+    echo "--- Test: Empty specs root ---"
 
-    # Create empty workspace
-    local empty_workspace="$TEST_TMP_DIR/empty_workspace"
-    mkdir -p "$empty_workspace"
+    # Create empty specs root
+    local specs_root="$TEST_TMP_DIR/empty_specs"
+    local repos_root="$TEST_TMP_DIR/empty_repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$empty_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
-    assert_exit_code 0 "$exit_code" "Empty workspace exits with code 0"
+    assert_exit_code 0 "$exit_code" "Empty specs root exits with code 0"
     assert_contains "$output" '"repos": [' "Output contains repos array"
-    assert_contains "$output" '"workspace_root":' "Output contains workspace_root"
+    assert_contains "$output" '"specs_root":' "Output contains specs_root"
+    assert_contains "$output" '"repos_root":' "Output contains repos_root"
 }
 
 #######################################
-# Test: Discovers _SDD directory
+# Test: Discovers specs directory
 #######################################
 test_discovers_sdd_directory() {
-    echo "--- Test: Discovers _SDD directory ---"
+    echo "--- Test: Discovers specs directory ---"
 
-    # Create test repo with _SDD
-    local test_workspace="$TEST_TMP_DIR/test_workspace"
-    mkdir -p "$test_workspace/my-repo/_SDD"
+    # Create test specs and repos
+    local specs_root="$TEST_TMP_DIR/test_specs"
+    local repos_root="$TEST_TMP_DIR/test_repos"
+    mkdir -p "$specs_root/my-repo"
+    mkdir -p "$repos_root/my-repo/my-repo/.git"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Discovery exits with code 0"
     assert_contains "$output" '"name": "my-repo"' "Found repo name"
-    assert_contains "$output" "_SDD" "Found _SDD path"
+    assert_contains "$output" 'specs' "Found specs path"
 }
 
 #######################################
-# Test: Discovers multiple _SDD directories
+# Test: Discovers multiple specs directories
 #######################################
 test_discovers_multiple_sdd_directories() {
-    echo "--- Test: Discovers multiple _SDD directories ---"
+    echo "--- Test: Discovers multiple specs directories ---"
 
-    # Create multiple repos with _SDD
-    local test_workspace="$TEST_TMP_DIR/multi_workspace"
-    mkdir -p "$test_workspace/repo-alpha/_SDD"
-    mkdir -p "$test_workspace/repo-beta/_SDD"
-    mkdir -p "$test_workspace/repo-gamma/_SDD"
-    mkdir -p "$test_workspace/no-sdd-here"  # This should not be found
+    # Create multiple specs entries
+    local specs_root="$TEST_TMP_DIR/multi_specs"
+    local repos_root="$TEST_TMP_DIR/multi_repos"
+    mkdir -p "$specs_root/repo-alpha"
+    mkdir -p "$specs_root/repo-beta"
+    mkdir -p "$specs_root/repo-gamma"
+    mkdir -p "$repos_root/repo-alpha/repo-alpha/.git"
+    mkdir -p "$repos_root/repo-beta/repo-beta/.git"
+    mkdir -p "$repos_root/repo-gamma/repo-gamma/.git"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Multiple discovery exits with code 0"
@@ -231,17 +239,19 @@ test_discovers_multiple_sdd_directories() {
 }
 
 #######################################
-# Test: Environment variable WORKSPACE_ROOT
+# Test: Environment variables SPECS_ROOT and REPOS_ROOT
 #######################################
 test_environment_variable() {
-    echo "--- Test: Environment variable WORKSPACE_ROOT ---"
+    echo "--- Test: Environment variables SPECS_ROOT and REPOS_ROOT ---"
 
-    # Create test workspace
-    local test_workspace="$TEST_TMP_DIR/env_workspace"
-    mkdir -p "$test_workspace/env-repo/_SDD"
+    # Create test specs and repos
+    local specs_root="$TEST_TMP_DIR/env_specs"
+    local repos_root="$TEST_TMP_DIR/env_repos"
+    mkdir -p "$specs_root/env-repo"
+    mkdir -p "$repos_root/env-repo/env-repo/.git"
 
     local output
-    output=$(WORKSPACE_ROOT="$test_workspace" bash "$MASTER_SCRIPT" 2>&1)
+    output=$(SPECS_ROOT="$specs_root" REPOS_ROOT="$repos_root" bash "$MASTER_SCRIPT" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Environment variable exits with code 0"
@@ -254,14 +264,16 @@ test_environment_variable() {
 test_argument_overrides_env() {
     echo "--- Test: Argument overrides environment variable ---"
 
-    # Create two workspaces
-    local env_workspace="$TEST_TMP_DIR/env_only_workspace"
-    local arg_workspace="$TEST_TMP_DIR/arg_workspace"
-    mkdir -p "$env_workspace/env-only-repo/_SDD"
-    mkdir -p "$arg_workspace/arg-repo/_SDD"
+    # Create two specs roots
+    local env_specs="$TEST_TMP_DIR/env_only_specs"
+    local arg_specs="$TEST_TMP_DIR/arg_specs"
+    local repos_root="$TEST_TMP_DIR/arg_repos"
+    mkdir -p "$env_specs/env-only-repo"
+    mkdir -p "$arg_specs/arg-repo"
+    mkdir -p "$repos_root/arg-repo/arg-repo/.git"
 
     local output
-    output=$(WORKSPACE_ROOT="$env_workspace" bash "$MASTER_SCRIPT" "$arg_workspace" 2>&1)
+    output=$(SPECS_ROOT="$env_specs" bash "$MASTER_SCRIPT" --specs-root "$arg_specs" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Argument override exits with code 0"
@@ -280,16 +292,19 @@ test_argument_overrides_env() {
 test_json_structure() {
     echo "--- Test: JSON output structure ---"
 
-    local test_workspace="$TEST_TMP_DIR/json_workspace"
-    mkdir -p "$test_workspace/json-repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/json_specs"
+    local repos_root="$TEST_TMP_DIR/json_repos"
+    mkdir -p "$specs_root/json-repo"
+    mkdir -p "$repos_root/json-repo/json-repo/.git"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "JSON structure test exits with code 0"
     assert_contains "$output" '"timestamp":' "JSON has timestamp"
-    assert_contains "$output" '"workspace_root":' "JSON has workspace_root"
+    assert_contains "$output" '"specs_root":' "JSON has specs_root"
+    assert_contains "$output" '"repos_root":' "JSON has repos_root"
     assert_contains "$output" '"repos":' "JSON has repos"
     assert_contains "$output" '"name":' "JSON repos have name"
     assert_contains "$output" '"sdd_root":' "JSON repos have sdd_root"
@@ -317,10 +332,12 @@ test_unknown_option() {
 test_summary_only_option() {
     echo "--- Test: --summary-only option ---"
 
-    local test_workspace="$TEST_TMP_DIR/summary_workspace"
-    mkdir -p "$test_workspace/repo/_SDD/tickets/T1/tasks"
-    echo "# Test" > "$test_workspace/repo/_SDD/tickets/T1/README.md"
-    cat > "$test_workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+    local specs_root="$TEST_TMP_DIR/summary_specs"
+    local repos_root="$TEST_TMP_DIR/summary_repos"
+    mkdir -p "$specs_root/repo/tickets/T1/tasks"
+    mkdir -p "$repos_root/repo/repo/.git"
+    echo "# Test" > "$specs_root/repo/tickets/T1/README.md"
+    cat > "$specs_root/repo/tickets/T1/tasks/T1.1001.md" << 'EOF'
 ## Status
 - [x] **Task completed**
 - [ ] **Tests pass**
@@ -328,7 +345,7 @@ test_summary_only_option() {
 EOF
 
     local output
-    output=$(bash "$MASTER_SCRIPT" --summary-only "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --summary-only --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Summary-only exits with code 0"
@@ -361,11 +378,13 @@ EOF
 test_summary_only_short_option() {
     echo "--- Test: -s short option ---"
 
-    local test_workspace="$TEST_TMP_DIR/summary_short_workspace"
-    mkdir -p "$test_workspace/repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/summary_short_specs"
+    local repos_root="$TEST_TMP_DIR/summary_short_repos"
+    mkdir -p "$specs_root/repo"
+    mkdir -p "$repos_root/repo/repo/.git"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" -s "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" -s --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "-s option exits with code 0"
@@ -384,10 +403,12 @@ test_summary_only_short_option() {
 test_verbose_option() {
     echo "--- Test: --verbose option ---"
 
-    local test_workspace="$TEST_TMP_DIR/verbose_workspace"
-    mkdir -p "$test_workspace/repo/_SDD/tickets/T1/tasks"
-    echo "# Test" > "$test_workspace/repo/_SDD/tickets/T1/README.md"
-    cat > "$test_workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+    local specs_root="$TEST_TMP_DIR/verbose_specs"
+    local repos_root="$TEST_TMP_DIR/verbose_repos"
+    mkdir -p "$specs_root/repo/tickets/T1/tasks"
+    mkdir -p "$repos_root/repo/repo/.git"
+    echo "# Test" > "$specs_root/repo/tickets/T1/README.md"
+    cat > "$specs_root/repo/tickets/T1/tasks/T1.1001.md" << 'EOF'
 ## Status
 - [ ] **Task completed**
 EOF
@@ -396,7 +417,7 @@ EOF
     local stderr_output
 
     # Capture stdout and stderr separately
-    stderr_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>&1 1>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" --verbose --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Verbose option exits with code 0"
@@ -421,11 +442,13 @@ EOF
 test_verbose_short_option() {
     echo "--- Test: -v short option ---"
 
-    local test_workspace="$TEST_TMP_DIR/verbose_short_workspace"
-    mkdir -p "$test_workspace/repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/verbose_short_specs"
+    local repos_root="$TEST_TMP_DIR/verbose_short_repos"
+    mkdir -p "$specs_root/repo"
+    mkdir -p "$repos_root/repo/repo/.git"
 
     local stderr_output
-    stderr_output=$(bash "$MASTER_SCRIPT" -v "$test_workspace" 2>&1 1>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" -v --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "-v option exits with code 0"
@@ -440,15 +463,17 @@ test_verbose_short_option() {
 test_combined_short_options() {
     echo "--- Test: Combined -sv options ---"
 
-    local test_workspace="$TEST_TMP_DIR/combined_workspace"
-    mkdir -p "$test_workspace/repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/combined_specs"
+    local repos_root="$TEST_TMP_DIR/combined_repos"
+    mkdir -p "$specs_root/repo"
+    mkdir -p "$repos_root/repo/repo/.git"
 
     local stdout_output
     local stderr_output
 
     # Capture both outputs
-    stdout_output=$(bash "$MASTER_SCRIPT" -sv "$test_workspace" 2>/dev/null)
-    stderr_output=$(bash "$MASTER_SCRIPT" -sv "$test_workspace" 2>&1 1>/dev/null)
+    stdout_output=$(bash "$MASTER_SCRIPT" -sv --specs-root "$specs_root" --repos-root "$repos_root" 2>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" -sv --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Combined -sv exits with code 0"
@@ -470,11 +495,13 @@ test_combined_short_options() {
 test_json_option() {
     echo "--- Test: --json option ---"
 
-    local test_workspace="$TEST_TMP_DIR/json_option_workspace"
-    mkdir -p "$test_workspace/repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/json_option_specs"
+    local repos_root="$TEST_TMP_DIR/json_option_repos"
+    mkdir -p "$specs_root/repo"
+    mkdir -p "$repos_root/repo/repo/.git"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" --json "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --json --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "--json option exits with code 0"
@@ -497,14 +524,16 @@ test_json_option() {
 test_verbose_output_streams() {
     echo "--- Test: Verbose output to stderr only ---"
 
-    local test_workspace="$TEST_TMP_DIR/streams_workspace"
-    mkdir -p "$test_workspace/repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/streams_specs"
+    local repos_root="$TEST_TMP_DIR/streams_repos"
+    mkdir -p "$specs_root/repo"
+    mkdir -p "$repos_root/repo/repo/.git"
 
     local stdout_output
     local stderr_output
 
-    stdout_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>/dev/null)
-    stderr_output=$(bash "$MASTER_SCRIPT" --verbose "$test_workspace" 2>&1 1>/dev/null)
+    stdout_output=$(bash "$MASTER_SCRIPT" --verbose --specs-root "$specs_root" --repos-root "$repos_root" 2>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" --verbose --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
 
     # stdout should NOT contain timing output
     if [[ "$stdout_output" == *"[0."* ]] || [[ "$stdout_output" == *"Scanned"* ]]; then
@@ -560,31 +589,35 @@ test_unknown_combined_option() {
 test_debug_mode() {
     echo "--- Test: Debug mode ---"
 
-    local test_workspace="$TEST_TMP_DIR/debug_workspace"
-    mkdir -p "$test_workspace/debug-repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/debug_specs"
+    local repos_root="$TEST_TMP_DIR/debug_repos"
+    mkdir -p "$specs_root/debug-repo"
+    mkdir -p "$repos_root/debug-repo/debug-repo/.git"
 
     local stderr_output
     local stdout_output
 
     # Capture stderr separately
-    stderr_output=$(bash "$MASTER_SCRIPT" --debug "$test_workspace" 2>&1 1>/dev/null)
+    stderr_output=$(bash "$MASTER_SCRIPT" --debug --specs-root "$specs_root" --repos-root "$repos_root" 2>&1 1>/dev/null)
 
     assert_contains "$stderr_output" "[DEBUG]" "Debug mode outputs DEBUG messages"
 }
 
 #######################################
-# Test: Symlink within workspace is followed
+# Test: Symlink within specs root is followed
 #######################################
 test_symlink_within_workspace() {
-    echo "--- Test: Symlink within workspace ---"
+    echo "--- Test: Symlink within specs root ---"
 
-    local test_workspace="$TEST_TMP_DIR/symlink_workspace"
-    mkdir -p "$test_workspace/real-repo/_SDD"
-    # Create symlink to real repo
-    ln -s "$test_workspace/real-repo" "$test_workspace/linked-repo"
+    local specs_root="$TEST_TMP_DIR/symlink_specs"
+    local repos_root="$TEST_TMP_DIR/symlink_repos"
+    mkdir -p "$specs_root/real-repo"
+    mkdir -p "$repos_root/real-repo/real-repo/.git"
+    # Create symlink to real specs entry
+    ln -s "$specs_root/real-repo" "$specs_root/linked-repo"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     # Should find both the real repo and follow the symlink
@@ -593,25 +626,27 @@ test_symlink_within_workspace() {
 }
 
 #######################################
-# Test: Depth limit prevents deep recursion
+# Test: Only direct children of specs root are discovered
 #######################################
 test_depth_limit() {
     echo "--- Test: Depth limit ---"
 
-    local test_workspace="$TEST_TMP_DIR/deep_workspace"
-    # Create _SDD at depth 1 (should be found)
-    mkdir -p "$test_workspace/shallow-repo/_SDD"
-    # Create _SDD at depth 4 (should NOT be found with maxdepth 2)
-    mkdir -p "$test_workspace/deep/nested/very/deep-repo/_SDD"
+    local specs_root="$TEST_TMP_DIR/deep_specs"
+    local repos_root="$TEST_TMP_DIR/deep_repos"
+    # Create specs entry at depth 1 (should be found)
+    mkdir -p "$specs_root/shallow-repo"
+    mkdir -p "$repos_root/shallow-repo/shallow-repo/.git"
+    # Create nested directory (should NOT be found - only direct children)
+    mkdir -p "$specs_root/deep/nested/very/deep-repo"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$test_workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Depth limit test exits with code 0"
     assert_contains "$output" '"name": "shallow-repo"' "Found shallow-repo"
 
-    # Should NOT find deep-repo (too deep)
+    # Should NOT find deep-repo (too deep, not a direct child)
     if [[ "$output" == *"deep-repo"* ]]; then
         log_result "Depth limit prevents deep discovery" "fail" "Found deep-repo when it should be too deep"
     else
@@ -1882,11 +1917,12 @@ test_scan_repo_multiple_tickets() {
 
     source "$MASTER_SCRIPT"
 
-    # Create repo with _SDD and multiple tickets
-    local repo_dir="$TEST_TMP_DIR/test-repo"
-    local sdd_root="$repo_dir/_SDD"
+    # Create specs entry with multiple tickets
+    local sdd_root="$TEST_TMP_DIR/specs/test-repo"
+    local repo_path="$TEST_TMP_DIR/repos/test-repo/"
     mkdir -p "$sdd_root/tickets/TICKET-1_first/tasks"
     mkdir -p "$sdd_root/tickets/TICKET-2_second/tasks"
+    mkdir -p "$TEST_TMP_DIR/repos/test-repo/test-repo/.git"
 
     # Create README files for tickets
     echo "# First Ticket" > "$sdd_root/tickets/TICKET-1_first/README.md"
@@ -1923,7 +1959,7 @@ EOF
 EOF
 
     local output
-    output=$(scan_repo "$sdd_root")
+    output=$(scan_repo "$sdd_root" "$repo_path")
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "scan_repo multiple tickets exits with code 0"
@@ -1944,9 +1980,8 @@ test_scan_repo_no_tickets_dir() {
 
     source "$MASTER_SCRIPT"
 
-    # Create repo with _SDD but no tickets/
-    local repo_dir="$TEST_TMP_DIR/no-tickets-repo"
-    local sdd_root="$repo_dir/_SDD"
+    # Create specs entry but no tickets/
+    local sdd_root="$TEST_TMP_DIR/specs/no-tickets-repo"
     mkdir -p "$sdd_root"
 
     local output
@@ -1954,6 +1989,7 @@ test_scan_repo_no_tickets_dir() {
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "scan_repo no tickets dir exits with code 0"
+    assert_contains "$output" '"name": "no-tickets-repo"' "Repo name from specs dir basename"
     assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
     assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
     assert_contains "$output" '"tickets": []' "Tickets array is empty"
@@ -1967,9 +2003,8 @@ test_scan_repo_empty_tickets_dir() {
 
     source "$MASTER_SCRIPT"
 
-    # Create repo with empty tickets/
-    local repo_dir="$TEST_TMP_DIR/empty-tickets-repo"
-    local sdd_root="$repo_dir/_SDD"
+    # Create specs entry with empty tickets/
+    local sdd_root="$TEST_TMP_DIR/specs/empty-tickets-repo"
     mkdir -p "$sdd_root/tickets"
 
     local output
@@ -1977,6 +2012,7 @@ test_scan_repo_empty_tickets_dir() {
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "scan_repo empty tickets dir exits with code 0"
+    assert_contains "$output" '"name": "empty-tickets-repo"' "Repo name from specs dir basename"
     assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
     assert_contains "$output" '"total_tasks": 0' "Total tasks is 0"
 }
@@ -1989,7 +2025,7 @@ test_scan_repo_missing_dir() {
 
     source "$MASTER_SCRIPT"
 
-    local sdd_root="$TEST_TMP_DIR/nonexistent/repo/_SDD"
+    local sdd_root="$TEST_TMP_DIR/nonexistent/specs/missing-repo"
     local output
     local exit_code=0
     output=$(scan_repo "$sdd_root") || exit_code=$?
@@ -2007,9 +2043,8 @@ test_scan_repo_aggregation_logic() {
 
     source "$MASTER_SCRIPT"
 
-    # Create repo with 3 tickets for thorough aggregation test
-    local repo_dir="$TEST_TMP_DIR/aggregation-repo"
-    local sdd_root="$repo_dir/_SDD"
+    # Create specs entry with 3 tickets for thorough aggregation test
+    local sdd_root="$TEST_TMP_DIR/specs/aggregation-repo"
     mkdir -p "$sdd_root/tickets/T1/tasks"
     mkdir -p "$sdd_root/tickets/T2/tasks"
     mkdir -p "$sdd_root/tickets/T3/tasks"
@@ -2059,6 +2094,7 @@ EOF
 
     # Total: 3 tickets, 6 tasks
     # States: 2 pending, 1 completed, 1 tested, 2 verified
+    assert_contains "$output" '"name": "aggregation-repo"' "Repo name from specs dir basename"
     assert_contains "$output" '"total_tickets": 3' "Total tickets is 3"
     assert_contains "$output" '"total_tasks": 6' "Total tasks is 6"
     assert_contains "$output" '"pending": 2' "Pending is 2"
@@ -2075,8 +2111,7 @@ test_scan_repo_valid_json() {
 
     source "$MASTER_SCRIPT"
 
-    local repo_dir="$TEST_TMP_DIR/json-repo"
-    local sdd_root="$repo_dir/_SDD"
+    local sdd_root="$TEST_TMP_DIR/specs/json-repo"
     mkdir -p "$sdd_root/tickets/TICKET-1/tasks"
     echo "# Test" > "$sdd_root/tickets/TICKET-1/README.md"
     cat > "$sdd_root/tickets/TICKET-1/tasks/TICKET-1.1001.md" << 'EOF'
@@ -2105,21 +2140,97 @@ EOF
 }
 
 #######################################
-# Test: scan_repo extracts repo name from parent directory
+# Test: scan_repo extracts repo name from specs directory basename
 #######################################
 test_scan_repo_extracts_repo_name() {
-    echo "--- Test: scan_repo extracts repo name from parent ---"
+    echo "--- Test: scan_repo extracts repo name from specs dir ---"
 
     source "$MASTER_SCRIPT"
 
-    local repo_dir="$TEST_TMP_DIR/my-awesome-repo"
-    local sdd_root="$repo_dir/_SDD"
+    local sdd_root="$TEST_TMP_DIR/specs/my-awesome-repo"
     mkdir -p "$sdd_root/tickets"
 
     local output
     output=$(scan_repo "$sdd_root")
 
-    assert_contains "$output" '"name": "my-awesome-repo"' "Extracted repo name from parent directory"
+    assert_contains "$output" '"name": "my-awesome-repo"' "Extracted repo name from specs directory basename"
+}
+
+#######################################
+# Test: Missing repo graceful handling
+# When specs entry exists but no matching repo directory
+#######################################
+test_missing_repo_graceful_handling() {
+    echo "--- Test: Missing repo graceful handling ---"
+
+    # Create specs dir with no matching repo
+    local specs_root="$TEST_TMP_DIR/missing_repo_specs"
+    local repos_root="$TEST_TMP_DIR/missing_repo_repos"
+    mkdir -p "$specs_root/dev-container/tickets"
+    mkdir -p "$repos_root"  # repos root exists but has no dev-container child
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --json --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Missing repo exits with code 0"
+
+    # Verify the repo is still discovered from specs
+    assert_contains "$output" '"name": "dev-container"' "Found repo name from specs"
+    assert_contains "$output" '"sdd_root":' "sdd_root field present"
+
+    # repo_path should be null and repo_status should be repo_not_found
+    assert_contains "$output" '"repo_path": null' "repo_path is null when repo missing"
+    assert_contains "$output" '"repo_status": "repo_not_found"' "repo_status is repo_not_found"
+
+    # Should still report tickets (empty in this case)
+    assert_contains "$output" '"tickets": []' "Tickets array is present"
+
+    # Regression check: output should not contain deprecated paths
+    local deprecated_marker="_SD""D"
+    if echo "$output" | grep -q "$deprecated_marker"; then
+        log_result "Missing repo output has no deprecated paths" "fail" "Output contains deprecated path"
+    else
+        log_result "Missing repo output has no deprecated paths" "pass"
+    fi
+}
+
+#######################################
+# Test: Non-matching git dir name
+# When the git root name differs from the parent directory name
+# (e.g., repos/mattermost/mattermost-webapp/.git)
+#######################################
+test_nonmatching_git_dir_name() {
+    echo "--- Test: Non-matching git dir name ---"
+
+    # Create specs/<name> and repos/<name>/<different-git-dir>
+    local specs_root="$TEST_TMP_DIR/nonmatch_specs"
+    local repos_root="$TEST_TMP_DIR/nonmatch_repos"
+    mkdir -p "$specs_root/mattermost/tickets"
+    mkdir -p "$repos_root/mattermost/mattermost-webapp/.git"
+
+    local output
+    output=$(bash "$MASTER_SCRIPT" --json --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Non-matching git dir exits with code 0"
+
+    # Name comes from specs directory basename
+    assert_contains "$output" '"name": "mattermost"' "Found repo name from specs"
+
+    # sdd_path should point to the specs directory
+    assert_contains "$output" "specs/mattermost" "sdd_root points to specs dir"
+
+    # repo_path should point to the repos directory
+    assert_contains "$output" "repos/mattermost" "repo_path points to repos dir"
+
+    # Regression check: output should not contain deprecated paths
+    local deprecated_marker="_SD""D"
+    if echo "$output" | grep -q "$deprecated_marker"; then
+        log_result "Non-matching git dir output has no deprecated paths" "fail" "Output contains deprecated path"
+    else
+        log_result "Non-matching git dir output has no deprecated paths" "pass"
+    fi
 }
 
 #######################################
@@ -2128,28 +2239,31 @@ test_scan_repo_extracts_repo_name() {
 test_integration_full_workspace_scan() {
     echo "--- Test: Integration - Full workspace scan ---"
 
-    # Create multi-repo workspace
-    local workspace="$TEST_TMP_DIR/workspace"
-    mkdir -p "$workspace/repo-alpha/_SDD/tickets/ALPHA-1/tasks"
-    mkdir -p "$workspace/repo-beta/_SDD/tickets/BETA-1/tasks"
+    # Create multi-repo two-root structure
+    local specs_root="$TEST_TMP_DIR/integ_specs"
+    local repos_root="$TEST_TMP_DIR/integ_repos"
+    mkdir -p "$specs_root/repo-alpha/tickets/ALPHA-1/tasks"
+    mkdir -p "$specs_root/repo-beta/tickets/BETA-1/tasks"
+    mkdir -p "$repos_root/repo-alpha/repo-alpha/.git"
+    mkdir -p "$repos_root/repo-beta/repo-beta/.git"
 
-    echo "# Alpha Ticket" > "$workspace/repo-alpha/_SDD/tickets/ALPHA-1/README.md"
-    echo "# Beta Ticket" > "$workspace/repo-beta/_SDD/tickets/BETA-1/README.md"
+    echo "# Alpha Ticket" > "$specs_root/repo-alpha/tickets/ALPHA-1/README.md"
+    echo "# Beta Ticket" > "$specs_root/repo-beta/tickets/BETA-1/README.md"
 
-    cat > "$workspace/repo-alpha/_SDD/tickets/ALPHA-1/tasks/ALPHA-1.1001.md" << 'EOF'
+    cat > "$specs_root/repo-alpha/tickets/ALPHA-1/tasks/ALPHA-1.1001.md" << 'EOF'
 ## Status
 - [x] **Task completed**
 - [x] **Tests pass**
 - [x] **Verified**
 EOF
 
-    cat > "$workspace/repo-beta/_SDD/tickets/BETA-1/tasks/BETA-1.1001.md" << 'EOF'
+    cat > "$specs_root/repo-beta/tickets/BETA-1/tasks/BETA-1.1001.md" << 'EOF'
 ## Status
 - [ ] **Task completed**
 EOF
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
     assert_exit_code 0 "$exit_code" "Integration scan exits with code 0"
@@ -2159,19 +2273,21 @@ EOF
 }
 
 #######################################
-# Test: Integration - Empty workspace
+# Test: Integration - Empty specs root
 #######################################
 test_integration_empty_workspace() {
-    echo "--- Test: Integration - Empty workspace ---"
+    echo "--- Test: Integration - Empty specs root ---"
 
-    local workspace="$TEST_TMP_DIR/empty-workspace"
-    mkdir -p "$workspace"
+    local specs_root="$TEST_TMP_DIR/empty-integ-specs"
+    local repos_root="$TEST_TMP_DIR/empty-integ-repos"
+    mkdir -p "$specs_root"
+    mkdir -p "$repos_root"
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
     local exit_code=$?
 
-    assert_exit_code 0 "$exit_code" "Empty workspace exits with code 0"
+    assert_exit_code 0 "$exit_code" "Empty specs root exits with code 0"
     assert_contains "$output" '"repos": [' "Output has repos array"
     assert_contains "$output" '"total_repos": 0' "Total repos is 0"
     assert_contains "$output" '"total_tickets": 0' "Total tickets is 0"
@@ -2183,21 +2299,24 @@ test_integration_empty_workspace() {
 test_integration_workspace_level_summary() {
     echo "--- Test: Integration - Workspace-level summary ---"
 
-    local workspace="$TEST_TMP_DIR/summary-workspace"
-    mkdir -p "$workspace/r1/_SDD/tickets/T1/tasks"
-    mkdir -p "$workspace/r2/_SDD/tickets/T2/tasks"
+    local specs_root="$TEST_TMP_DIR/summary-integ-specs"
+    local repos_root="$TEST_TMP_DIR/summary-integ-repos"
+    mkdir -p "$specs_root/r1/tickets/T1/tasks"
+    mkdir -p "$specs_root/r2/tickets/T2/tasks"
+    mkdir -p "$repos_root/r1/r1/.git"
+    mkdir -p "$repos_root/r2/r2/.git"
 
-    echo "# T1" > "$workspace/r1/_SDD/tickets/T1/README.md"
-    echo "# T2" > "$workspace/r2/_SDD/tickets/T2/README.md"
+    echo "# T1" > "$specs_root/r1/tickets/T1/README.md"
+    echo "# T2" > "$specs_root/r2/tickets/T2/README.md"
 
     # r1: 1 pending task
-    cat > "$workspace/r1/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+    cat > "$specs_root/r1/tickets/T1/tasks/T1.1001.md" << 'EOF'
 ## Status
 - [ ] **Task completed**
 EOF
 
     # r2: 1 verified task
-    cat > "$workspace/r2/_SDD/tickets/T2/tasks/T2.1001.md" << 'EOF'
+    cat > "$specs_root/r2/tickets/T2/tasks/T2.1001.md" << 'EOF'
 ## Status
 - [x] **Task completed**
 - [x] **Tests pass**
@@ -2205,7 +2324,7 @@ EOF
 EOF
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
 
     # Workspace summary should be aggregated
     assert_contains "$output" '"total_repos": 2' "Workspace total_repos is 2"
@@ -2219,16 +2338,18 @@ EOF
 test_integration_output_valid_json() {
     echo "--- Test: Integration - Output is valid JSON ---"
 
-    local workspace="$TEST_TMP_DIR/json-workspace"
-    mkdir -p "$workspace/repo/_SDD/tickets/T1/tasks"
-    echo "# T1" > "$workspace/repo/_SDD/tickets/T1/README.md"
-    cat > "$workspace/repo/_SDD/tickets/T1/tasks/T1.1001.md" << 'EOF'
+    local specs_root="$TEST_TMP_DIR/json-integ-specs"
+    local repos_root="$TEST_TMP_DIR/json-integ-repos"
+    mkdir -p "$specs_root/repo/tickets/T1/tasks"
+    mkdir -p "$repos_root/repo/repo/.git"
+    echo "# T1" > "$specs_root/repo/tickets/T1/README.md"
+    cat > "$specs_root/repo/tickets/T1/tasks/T1.1001.md" << 'EOF'
 ## Status
 - [x] **Task completed**
 EOF
 
     local output
-    output=$(bash "$MASTER_SCRIPT" "$workspace" 2>&1)
+    output=$(bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" 2>&1)
 
     if command -v jq &>/dev/null; then
         if echo "$output" | jq . >/dev/null 2>&1; then
@@ -2254,16 +2375,19 @@ test_integration_performance() {
     echo "--- Test: Integration - Performance ---"
 
     # Test against real workspace if it exists, otherwise use temp
-    local workspace="/workspace/repos"
-    if [[ ! -d "$workspace" ]]; then
-        workspace="$TEST_TMP_DIR/perf-workspace"
-        mkdir -p "$workspace"
+    local specs_root="/workspace/_SPECS"
+    local repos_root="/workspace/repos"
+    if [[ ! -d "$specs_root" ]]; then
+        specs_root="$TEST_TMP_DIR/perf-specs"
+        repos_root="$TEST_TMP_DIR/perf-repos"
+        mkdir -p "$specs_root"
+        mkdir -p "$repos_root"
     fi
 
     local start_time end_time elapsed
     start_time=$(date +%s%N)
 
-    bash "$MASTER_SCRIPT" "$workspace" >/dev/null 2>&1
+    bash "$MASTER_SCRIPT" --specs-root "$specs_root" --repos-root "$repos_root" >/dev/null 2>&1
     local exit_code=$?
 
     end_time=$(date +%s%N)
@@ -2290,16 +2414,17 @@ test_recommended_action_multiple_priorities() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "LOW-1_low-priority",
           "name": "Low Priority Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/LOW-1_low-priority",
+          "path": "/workspace/_SPECS/test-repo/tickets/LOW-1_low-priority",
           "autogate": {"ready": true, "agent_ready": true, "priority": 3, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/LOW-1.1001.md", "task_id": "LOW-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2309,7 +2434,7 @@ test_recommended_action_multiple_priorities() {
         {
           "ticket_id": "HIGH-1_high-priority",
           "name": "High Priority Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/HIGH-1_high-priority",
+          "path": "/workspace/_SPECS/test-repo/tickets/HIGH-1_high-priority",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/HIGH-1.1001.md", "task_id": "HIGH-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2319,7 +2444,7 @@ test_recommended_action_multiple_priorities() {
         {
           "ticket_id": "MED-1_medium-priority",
           "name": "Medium Priority Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/MED-1_medium-priority",
+          "path": "/workspace/_SPECS/test-repo/tickets/MED-1_medium-priority",
           "autogate": {"ready": true, "agent_ready": true, "priority": 2, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/MED-1.1001.md", "task_id": "MED-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2356,16 +2481,17 @@ test_recommended_action_tied_priorities() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "ZEBRA-1_later-alphabetically",
           "name": "Zebra Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/ZEBRA-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/ZEBRA-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/ZEBRA-1.1001.md", "task_id": "ZEBRA-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2375,7 +2501,7 @@ test_recommended_action_tied_priorities() {
         {
           "ticket_id": "ALPHA-1_earlier-alphabetically",
           "name": "Alpha Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/ALPHA-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/ALPHA-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/ALPHA-1.1001.md", "task_id": "ALPHA-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2412,16 +2538,17 @@ test_recommended_action_ready_false_filtered() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "BLOCKED-1_not-ready",
           "name": "Blocked Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/BLOCKED-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/BLOCKED-1",
           "autogate": {"ready": false, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/BLOCKED-1.1001.md", "task_id": "BLOCKED-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2457,16 +2584,17 @@ test_recommended_action_agent_ready_false_filtered() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "MANUAL-1_human-only",
           "name": "Human Only Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/MANUAL-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/MANUAL-1",
           "autogate": {"ready": true, "agent_ready": false, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/MANUAL-1.1001.md", "task_id": "MANUAL-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2502,16 +2630,17 @@ test_recommended_action_agent_ready_true_selected() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "AAAAAA-1_first-but-not-agent-ready",
           "name": "First but not agent ready",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/AAAAAA-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/AAAAAA-1",
           "autogate": {"ready": true, "agent_ready": false, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/AAAAAA-1.1001.md", "task_id": "AAAAAA-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2521,7 +2650,7 @@ test_recommended_action_agent_ready_true_selected() {
         {
           "ticket_id": "ZZZZZZ-1_last-but-agent-ready",
           "name": "Last but agent ready",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/ZZZZZZ-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/ZZZZZZ-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/ZZZZZZ-1.1001.md", "task_id": "ZZZZZZ-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2558,16 +2687,17 @@ test_recommended_action_all_verified_returns_none() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "DONE-1_all-verified",
           "name": "All Done Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/DONE-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/DONE-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/DONE-1.1001.md", "task_id": "DONE-1.1001", "task_completed": true, "tests_pass": true, "verified": true},
@@ -2604,11 +2734,12 @@ test_recommended_action_no_tickets_returns_none() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "empty-repo",
-      "sdd_root": "/workspace/repos/empty-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/empty-repo",
       "tickets": [],
       "summary": {"total_tickets": 0, "total_tasks": 0, "pending": 0, "completed": 0, "tested": 0, "verified": 0}
     }
@@ -2638,16 +2769,17 @@ test_recommended_action_task_state_priority() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "MIXED-1_mixed-states",
           "name": "Mixed States Ticket",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/MIXED-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/MIXED-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/MIXED-1.1003.md", "task_id": "MIXED-1.1003", "task_completed": true, "tests_pass": true, "verified": false},
@@ -2685,19 +2817,20 @@ test_recommended_action_includes_sdd_root() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "my-repo",
-      "sdd_root": "/workspace/repos/my-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/my-repo",
       "tickets": [
         {
           "ticket_id": "TEST-1_sdd-root-test",
           "name": "SDD Root Test",
-          "path": "/workspace/repos/my-repo/_SDD/tickets/TEST-1",
+          "path": "/workspace/_SPECS/my-repo/tickets/TEST-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
-            {"file": "/workspace/repos/my-repo/_SDD/tickets/TEST-1/tasks/TEST-1.1001.md", "task_id": "TEST-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
+            {"file": "/workspace/_SPECS/my-repo/tickets/TEST-1/tasks/TEST-1.1001.md", "task_id": "TEST-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
           ],
           "summary": {"total_tasks": 1, "pending": 1, "completed": 0, "tested": 0, "verified": 0}
         }
@@ -2713,7 +2846,7 @@ EOF
     local output
     output=$(compute_recommended_action "$scan_output")
 
-    assert_contains "$output" '"sdd_root": "/workspace/repos/my-repo/_SDD"' "Output includes sdd_root path"
+    assert_contains "$output" '"sdd_root": "/workspace/_SPECS/my-repo"' "Output includes sdd_root path"
     assert_contains "$output" '"task_file":' "Output includes task_file path"
 }
 
@@ -2729,16 +2862,17 @@ test_recommended_action_valid_json_output() {
     scan_output=$(cat << 'EOF'
 {
   "timestamp": "2026-01-15T10:00:00+00:00",
-  "workspace_root": "/workspace/repos/",
+  "specs_root": "/workspace/_SPECS/",
+  "repos_root": "/workspace/repos/",
   "repos": [
     {
       "name": "test-repo",
-      "sdd_root": "/workspace/repos/test-repo/_SDD",
+      "sdd_root": "/workspace/_SPECS/test-repo",
       "tickets": [
         {
           "ticket_id": "JSON-1_json-test",
           "name": "JSON Test",
-          "path": "/workspace/repos/test-repo/_SDD/tickets/JSON-1",
+          "path": "/workspace/_SPECS/test-repo/tickets/JSON-1",
           "autogate": {"ready": true, "agent_ready": true, "priority": 1, "stop_at_phase": null},
           "tasks": [
             {"file": "/path/JSON-1.1001.md", "task_id": "JSON-1.1001", "task_completed": false, "tests_pass": false, "verified": false}
@@ -2974,6 +3108,10 @@ main() {
     test_scan_repo_valid_json
     echo ""
     test_scan_repo_extracts_repo_name
+    echo ""
+    test_missing_repo_graceful_handling
+    echo ""
+    test_nonmatching_git_dir_name
     echo ""
 
     # Run integration tests
