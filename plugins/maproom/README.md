@@ -34,8 +34,12 @@ See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) 
 Before using the Maproom plugin, ensure you have:
 
 1. **crewchief-maproom CLI installed**: The plugin requires the `crewchief-maproom` command-line tool to be available in your system PATH
-2. **Indexed database**: Your codebase must be scanned using `crewchief-maproom scan` before searching
-3. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
+2. **Minimum crewchief-maproom version**: 0.1.0. Verify your version:
+   ```bash
+   crewchief-maproom --version
+   ```
+3. **Indexed database**: Your codebase must be scanned using `crewchief-maproom scan` before searching
+4. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
 
 To verify your setup:
 ```bash
