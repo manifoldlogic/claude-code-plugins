@@ -4579,6 +4579,42 @@ test_list_subdirs_normal_with_timeout() {
 }
 
 # =============================================================================
+# Priority 16: Shellcheck Static Analysis (SDDLOOP-6.5002)
+# =============================================================================
+
+#######################################
+# Test: shellcheck static analysis on sdd-loop.sh
+# Runs shellcheck --severity=style to prevent regressions.
+# Skips with a warning if shellcheck is not installed.
+#
+# To run shellcheck locally:
+#   shellcheck --severity=style sdd-loop.sh
+# Install shellcheck:
+#   Ubuntu/Debian: apt-get install shellcheck
+#   macOS: brew install shellcheck
+#######################################
+test_shellcheck_static_analysis() {
+    echo "--- Test: shellcheck static analysis ---"
+
+    if ! command -v shellcheck >/dev/null 2>&1; then
+        echo "  SKIP: shellcheck not installed (install with: apt-get install shellcheck)"
+        log_result "shellcheck static analysis (sdd-loop.sh)" "pass" "SKIPPED - shellcheck not available"
+        return
+    fi
+
+    local output=""
+    local exit_code=0
+    output=$(shellcheck --severity=style "$SDD_LOOP_ORIGINAL" 2>&1) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        log_result "shellcheck static analysis (sdd-loop.sh)" "pass"
+    else
+        echo "$output"
+        log_result "shellcheck static analysis (sdd-loop.sh)" "fail" "shellcheck found issues (exit code $exit_code)"
+    fi
+}
+
+# =============================================================================
 # Main Test Runner
 # =============================================================================
 
@@ -5045,6 +5081,17 @@ main() {
     test_list_subdirs_timeout_handling
     echo ""
     test_list_subdirs_normal_with_timeout
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 16 TESTS (Shellcheck Static Analysis - SDDLOOP-6.5002)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 16 Tests (Shellcheck Static Analysis)"
+    echo "====================================="
+    echo ""
+
+    test_shellcheck_static_analysis
     echo ""
 
     # Summary

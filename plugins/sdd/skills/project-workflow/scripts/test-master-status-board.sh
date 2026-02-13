@@ -3387,6 +3387,42 @@ TASKMD
     assert_contains "$output" "TICKET-1.1001" "scan_repo output contains task ID"
 }
 
+# =============================================================================
+# Shellcheck Static Analysis (SDDLOOP-6.5002)
+# =============================================================================
+
+#######################################
+# Test: shellcheck static analysis on master-status-board.sh
+# Runs shellcheck --severity=style to prevent regressions.
+# Skips with a warning if shellcheck is not installed.
+#
+# To run shellcheck locally:
+#   shellcheck --severity=style master-status-board.sh
+# Install shellcheck:
+#   Ubuntu/Debian: apt-get install shellcheck
+#   macOS: brew install shellcheck
+#######################################
+test_shellcheck_static_analysis() {
+    echo "--- Test: shellcheck static analysis ---"
+
+    if ! command -v shellcheck >/dev/null 2>&1; then
+        echo "  SKIP: shellcheck not installed (install with: apt-get install shellcheck)"
+        log_result "shellcheck static analysis (master-status-board.sh)" "pass" "SKIPPED - shellcheck not available"
+        return
+    fi
+
+    local output=""
+    local exit_code=0
+    output=$(shellcheck --severity=style "$MASTER_SCRIPT" 2>&1) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        log_result "shellcheck static analysis (master-status-board.sh)" "pass"
+    else
+        echo "$output"
+        log_result "shellcheck static analysis (master-status-board.sh)" "fail" "shellcheck found issues (exit code $exit_code)"
+    fi
+}
+
 #######################################
 # Main test runner
 #######################################
@@ -3674,6 +3710,14 @@ main() {
     test_scan_repo_timeout_handling
     echo ""
     test_scan_repo_normal_with_timeout
+    echo ""
+
+    # Run shellcheck static analysis tests
+    echo "====================================="
+    echo "Shellcheck Static Analysis (SDDLOOP-6.5002)"
+    echo "====================================="
+    echo ""
+    test_shellcheck_static_analysis
     echo ""
 
     # Summary
