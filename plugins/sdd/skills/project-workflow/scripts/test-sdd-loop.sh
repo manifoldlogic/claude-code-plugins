@@ -2874,6 +2874,363 @@ test_find_git_root_leading_dash() {
 }
 
 # =============================================================================
+# PRIORITY 10b TESTS (Helper Function Unit Tests - SDDLOOP-6.3007)
+# =============================================================================
+
+#######################################
+# Test: list_subdirectories_sorted with empty directory
+#######################################
+test_list_subdirs_empty_dir() {
+    echo "--- Test: list_subdirectories_sorted with empty directory ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_empty/parent"
+    mkdir -p "$test_dir"
+
+    # Capture null-terminated output to a temp file
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # File should be empty (no subdirectories)
+    local file_size
+    file_size=$(wc -c < "$output_file")
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 for empty dir"
+    assert_equals "0" "$file_size" "list_subdirectories_sorted produces no output for empty dir"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with single subdirectory
+#######################################
+test_list_subdirs_single() {
+    echo "--- Test: list_subdirectories_sorted with single subdir ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_single/parent"
+    mkdir -p "$test_dir/alpha"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # Read null-terminated output
+    local first_entry=""
+    local count=0
+    while IFS= read -r -d '' entry; do
+        if [ $count -eq 0 ]; then
+            first_entry="$entry"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 for single subdir"
+    assert_equals 1 "$count" "list_subdirectories_sorted returns exactly 1 entry"
+    assert_equals "$test_dir/alpha" "$first_entry" "list_subdirectories_sorted returns correct path"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with multiple subdirectories (sorted)
+#######################################
+test_list_subdirs_multiple_sorted() {
+    echo "--- Test: list_subdirectories_sorted with multiple subdirs (sorted) ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_multi/parent"
+    # Create in non-alphabetical order to verify sorting
+    mkdir -p "$test_dir/zebra"
+    mkdir -p "$test_dir/alpha"
+    mkdir -p "$test_dir/middle"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+    local exit_code=$?
+
+    # Read null-terminated output into ordered entries
+    local entries=""
+    local count=0
+    while IFS= read -r -d '' entry; do
+        if [ -n "$entries" ]; then
+            entries="$entries|$(basename "$entry")"
+        else
+            entries="$(basename "$entry")"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 0 "$exit_code" "list_subdirectories_sorted exits 0 for multiple subdirs"
+    assert_equals 3 "$count" "list_subdirectories_sorted returns all 3 entries"
+    assert_equals "alpha|middle|zebra" "$entries" "list_subdirectories_sorted returns sorted order"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with nonexistent directory
+#######################################
+test_list_subdirs_nonexistent() {
+    echo "--- Test: list_subdirectories_sorted with nonexistent dir ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local exit_code=0
+    list_subdirectories_sorted "/tmp/nonexistent_dir_$$/no_such_dir" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "list_subdirectories_sorted exits 1 for nonexistent dir"
+}
+
+#######################################
+# Test: list_subdirectories_sorted excludes files (only directories)
+#######################################
+test_list_subdirs_excludes_files() {
+    echo "--- Test: list_subdirectories_sorted excludes files ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_files/parent"
+    mkdir -p "$test_dir/subdir"
+    touch "$test_dir/a-file.txt"
+    touch "$test_dir/z-file.txt"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+
+    local count=0
+    local first_entry=""
+    while IFS= read -r -d '' entry; do
+        if [ $count -eq 0 ]; then
+            first_entry="$entry"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 1 "$count" "list_subdirectories_sorted returns only directories"
+    assert_equals "$test_dir/subdir" "$first_entry" "list_subdirectories_sorted returns the directory, not files"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: list_subdirectories_sorted with spaces in directory name
+#######################################
+test_list_subdirs_spaces() {
+    echo "--- Test: list_subdirectories_sorted with spaces in name ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/lss_spaces/parent"
+    mkdir -p "$test_dir/my dir"
+    mkdir -p "$test_dir/another dir"
+
+    local output_file
+    output_file=$(mktemp)
+    list_subdirectories_sorted "$test_dir" > "$output_file"
+
+    local count=0
+    local first_entry=""
+    while IFS= read -r -d '' entry; do
+        if [ $count -eq 0 ]; then
+            first_entry="$(basename "$entry")"
+        fi
+        count=$((count + 1))
+    done < "$output_file"
+
+    assert_equals 2 "$count" "list_subdirectories_sorted returns 2 dirs with spaces"
+    assert_equals "another dir" "$first_entry" "list_subdirectories_sorted sorts dirs with spaces correctly"
+    rm -f "$output_file"
+}
+
+#######################################
+# Test: select_first_git_root with single .git directory
+#######################################
+test_select_git_root_single_dir() {
+    echo "--- Test: select_first_git_root with single .git dir ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_single"
+    mkdir -p "$test_dir/repo/.git"
+
+    # Build candidates file
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0' "$test_dir/repo" > "$candidates_file"
+
+    local result
+    local exit_code=0
+    result=$(select_first_git_root "$candidates_file" "test-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 for single .git dir"
+    assert_equals "$test_dir/repo" "$result" "select_first_git_root returns the git root"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with worktree fallback (.git file)
+#######################################
+test_select_git_root_worktree_fallback() {
+    echo "--- Test: select_first_git_root with worktree fallback ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_worktree"
+    mkdir -p "$test_dir/wt-branch"
+    echo "gitdir: /some/path/.git/worktrees/wt-branch" > "$test_dir/wt-branch/.git"
+
+    # Build candidates file (no .git directory, only .git file)
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0' "$test_dir/wt-branch" > "$candidates_file"
+
+    local result
+    local exit_code=0
+    result=$(select_first_git_root "$candidates_file" "test-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 for worktree"
+    assert_equals "$test_dir/wt-branch" "$result" "select_first_git_root returns worktree path"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root prefers .git dir over .git file
+#######################################
+test_select_git_root_prefers_dir_over_file() {
+    echo "--- Test: select_first_git_root prefers .git dir over .git file ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_prefer"
+    # aaa has .git file (worktree), bbb has .git directory
+    mkdir -p "$test_dir/aaa"
+    echo "gitdir: /some/path" > "$test_dir/aaa/.git"
+    mkdir -p "$test_dir/bbb/.git"
+
+    # Build candidates file (sorted order: aaa, bbb)
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0%s\0' "$test_dir/aaa" "$test_dir/bbb" > "$candidates_file"
+
+    local result
+    local exit_code=0
+    result=$(select_first_git_root "$candidates_file" "test-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 when preferring dir"
+    assert_equals "$test_dir/bbb" "$result" "select_first_git_root prefers .git dir over .git file"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with no git entries
+#######################################
+test_select_git_root_none_found() {
+    echo "--- Test: select_first_git_root with no git entries ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_none"
+    mkdir -p "$test_dir/just-a-dir"
+    mkdir -p "$test_dir/another-dir"
+
+    # Build candidates file (no .git anywhere)
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0%s\0' "$test_dir/just-a-dir" "$test_dir/another-dir" > "$candidates_file"
+
+    local exit_code=0
+    select_first_git_root "$candidates_file" "test-repo" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "select_first_git_root exits 1 when no git entries"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with multiple .git dirs logs warnings
+#######################################
+test_select_git_root_multiple_warns() {
+    echo "--- Test: select_first_git_root with multiple .git dirs warns ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    local test_dir="$TEST_TMP_DIR/sfgr_multi"
+    mkdir -p "$test_dir/aaa/.git"
+    mkdir -p "$test_dir/bbb/.git"
+    mkdir -p "$test_dir/ccc/.git"
+
+    # Build candidates file
+    local candidates_file
+    candidates_file=$(mktemp)
+    printf '%s\0%s\0%s\0' "$test_dir/aaa" "$test_dir/bbb" "$test_dir/ccc" > "$candidates_file"
+
+    local result
+    local stderr_output
+    local exit_code=0
+    stderr_output=$(select_first_git_root "$candidates_file" "my-repo" 2>&1 1>/dev/null) || true
+
+    # Re-read candidates file for the actual result
+    result=$(select_first_git_root "$candidates_file" "my-repo" 2>/dev/null) || exit_code=$?
+
+    assert_equals 0 "$exit_code" "select_first_git_root exits 0 for multiple git dirs"
+    assert_equals "$test_dir/aaa" "$result" "select_first_git_root returns first alphabetically"
+    assert_contains "$stderr_output" "Multiple git roots found for repo: my-repo" \
+        "select_first_git_root warns about multiple git roots"
+    assert_contains "$stderr_output" "Candidates: [aaa, bbb, ccc]" \
+        "select_first_git_root lists all candidates"
+    assert_contains "$stderr_output" "Selected (alphabetically first): aaa" \
+        "select_first_git_root indicates selection"
+    rm -f "$candidates_file"
+}
+
+#######################################
+# Test: select_first_git_root with empty candidates file
+#######################################
+test_select_git_root_empty_candidates() {
+    echo "--- Test: select_first_git_root with empty candidates ---"
+
+    setup_test_env
+
+    source "$SDD_LOOP"
+
+    # Build empty candidates file
+    local candidates_file
+    candidates_file=$(mktemp)
+
+    local exit_code=0
+    select_first_git_root "$candidates_file" "test-repo" >/dev/null 2>&1 || exit_code=$?
+
+    assert_equals 1 "$exit_code" "select_first_git_root exits 1 for empty candidates"
+    rm -f "$candidates_file"
+}
+
+# =============================================================================
 # PRIORITY 11 TESTS (Concurrent Invocation Protection - SDDLOOP-6.3002)
 # =============================================================================
 
@@ -3410,6 +3767,39 @@ main() {
     test_find_git_root_newline_in_name
     echo ""
     test_find_git_root_leading_dash
+    echo ""
+
+    # ==========================================================================
+    # PRIORITY 10b TESTS (Helper Function Unit Tests - SDDLOOP-6.3007)
+    # ==========================================================================
+    echo "====================================="
+    echo "Priority 10b Tests (list_subdirectories_sorted / select_first_git_root)"
+    echo "====================================="
+    echo ""
+
+    test_list_subdirs_empty_dir
+    echo ""
+    test_list_subdirs_single
+    echo ""
+    test_list_subdirs_multiple_sorted
+    echo ""
+    test_list_subdirs_nonexistent
+    echo ""
+    test_list_subdirs_excludes_files
+    echo ""
+    test_list_subdirs_spaces
+    echo ""
+    test_select_git_root_single_dir
+    echo ""
+    test_select_git_root_worktree_fallback
+    echo ""
+    test_select_git_root_prefers_dir_over_file
+    echo ""
+    test_select_git_root_none_found
+    echo ""
+    test_select_git_root_multiple_warns
+    echo ""
+    test_select_git_root_empty_candidates
     echo ""
 
     # ==========================================================================

@@ -396,35 +396,50 @@ parse_json_field() {
 # =============================================================================
 
 #######################################
-# Find the git root directory under repos/<name>/
-# Selection: Alphabetically first .git directory, fallback to .git file (worktree)
+# List subdirectories under a parent directory, sorted alphabetically.
+# Returns a null-terminated list suitable for safe iteration over directory
+# names containing spaces, newlines, or other special characters.
 #
 # Arguments:
-#   $1 - repos_root: Root directory for repositories (e.g., "/workspace/repos/")
-#   $2 - repo_name: Name of the repository (e.g., "claude-code-plugins")
+#   $1 - parent_dir: Directory to list subdirectories under
 #
 # Outputs:
-#   Path to the git root directory on stdout
+#   Null-terminated paths to subdirectories on stdout (sorted alphabetically)
 #
 # Returns:
-#   0 - Found a git root
-#   1 - No git root found (repo_parent doesn't exist or no .git entries)
+#   0 - Success (even if no subdirectories found; output will be empty)
+#   1 - Parent directory doesn't exist
 #######################################
-find_git_root() {
-    local repos_root="$1"
+list_subdirectories_sorted() {
+    local parent_dir="$1"
+
+    [ -d "$parent_dir" ] || return 1
+
+    # Use find -print0 | sort -z to produce a null-terminated, alphabetically
+    # sorted list. This avoids word-splitting on directory names that contain
+    # spaces, newlines, or other special characters.
+    find "$parent_dir" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z
+}
+
+#######################################
+# Select the first git root from a null-terminated candidate list.
+# Prefers main checkouts (.git is a directory) over worktrees (.git is a file).
+# Logs enhanced warnings when multiple git directories are found.
+#
+# Arguments:
+#   $1 - candidates_file: Path to file containing null-terminated directory paths
+#   $2 - repo_name: Repository name (used in warning messages)
+#
+# Outputs:
+#   Path to selected git root on stdout (or empty if none found)
+#
+# Returns:
+#   0 - Git root found
+#   1 - No git root found among candidates
+#######################################
+select_first_git_root() {
+    local candidates_file="$1"
     local repo_name="$2"
-    local repo_parent="${repos_root}${repo_name}"
-
-    [[ -d "$repo_parent" ]] || return 1
-
-    # Build a null-terminated, alphabetically sorted list of subdirectories.
-    # Using find -print0 | sort -z avoids word-splitting on directory names
-    # that contain spaces, newlines, or other special characters.
-    local candidates_file
-    candidates_file=$(mktemp) || return 1
-
-    # Use -- to protect against directory names starting with a dash
-    find "$repo_parent" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z > "$candidates_file"
 
     # Prefer main checkout (.git is a directory) over worktree (.git is a file)
     local candidate
@@ -452,7 +467,6 @@ find_git_root() {
             log_warn "Candidates: [$all_candidates]"
             log_warn "Selected (alphabetically first): $(basename "$found_root")"
         fi
-        rm -f "$candidates_file"
         echo "$found_root"
         return 0
     fi
@@ -460,11 +474,52 @@ find_git_root() {
     # Fallback: worktree (.git is a file)
     while IFS= read -r -d '' candidate; do
         if [[ -f "$candidate/.git" ]]; then
-            rm -f "$candidates_file"
             echo "${candidate%/}"
             return 0
         fi
     done < "$candidates_file"
+
+    return 1
+}
+
+#######################################
+# Find the git root directory under repos/<name>/
+# Orchestrates list_subdirectories_sorted() and select_first_git_root()
+# to discover the git root within a repository parent directory.
+#
+# Selection: Alphabetically first .git directory, fallback to .git file (worktree)
+#
+# Arguments:
+#   $1 - repos_root: Root directory for repositories (e.g., "/workspace/repos/")
+#   $2 - repo_name: Name of the repository (e.g., "claude-code-plugins")
+#
+# Outputs:
+#   Path to the git root directory on stdout
+#
+# Returns:
+#   0 - Found a git root
+#   1 - No git root found (repo_parent doesn't exist or no .git entries)
+#######################################
+find_git_root() {
+    local repos_root="$1"
+    local repo_name="$2"
+    local repo_parent="${repos_root}${repo_name}"
+
+    [[ -d "$repo_parent" ]] || return 1
+
+    # Build sorted candidate list via helper
+    local candidates_file
+    candidates_file=$(mktemp) || return 1
+
+    list_subdirectories_sorted "$repo_parent" > "$candidates_file"
+
+    # Select first git root from candidates via helper
+    local selected_root
+    if selected_root=$(select_first_git_root "$candidates_file" "$repo_name"); then
+        rm -f "$candidates_file"
+        echo "$selected_root"
+        return 0
+    fi
 
     rm -f "$candidates_file"
     return 1
