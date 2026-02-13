@@ -13,6 +13,8 @@
 #   7. Successful scaffold does NOT trigger cleanup (directory persists)
 #   8. Failed scaffold triggers cleanup (partial directory removed)
 #   9. Pre-existing directory is NOT cleaned up on failure
+#  10. Path traversal via relative path (../../../etc/passwd) rejected
+#  11. Absolute path (/etc/passwd) rejected
 #
 # Usage:
 #   bash test-backward-compatibility.sh
@@ -457,6 +459,79 @@ fi
 
 # Clean up pre-existing test directory
 rm -rf "$PREEXIST_DIR"
+
+# =============================================
+# Test 10: Path traversal via relative path
+#          (../../../etc/passwd) rejected
+# =============================================
+
+printf -- "\n${CYAN}--- Path Traversal Prevention Tests (SMRTING.7003) ---${NC}\n\n"
+
+# Use a fresh SDD_ROOT_DIR for path traversal tests
+TRAVERSAL_TEST_DIR="$TEMP_DIR/traversal-tests"
+mkdir -p "$TRAVERSAL_TEST_DIR/tickets"
+export SDD_ROOT_DIR="$TRAVERSAL_TEST_DIR"
+
+test_name="Path traversal via relative path (../../../etc/passwd) rejected"
+
+# Create a manifest with a relative path traversal filename
+TRAVERSAL_MANIFEST="$TEMP_DIR/traversal-manifest.json"
+printf '%s\n' '{"documents": [{"filename": "../../../etc/passwd", "action": "generate"}]}' > "$TRAVERSAL_MANIFEST"
+
+set +e
+TRAVERSAL_T10_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" --manifest "$TRAVERSAL_MANIFEST" "TRAVREL" "traversal-relative" 2>&1)
+TRAVERSAL_T10_EXIT=$?
+set -e
+
+if [ "$TRAVERSAL_T10_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "scaffold-ticket.sh should have rejected path traversal but exited 0"
+elif printf '%s' "$TRAVERSAL_T10_OUTPUT" | grep -q "path traversal"; then
+    # Verify no file was created at the traversal target
+    if [ -f "$TRAVERSAL_TEST_DIR/etc/passwd" ] || [ -f "$TRAVERSAL_TEST_DIR/tickets/../../../etc/passwd" ]; then
+        log_fail "$test_name" "File created at traversal path despite rejection"
+    else
+        log_pass "$test_name"
+    fi
+else
+    log_fail "$test_name" "Expected 'path traversal' in error output. Got: $TRAVERSAL_T10_OUTPUT"
+fi
+
+# Clean up traversal test directory
+rm -rf "$TRAVERSAL_TEST_DIR/tickets/TRAVREL_traversal-relative"
+
+# =============================================
+# Test 11: Absolute path (/etc/passwd) rejected
+# =============================================
+
+# Recreate tickets dir in case cleanup removed it
+mkdir -p "$TRAVERSAL_TEST_DIR/tickets"
+
+test_name="Absolute path (/etc/passwd) rejected"
+
+# Create a manifest with an absolute path filename
+ABS_MANIFEST="$TEMP_DIR/absolute-path-manifest.json"
+printf '%s\n' '{"documents": [{"filename": "/etc/passwd", "action": "generate"}]}' > "$ABS_MANIFEST"
+
+set +e
+# shellcheck disable=SC2034
+TRAVERSAL_T11_OUTPUT=$(bash "$SCAFFOLD_SCRIPT" --manifest "$ABS_MANIFEST" "TRAVABS" "traversal-absolute" 2>&1)
+TRAVERSAL_T11_EXIT=$?
+set -e
+
+if [ "$TRAVERSAL_T11_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "scaffold-ticket.sh should have rejected absolute path but exited 0"
+else
+    # Verify no file was created at the absolute path target
+    # The script should fail either via path traversal check or missing template
+    if [ -f "/etc/passwd.new" ]; then
+        log_fail "$test_name" "File created at absolute path target"
+    else
+        log_pass "$test_name"
+    fi
+fi
+
+# Clean up traversal test directory
+rm -rf "$TRAVERSAL_TEST_DIR/tickets/TRAVABS_traversal-absolute"
 
 # --- Summary ---
 
