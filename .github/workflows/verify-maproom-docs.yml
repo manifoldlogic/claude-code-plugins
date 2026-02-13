@@ -1,0 +1,23 @@
+name: Verify Maproom Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugins/maproom/**/*.md'
+  pull_request:
+    paths:
+      - 'plugins/maproom/**/*.md'
+
+jobs:
+  verify-docs:
+    name: Verify documentation consistency
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run documentation verification
+        run: bash plugins/maproom/scripts/verify-docs.sh

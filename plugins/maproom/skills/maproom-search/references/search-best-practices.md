@@ -11,6 +11,7 @@ Maproom provides semantic code search that understands code concepts and relatio
 3. **Use technical terms**: Prefer code-like terminology over descriptions (e.g., "authentication" not "logging in")
 4. **Preserve identifiers**: Keep camelCase and snake_case names intact as they help identify specific code patterns
 5. **Trust auto-detection**: Let SearchMode determine the optimal search type automatically based on your query pattern
+6. **Use agent-optimized output**: Always use `--format agent` for compact, token-efficient results designed for LLM consumption
 
 ## Anti-Patterns to Avoid
 
@@ -44,7 +45,7 @@ Searching `"*.test.ts"` or `"src/components/*.tsx"` fails because Maproom search
 
 ### 8. Too Many Results Without Filtering
 
-Broad conceptual searches return 100+ results, making it hard to find relevant code. **Fix**: Use filters like `filters: {file_type: "ts"}` to narrow scope, or `k: 5` to limit result count.
+Broad conceptual searches return 100+ results, making it hard to find relevant code. **Fix**: Use filters like `filters: {file_type: "ts"}` to narrow scope, `--kind func` to restrict to functions, `--lang ts` to filter by language, or `k: 5` to limit result count.
 
 ### 9. Not Using Context for Understanding
 
