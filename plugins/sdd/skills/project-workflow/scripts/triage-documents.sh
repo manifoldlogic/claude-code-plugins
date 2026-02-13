@@ -153,6 +153,17 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+# --- Validate Conflicting Overrides ---
+
+for plus_doc in $overrides_plus; do
+    case " $overrides_minus " in
+        *" $plus_doc "*)
+            error "Conflicting overrides for document '$plus_doc': both +$plus_doc and -$plus_doc specified"
+            exit 1
+            ;;
+    esac
+done
+
 # --- Validate Registry ---
 
 if [ ! -f "$REGISTRY_FILE" ]; then

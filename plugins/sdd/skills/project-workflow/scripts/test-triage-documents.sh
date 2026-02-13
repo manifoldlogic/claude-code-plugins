@@ -37,6 +37,9 @@
 #  34. --debug flag enables verbose tracing (set -x output on stderr)
 #  35. DEBUG=1 env var enables verbose tracing (set -x output on stderr)
 #  36. Stderr messages include [HH:MM:SS] timestamp prefix
+#  37. Conflicting overrides +doc -doc detected - exits 1 with conflict error
+#  38. Conflicting overrides -doc +doc detected (reverse order) - exits 1 with conflict error
+#  39. Non-conflicting overrides pass - no false positives
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -1266,6 +1269,83 @@ if $test_ok; then
         log_pass "$test_name"
     else
         log_fail "$test_name" "no [HH:MM:SS] timestamp found in stderr (got: $TIMESTAMP_STDERR)"
+    fi
+fi
+
+# =============================================
+# Test 37: Conflicting overrides +doc -doc detected
+# Running with +accessibility -accessibility should:
+#   - Exit with code 1
+#   - Print conflict error to stderr
+# =============================================
+
+printf -- "\n${CYAN}--- Conflicting Override Tests ---${NC}\n\n"
+
+run_triage_with_stderr "test description" "+accessibility" "-accessibility"
+
+test_name="Conflicting overrides +doc -doc: exits 1 with conflict error"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "script exited 0, expected non-zero"
+    test_ok=false
+fi
+
+if $test_ok; then
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Conflicting overrides for document 'accessibility'"; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "stderr missing conflict error (got: $TRIAGE_STDERR)"
+    fi
+fi
+
+# =============================================
+# Test 38: Conflicting overrides -doc +doc detected (reverse order)
+# Running with -observability +observability should:
+#   - Exit with code 1
+#   - Print conflict error to stderr
+# =============================================
+
+run_triage_with_stderr "test description" "-observability" "+observability"
+
+test_name="Conflicting overrides -doc +doc (reverse): exits 1 with conflict error"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -eq 0 ]; then
+    log_fail "$test_name" "script exited 0, expected non-zero"
+    test_ok=false
+fi
+
+if $test_ok; then
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Conflicting overrides for document 'observability'"; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "stderr missing conflict error (got: $TRIAGE_STDERR)"
+    fi
+fi
+
+# =============================================
+# Test 39: Non-conflicting overrides pass (no false positives)
+# Running with +accessibility -runbook +observability should:
+#   - Exit with code 0
+#   - No conflict errors on stderr
+# =============================================
+
+run_triage_with_stderr "test description" "+accessibility" "-runbook" "+observability"
+
+test_name="Non-conflicting overrides: no false positives"
+test_ok=true
+
+if [ "$TRIAGE_EXIT" -ne 0 ]; then
+    log_fail "$test_name" "script exited $TRIAGE_EXIT, expected 0"
+    test_ok=false
+fi
+
+if $test_ok; then
+    if printf '%s' "$TRIAGE_STDERR" | grep -qF "Conflicting overrides"; then
+        log_fail "$test_name" "false positive: conflict error found for non-conflicting overrides (got: $TRIAGE_STDERR)"
+    else
+        log_pass "$test_name"
     fi
 fi
 
