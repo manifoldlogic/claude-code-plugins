@@ -3588,6 +3588,34 @@ test_help_shows_directory_structure() {
     assert_contains "$output" "repos-root/" "Help shows repos-root structure"
 }
 
+#######################################
+# Test: Empty --specs-root is rejected with clear error
+#######################################
+test_empty_specs_root_rejected() {
+    echo "--- Test: Empty --specs-root rejected ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --specs-root "" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Empty --specs-root exits with code 1"
+    assert_contains "$output" "--specs-root cannot be empty" "Error message mentions --specs-root cannot be empty"
+}
+
+#######################################
+# Test: Empty --repos-root is rejected with clear error
+#######################################
+test_empty_repos_root_rejected() {
+    echo "--- Test: Empty --repos-root rejected ---"
+
+    local output
+    local exit_code=0
+    output=$(bash "$SDD_LOOP_ORIGINAL" --repos-root "" 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Empty --repos-root exits with code 1"
+    assert_contains "$output" "--repos-root cannot be empty" "Error message mentions --repos-root cannot be empty"
+}
+
 # =============================================================================
 # PRIORITY 13 TESTS (find_git_root_cached Unit Tests - SDDLOOP-6.3009)
 # =============================================================================
@@ -4352,6 +4380,10 @@ main() {
     test_no_warning_for_different_roots
     echo ""
     test_help_shows_directory_structure
+    echo ""
+    test_empty_specs_root_rejected
+    echo ""
+    test_empty_repos_root_rejected
     echo ""
 
     # ==========================================================================

@@ -847,6 +847,10 @@ main() {
                     exit 2
                 fi
                 arg_specs_root="$2"
+                if [ -z "$arg_specs_root" ]; then
+                    echo "Error: --specs-root cannot be empty" >&2
+                    exit 1
+                fi
                 shift 2
                 ;;
             --repos-root)
@@ -855,6 +859,10 @@ main() {
                     exit 2
                 fi
                 arg_repos_root="$2"
+                if [ -z "$arg_repos_root" ]; then
+                    echo "Error: --repos-root cannot be empty" >&2
+                    exit 1
+                fi
                 shift 2
                 ;;
             --json)

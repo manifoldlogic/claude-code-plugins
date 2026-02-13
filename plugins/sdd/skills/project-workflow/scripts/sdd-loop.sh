@@ -1776,19 +1776,27 @@ main() {
                 shift 2
                 ;;
             --specs-root)
-                if [[ -z "${2:-}" ]]; then
+                if [[ $# -lt 2 ]]; then
                     log_error "Option --specs-root requires a directory path"
                     exit 2
                 fi
                 SDD_LOOP_SPECS_ROOT="$2"
+                if [ -z "$SDD_LOOP_SPECS_ROOT" ]; then
+                    log_error "Error: --specs-root cannot be empty"
+                    exit 1
+                fi
                 shift 2
                 ;;
             --repos-root)
-                if [[ -z "${2:-}" ]]; then
+                if [[ $# -lt 2 ]]; then
                     log_error "Option --repos-root requires a directory path"
                     exit 2
                 fi
                 SDD_LOOP_REPOS_ROOT="$2"
+                if [ -z "$SDD_LOOP_REPOS_ROOT" ]; then
+                    log_error "Error: --repos-root cannot be empty"
+                    exit 1
+                fi
                 shift 2
                 ;;
             --max-iterations)
