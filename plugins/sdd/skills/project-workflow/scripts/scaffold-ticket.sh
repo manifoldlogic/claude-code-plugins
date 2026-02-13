@@ -4,11 +4,12 @@
 # Creates the folder structure for a new ticket
 #
 # Usage:
-#   bash scaffold-ticket.sh <TICKET_ID> <name>
+#   bash scaffold-ticket.sh [--manifest <path>] <TICKET_ID> <name>
 #
 # Arguments:
-#   TICKET_ID  - Ticket identifier (4-12 chars, uppercase with optional dashes for Jira IDs like UIT-9819)
-#   name       - Ticket name (kebab-case)
+#   --manifest <path>  Optional path to triage manifest JSON
+#   TICKET_ID          Ticket identifier (2-12 chars, uppercase with optional dashes for Jira IDs like UIT-9819)
+#   name               Ticket name (kebab-case)
 #
 # Output:
 #   JSON with created structure
@@ -31,15 +32,16 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") <TICKET_ID> <name>
+Usage: $(basename "$0") [--manifest <path>] <TICKET_ID> <name>
 
 Arguments:
-  TICKET_ID  Ticket identifier (e.g., APIV2, DKRHUB, or Jira ID like UIT-9819)
-  name       Ticket name (kebab-case, e.g., "api-redesign")
+  --manifest <path>  Optional triage manifest JSON (output of triage-documents.sh)
+  TICKET_ID          Ticket identifier (e.g., APIV2, DKRHUB, or Jira ID like UIT-9819)
+  name               Ticket name (kebab-case, e.g., "api-redesign")
 
 Examples:
   $(basename "$0") APIV2 api-version-2
-  $(basename "$0") DKRHUB docker-hub-publishing
+  $(basename "$0") --manifest /tmp/manifest.json DKRHUB docker-hub-publishing
   $(basename "$0") UIT-9819 user-profile-update    # Jira-based ticket ID
 
 Output:
@@ -86,34 +88,63 @@ check_ticket_id_unique() {
     fi
 }
 
-main() {
-    if [[ $# -lt 2 ]]; then
-        usage
-    fi
+# Generate a planning document from a standalone template file.
+# Reads the template, substitutes {NAME} with the ticket name, writes to output.
+#
+# Arguments:
+#   $1 - filename (e.g., "analysis.md")
+#   $2 - output directory (e.g., "/path/to/ticket/planning")
+#   $3 - ticket_name (human-readable, spaces instead of hyphens)
+generate_doc() {
+    local filename="$1"
+    local output_dir="$2"
+    local ticket_name="$3"
+    local template_path="$TEMPLATE_DIR/$filename"
+    local output_path="$output_dir/$filename"
 
-    local ticket_id="$1"
-    local name="$2"
-    local folder_name="${ticket_id}_${name}"
-    local ticket_path="$SDD_ROOT_DIR/tickets/$folder_name"
-
-    validate_ticket_id "$ticket_id"
-    validate_name "$name"
-    check_ticket_id_unique "$ticket_id"
-
-    # Check if already exists
-    if [[ -d "$ticket_path" ]]; then
-        error "Ticket already exists: $ticket_path"
+    if [ ! -f "$template_path" ]; then
+        error "Template file missing: $template_path"
         exit 1
     fi
 
-    info "Creating ticket: $folder_name"
+    sed "s/{NAME}/${ticket_name}/g" "$template_path" > "$output_path"
+}
 
-    # Create directory structure
-    mkdir -p "$ticket_path"/{planning,tasks,deliverables}
+# Generate README.md with links only to the documents that were actually created.
+#
+# Arguments:
+#   $1 - ticket_path (e.g., "/path/to/ticket")
+#   $2 - ticket_id
+#   $3 - ticket_name (human-readable, spaces instead of hyphens)
+#   $4 - space-separated list of created filenames (e.g., "analysis.md architecture.md plan.md")
+generate_readme() {
+    local ticket_path="$1"
+    local ticket_id="$2"
+    local ticket_name="$3"
+    local created_files="$4"
+    local readme_path="$ticket_path/README.md"
 
-    # Create README.md
-    cat > "$ticket_path/README.md" << EOF
-# Ticket: ${name//-/ }
+    # Build the planning documents link list
+    local planning_links=""
+    for filename in $created_files; do
+        # Look up the title from the document registry if available
+        local title=""
+        if [ -f "$TEMPLATE_DIR/../document-registry.json" ]; then
+            title=$(jq -r --arg fn "$filename" \
+                '.documents[] | select(.filename == $fn) | .title // empty' \
+                "$TEMPLATE_DIR/../document-registry.json" 2>/dev/null || true)
+        fi
+        # Fallback: derive title from filename
+        if [ -z "$title" ]; then
+            # Remove .md extension, replace hyphens with spaces, capitalize first letter
+            title=$(printf '%s' "$filename" | sed 's/\.md$//' | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
+        fi
+        planning_links="${planning_links}- [${filename}](planning/${filename}) - ${title}
+"
+    done
+
+    cat > "$readme_path" << EOF
+# Ticket: ${ticket_name}
 
 **Ticket ID:** $ticket_id
 **Status:** Planning
@@ -147,343 +178,114 @@ See [deliverables/](deliverables/) for analysis reports, findings documents, and
 
 ## Planning Documents
 
-- [analysis.md](planning/analysis.md) - Problem analysis
-- [PRD](planning/prd.md) - Product Requirements Document
-- [architecture.md](planning/architecture.md) - Solution design
-- [plan.md](planning/plan.md) - Execution plan
-- [quality-strategy.md](planning/quality-strategy.md) - Testing approach
-- [security-review.md](planning/security-review.md) - Security assessment
-
+${planning_links}
 ## Tasks
 
 See [tasks/](tasks/) for all ticket tasks.
 EOF
-
-    # Create analysis.md template
-    cat > "$ticket_path/planning/analysis.md" << EOF
-# Analysis: ${name//-/ }
-
-## Problem Definition
-
-[Clear statement of the problem being solved]
-
-## Context
-
-[Background information and why this work is needed]
-
-## Existing Solutions
-
-[What solutions exist in the industry or codebase?]
-
-## Current State
-
-[If applicable, describe current implementation]
-
-## Research Findings
-
-[Key insights from research and exploration]
-
-## Constraints
-
-[Technical, business, or resource constraints]
-
-## Success Criteria
-
-[How will we know this ticket succeeded?]
-EOF
-
-    # Create prd.md template (Product Requirements Document)
-    cat > "$ticket_path/planning/prd.md" << 'EOF'
-# PRD: {NAME}
-
-## Product Vision
-
-[Brief problem statement and proposed solution. What problem are we solving and why does it matter? Keep this concise - 2-3 sentences maximum.]
-
-*Mark as N/A if this is a technical refactoring or internal improvement ticket.*
-
-## Target Users
-
-[Who will use this feature? Describe the primary user personas and their context. Include both direct users and any secondary stakeholders.]
-
-- **Primary Users:** [Description of main users]
-- **Secondary Users:** [Description of secondary users, if any]
-
-*Mark as N/A if this is infrastructure or internal tooling with no direct users.*
-
-## Functional Requirements
-
-[What must the system do? List the core functionality required. Each requirement should be specific and verifiable.]
-
-- [ ] [Requirement 1: specific behavior the system must exhibit]
-- [ ] [Requirement 2: specific behavior the system must exhibit]
-- [ ] [Requirement 3: specific behavior the system must exhibit]
-
-## Non-Functional Requirements
-
-[Quality attributes and constraints. Include performance, scalability, security, accessibility, and reliability requirements as applicable.]
-
-### Performance
-- [Performance requirement, e.g., "Response time under 200 ms"]
-
-### Security
-- [Security requirement, e.g., "Input validation on all user-provided data"]
-
-### Reliability
-- [Reliability requirement, e.g., "Graceful degradation when external services unavailable"]
-
-*Mark individual subsections as N/A if not applicable to this ticket.*
-
-## User Stories
-
-[Describe how users will interact with this feature. Use the format: "As a [user type], I want [goal] so that [benefit]".]
-
-- As a [user type], I want [goal] so that [benefit].
-- As a [user type], I want [goal] so that [benefit].
-
-*Mark as N/A for technical tickets without user-facing changes.*
-
-## Acceptance Criteria
-
-[Specific, testable conditions that must be met for this work to be considered complete. These should be unambiguous and verifiable.]
-
-- [ ] [Criterion 1: specific testable condition]
-- [ ] [Criterion 2: specific testable condition]
-- [ ] [Criterion 3: specific testable condition]
-
-## Out of Scope
-
-[Explicitly list what this ticket will NOT include. This prevents scope creep and sets clear boundaries.]
-
-- [Item explicitly excluded from this work]
-- [Feature or enhancement deferred to future work]
-
-*Mark as N/A if scope is self-evident and no clarification needed.*
-
-## Assumptions
-
-[List assumptions being made that could affect the implementation or success of this work.]
-
-- [Assumption 1: condition assumed to be true]
-- [Assumption 2: dependency assumed to be available]
-
-*Mark as N/A if no significant assumptions.*
-
-## Success Metrics
-
-[How will we measure if this work achieved its goals? Include both immediate deliverables and longer-term impact metrics where applicable.]
-
-- [ ] [Metric 1: specific, measurable outcome]
-- [ ] [Metric 2: specific, measurable outcome]
-
-*Mark as N/A if success is binary (feature works or does not work).*
-EOF
-    # Substitute {NAME} placeholder with ticket name
-    sed -i "s/{NAME}/${name//-/ }/g" "$ticket_path/planning/prd.md"
-
-    # Create architecture.md template
-    cat > "$ticket_path/planning/architecture.md" << EOF
-# Architecture: ${name//-/ }
-
-## Overview
-
-[High-level description of the solution architecture]
-
-## Design Decisions
-
-### Decision 1: [Title]
-
-**Context:** [Why this decision was needed]
-**Decision:** [What was decided]
-**Rationale:** [Why this choice]
-
-## Technology Choices
-
-| Component | Choice | Rationale |
-|-----------|--------|-----------|
-| [Component] | [Tech] | [Why] |
-
-## Component Design
-
-### Component 1
-
-[Description, responsibilities, interfaces]
-
-## Data Flow
-
-[How data moves through the system]
-
-## Integration Points
-
-[How this integrates with existing systems]
-
-## Performance Considerations
-
-[Performance requirements and approach]
-
-## Maintainability
-
-[How the design enables long-term maintenance]
-EOF
-
-    # Create plan.md template
-    cat > "$ticket_path/planning/plan.md" << EOF
-# Plan: ${name//-/ }
-
-## Overview
-
-This document outlines the execution plan for the ticket.
-
-## Phases
-
-### Phase 1: [Foundation]
-
-**Objective:** [What this phase achieves]
-
-**Deliverables:**
-<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
-| Deliverable | Purpose | Disposition |
-|-------------|---------|-------------|
-| audit-report.md | Gap analysis findings | extract: docs/decisions/ |
-| verification-report.md | Phase completion proof | archive |
-| design-notes.md | Context documentation | external: Wiki: Project/Design |
-
-**Agent Assignments:**
-- [agent-name]: [responsibility]
-
-### Phase 2: [Core Implementation]
-
-**Objective:** [What this phase achieves]
-
-**Deliverables:**
-<!-- Disposition syntax: "extract: path/to/dest", "archive", or "external: Location Description" -->
-| Deliverable | Purpose | Disposition |
-|-------------|---------|-------------|
-| {file.md} | {purpose} | {extract: path/ | archive | external: Location} |
-
-**Agent Assignments:**
-- [agent-name]: [responsibility]
-
-## Dependencies
-
-[Cross-phase and external dependencies]
-
-## Risk Mitigation
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| [Risk] | Low/Med/High | Low/Med/High | [Strategy] |
-
-## Success Metrics
-
-- [ ] [Metric 1]
-- [ ] [Metric 2]
-EOF
-
-    # Create quality-strategy.md template
-    cat > "$ticket_path/planning/quality-strategy.md" << EOF
-# Quality Strategy: ${name//-/ }
-
-## Testing Philosophy
-
-[Approach to testing - enterprise-grade, comprehensive coverage]
-
-## Coverage Requirements
-
-**Minimum Thresholds:**
-- Line coverage: [X]% (must meet or exceed existing thresholds)
-- Branch coverage: [X]%
-
-## Test Types
-
-### Unit Tests
-
-**Scope:** [What's covered]
-**Tools:** [Testing frameworks]
-**Coverage Target:** [Must meet or exceed ticket thresholds]
-
-**What to Test:**
-- All public interfaces
-- Business logic and transformations
-- Error handling paths
-- Edge cases and boundary conditions
-
-### Integration Tests
-
-**Scope:** [What's covered]
-**Approach:** [How integration is tested]
-
-### End-to-End Tests
-
-**Scope:** [Critical user paths]
-**Approach:** [E2E testing strategy]
-
-## Critical Paths
-
-The following paths MUST have comprehensive test coverage:
-
-1. [Critical path 1] - happy path, error cases, edge cases
-2. [Critical path 2] - happy path, error cases, edge cases
-
-## Negative Testing Requirements
-
-- Invalid inputs and malformed data
-- Error handling paths
-- Authorization failures
-- Resource not found scenarios
-
-## Test Data Strategy
-
-[How test data is managed]
-
-## Quality Gates
-
-Before verification:
-- [ ] Unit tests pass
-- [ ] Coverage thresholds met
-- [ ] Integration tests pass (if applicable)
-- [ ] No linting errors
-- [ ] Critical paths tested (happy path AND error cases)
-- [ ] Edge cases covered
-EOF
-
-    # Create security-review.md template
-    cat > "$ticket_path/planning/security-review.md" << EOF
-# Security Review: ${name//-/ }
-
-## Security Assessment
-
-### Authentication & Authorization
-
-[How auth is handled]
-
-### Data Protection
-
-[How sensitive data is protected]
-
-### Input Validation
-
-[Input validation approach]
-
-### Known Gaps
-
-| Gap | Risk Level | Mitigation | Status |
-|-----|------------|------------|--------|
-| [Gap] | Low/Med/High | [Mitigation] | Open/Accepted |
-
-## Initial Release Security Scope
-
-[What security is in scope for initial release vs future phases]
-
-## Security Checklist
-
-- [ ] No hardcoded secrets
-- [ ] Input validation on external inputs
-- [ ] Proper error handling (no info leakage)
-- [ ] Dependencies are up to date
-- [ ] No SQL injection vulnerabilities
-- [ ] No XSS vulnerabilities (if applicable)
-EOF
+}
+
+main() {
+    # --- Parse optional flags ---
+    local manifest_path=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --manifest)
+                if [ $# -lt 2 ]; then
+                    error "--manifest requires a path argument"
+                    exit 1
+                fi
+                manifest_path="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                ;;
+            -*)
+                error "Unknown option: $1"
+                usage
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if [[ $# -lt 2 ]]; then
+        usage
+    fi
+
+    local ticket_id="$1"
+    local name="$2"
+    local folder_name="${ticket_id}_${name}"
+    local ticket_path="$SDD_ROOT_DIR/tickets/$folder_name"
+    local ticket_name="${name//-/ }"
+
+    validate_ticket_id "$ticket_id"
+    validate_name "$name"
+    check_ticket_id_unique "$ticket_id"
+
+    # Validate manifest if provided
+    if [ -n "$manifest_path" ]; then
+        if [ ! -f "$manifest_path" ]; then
+            error "Manifest not found: $manifest_path"
+            exit 1
+        fi
+        if ! jq empty "$manifest_path" 2>/dev/null; then
+            error "Invalid JSON in manifest: $manifest_path"
+            exit 1
+        fi
+    fi
+
+    # Check if already exists
+    if [[ -d "$ticket_path" ]]; then
+        error "Ticket already exists: $ticket_path"
+        exit 1
+    fi
+
+    info "Creating ticket: $folder_name"
+
+    # Create directory structure
+    mkdir -p "$ticket_path"/{planning,tasks,deliverables}
+
+    # --- Determine which documents to generate ---
+    local docs_to_generate=""
+
+    if [ -n "$manifest_path" ]; then
+        # Manifest-driven: generate only documents with action="generate"
+        docs_to_generate=$(jq -r '.documents[] | select(.action=="generate") | .filename' "$manifest_path")
+
+        # Copy manifest for downstream reference
+        cp "$manifest_path" "$ticket_path/planning/.triage-manifest.json"
+        info "Triage manifest saved to planning/.triage-manifest.json"
+    else
+        # Legacy: generate original six documents
+        docs_to_generate="analysis.md architecture.md plan.md prd.md quality-strategy.md security-review.md"
+    fi
+
+    # --- Generate planning documents ---
+    local created_files=""
+    local created_paths=""
+
+    for doc in $docs_to_generate; do
+        generate_doc "$doc" "$ticket_path/planning" "$ticket_name"
+        created_files="${created_files}${created_files:+ }${doc}"
+        created_paths="${created_paths}
+    \"$ticket_path/planning/$doc\","
+        info "Generated: planning/$doc"
+    done
+
+    # --- Generate README.md ---
+    generate_readme "$ticket_path" "$ticket_id" "$ticket_name" "$created_files"
+
+    # --- Build JSON created array ---
+    local created_json=""
+    created_json="\"$ticket_path/README.md\""
+    for doc in $created_files; do
+        created_json="${created_json},
+    \"$ticket_path/planning/$doc\""
+    done
 
     # Output JSON
     cat << EOF
@@ -496,13 +298,7 @@ EOF
     "path": "$ticket_path"
   },
   "created": [
-    "$ticket_path/README.md",
-    "$ticket_path/planning/analysis.md",
-    "$ticket_path/planning/prd.md",
-    "$ticket_path/planning/architecture.md",
-    "$ticket_path/planning/plan.md",
-    "$ticket_path/planning/quality-strategy.md",
-    "$ticket_path/planning/security-review.md"
+    $created_json
   ],
   "directories": [
     "$ticket_path/planning",
