@@ -428,21 +428,30 @@ find_git_root() {
 
     # Prefer main checkout (.git is a directory) over worktree (.git is a file)
     local candidate
-    local git_dir_count=0
     local found_root=""
+    local all_candidates=""
+    local git_dir_count=0
     while IFS= read -r -d '' candidate; do
         if [[ -d "$candidate/.git" ]]; then
             git_dir_count=$((git_dir_count + 1))
-            if [[ $git_dir_count -gt 1 ]]; then
-                log_warn "Multiple git roots found in $repo_parent; using first alphabetically"
+            if [ -n "$all_candidates" ]; then
+                all_candidates="$all_candidates, $(basename "$candidate")"
+            else
+                all_candidates="$(basename "$candidate")"
             fi
-            if [[ $git_dir_count -eq 1 ]]; then
+            if [[ -z "$found_root" ]]; then
                 found_root="${candidate%/}"
             fi
         fi
     done < "$candidates_file"
 
     if [[ -n "$found_root" ]]; then
+        # Check if multiple git dirs were found and log enhanced warning
+        if [ "$git_dir_count" -gt 1 ]; then
+            log_warn "Multiple git roots found for repo: $repo_name"
+            log_warn "Candidates: [$all_candidates]"
+            log_warn "Selected (alphabetically first): $(basename "$found_root")"
+        fi
         rm -f "$candidates_file"
         echo "$found_root"
         return 0

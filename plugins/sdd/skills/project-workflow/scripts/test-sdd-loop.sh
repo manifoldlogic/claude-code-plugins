@@ -2701,15 +2701,27 @@ test_find_git_root_multiple_git_dirs() {
 
     local test_repos="$TEST_TMP_DIR/fgr_multi/repos"
     mkdir -p "$test_repos/foo/aaa/.git"
+    mkdir -p "$test_repos/foo/mmm/.git"
     mkdir -p "$test_repos/foo/zzz/.git"
 
     local result
+    local stderr_output
     local exit_code=0
-    result=$(find_git_root "$test_repos/" "foo") || exit_code=$?
+    # Capture stderr for warning verification
+    stderr_output=$(find_git_root "$test_repos/" "foo" 2>&1 1>/dev/null) || true
+    result=$(find_git_root "$test_repos/" "foo" 2>/dev/null) || exit_code=$?
 
     # Should select first alphabetically (aaa) since find -print0 | sort -z sorts alphabetically
     assert_equals "$test_repos/foo/aaa" "$result" "find_git_root returns first alphabetically (aaa)"
     assert_equals 0 "$exit_code" "find_git_root exits with 0 when multiple git dirs exist"
+
+    # Verify enhanced warning messages
+    assert_contains "$stderr_output" "Multiple git roots found for repo: foo" \
+        "find_git_root warns about multiple git roots with repo name"
+    assert_contains "$stderr_output" "Candidates: [aaa, mmm, zzz]" \
+        "find_git_root lists all candidate basenames"
+    assert_contains "$stderr_output" "Selected (alphabetically first): aaa" \
+        "find_git_root indicates which candidate was selected"
 }
 
 #######################################
