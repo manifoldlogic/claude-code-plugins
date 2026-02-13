@@ -4,8 +4,11 @@
 # Validates ticket/task structure and reports issues
 #
 # Usage:
-#   bash validate-structure.sh <TICKET_ID> # Validate specific ticket
-#   bash validate-structure.sh             # Validate all tickets
+#   bash validate-structure.sh [--no-color] <TICKET_ID> # Validate specific ticket
+#   bash validate-structure.sh [--no-color]             # Validate all tickets
+#
+# Arguments:
+#   --no-color         Disable color output (also: NO_COLOR=1)
 #
 # Output:
 #   JSON validation report
@@ -14,6 +17,14 @@ set -euo pipefail
 
 # Source shared helper functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Parse color flag before sourcing common.sh
+for arg in "$@"; do
+    case "$arg" in
+        --no-color) USE_COLOR=false ;;
+    esac
+done
+
 # shellcheck source=common.sh
 . "$SCRIPT_DIR/common.sh"
 
@@ -340,7 +351,14 @@ validate_ticket_tasks() {
 
 # Main execution
 main() {
-    local ticket_id="${1:-}"
+    # Strip --no-color from positional args (already handled before sourcing common.sh)
+    local ticket_id=""
+    for arg in "$@"; do
+        case "$arg" in
+            --no-color) ;;
+            *) ticket_id="$arg" ;;
+        esac
+    done
 
     echo "{"
     echo "  \"timestamp\": \"$(date -Iseconds)\","

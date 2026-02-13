@@ -5,9 +5,10 @@
 # and produces a JSON manifest indicating which documents to generate.
 #
 # Usage:
-#   bash triage-documents.sh "ticket description" [+override] [-override] ...
+#   bash triage-documents.sh [--no-color] "ticket description" [+override] [-override] ...
 #
 # Arguments:
+#   --no-color          - Disable color output (also: NO_COLOR=1)
 #   ticket description  - Text describing the ticket (required, first argument)
 #   +doc-name           - Force-include a document (e.g., +accessibility)
 #   -doc-name           - Force-exclude a document (e.g., -runbook)
@@ -41,6 +42,13 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REGISTRY_FILE="$SCRIPT_DIR/../templates/document-registry.json"
 
+# Parse color flag before sourcing common.sh
+for arg in "$@"; do
+    case "$arg" in
+        --no-color) USE_COLOR=false ;;
+    esac
+done
+
 # shellcheck source=common.sh
 . "$SCRIPT_DIR/common.sh"
 
@@ -55,9 +63,10 @@ sanitize_description() {
 
 usage() {
     cat >&2 << 'EOF'
-Usage: triage-documents.sh "ticket description" [+override] [-override] ...
+Usage: triage-documents.sh [--no-color] "ticket description" [+override] [-override] ...
 
 Arguments:
+  --no-color          Disable color output (also: NO_COLOR=1)
   ticket description  Text describing the ticket (required, first argument)
   +doc-name           Force-include a document (e.g., +accessibility)
   -doc-name           Force-exclude a document (e.g., -runbook)
@@ -70,6 +79,11 @@ EOF
 }
 
 # --- Input Validation ---
+
+# Skip --no-color if it appears before the description (already handled above)
+if [ "${1:-}" = "--no-color" ]; then
+    shift
+fi
 
 if [ $# -lt 1 ] || [ -z "$1" ]; then
     error "Missing required argument: ticket description"
@@ -98,6 +112,11 @@ seen_overrides=""
 
 while [ $# -gt 0 ]; do
     arg="$1"
+    # Skip --no-color (already handled before sourcing common.sh)
+    if [ "$arg" = "--no-color" ]; then
+        shift
+        continue
+    fi
     # Match +doc-name or -doc-name patterns
     if printf '%s' "$arg" | grep -qE '^\+[a-z][a-z0-9-]*$'; then
         # Check for duplicate override

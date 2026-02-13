@@ -32,6 +32,8 @@
 #  29. Duplicate positive override warns - +accessibility +accessibility warns on stderr
 #  30. Duplicate negative override warns - -observability -observability warns on stderr
 #  31. Mixed duplicates both detected - +accessibility +accessibility -observability -observability
+#  32. --no-color flag disables ANSI codes in stderr output
+#  33. NO_COLOR env var disables ANSI codes in stderr output
 #
 # Usage:
 #   bash test-triage-documents.sh
@@ -1100,6 +1102,57 @@ if $test_ok; then
         log_pass "$test_name"
     else
         log_fail "$test_name" "expected both warnings (plus_dup=$has_plus_dup, minus_dup=$has_minus_dup, stderr: $TRIAGE_STDERR)"
+    fi
+fi
+
+# =============================================
+# Test 32: --no-color flag disables ANSI codes
+# Run triage-documents.sh with --no-color and invalid args to force error output
+# Verify no ANSI escape codes (\033 or \x1b) in stderr output
+# =============================================
+
+printf -- "\n${CYAN}--- Color Control Tests ---${NC}\n\n"
+
+# Use --no-color with empty description to force error output on stderr
+set +e
+NO_COLOR_OUTPUT=$(bash "$TRIAGE_SCRIPT" --no-color "" 2>&1)
+NO_COLOR_EXIT=$?
+set -e
+
+test_name="--no-color flag disables ANSI codes in stderr output"
+# Check for ANSI escape sequences (ESC character = octal 033)
+if printf '%s' "$NO_COLOR_OUTPUT" | grep -qP '\x1b\[' 2>/dev/null || printf '%s' "$NO_COLOR_OUTPUT" | grep -q "$(printf '\033')" 2>/dev/null; then
+    log_fail "$test_name" "ANSI escape codes found in output with --no-color"
+else
+    # Verify the script actually produced output (not a false pass from empty output)
+    if [ -n "$NO_COLOR_OUTPUT" ]; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "no output produced (cannot verify color was disabled)"
+    fi
+fi
+
+# =============================================
+# Test 33: NO_COLOR env var disables ANSI codes
+# Run triage-documents.sh with NO_COLOR=1 env var and invalid args
+# Verify no ANSI escape codes in stderr output
+# =============================================
+
+set +e
+NO_COLOR_ENV_OUTPUT=$(NO_COLOR=1 bash "$TRIAGE_SCRIPT" "" 2>&1)
+NO_COLOR_ENV_EXIT=$?
+set -e
+
+test_name="NO_COLOR env var disables ANSI codes in stderr output"
+# Check for ANSI escape sequences
+if printf '%s' "$NO_COLOR_ENV_OUTPUT" | grep -qP '\x1b\[' 2>/dev/null || printf '%s' "$NO_COLOR_ENV_OUTPUT" | grep -q "$(printf '\033')" 2>/dev/null; then
+    log_fail "$test_name" "ANSI escape codes found in output with NO_COLOR=1"
+else
+    # Verify the script actually produced output
+    if [ -n "$NO_COLOR_ENV_OUTPUT" ]; then
+        log_pass "$test_name"
+    else
+        log_fail "$test_name" "no output produced (cannot verify color was disabled)"
     fi
 fi
 

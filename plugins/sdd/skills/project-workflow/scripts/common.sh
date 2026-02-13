@@ -7,11 +7,19 @@
 # Note: Does NOT set -euo pipefail - that is the caller's responsibility.
 # Having set -e in a sourced file can cause unexpected behavior.
 
-# Colors (stderr only)
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# Color control: respect NO_COLOR env var (https://no-color.org)
+# Callers can also set USE_COLOR=false before sourcing
+if [ "${NO_COLOR:-}" != "" ] || [ "${USE_COLOR:-}" = "false" ]; then
+    RED=""
+    GREEN=""
+    YELLOW=""
+    NC=""
+else
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+fi
 
 # Print error message to stderr in red
 error() { printf "${RED}[ERROR]${NC} %s\n" "$1" >&2; }
