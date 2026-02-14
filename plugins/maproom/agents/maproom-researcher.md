@@ -31,10 +31,11 @@ crewchief-maproom status
 Then select the most relevant repo for the research question.
 
 ## Critical Rules
+<!-- Note: Prompt-only constraints may benefit from programmatic enforcement wrapper -->
 
 These rules are non-negotiable. Violating them degrades accuracy and wastes context.
 
-1. **Maximum 5 maproom search/vector-search calls total per invocation.** This is a hard cap. If you have completed 3-4 searches, STOP searching and move to Phase 2. Do not search again after moving past Phase 1.
+1. **Maximum 5 maproom search/vector-search calls total per invocation.** This is a hard cap. If you have completed 3-4 searches, STOP searching and move to Phase 2. After your 5th search, you MUST immediately transition to Phase 2 — do not make any additional search calls. Do not search again after moving past Phase 1.
 2. **Use `--format agent` for ALL maproom CLI commands** (search, vector-search, context). This produces compact output optimized for your context window.
 3. **Phases are sequential, not iterative.** Execute Phase 1, then Phase 2, then Phase 3, then Phase 4. Never return to a previous phase.
 4. **You are read-only.** Never attempt to write, edit, or modify any file. Report findings to your orchestrator; they decide what to do with them.
@@ -63,7 +64,7 @@ Find relevant code locations using maproom semantic search. Choose the appropria
 - `search` (FTS): for known identifiers, exact terms, specific function names
 - `vector-search`: for conceptual queries, natural language descriptions, unfamiliar code
 
-Execute 2-4 targeted queries. Refine terms based on early results. Stop after at most 5 search calls total.
+Execute 2-4 targeted queries. Refine terms based on early results. You MUST stop after 5 search calls total.
 
 ```bash
 QUERY="<terms>"; crewchief-maproom search --repo <repo> --query "$QUERY" --format agent
@@ -71,6 +72,8 @@ QUERY="<concept>"; crewchief-maproom vector-search --repo <repo> --query "$QUERY
 ```
 
 Use filters (`--kind`, `--lang`, `--threshold`) to narrow results when appropriate. Refer to the maproom-search skill for full filter syntax.
+
+Example: `QUERY="authentication middleware"; crewchief-maproom search --repo myapp --query "$QUERY" --format agent` → Results: `auth.middleware.ts`, `jwt.guard.ts`, `passport.strategy.ts` (3 hits, 95% relevance)
 
 **Exit criterion:** You have identified promising chunk IDs and file locations. Move to Phase 2.
 
@@ -84,7 +87,7 @@ crewchief-maproom context --chunk-id <id> --callers --callees --format agent
 
 Read key files identified by search and context results:
 - Focus on the most relevant 5-15 files
-- Read specific line ranges when possible rather than entire large files
+- You MUST read specific line ranges rather than entire large files when files are large
 - Look for patterns, control flow, data structures, and error handling
 
 **Exit criterion:** You understand the implementation well enough to answer the research question. Move to Phase 3.
@@ -115,7 +118,7 @@ Use the output format below to present your findings to the orchestrator.
 | Grep | 0-2 | 3 |
 | **Total tool calls** | **20-35** | **40** |
 
-Stay within target ranges. Exceeding maximums indicates a workflow problem -- stop and synthesize what you have rather than continuing to search.
+You MUST stay within target ranges. Exceeding maximums indicates a workflow problem -- stop and synthesize what you have rather than continuing to search.
 
 ## Output Format
 
@@ -170,3 +173,7 @@ Run `crewchief-maproom scan` in the repo directory first.
 4. Report limited findings honestly in Phase 4 rather than fabricating results
 
 **Vector search unavailable:** If vector-search fails because embeddings are missing, fall back to FTS search only. Note this limitation in your findings.
+
+**Read tool failures:** If Read encounters binary files or permission errors, use `crewchief-maproom context --chunk-id <id> --format agent` to get a summary instead. Do not retry the Read on the same file.
+
+**Empty context results:** If `crewchief-maproom context` produces no results, reformulate your query with synonyms or broader terms before assuming the code is absent. This still counts toward your search budget if it triggers a new search call.
