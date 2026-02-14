@@ -455,6 +455,135 @@ class TestFilesystemErrors(unittest.TestCase):
         )
 
 
+# =============================================================================
+# Metrics Emission Tests
+# =============================================================================
+
+class TestMetrics:
+    """Tests for opt-in metrics emission via MAPROOM_METRICS_ENABLED."""
+
+    def test_soft_cap_metrics_enabled(self):
+        """Soft cap warning emits metric to stderr when MAPROOM_METRICS_ENABLED=1."""
+        sid = "test-metrics-soft-enabled"
+        _seed_counter(sid, 5)
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"MAPROOM_METRICS_ENABLED": "1"},
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert "Soft search cap reached" in stderr
+        assert "METRIC:maproom.search_cap.soft_warning:1" in stderr
+
+    def test_hard_cap_metrics_enabled(self):
+        """Hard cap block emits metric to stderr when MAPROOM_METRICS_ENABLED=1."""
+        sid = "test-metrics-hard-enabled"
+        _seed_counter(sid, 10)
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"MAPROOM_METRICS_ENABLED": "1"},
+            session_id=sid,
+        )
+        assert exit_code == 2
+        assert "Search cap exceeded" in stderr
+        assert "METRIC:maproom.search_cap.hard_block:1" in stderr
+
+    def test_metrics_disabled_by_default(self):
+        """No METRIC: lines emitted when MAPROOM_METRICS_ENABLED is not set."""
+        sid = "test-metrics-disabled"
+        _seed_counter(sid, 5)
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert "Soft search cap reached" in stderr
+        assert "METRIC:" not in stderr
+
+    def test_metrics_enabled_true_string(self):
+        """Metrics emitted when MAPROOM_METRICS_ENABLED=true."""
+        sid = "test-metrics-true-str"
+        _seed_counter(sid, 5)
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"MAPROOM_METRICS_ENABLED": "true"},
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert "METRIC:maproom.search_cap.soft_warning:1" in stderr
+
+    def test_metrics_enabled_yes_string(self):
+        """Metrics emitted when MAPROOM_METRICS_ENABLED=yes."""
+        sid = "test-metrics-yes-str"
+        _seed_counter(sid, 5)
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"MAPROOM_METRICS_ENABLED": "yes"},
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert "METRIC:maproom.search_cap.soft_warning:1" in stderr
+
+    def test_metrics_not_emitted_for_false(self):
+        """No METRIC: lines when MAPROOM_METRICS_ENABLED=false."""
+        sid = "test-metrics-false-str"
+        _seed_counter(sid, 5)
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"MAPROOM_METRICS_ENABLED": "false"},
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert "Soft search cap reached" in stderr
+        assert "METRIC:" not in stderr
+
+
+# =============================================================================
+# SessionEnd Cleanup Hook Tests
+# =============================================================================
+
+CLEANUP_HOOK_PATH = os.path.join(os.path.dirname(__file__), "cleanup-search-counter.py")
+
+
+class TestCleanupHook:
+    """Tests for the SessionEnd cleanup hook."""
+
+    def test_cleanup_removes_counter_file(self):
+        """Cleanup hook removes existing counter file for the session."""
+        sid = "test-cleanup-exists"
+        counter_path = _counter_path(sid)
+        _seed_counter(sid, 7)
+        assert os.path.exists(counter_path)
+
+        env = os.environ.copy()
+        env["CLAUDE_SESSION_ID"] = sid
+        result = subprocess.run(
+            ["python3", CLEANUP_HOOK_PATH],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert result.returncode == 0
+        assert not os.path.exists(counter_path)
+
+    def test_cleanup_no_file_exits_cleanly(self):
+        """Cleanup hook exits cleanly when no counter file exists."""
+        sid = "test-cleanup-nofile"
+        counter_path = _counter_path(sid)
+        if os.path.exists(counter_path):
+            os.remove(counter_path)
+
+        env = os.environ.copy()
+        env["CLAUDE_SESSION_ID"] = sid
+        result = subprocess.run(
+            ["python3", CLEANUP_HOOK_PATH],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert result.returncode == 0
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

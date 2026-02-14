@@ -33,6 +33,17 @@ import traceback
 SOFT_CAP = 5
 HARD_CAP = 10
 AGENT_NAME = "maproom-researcher"
+METRICS_ENABLED = os.environ.get("MAPROOM_METRICS_ENABLED") in ["1", "true", "yes"]
+
+
+def emit_metric(metric_name, value=1):
+    """Emit a metric to stderr for collection by monitoring systems.
+
+    Metrics are only emitted if MAPROOM_METRICS_ENABLED is set.
+    Format: METRIC:{metric_name}:{value}
+    """
+    if METRICS_ENABLED:
+        sys.stderr.write(f"METRIC:{metric_name}:{value}\n")
 
 
 def get_counter_file():
@@ -99,6 +110,7 @@ def main():
                 f"invocations per session. Synthesize findings from existing results."
             )
             print(msg, file=sys.stderr)
+            emit_metric("maproom.search_cap.hard_block")
             sys.exit(2)  # Block
         elif count > SOFT_CAP:
             # Soft cap reached: warn but allow, increment counter
@@ -109,6 +121,7 @@ def main():
                 f"remaining before the hard cap."
             )
             print(msg, file=sys.stderr)
+            emit_metric("maproom.search_cap.soft_warning")
             write_count(counter_path, count)
             sys.exit(0)
         else:
