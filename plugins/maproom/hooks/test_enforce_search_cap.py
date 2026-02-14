@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""
+Unit tests for enforce-search-cap.py hook.
+
+Tests verify the two-tier search cap system for the maproom-researcher agent:
+  - Searches 1-5 (below soft cap): allowed silently
+  - Searches 6-10 (soft cap to hard cap): allowed with stderr warning
+  - Searches 11+ (above hard cap): blocked
+
+Covers threshold boundaries, bypass paths, error handling, and counter state.
+"""
+import glob
+import json
+import os
+import subprocess
+
+# Path to the hook script
+HOOK_PATH = os.path.join(os.path.dirname(__file__), "enforce-search-cap.py")
+
+# Standard maproom search command used in most tests
+MAPROOM_SEARCH_CMD = "crewchief-maproom search 'test query'"
+
+
+def run_hook(json_input, env_vars=None, session_id=None):
+    """
+    Run hook via subprocess with controlled inputs.
+
+    Args:
+        json_input: String to feed on stdin (raw string, not further serialized).
+        env_vars: Dict of environment variables to set.
+        session_id: If provided, sets CLAUDE_SESSION_ID in the environment.
+
+    Returns:
+        (exit_code, stdout, stderr) tuple.
+    """
+    env = os.environ.copy()
+    # Default to maproom-researcher agent unless overridden
+    env["CLAUDE_AGENT_NAME"] = "maproom-researcher"
+    if env_vars:
+        env.update(env_vars)
+    if session_id is not None:
+        env["CLAUDE_SESSION_ID"] = session_id
+
+    result = subprocess.run(
+        ["python3", HOOK_PATH],
+        input=json_input,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def _counter_path(session_id):
+    """Return the counter file path for a given session ID."""
+    return f"/tmp/maproom-search-count-{session_id}"
+
+
+def _seed_counter(session_id, value):
+    """Pre-seed a counter file with a given integer value."""
+    with open(_counter_path(session_id), "w") as f:
+        f.write(str(value))
+
+
+def _read_counter(session_id):
+    """Read the counter file value for a given session ID."""
+    try:
+        with open(_counter_path(session_id), "r") as f:
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def _make_search_input(command=None):
+    """Build the standard JSON input for a Bash tool call."""
+    if command is None:
+        command = MAPROOM_SEARCH_CMD
+    return json.dumps({
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+    })
+
+
+def teardown_module():
+    """Remove test counter files after all tests complete."""
+    for path in glob.glob("/tmp/maproom-search-count-test-*"):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+# =============================================================================
+# Threshold Boundary Tests (Critical Path)
+# =============================================================================
+
+class TestThresholdBoundaries:
+    """Tests for soft cap and hard cap threshold boundaries."""
+
+    def test_search_1_first_search(self):
+        """First search (count 1): allowed silently, no cap-related output."""
+        sid = "test-threshold-1"
+        # Counter absent = count 0 before invocation
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert "cap" not in stderr.lower()
+        assert _read_counter(sid) == 1
+
+    def test_search_5_at_soft_cap(self):
+        """Search 5 (at soft cap boundary): allowed silently, no warning."""
+        sid = "test-threshold-5"
+        _seed_counter(sid, 4)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert "cap" not in stderr.lower()
+        assert _read_counter(sid) == 5
+
+    def test_search_6_first_warning(self):
+        """Search 6 (first warning): allowed with soft cap warning showing 6/10."""
+        sid = "test-threshold-6"
+        _seed_counter(sid, 5)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert "6/10" in stderr
+        assert "Soft search cap reached" in stderr
+        assert _read_counter(sid) == 6
+
+    def test_search_8_mid_warning_zone(self):
+        """Search 8 (mid-warning zone): allowed with soft cap warning showing 8/10."""
+        sid = "test-threshold-8"
+        _seed_counter(sid, 7)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert "8/10" in stderr
+        assert "Soft search cap reached" in stderr
+        assert _read_counter(sid) == 8
+
+    def test_search_10_last_allowed(self):
+        """Search 10 (last allowed): allowed with soft cap warning showing 10/10."""
+        sid = "test-threshold-10"
+        _seed_counter(sid, 9)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert "10/10" in stderr
+        assert "Soft search cap reached" in stderr
+        assert _read_counter(sid) == 10
+
+    def test_search_11_first_blocked(self):
+        """Search 11 (first blocked): blocked with hard cap message."""
+        sid = "test-threshold-11"
+        _seed_counter(sid, 10)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 2
+        assert "Search cap exceeded" in stderr
+        assert "10/10" in stderr
+        # Counter should NOT be incremented on block
+        assert _read_counter(sid) == 10
+
+    def test_search_15_deep_block(self):
+        """Search 15 (deep block): blocked with hard cap message."""
+        sid = "test-threshold-15"
+        _seed_counter(sid, 14)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 2
+        assert "Search cap exceeded" in stderr
+        assert "14/10" in stderr
+        # Counter should NOT be incremented on block
+        assert _read_counter(sid) == 14
+
+
+# =============================================================================
+# Bypass Path Tests
+# =============================================================================
+
+class TestBypassPaths:
+    """Tests for conditions that should bypass the search cap entirely."""
+
+    def test_wrong_agent_name(self):
+        """Wrong agent name should bypass cap (exit 0, no counting)."""
+        sid = "test-bypass-wrong-agent"
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"CLAUDE_AGENT_NAME": "other-agent"},
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert _read_counter(sid) is None  # No counter file created
+
+    def test_no_agent_name(self):
+        """No agent name set should bypass cap (exit 0, no counting)."""
+        sid = "test-bypass-no-agent"
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            env_vars={"CLAUDE_AGENT_NAME": ""},
+            session_id=sid,
+        )
+        assert exit_code == 0
+        assert _read_counter(sid) is None
+
+    def test_non_bash_tool(self):
+        """Non-Bash tool should bypass cap (exit 0, no counting)."""
+        sid = "test-bypass-non-bash"
+        input_json = json.dumps({
+            "tool_name": "Read",
+            "tool_input": {"file": "/tmp/test"},
+        })
+        exit_code, stdout, stderr = run_hook(input_json, session_id=sid)
+        assert exit_code == 0
+        assert _read_counter(sid) is None
+
+    def test_non_maproom_command(self):
+        """Non-maproom Bash command should bypass cap (exit 0, no counting)."""
+        sid = "test-bypass-non-maproom"
+        input_json = json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls -la"},
+        })
+        exit_code, stdout, stderr = run_hook(input_json, session_id=sid)
+        assert exit_code == 0
+        assert _read_counter(sid) is None
+
+    def test_maproom_context_command(self):
+        """Maproom context command (not search) should bypass cap."""
+        sid = "test-bypass-maproom-context"
+        input_json = json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "crewchief-maproom context /path/to/file"},
+        })
+        exit_code, stdout, stderr = run_hook(input_json, session_id=sid)
+        assert exit_code == 0
+        assert _read_counter(sid) is None
+
+
+# =============================================================================
+# Error Handling Tests
+# =============================================================================
+
+class TestErrorHandling:
+    """Tests for error conditions that should fail-open (exit 0)."""
+
+    def test_malformed_json(self):
+        """Malformed JSON input should fail-open (exit 0)."""
+        sid = "test-error-malformed"
+        exit_code, stdout, stderr = run_hook("not valid json", session_id=sid)
+        assert exit_code == 0
+
+    def test_missing_tool_input(self):
+        """Missing tool_input field should fail-open (exit 0)."""
+        sid = "test-error-missing-fields"
+        input_json = json.dumps({"tool_name": "Bash"})
+        exit_code, stdout, stderr = run_hook(input_json, session_id=sid)
+        assert exit_code == 0
+
+    def test_empty_command(self):
+        """Empty command string should bypass cap (exit 0, no counting)."""
+        sid = "test-error-empty-cmd"
+        input_json = json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": ""},
+        })
+        exit_code, stdout, stderr = run_hook(input_json, session_id=sid)
+        assert exit_code == 0
+        assert _read_counter(sid) is None
+
+
+# =============================================================================
+# Counter State Tests
+# =============================================================================
+
+class TestCounterState:
+    """Tests for counter file creation, reading, and corruption handling."""
+
+    def test_counter_absent_creates_file(self):
+        """When counter file is absent, first search creates it with value 1."""
+        sid = "test-counter-absent"
+        # Ensure no counter file exists
+        path = _counter_path(sid)
+        if os.path.exists(path):
+            os.remove(path)
+
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert _read_counter(sid) == 1
+
+    def test_counter_present_increments(self):
+        """When counter file exists with value 4, search increments to 5."""
+        sid = "test-counter-present"
+        _seed_counter(sid, 4)
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        assert _read_counter(sid) == 5
+        # No warning at count 5 (at soft cap, not above)
+        assert "cap" not in stderr.lower()
+
+    def test_counter_corrupt_treated_as_zero(self):
+        """Corrupt counter file (non-integer) should be treated as 0."""
+        sid = "test-counter-corrupt"
+        path = _counter_path(sid)
+        with open(path, "w") as f:
+            f.write("abc")
+
+        exit_code, stdout, stderr = run_hook(_make_search_input(), session_id=sid)
+        assert exit_code == 0
+        # Corrupt file read as 0, incremented to 1 -- no warning
+        assert _read_counter(sid) == 1
+        assert "cap" not in stderr.lower()
+
+
+if __name__ == "__main__":
+    import pytest
+    pytest.main([__file__, "-v"])
