@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
-PreToolUse hook: Enforce 5-search cap for maproom-researcher agent.
+PreToolUse hook: Enforce two-tier search cap for maproom-researcher agent.
 
 Tracks invocations of `crewchief-maproom search` and `crewchief-maproom vector-search`
-per session. Blocks execution after the 5th search call (defense-in-depth enforcement
-of the prompt-level constraint).
+per session using a soft/hard cap threshold system:
+
+  - Searches 1-5 (below soft cap): allowed silently (exit 0)
+  - Searches 6-10 (soft cap to hard cap): allowed with stderr warning (exit 0)
+  - Searches 11+ (above hard cap): blocked with stderr message (exit 2)
+
+The soft cap warning is emitted on every search from 6 through 10, with a climbing
+count (e.g., "7/10") so the agent can gauge proximity to the hard block.
 
 Hook behavior:
 - Only activates for the maproom-researcher agent (checks CLAUDE_AGENT_NAME)
@@ -23,7 +29,8 @@ import re
 import sys
 import tempfile
 
-MAX_SEARCHES = 5
+SOFT_CAP = 5
+HARD_CAP = 10
 AGENT_NAME = "maproom-researcher"
 
 
@@ -76,24 +83,36 @@ def main():
         if not is_maproom_search(command):
             sys.exit(0)
 
-        # Read current count, increment, and check cap
+        # Read current count, increment, and check thresholds
         counter_path = get_counter_file()
         count = read_count(counter_path)
         count += 1
 
-        if count > MAX_SEARCHES:
+        if count > HARD_CAP:
+            # Hard cap exceeded: block without incrementing counter
             msg = (
-                f"Search cap exceeded: {count - 1}/{MAX_SEARCHES} searches used. "
+                f"Search cap exceeded: {count - 1}/{HARD_CAP} searches used. "
                 f"Cannot execute additional searches.\n"
-                f"The maproom-researcher agent is limited to {MAX_SEARCHES} search "
+                f"The maproom-researcher agent is limited to {HARD_CAP} search "
                 f"invocations per session. Synthesize findings from existing results."
             )
             print(msg, file=sys.stderr)
             sys.exit(2)  # Block
-
-        # Under cap: persist updated count and allow
-        write_count(counter_path, count)
-        sys.exit(0)
+        elif count > SOFT_CAP:
+            # Soft cap reached: warn but allow, increment counter
+            remaining = HARD_CAP - count
+            msg = (
+                f"Soft search cap reached: {count}/{HARD_CAP} searches used.\n"
+                f"Start wrapping up Phase 1 -- you have {remaining} searches "
+                f"remaining before the hard cap."
+            )
+            print(msg, file=sys.stderr)
+            write_count(counter_path, count)
+            sys.exit(0)
+        else:
+            # Under soft cap: allow silently, increment counter
+            write_count(counter_path, count)
+            sys.exit(0)
 
     except Exception as e:
         # On hook error, log warning but allow execution to continue
