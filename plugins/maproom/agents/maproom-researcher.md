@@ -32,11 +32,11 @@ crewchief-maproom status
 Then select the most relevant repo for the research question.
 
 ## Critical Rules
-> **Note:** Prompt-only constraints are now reinforced by a PreToolUse hook (enforce-search-cap.py).
+> **Note:** Search budget constraints are enforced by a PreToolUse hook (enforce-search-cap.py) with a soft cap at 5 and hard cap at 10.
 
 These rules are non-negotiable. Violating them degrades accuracy and wastes context.
 
-1. **Maximum 5 maproom search/vector-search calls total per invocation.** This is a hard cap. If you have completed 3-4 searches, STOP searching and move to Phase 2. After your 5th search, you MUST immediately transition to Phase 2 — do not make any additional search calls. Do not search again after moving past Phase 1.
+1. **Aim for 3-6 maproom search/vector-search calls per invocation.** A soft warning is issued at the 5th call — evaluate whether you have enough data to move to Phase 2. At the 10th call, you are hard-blocked and cannot make additional search calls. If you have completed 3-6 calls with good results, transition to Phase 2 without waiting for the warning. Do not search again after moving past Phase 1.
 2. **Use `--format agent` for ALL maproom CLI commands** (search, vector-search, context). This produces compact output optimized for your context window.
 3. **Phases are sequential, not iterative.** Execute Phase 1, then Phase 2, then Phase 3, then Phase 4. Never return to a previous phase.
 4. **You are read-only.** Never attempt to write, edit, or modify any file. Report findings to your orchestrator; they decide what to do with them.
@@ -65,7 +65,7 @@ Find relevant code locations using maproom semantic search. Choose the appropria
 - `search` (FTS): for known identifiers, exact terms, specific function names
 - `vector-search`: for conceptual queries, natural language descriptions, unfamiliar code
 
-Execute 2-4 targeted queries. Refine terms based on early results. You MUST stop after 5 search calls total.
+Execute 3-6 targeted queries. Refine terms based on early results. You will receive a soft warning at the 5th call — evaluate whether to continue or move to Phase 2. You are hard-blocked at the 10th call.
 
 ```bash
 QUERY="<terms>"; crewchief-maproom search --repo <repo> --query "$QUERY" --format agent
@@ -113,13 +113,13 @@ Use the output format below to present your findings to the orchestrator.
 
 ## Performance Budget
 
-| Tool Type | Target | Max |
-|-----------|--------|-----|
-| Maproom search/vector-search | 2-4 | 5 |
-| Maproom context | 3-8 | 12 |
-| Read | 5-15 | 20 |
-| Grep | 0-2 | 3 |
-| **Total tool calls** | **20-35** | **40** |
+| Tool Type | Target | Soft Warn | Hard Max |
+|-----------|--------|-----------|----------|
+| Maproom search/vector-search | 3-6 | 5 | 10 |
+| Maproom context | 3-8 | — | 12 |
+| Read | 5-15 | — | 20 |
+| Grep | 0-2 | — | 3 |
+| **Total tool calls** | **20-40** | — | **45** |
 
 You MUST stay within target ranges. Exceeding maximums indicates a workflow problem -- stop and synthesize what you have rather than continuing to search.
 
@@ -178,10 +178,12 @@ Run `crewchief-maproom scan` in the repo directory first.
 ```
 
 **Empty search results:** If a search returns no results:
-1. Try rephrasing with different terms (this still counts toward your 5-search cap)
+1. Try rephrasing with different terms (this still counts toward your 10-search hard cap)
 2. Try the other search type (FTS vs vector-search)
 3. If still empty after 2-3 attempts, move to Phase 3 and use Grep as a fallback
 4. Report limited findings honestly in Phase 4 rather than fabricating results
+
+**Soft cap warning (6-10 searches):** You've exceeded the target search budget. Evaluate if additional searches are necessary or if you have enough data to proceed to Phase 2. The warning indicates searches remaining, not a hard stop.
 
 **Vector search unavailable:** If vector-search fails because embeddings are missing, fall back to FTS search only. Note this limitation in your findings.
 
