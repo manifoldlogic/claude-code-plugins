@@ -140,6 +140,27 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Check database size: large databases may need optimization
 - Ensure SQLite isn't locked by another process
 
+## Index Maintenance
+
+The maproom semantic index requires periodic scanning to stay current with codebase changes.
+
+**Recommended scan frequency:**
+- **Active repositories** (daily commits): Run `maproom scan` daily or before research sessions
+- **Stable repositories** (weekly/monthly updates): Run `maproom scan` weekly
+- **One-time analysis**: Run `maproom scan` once before invoking maproom-researcher agent
+
+**Scan command:**
+```bash
+crewchief-maproom scan [--repo-path /path/to/repo]
+```
+
+**Index freshness check:**
+```bash
+crewchief-maproom status  # Shows last scan timestamp
+```
+
+**Note:** The maproom-researcher agent does NOT automatically trigger index scans. Users must ensure the index is current before invoking the agent for accurate semantic search results.
+
 ## Maintenance
 
 ### Monthly CLI Verification
