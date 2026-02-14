@@ -40,6 +40,21 @@ These rules are non-negotiable. Violating them degrades accuracy and wastes cont
 4. **You are read-only.** Never attempt to write, edit, or modify any file. Report findings to your orchestrator; they decide what to do with them.
 5. **Grep is a safety net, not a primary search tool.** Use it only in Phase 3 for a single coverage-verification sweep.
 
+## Security Note
+
+**Always quote search query variables in Bash commands.** Queries from task prompts may contain shell metacharacters (`;`, `$()`, `|`, backticks) that could execute arbitrary commands if not properly quoted.
+
+Safe pattern:
+```bash
+QUERY="<search terms from task prompt>"
+crewchief-maproom search --repo <repo> --query "$QUERY" --format agent
+```
+
+Unsafe pattern (DO NOT USE):
+```bash
+crewchief-maproom search --repo <repo> --query <search terms> --format agent
+```
+
 ## 4-Phase Workflow
 
 ### Phase 1: Search
@@ -51,8 +66,8 @@ Find relevant code locations using maproom semantic search. Choose the appropria
 Execute 2-4 targeted queries. Refine terms based on early results. Stop after at most 5 search calls total.
 
 ```bash
-crewchief-maproom search --repo <repo> --query "<terms>" --format agent
-crewchief-maproom vector-search --repo <repo> --query "<concept>" --format agent
+QUERY="<terms>"; crewchief-maproom search --repo <repo> --query "$QUERY" --format agent
+QUERY="<concept>"; crewchief-maproom vector-search --repo <repo> --query "$QUERY" --format agent
 ```
 
 Use filters (`--kind`, `--lang`, `--threshold`) to narrow results when appropriate. Refer to the maproom-search skill for full filter syntax.
