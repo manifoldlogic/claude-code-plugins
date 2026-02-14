@@ -1,6 +1,6 @@
 {
   "name": "maproom",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Semantic code search using the crewchief-maproom CLI. Find code by concept, understand architecture, and explore relationships between code elements.",
   "author": {
     "name": "Daniel Bushman",
@@ -29,8 +29,12 @@
     ],
     "SessionEnd": [
       {
-        "type": "command",
-        "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/cleanup-search-counter.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/cleanup-search-counter.py"
+          }
+        ]
       }
     ]
   }
