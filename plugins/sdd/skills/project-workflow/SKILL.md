@@ -21,6 +21,16 @@ Epic (research/discovery)
 3. **Sonnet for reasoning** - Planning, review, verification
 4. **Strict delegation** - Orchestrator NEVER does work itself. This principle preserves context conservation by maximizing token efficiency (delegating work to fresh contexts instead of consuming orchestrator tokens), maintaining sharp attention focus (orchestrator coordinates rather than gets buried in implementation details), and extending session longevity (avoiding context exhaustion from doing work directly). For general-purpose implementation work, use the Task tool with `subagent_type: "general-purpose"` to spawn fresh subagent contexts. See [delegation-patterns.md](references/delegation-patterns.md) for detailed decision criteria on when and how to delegate.
 
+## Prerequisites
+
+- **jq 1.5+**: JSON processor used by scaffolding, triage, and validation scripts. Install with your package manager:
+  - `apt-get install jq` (Debian/Ubuntu)
+  - `brew install jq` (macOS)
+  - `yum install jq` (RHEL/CentOS)
+  - `apk add jq` (Alpine)
+
+  Scripts validate the jq version on startup and exit with a clear error if the requirement is not met.
+
 ## Workflow Hierarchy
 
 ### Epics
@@ -63,7 +73,13 @@ bash scripts/scaffold-epic.sh "epic-name" "UIT-444" "Vision statement"
 
 ### Create Ticket
 ```bash
-# Scaffold structure
+# Triage documents based on description and overrides
+bash scripts/triage-documents.sh "ticket description" [+doc -doc]
+
+# Scaffold structure (with manifest for selective document creation)
+bash scripts/scaffold-ticket.sh --manifest /path/to/manifest.json "TICKET_ID" "ticket-name"
+
+# Scaffold structure (legacy: all six default documents)
 bash scripts/scaffold-ticket.sh "TICKET_ID" "ticket-name"
 
 # Then delegate to ticket-planner agent for planning docs
@@ -106,6 +122,7 @@ All scripts are in `scripts/` directory. Use these for mechanical tasks:
 |--------|---------|--------|
 | `scaffold-epic.sh` | Create epic folder structure | Directory tree |
 | `scaffold-ticket.sh` | Create ticket folder structure | Directory tree |
+| `triage-documents.sh` | Select documents based on description + overrides | JSON manifest |
 | `task-status.sh` | Scan ticket checkboxes | JSON status |
 | `validate-structure.sh` | Verify ticket/task structure | Validation report |
 | `ticket-summary.sh` | Generate ticket summary | Markdown summary |
@@ -225,10 +242,11 @@ For task execution:
 
 ## Templates
 
-Templates are in `templates/` directory:
+Templates are in `templates/` directory. The document registry (`templates/document-registry.json`) defines all document types, their tiers, and trigger keywords.
 
 ```
 templates/
+├── document-registry.json    # Authoritative document definitions
 ├── epic/
 │   ├── overview.md
 │   ├── opportunity-map.md
@@ -236,17 +254,221 @@ templates/
 │   └── decisions.md
 ├── ticket/
 │   ├── README.md
-│   ├── analysis.md
-│   ├── architecture.md
-│   ├── plan.md
-│   ├── quality-strategy.md
-│   ├── security-review.md
+│   ├── analysis.md           # Core: Problem analysis
+│   ├── architecture.md       # Core: Solution design
+│   ├── plan.md               # Core: Execution plan
+│   ├── prd.md                # Standard: Product requirements
+│   ├── quality-strategy.md   # Standard: Testing approach
+│   ├── security-review.md    # Standard: Security assessment
+│   ├── observability.md      # Conditional: Logging, metrics, alerting
+│   ├── migration-plan.md     # Conditional: Schema changes, rollback
+│   ├── accessibility.md      # Conditional: WCAG, keyboard nav
+│   ├── api-contract.md       # Conditional: API schemas, versioning
+│   ├── runbook.md            # Conditional: Deployment, incident response
+│   ├── dependency-audit.md   # Conditional: Package licenses, security
 │   └── pr-description.md
 └── task/
     └── task-template.md
 ```
 
-Scripts use these templates when scaffolding.
+Scripts use these templates when scaffolding. The triage system determines which ticket templates to use for each ticket (see Document Selection below).
+
+## Document Selection
+
+The triage system selects which planning documents to generate for each ticket. This replaces the previous fixed six-document approach with a context-aware selection algorithm.
+
+### Script Flags
+
+All workflow scripts (`triage-documents.sh`, `scaffold-ticket.sh`, `validate-structure.sh`) support the following common flags:
+
+| Flag | Environment Variable | Description |
+|------|---------------------|-------------|
+| `--no-color` | `NO_COLOR=1` | Disable ANSI color codes in output |
+| `--debug` | `DEBUG=1` | Enable shell command tracing (`set -x`) |
+| `--verbose` | `VERBOSE=1` | Enable human-readable progress output to stderr |
+
+The `--verbose` flag provides mid-level visibility between silent mode (default) and `--debug` (full shell tracing). Verbose output goes to stderr, preserving clean JSON on stdout.
+
+**Example verbose output from `triage-documents.sh`:**
+```
+[VERBOSE] Checking jq availability... OK
+[VERBOSE] Description validated (42 bytes)
+[VERBOSE] Loaded document registry: 12 document types
+[VERBOSE] Matched observability: keywords 'api', 'backend'
+[VERBOSE] Matched api-contract: keywords 'api'
+[VERBOSE] Override: +accessibility (force include)
+[VERBOSE] Override: -runbook (force exclude)
+[VERBOSE] Generating manifest: 9 documents selected
+```
+
+Flags can be combined: `--verbose --debug` shows both human-readable progress and shell command tracing.
+
+### Triage Algorithm
+
+The `triage-documents.sh` script runs during `/sdd:plan-ticket` (Step 1.5) and follows this algorithm:
+
+1. **Load the document registry** from `templates/document-registry.json`.
+2. **Always include core documents**: analysis, architecture, plan.
+3. **Include standard documents by default**: prd, quality-strategy, security-review.
+4. **Evaluate conditional documents**: For each conditional document, scan the ticket description for its trigger keywords (case-insensitive substring matching). Include the document if any keyword matches.
+5. **Apply overrides**: Process `+doc-name` (force include) and `-doc-name` (force exclude) flags from the command arguments. Core documents cannot be excluded.
+6. **Output a manifest**: Write a JSON manifest listing each document with its action (generate or skip) and the reason for that decision.
+
+### Manifest File
+
+The triage produces a manifest saved to the ticket's `planning/.triage-manifest.json`. This file records exactly which documents were selected and why:
+
+```json
+{
+  "ticket_id": "AUTH",
+  "description": "Implement user authentication with OAuth",
+  "documents": [
+    {"id": "analysis", "filename": "analysis.md", "tier": "core", "action": "generate", "reason": "Core document (always generated)"},
+    {"id": "api-contract", "filename": "api-contract.md", "tier": "conditional", "action": "generate", "reason": "Keyword match: api"},
+    {"id": "runbook", "filename": "runbook.md", "tier": "conditional", "action": "skip", "reason": "No trigger keywords matched"}
+  ],
+  "overrides": []
+}
+```
+
+### Decision Factors
+
+| Factor | Effect |
+|--------|--------|
+| Ticket description keywords | Trigger conditional document inclusion |
+| `+doc-name` override | Force-include a document regardless of keywords |
+| `-doc-name` override | Force-exclude a standard or conditional document |
+| Document tier (core) | Always included, cannot be overridden |
+| Document tier (standard) | Included by default, can be excluded with `-` |
+| Document tier (conditional) | Included only on keyword match or `+` override |
+
+### Fallback Behavior
+
+If the triage script fails or is unavailable, the workflow falls back to legacy behavior: the original six documents (analysis, architecture, plan, prd, quality-strategy, security-review) are generated without a manifest. This ensures backward compatibility.
+
+## Override Mechanism
+
+Override flags let developers adjust document selection without modifying the registry or triage logic.
+
+### Syntax
+
+```
++doc-name    Force include a document
+-doc-name    Force exclude a document
+```
+
+Override flags can appear anywhere in the `/sdd:plan-ticket` arguments. They are extracted before the description is parsed.
+
+### Examples
+
+```bash
+# Backend ticket, but needs accessibility review
+/sdd:plan-ticket "payment processing backend" +accessibility
+
+# API ticket, no new infrastructure needed
+/sdd:plan-ticket "REST API v2 endpoints" -runbook
+
+# Multiple overrides with planning context
+/sdd:plan-ticket "data pipeline service" +observability -dependency-audit Focus on reliability
+```
+
+### Validation
+
+- Override names are validated against the document registry. Unknown names produce a warning but do not block the workflow.
+- Core documents (`analysis`, `architecture`, `plan`) cannot be excluded. Attempting `-analysis` has no effect.
+
+## Extensibility
+
+New document types can be added without modifying the triage script or any hook code.
+
+### Adding a New Document Type
+
+1. **Create the template**: Add a new file at `templates/ticket/{new-document}.md` with the template structure.
+
+2. **Register in the document registry**: Add an entry to `templates/document-registry.json` in the `documents` object:
+   ```json
+   "new-document": {
+     "filename": "new-document.md",
+     "title": "Human-Readable Title",
+     "tier": "conditional",
+     "template": "new-document.md",
+     "create_tasks_validation": "none",
+     "triggers": {
+       "keywords": ["keyword1", "keyword2"],
+       "description": "Short description of when this document should be generated"
+     }
+   }
+   ```
+
+3. **Add to the tier list**: In the `tiers` section of the same file, add the document ID to the appropriate tier's `documents` array.
+
+The triage script reads the registry dynamically at runtime, so new document types are immediately available. Developers can use `+new-document` or `-new-document` overrides as soon as the registry entry exists.
+
+### Tier Selection Guide
+
+| Tier | Use When |
+|------|----------|
+| `core` | Document should be generated for every ticket without exception |
+| `standard` | Document should be generated by default but can be N/A-signed when irrelevant |
+| `conditional` | Document is only relevant for certain ticket types, identified by keywords |
+
+## Keyword Tuning
+
+The triage system uses keyword matching to decide which conditional documents to generate. Over time, you may find that certain documents are relevant to your tickets but not being automatically included. This section explains how to identify and fix these false negatives.
+
+### Identifying False Negatives
+
+A false negative occurs when a document should be included but the triage system skips it because none of its trigger keywords appear in the ticket description. Signs of false negatives:
+
+- You repeatedly use `+doc-name` overrides for the same document type across different tickets.
+- Reviewers flag missing documents that should have been auto-generated.
+- A document type is relevant to your domain but the keywords are too narrow.
+
+To check override frequency, look at recent triage manifests:
+
+```bash
+# Find tickets where a specific document was force-included
+grep -r '"action": "generate"' */planning/.triage-manifest.json | grep '"reason": "Override: +observability"'
+```
+
+### Tuning Process
+
+1. **Identify the pattern**: Notice that you're repeatedly overriding `+observability` for backend service tickets.
+
+2. **Examine the current keywords**: Look at the document's entry in `document-registry.json`:
+   ```json
+   "observability": {
+     "triggers": {
+       "keywords": ["monitoring", "logging", "metrics", "alerting", "dashboard", "tracing"],
+       "description": "Backend services, infrastructure, or production-facing changes"
+     }
+   }
+   ```
+
+3. **Find the missing keywords**: Your ticket descriptions use terms like "backend", "microservice", or "api gateway" but none of those match the existing trigger keywords.
+
+4. **Add new keywords**: Update the `keywords` array in `document-registry.json`:
+   ```json
+   "observability": {
+     "triggers": {
+       "keywords": ["monitoring", "logging", "metrics", "alerting", "dashboard", "tracing", "backend", "microservice"],
+       "description": "Backend services, infrastructure, or production-facing changes"
+     }
+   }
+   ```
+
+5. **Test the change**: Run the triage script with a sample description to verify improved matching:
+   ```bash
+   bash scripts/triage-documents.sh "implement backend microservice for payments"
+   ```
+
+### Guidelines for Keyword Quality
+
+- **Be specific**: Prefer "microservice" over "service" to avoid false positives.
+- **Use domain terms**: Add keywords that reflect how your team describes work (e.g., "pipeline" for CI/CD-related observability).
+- **Avoid overly broad terms**: Words like "update", "fix", or "change" match too many tickets and generate unnecessary documents.
+- **Base tuning on evidence**: Only add keywords when you see a pattern of repeated overrides, not on speculation.
+- **Test before committing**: Run `triage-documents.sh` with several representative descriptions to verify the new keywords match appropriately without causing noise.
 
 ## Status Indicators
 
@@ -281,7 +503,7 @@ Commands in the `commands/` directory provide user-friendly interfaces:
 | `/sdd:do-task` | Single task workflow |
 | `/sdd:import-jira-ticket` | acli jira + scaffold-ticket.sh + ticket-planner |
 | `/sdd:mark-ready` | Update .autogate.json with agent_ready: true |
-| `/sdd:plan-ticket` | scaffold-ticket.sh + ticket-planner |
+| `/sdd:plan-ticket` | triage-documents.sh + scaffold-ticket.sh + ticket-planner |
 | `/sdd:pr` | Create GitHub Pull Request for completed ticket |
 | `/sdd:recommend-agents` | agent-recommender agent |
 | `/sdd:review` | ticket-reviewer agent |
@@ -322,8 +544,10 @@ The full ticket lifecycle with optional agent customization:
 
 ```
 1. Create Ticket
-   /sdd:plan-ticket "Ticket description"
-   → scaffold-ticket.sh creates structure
+   /sdd:plan-ticket "Ticket description" [+doc -doc]
+   → triage-documents.sh selects relevant documents
+   → Developer confirms document selection
+   → scaffold-ticket.sh --manifest creates structure (selected docs only)
    → ticket-planner fills planning docs
    → May recommend agent analysis
 

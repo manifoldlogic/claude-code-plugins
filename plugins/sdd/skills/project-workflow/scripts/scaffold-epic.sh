@@ -83,10 +83,14 @@ validate_jira_id() {
         exit 1
     fi
 
-    # Length check (2-12 characters)
+    # Length check
+    # Constants defined in common.sh; duplicated here since scaffold-epic.sh
+    # does not yet source common.sh
+    local min_len=${MIN_TICKET_ID_LENGTH:-2}
+    local max_len=${MAX_TICKET_ID_LENGTH:-12}
     local len=${#jira_id}
-    if [[ $len -lt 2 || $len -gt 12 ]]; then
-        error "Jira ID must be 2-12 characters: $jira_id (got $len)"
+    if [[ $len -lt $min_len || $len -gt $max_len ]]; then
+        error "Jira ID must be ${min_len}-${max_len} characters: $jira_id (got $len)"
         exit 1
     fi
 }

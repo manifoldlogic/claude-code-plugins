@@ -86,11 +86,9 @@ You are a senior technical reviewer asking:
    ```bash
    ls {ticket_dir}/planning/*.md
    ```
-   - `analysis.md` - Problem definition and requirements
-   - `architecture.md` - Solution design
-   - `plan.md` - Execution plan and phases
-   - `quality-strategy.md` - Testing strategy
-   - `security-review.md` - Security considerations
+   Discover and read all planning documents dynamically. Do NOT assume specific documents exist - the document set varies per ticket based on triage decisions. Common documents include analysis.md, architecture.md, plan.md, and others (quality-strategy.md, security-review.md, observability.md, etc.).
+
+   **N/A Document Handling**: For each planning document, check if N/A-signed (first 100 bytes contain `**Status:** N/A` and file size <500 bytes). If N/A-signed, read status and assessment for awareness but skip deep content analysis - do not evaluate implementation against N/A-signed document requirements.
 
 2. **Task files** (`tasks/*.md`):
    ```bash

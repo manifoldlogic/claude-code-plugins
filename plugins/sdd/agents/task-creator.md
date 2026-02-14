@@ -36,6 +36,25 @@ Tickets use **phase-based numbering** where the first digit indicates the phase:
 
 Within each phase, increment sequentially from the highest existing number.
 
+## Document Discovery
+
+When reading planning documents for context (e.g., to populate task details, extract deliverables, or understand scope):
+
+List files in planning directory: `ls planning/*.md`
+Read all discovered documents as context.
+Do NOT assume specific documents exist - the document set varies per ticket based on triage decisions. New document types (e.g., observability.md, accessibility.md, migration-plan.md) are automatically available through dynamic discovery.
+
+## N/A Document Handling
+
+For each planning document:
+1. Check if N/A-signed: read first 100 bytes, look for `**Status:** N/A`
+2. Check file size: if >500 bytes, treat as full document (N/A marker may be in quoted example)
+3. If N/A-signed (marker present + <500 bytes):
+   - Read status and assessment for awareness (note that area was assessed but deemed not applicable)
+   - Skip deep content processing
+   - Do not extract detailed requirements or tasks from this document
+   - Do not generate acceptance criteria based on N/A-signed documents
+
 ## Required Inputs
 
 Before creating a task, you MUST have:

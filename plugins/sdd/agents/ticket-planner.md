@@ -24,24 +24,45 @@ All paths referencing the SDD data directory use `{{SDD_ROOT}}` as a placeholder
 
 ## Ticket Structure
 
-You fill these planning documents:
+You fill the planning documents that were scaffolded for this ticket. The document set varies per ticket based on triage.
 
 ```
 {{SDD_ROOT}}/tickets/{TICKET_ID}_{name}/
-├── README.md              # Overview (update)
+├── README.md                        # Overview (update)
 ├── planning/
-│   ├── analysis.md        # Problem analysis
-│   ├── prd.md             # Product requirements
-│   ├── architecture.md    # Solution design
-│   ├── plan.md            # Execution plan
-│   ├── quality-strategy.md # Testing approach
-│   └── security-review.md  # Security considerations
-└── tasks/                 # (Created later by task-creator)
+│   ├── .triage-manifest.json        # Document triage decisions (read-only)
+│   ├── analysis.md                  # Core: Problem analysis
+│   ├── architecture.md              # Core: Solution design
+│   ├── plan.md                      # Core: Execution plan
+│   ├── prd.md                       # Standard: Product requirements
+│   ├── quality-strategy.md          # Standard: Testing approach
+│   ├── security-review.md           # Standard: Security considerations
+│   ├── observability.md             # Conditional: Monitoring/logging
+│   ├── migration-plan.md            # Conditional: Migration strategy
+│   ├── accessibility.md             # Conditional: Accessibility review
+│   ├── api-contract.md              # Conditional: API specification
+│   ├── runbook.md                   # Conditional: Operations guide
+│   └── dependency-audit.md          # Conditional: Dependency review
+└── tasks/                           # (Created later by task-creator)
 ```
+
+**Not all documents will be present.** Only fill documents that exist in the planning directory.
 
 ## Planning Workflow
 
-### Step 1: Context Gathering
+### Step 1: Review Document Triage
+
+Read `planning/.triage-manifest.json` to understand which documents need to be filled.
+
+**Display summary:**
+- **Core documents** (always present): analysis.md, architecture.md, plan.md
+- **Standard documents** (present by default, may N/A-sign): list which are scaffolded
+- **Conditional documents** (present based on triage): list which are scaffolded
+- **Overrides applied**: note any forced inclusions (+doc) or exclusions (-doc)
+
+**Discovery**: List files in `planning/` to confirm which templates were scaffolded. Only fill documents that exist. Do NOT create documents that were not scaffolded.
+
+### Step 2: Context Gathering
 
 Before writing any documents:
 
@@ -50,7 +71,7 @@ Before writing any documents:
 3. **Check Existing Patterns**: How are similar things done?
 4. **Identify Constraints**: What limits exist?
 
-### Step 2: Analysis Document
+### Step 3: Analysis Document
 
 **Purpose**: Deep understanding of the problem
 
@@ -67,7 +88,7 @@ Before writing any documents:
 - Identify gaps in understanding
 - Note assumptions explicitly
 
-### Step 3: PRD Document
+### Step 4: PRD Document
 
 **Purpose**: Define WHAT is being built (requirements and acceptance criteria)
 
@@ -97,7 +118,7 @@ Fill in `planning/prd.md` (Product Requirements Document) - the authoritative so
 - Plan.md (delivery strategy for PRD features)
 - Quality-strategy.md (testing approach to validate PRD criteria)
 
-### Step 4: Architecture Document
+### Step 5: Architecture Document
 
 **Purpose**: Focused, pragmatic solution design that implements PRD requirements
 
@@ -119,7 +140,7 @@ Fill in `planning/architecture.md` to design HOW to implement the PRD requiremen
 - **Consistent**: Follow existing codebase patterns
 - **Reuse**: Leverage existing components
 
-### Step 5: Execution Plan
+### Step 6: Execution Plan
 
 **Purpose**: Phased approach to delivery
 
@@ -142,7 +163,7 @@ Fill in `planning/architecture.md` to design HOW to implement the PRD requiremen
 - Clear agent assignments
 - Dependencies noted
 
-### Step 6: Quality Strategy
+### Step 7: Quality Strategy
 
 **Purpose**: Enterprise-grade testing approach
 
@@ -162,7 +183,7 @@ Fill in `planning/architecture.md` to design HOW to implement the PRD requiremen
 - **Non-happy-path coverage** - Error handling, exception cases, and failure modes must be tested, not just success scenarios
 - This is enterprise software - testing is not optional or ceremonial, it's foundational
 
-### Step 7: Security Review
+### Step 8: Security Review
 
 **Purpose**: Practical security assessment
 
@@ -174,6 +195,46 @@ Fill in `planning/architecture.md` to design HOW to implement the PRD requiremen
 - Initial release security scope
 
 **Key Principle**: No unmitigated security risks in production code
+
+### Step 9: Conditional Documents (if scaffolded)
+
+Only fill these if the corresponding file exists in `planning/`. Each template file contains its full structure -- follow it. Below is guidance on content focus.
+
+#### Operational Concerns: observability.md + runbook.md
+
+**observability.md** -- Logging strategy, metrics to collect, alerting rules and thresholds, dashboard layout, distributed tracing approach. Focus on: what signals indicate healthy vs unhealthy system behavior.
+
+**runbook.md** -- Deployment steps, health check procedures, monitoring interpretation, incident response playbook, rollback procedure, escalation path. Focus on: what does an on-call engineer need to know.
+
+#### Interface Contracts: accessibility.md + api-contract.md
+
+**accessibility.md** -- WCAG 2.1 compliance level, keyboard navigation plan, screen reader considerations, color contrast and visual design requirements, testing tools. Focus on: what makes this usable for all users.
+
+**api-contract.md** -- Endpoints with methods/paths, request/response schemas, authentication, versioning strategy, error format, example requests. Focus on: what does a consumer need to integrate.
+
+#### Change Management: migration-plan.md + dependency-audit.md
+
+**migration-plan.md** -- Current state description, target state description, step-by-step migration procedure, rollback plan, risk assessment, data integrity verification. Focus on: how to get from A to B safely.
+
+**dependency-audit.md** -- New packages with justification, license compatibility, security posture (known CVEs, maintenance status), bundle size impact, alternatives considered. Focus on: is this dependency worth the cost.
+
+### N/A Sign-Off Guidance
+
+For **standard-tier** documents (prd.md, quality-strategy.md, security-review.md) where the ticket scope makes them inapplicable, write a brief N/A sign-off instead of the full document. Replace the template content with:
+
+```markdown
+## Status: N/A
+
+**Assessment**: [1-3 sentences explaining why this document is not applicable to the current ticket scope.]
+
+**Re-evaluate If**: [Condition that would make this document relevant, e.g., "Scope expands to include user-facing UI" or "Authentication changes are added."]
+```
+
+**Rules**:
+- N/A is **NEVER** appropriate for core-tier documents (analysis.md, architecture.md, plan.md) -- these must always be filled fully
+- N/A **IS** appropriate for: prd.md (backend-only work), security-review.md (no security surface), quality-strategy.md (trivial change with no test impact)
+- Conditional documents are not N/A-signed -- they are either scaffolded (fill them) or not scaffolded (ignore them)
+- Assess applicability during Step 2 (Context Gathering) based on ticket scope
 
 ## Research Methods
 
@@ -235,6 +296,14 @@ Before completing:
 - [ ] Mitigations practical
 - [ ] Scope appropriate for initial release
 
+**Conditional Documents** (if scaffolded):
+- [ ] Each scaffolded conditional document filled with ticket-specific content
+- [ ] Template structure followed
+
+**N/A Sign-offs** (if applicable):
+- [ ] Standard-tier N/A sign-offs include assessment and re-evaluate condition
+- [ ] No core-tier documents were N/A-signed
+
 ## Anti-Patterns to Avoid
 
 1. **Over-Engineering**: Don't add features/complexity beyond defined requirements
@@ -263,9 +332,9 @@ This ensures consistent parsing and display of guidance to users.
 ## Handoff
 
 After planning:
-1. All six planning docs completed (analysis.md, prd.md, architecture.md, plan.md, quality-strategy.md, security-review.md)
+1. All scaffolded planning docs completed (or N/A-signed for inapplicable standard-tier docs)
 2. README.md updated
-3. Report summary to orchestrator
+3. Report summary to orchestrator (include triage summary: which docs filled, which N/A-signed)
 4. Evaluate if custom agents would help (see below)
 5. Output recommended next step (see Output Format above)
 

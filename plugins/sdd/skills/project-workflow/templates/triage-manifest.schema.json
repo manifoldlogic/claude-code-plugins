@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SDD Triage Manifest",
+  "description": "Schema for the triage manifest output produced by triage-documents.sh. Defines the structure of .triage-manifest.json files stored in ticket planning directories.",
+  "type": "object",
+  "required": ["ticket_description", "overrides", "documents"],
+  "additionalProperties": false,
+  "properties": {
+    "ticket_description": {
+      "type": "string",
+      "description": "The ticket description text used for document triage"
+    },
+    "overrides": {
+      "type": "array",
+      "description": "List of override flags applied during triage (e.g., +accessibility, -runbook)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "documents": {
+      "type": "array",
+      "description": "List of documents evaluated during triage with their disposition",
+      "items": {
+        "$ref": "#/definitions/documentEntry"
+      }
+    }
+  },
+  "definitions": {
+    "documentEntry": {
+      "type": "object",
+      "description": "A single document triage result with its action and reason",
+      "required": ["id", "filename", "action", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Document identifier (lowercase kebab-case)"
+        },
+        "filename": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*\\.md$",
+          "description": "Document filename (kebab-case with .md extension)"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["generate", "skip"],
+          "description": "Triage action: generate (include in planning) or skip (exclude)"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason for the triage decision"
+        }
+      }
+    }
+  }
+}
