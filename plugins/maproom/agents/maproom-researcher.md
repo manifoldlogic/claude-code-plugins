@@ -32,6 +32,7 @@ crewchief-maproom status
 Then select the most relevant repo for the research question.
 
 ## Critical Rules
+<!-- MAPCAP: soft=5, hard=10 - DO NOT UPDATE without checking all 5 prompt sections -->
 > **Note:** Search budget constraints are enforced by a PreToolUse hook (enforce-search-cap.py) with a soft cap at 5 and hard cap at 10.
 
 These rules are non-negotiable. Violating them degrades accuracy and wastes context.

@@ -28,6 +28,7 @@ import os
 import re
 import sys
 import tempfile
+import traceback
 
 SOFT_CAP = 5
 HARD_CAP = 10
@@ -38,6 +39,7 @@ def get_counter_file():
     """Return path to the session-scoped counter file."""
     # Use CLAUDE_SESSION_ID if available, fall back to parent PID
     session_id = os.environ.get("CLAUDE_SESSION_ID", str(os.getppid()))
+    session_id = session_id.replace('/', '_').replace('\\', '_')
     return os.path.join(tempfile.gettempdir(), f"maproom-search-count-{session_id}")
 
 
@@ -118,6 +120,7 @@ def main():
         # On hook error, log warning but allow execution to continue
         # (fail-open to avoid breaking agent workflows)
         sys.stderr.write(f"Warning: maproom search cap hook error: {e}\n")
+        sys.stderr.write(traceback.format_exc())
         sys.exit(0)
 
 
