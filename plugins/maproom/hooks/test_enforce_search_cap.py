@@ -7,12 +7,16 @@ Tests verify the two-tier search cap system for the maproom-researcher agent:
   - Searches 6-10 (soft cap to hard cap): allowed with stderr warning
   - Searches 11+ (above hard cap): blocked
 
-Covers threshold boundaries, bypass paths, error handling, and counter state.
+Covers threshold boundaries, bypass paths, error handling, counter state,
+and filesystem error fail-open behavior.
 """
 import glob
 import json
 import os
+import stat
 import subprocess
+import tempfile
+import unittest
 
 # Path to the hook script
 HOOK_PATH = os.path.join(os.path.dirname(__file__), "enforce-search-cap.py")
@@ -304,6 +308,151 @@ class TestCounterState:
         # Corrupt file read as 0, incremented to 1 -- no warning
         assert _read_counter(sid) == 1
         assert "cap" not in stderr.lower()
+
+
+# =============================================================================
+# Filesystem Error Tests (Fail-Open Verification)
+# =============================================================================
+
+class TestFilesystemErrors(unittest.TestCase):
+    """Tests for fail-open behavior under filesystem stress.
+
+    The hook wraps all logic in a try/except that catches Exception and
+    exits 0 (fail-open). These tests verify that this safety mechanism
+    works under real filesystem pressure -- permission errors, missing
+    directories, and unwritable paths.
+    """
+
+    def setUp(self):
+        """Track temporary directories and files for cleanup."""
+        self._temp_dirs = []
+        self._restricted_files = []
+
+    def tearDown(self):
+        """Restore permissions and clean up all test artifacts."""
+        # Restore file permissions before removal
+        for fpath in self._restricted_files:
+            try:
+                os.chmod(fpath, stat.S_IRUSR | stat.S_IWUSR)
+                os.remove(fpath)
+            except OSError:
+                pass
+
+        # Restore directory permissions and remove temp dirs (reverse order)
+        for dpath in reversed(self._temp_dirs):
+            try:
+                os.chmod(dpath, stat.S_IRWXU)
+            except OSError:
+                pass
+            try:
+                # Remove any files inside the directory
+                for entry in os.listdir(dpath):
+                    entry_path = os.path.join(dpath, entry)
+                    try:
+                        os.chmod(entry_path, stat.S_IRUSR | stat.S_IWUSR)
+                        os.remove(entry_path)
+                    except OSError:
+                        pass
+                os.rmdir(dpath)
+            except OSError:
+                pass
+
+    def test_unwritable_counter_path(self):
+        """When counter path is a directory (not a file), hook should fail-open (exit 0).
+
+        Places a directory at the expected counter file path. When the hook
+        attempts to open() this path for reading or writing, it raises
+        IsADirectoryError (a subclass of OSError), which is caught by the
+        top-level except block.
+        """
+        sid = "test-fs-unwritable-path"
+        counter_path = _counter_path(sid)
+
+        # Place a directory where the counter file should be
+        if os.path.exists(counter_path):
+            os.remove(counter_path)
+        os.makedirs(counter_path, exist_ok=True)
+        self._temp_dirs.append(counter_path)
+
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            session_id=sid,
+        )
+
+        assert exit_code == 0, (
+            f"Expected fail-open (exit 0) when counter path is a directory, "
+            f"got exit {exit_code}. stderr: {stderr}"
+        )
+        assert "warning" in stderr.lower(), (
+            f"Expected warning on stderr when counter path is a directory. "
+            f"stderr: {stderr}"
+        )
+
+    def test_readonly_counter_file(self):
+        """When counter file has no permissions, hook should fail-open (exit 0).
+
+        Pre-creates a counter file with value 4, then removes all
+        permissions (chmod 0o000). The hook cannot read or write the file,
+        causing an exception caught by the fail-open handler.
+        """
+        sid = "test-fs-readonly-file"
+        counter_path = _counter_path(sid)
+
+        # Pre-create the counter file with a normal value
+        _seed_counter(sid, 4)
+        self._restricted_files.append(counter_path)
+
+        # Remove all permissions from the counter file
+        os.chmod(counter_path, 0o000)
+
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            session_id=sid,
+        )
+
+        assert exit_code == 0, (
+            f"Expected fail-open (exit 0) when counter file is unreadable, "
+            f"got exit {exit_code}. stderr: {stderr}"
+        )
+        assert "warning" in stderr.lower(), (
+            f"Expected warning on stderr when counter file is unreadable. "
+            f"stderr: {stderr}"
+        )
+
+    def test_nonexistent_tmp_path(self):
+        """When counter path is a broken symlink, hook should fail-open (exit 0).
+
+        Creates a symlink at the counter file path that points to a file
+        inside a nonexistent directory. The hook's read_count() catches
+        FileNotFoundError, returning 0. But write_count() attempts to open
+        the symlink target for writing, raising FileNotFoundError (because
+        the target directory doesn't exist), which is caught by fail-open.
+        """
+        sid = "test-fs-nonexistent-tmp"
+        counter_path = _counter_path(sid)
+
+        # Remove any existing file at the counter path
+        if os.path.exists(counter_path) or os.path.islink(counter_path):
+            os.remove(counter_path)
+
+        # Create a symlink pointing to a file in a nonexistent directory
+        broken_target = "/tmp/test-fs-nonexistent-dir-" + str(os.getpid()) + "/counter"
+        os.symlink(broken_target, counter_path)
+        self._restricted_files.append(counter_path)
+
+        exit_code, stdout, stderr = run_hook(
+            _make_search_input(),
+            session_id=sid,
+        )
+
+        assert exit_code == 0, (
+            f"Expected fail-open (exit 0) when counter is a broken symlink, "
+            f"got exit {exit_code}. stderr: {stderr}"
+        )
+        assert "warning" in stderr.lower(), (
+            f"Expected warning on stderr when counter is a broken symlink. "
+            f"stderr: {stderr}"
+        )
 
 
 if __name__ == "__main__":
