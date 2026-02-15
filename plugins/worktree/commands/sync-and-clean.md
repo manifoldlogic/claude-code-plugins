@@ -42,24 +42,26 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
 
 ### Step 2: Fetch and prune
 
-Run `git fetch --prune` to retrieve remote updates and remove stale remote-tracking branches:
+Run `git fetch --prune` with a 120-second timeout to retrieve remote updates and remove stale remote-tracking branches:
 
 ```bash
-git -C /workspace/repos/<repo>/<worktree> fetch --prune
+timeout 120 git -C /workspace/repos/<repo>/<worktree> fetch --prune
 ```
 
 **Error handling:**
-- If `git fetch --prune` fails (non-zero exit code), warn the user that fetch failed but **continue to Step 3** anyway. The pull may still succeed if the local tracking is intact. Report the fetch error output so the user can investigate (e.g., network issues, authentication problems).
+- If the command times out (exit code 124), report: "Git fetch timed out after 120 seconds. This may indicate a slow network connection or large repository size. Check network connectivity and consider running git operations manually."
+- If `git fetch --prune` fails with a different non-zero exit code, warn the user that fetch failed but **continue to Step 3** anyway. The pull may still succeed if the local tracking is intact. Report the fetch error output so the user can investigate (e.g., network issues, authentication problems).
 
 ### Step 3: Pull latest changes
 
-Run `git pull` to merge remote changes into the local branch:
+Run `git pull` with a 120-second timeout to merge remote changes into the local branch:
 
 ```bash
-git -C /workspace/repos/<repo>/<worktree> pull
+timeout 120 git -C /workspace/repos/<repo>/<worktree> pull
 ```
 
 **Error handling:**
+- If the command times out (exit code 124), report: "Git pull timed out after 120 seconds. This may indicate a slow network connection or large repository size. Check network connectivity and consider running git operations manually."
 - If `git pull` fails due to merge conflicts, report the error clearly. Suggest:
   - Navigate to the worktree and resolve conflicts manually
   - Or run `git -C /workspace/repos/<repo>/<worktree> merge --abort` to cancel
