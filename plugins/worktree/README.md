@@ -10,6 +10,7 @@ The Worktree plugin provides Git worktree management capabilities powered by the
 - **Isolated Environments**: Each worktree is a separate directory with its own checkout, preventing conflicts
 - **Safe Merge**: Merge worktrees back to main with built-in safety checks and automatic cleanup
 - **Smart Cleanup**: Remove worktrees with SDD ticket status awareness to prevent accidental cleanup of incomplete work
+- **Sync and Clean**: Pull latest changes and prune stale branches for a worktree in one command
 - **Branch Management**: Create, list, and manage git worktrees with simple commands
 - **Status Tracking**: View all active worktrees and their current state
 - **VS Code Integration**: Automatic workspace file updates when spawning or cleaning up worktrees
@@ -104,6 +105,20 @@ Safely merges the completed feature back to the main branch with automatic clean
 
 # Preview merge operations first
 merge-worktree.sh feature-auth --repo myproject --dry-run
+```
+
+### Syncing and Cleaning a Worktree
+```
+Pull latest changes and prune stale branches for the authentication worktree
+```
+Syncs the worktree with the remote tracking branch and removes stale remote references.
+
+```bash
+# Sync with explicit worktree name
+/worktree:sync-and-clean feature-auth
+
+# Auto-detect from current worktree directory
+/worktree:sync-and-clean
 ```
 
 ### Cleaning Up with Ticket Awareness
@@ -204,7 +219,8 @@ plugins/worktree/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── commands/
-│   └── merge.md
+│   ├── merge.md
+│   └── sync-and-clean.md
 ├── skills/
 │   ├── worktree-spawn/
 │   │   └── SKILL.md
