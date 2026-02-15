@@ -29,8 +29,14 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
    - This validation applies whether the name was provided via `$ARGUMENTS` or auto-detected from the current working directory.
 
 3. Resolve the worktree path:
-   - If the worktree name was provided but the repo is unknown, search `/workspace/repos/` for a repo directory containing a subdirectory matching the worktree name. Use `ls` to list directories under `/workspace/repos/` and check each one.
-   - Construct the full path as `/workspace/repos/<repo>/<worktree>`.
+   - If the worktree name was provided but the repo is unknown, search `/workspace/repos/` for **all** repo directories containing a subdirectory matching the worktree name. Use `ls` to list directories under `/workspace/repos/` and check each one. Track all matching repos, not just the first match.
+   - If **no matches** found, report an error: "Worktree directory not found. Check the worktree name and try again. Use `ccwt list` to see available worktrees."
+   - If **multiple matches** found (worktree name exists in more than one repo), report an error and stop processing:
+     "Ambiguous: worktree '{name}' exists in multiple repos: {repo1}, {repo2}.
+      Run command from within desired worktree for auto-detection:
+        cd /workspace/repos/{repo}/{name}
+        /worktree:sync-and-clean"
+   - If **exactly one match** found, construct the full path as `/workspace/repos/<repo>/<worktree>`.
    - Verify the directory exists by checking with `ls -d /workspace/repos/<repo>/<worktree>`.
    - If the directory does not exist, report an error: "Worktree directory not found at `/workspace/repos/<repo>/<worktree>`. Check the worktree name and try again. Use `ccwt list` to see available worktrees."
 
