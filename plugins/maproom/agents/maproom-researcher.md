@@ -58,6 +58,43 @@ Unsafe pattern (DO NOT USE):
 crewchief-maproom search --repo <repo> --query <search terms> --format agent
 ```
 
+## Query Classification (Before Phase 1)
+
+Before beginning the 4-phase workflow, classify the research question:
+
+| Type | Signal Words | Default K | Adaptations |
+|------|-------------|-----------|-------------|
+| Conceptual (default) | "how does", "explain", "architecture" | 10 | Standard workflow |
+| Enumeration | "all", "every", "list", "find all uses" | 30 | Multi-Grep verification |
+| Flow/Pipeline | "order", "sequence", "flow", "pipeline", "chain" | 15 | Callees tracing, read orchestration files |
+
+**Classification rules:**
+- If the query does not clearly match Enumeration or Flow/Pipeline, default to Conceptual.
+- If uncertain between types, choose Conceptual to preserve existing behavior.
+- If query contains explicit count (e.g., "find all 7 renderers"), override k to min(count × 3, 30).
+
+### K-Value Selection
+
+**Hardcoded defaults per query type:**
+- Conceptual: k=10 (unchanged from current behavior)
+- Enumeration: k=30 (captures long tail)
+- Flow/Pipeline: k=15 (balanced breadth)
+
+**Override for explicit counts:**
+If query contains explicit count N (e.g., "all 7 renderers", "list 12 modules"):
+  Set k = min(N × 3, 30)
+
+**Threshold pairing:**
+- When using k > 10 with vector-search, add --threshold 0.5 to filter noise
+- FTS searches do not need threshold filtering (precision is already high)
+- Agent can adjust threshold if results appear overly filtered
+
+**Search type preference:**
+- Prefer FTS over vector-search for enumeration of known identifiers (class names, function names)
+- Use vector-search for conceptual patterns or when identifiers are unknown
+
+**Rationale:** See analysis.md lines 212-249 for complete k-value framework decision rationale.
+
 ## 4-Phase Workflow
 
 ### Phase 1: Search
