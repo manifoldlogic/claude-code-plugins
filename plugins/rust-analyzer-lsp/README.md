@@ -39,6 +39,10 @@ brew install rust-analyzer
 # Download from https://github.com/rust-lang/rust-analyzer/releases
 ```
 
+**Recommended version**: rust-analyzer 1.70.0 or later
+
+This plugin works with any recent rust-analyzer version (tested with 1.93.0). Older versions may have limited LSP features.
+
 ## Installation
 
 Install the plugin using the Claude Code plugin command:
@@ -57,6 +61,15 @@ claude plugin install rust-analyzer-lsp@crewchief --scope project
 ```
 
 Both plugins register the same LSP server name, so having both installed simultaneously may cause conflicts. Uninstall the official plugin before installing this one.
+
+## Verifying Installation
+
+After installing the plugin, verify it's working:
+
+1. Check plugin is installed: `claude plugin list | grep rust-analyzer`
+2. Check rust-analyzer is in PATH: `command -v rust-analyzer`
+3. Open a .rs file and ask Claude about errors in the file
+4. Claude should mention diagnostics from rust-analyzer
 
 ## How It Works
 
@@ -97,6 +110,12 @@ When you open or edit a `.rs` file, Claude Code automatically starts rust-analyz
 ```
 claude plugin uninstall rust-analyzer-lsp@claude-plugins-official
 ```
+
+### LSP Works After Installing rust-analyzer but Not Before
+
+**Problem**: You installed rust-analyzer after installing the plugin, but LSP still doesn't activate.
+
+**Solution**: Claude Code reads $PATH at session start. Restart your Claude Code session to pick up the new binary location.
 
 ## Version
 
