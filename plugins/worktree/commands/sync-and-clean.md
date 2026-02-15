@@ -20,7 +20,11 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
    - If `$ARGUMENTS` is empty, auto-detect from the current working directory:
      - Run `pwd` and parse the path to extract the repo and worktree name.
      - The expected path structure is `/workspace/repos/<repo>/<worktree>`.
-     - If the current directory does not match this pattern, report an error: "Could not auto-detect worktree from current directory. Please provide a worktree name: `/worktree:sync-and-clean <worktree-name>`"
+     - If the current directory matches `/workspace/repos/<repo>` with no subdirectory (i.e., the main worktree), report a specific error:
+       "You are in the main worktree. This command is for feature worktrees only.
+        Provide a worktree name: `/worktree:sync-and-clean <name>`
+        Use `ccwt list` to see available worktrees."
+     - If the current directory does not match the `/workspace/repos/<repo>/<worktree>` pattern at all, report a generic error: "Could not auto-detect worktree from current directory. Please provide a worktree name: `/worktree:sync-and-clean <worktree-name>`"
 
 2. Validate worktree name format:
    - Check that the worktree name matches the pattern `[a-zA-Z0-9_-]+` (only alphanumeric characters, hyphens, and underscores).
