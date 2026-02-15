@@ -221,6 +221,27 @@ Tab names follow the `"<repo> <worktree>"` convention, enabling reliable tab man
 - Set upstream if needed: `git branch -u origin/<branch>`
 - Ensure you've pushed the branch to remote if collaboration is needed
 
+### Sync Failures
+
+**Problem**: Sync operation times out after 120 seconds
+
+**Solution**:
+- Check network connectivity: `ping github.com`
+- For large repositories, run git operations manually with no timeout: `git -C <path> fetch --prune && git -C <path> pull`
+
+**Problem**: Auto-detection fails with "Could not auto-detect worktree"
+
+**Solution**:
+- Ensure you are inside a worktree directory (path must match `/workspace/repos/<repo>/<worktree>`)
+- If running from the main worktree (`/workspace/repos/<repo>`), provide an explicit name: `/worktree:sync-and-clean <name>`
+- List available worktrees: `ccwt list`
+
+**Problem**: Ambiguous worktree name exists in multiple repos
+
+**Solution**:
+- Navigate into the desired worktree directory and run `/worktree:sync-and-clean` with no arguments (auto-detect)
+- Or use a unique worktree name that only exists in one repo
+
 ## Skills Reference
 
 This plugin provides the following skills with detailed documentation:
