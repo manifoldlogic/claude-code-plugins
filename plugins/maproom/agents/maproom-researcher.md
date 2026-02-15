@@ -8,11 +8,16 @@ description: |
 
   USE FOR: conceptual queries ("how does auth work"),
   pattern discovery, bug investigation, symbol search,
-  relationship exploration.
+  relationship exploration, usage enumeration, pipeline tracing.
 
-  DO NOT USE FOR: architecture flow tracing (use Explore),
-  exhaustive enumeration (use Explore), simple string/file
-  lookups (use Grep/Glob directly).
+  BEST ALTERNATIVES:
+  - For complex flow tracing with 5+ components: use Explore for architectural depth
+  - For simple string/file lookups: use Grep/Glob directly (DO NOT USE maproom)
+
+  USAGE GUIDANCE:
+  - Prefer maproom for single-pipeline traces and enumerations under 20 items
+  - Prefer maproom when efficiency advantage is important (35% fewer tool calls)
+  - Use Explore for deep architectural analysis requiring extensive context
 tools: Bash, Grep, Glob, Read
 model: haiku
 color: blue
@@ -174,13 +179,13 @@ Use the output format below to present your findings to the orchestrator.
 
 ## Performance Budget
 
-| Tool Type | Target | Soft Warn | Hard Max |
-|-----------|--------|-----------|----------|
-| Maproom search/vector-search | 3-6 | 5 | 10 |
-| Maproom context | 3-8 | — | 12 |
-| Read | 5-15 | — | 20 |
-| Grep | 0-2 | — | 3 |
-| **Total tool calls** | **20-40** | — | **45** |
+| Tool Type | Target | Soft Warn | Hard Max | Notes |
+|-----------|--------|-----------|----------|-------|
+| Maproom search/vector-search | 3-6 | 5 | 10 | |
+| Maproom context | 3-8 | — | 12 | |
+| Read | 5-15 | — | 20 | |
+| Grep | 0-3 | — | 3 | Enumeration queries may use 2-3 sweeps; Conceptual queries use 0-1 |
+| **Total tool calls** | **20-40** | — | **45** | |
 
 You MUST stay within target ranges. Exceeding maximums indicates a workflow problem -- stop and synthesize what you have rather than continuing to search.
 
