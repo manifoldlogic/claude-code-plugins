@@ -22,7 +22,13 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
      - The expected path structure is `/workspace/repos/<repo>/<worktree>`.
      - If the current directory does not match this pattern, report an error: "Could not auto-detect worktree from current directory. Please provide a worktree name: `/worktree:sync-and-clean <worktree-name>`"
 
-2. Resolve the worktree path:
+2. Validate worktree name format:
+   - Check that the worktree name matches the pattern `[a-zA-Z0-9_-]+` (only alphanumeric characters, hyphens, and underscores).
+   - If the worktree name contains any other characters (including `..`, `/`, `\`, spaces, or other special characters), report an error and stop processing:
+     "Invalid worktree name '{name}'. Use only alphanumeric characters, hyphens, and underscores. Example: my-worktree-123"
+   - This validation applies whether the name was provided via `$ARGUMENTS` or auto-detected from the current working directory.
+
+3. Resolve the worktree path:
    - If the worktree name was provided but the repo is unknown, search `/workspace/repos/` for a repo directory containing a subdirectory matching the worktree name. Use `ls` to list directories under `/workspace/repos/` and check each one.
    - Construct the full path as `/workspace/repos/<repo>/<worktree>`.
    - Verify the directory exists by checking with `ls -d /workspace/repos/<repo>/<worktree>`.
