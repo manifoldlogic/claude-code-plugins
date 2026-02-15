@@ -121,6 +121,27 @@ Syncs the worktree with the remote tracking branch and removes stale remote refe
 /worktree:sync-and-clean
 ```
 
+#### Common Issues
+
+**Merge Conflicts**
+If pull fails with merge conflicts:
+- Navigate to the worktree: `cd /workspace/repos/<repo>/<worktree>`
+- Resolve conflicts in the affected files
+- Stage and commit: `git add . && git commit`
+- Or abort the merge: `git -C /workspace/repos/<repo>/<worktree> merge --abort`
+
+**Network Errors**
+If fetch or pull fails due to connectivity issues:
+- Check your connection: `ping github.com`
+- Verify the remote URL: `git -C /workspace/repos/<repo>/<worktree> remote -v`
+- Try a manual fetch: `git -C /workspace/repos/<repo>/<worktree> fetch`
+
+**Worktree Not Found**
+If the worktree name doesn't match any directory:
+- List available worktrees: `ccwt list`
+- Check spelling and case sensitivity
+- Use auto-detection by running the command from within the worktree directory
+
 ### Cleaning Up with Ticket Awareness
 ```
 Remove the experimental-refactor worktree
