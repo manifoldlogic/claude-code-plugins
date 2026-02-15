@@ -40,6 +40,15 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
    - Verify the directory exists by checking with `ls -d /workspace/repos/<repo>/<worktree>`.
    - If the directory does not exist, report an error: "Worktree directory not found at `/workspace/repos/<repo>/<worktree>`. Check the worktree name and try again. Use `ccwt list` to see available worktrees."
 
+4. Check for uncommitted changes:
+   - Run `git -C /workspace/repos/<repo>/<worktree> status --porcelain` to detect uncommitted changes.
+   - If the output is non-empty (worktree has uncommitted changes), display a warning but **do not stop processing**:
+     "Warning: Worktree has uncommitted changes. Pull may fail or create merge conflicts.
+      Uncommitted files:
+      {list each line from the status output}
+      Proceeding with sync operation..."
+   - If the output is empty (clean worktree), proceed silently without any warning.
+
 ### Step 2: Fetch and prune
 
 Run `git fetch --prune` with a 120-second timeout to retrieve remote updates and remove stale remote-tracking branches:
