@@ -114,6 +114,12 @@ Use filters (`--kind`, `--lang`, `--threshold`) to narrow results when appropria
 
 Example: `QUERY="authentication middleware"; crewchief-maproom search --repo myapp --query "$QUERY" --format agent` → Results: `auth.middleware.ts`, `jwt.guard.ts`, `passport.strategy.ts` (3 hits, 95% relevance)
 
+**Query-type adaptations:**
+- **Enumeration:** Use k=30 for higher recall. Prefer FTS over vector-search for known identifiers (class names, function names) — exact match ranking captures long-tail results better than semantic similarity.
+  Example: `QUERY="UserProfileRenderer"; crewchief-maproom search --repo myapp --query "$QUERY" --k 30 --kind class --format agent`
+- **Flow/Pipeline:** Search both source and consumption endpoints. Use k=15 for balanced breadth. If the query traces a flow from A to B, issue separate searches for each endpoint.
+  Example: "trace env var flow from dotenv to webpack" → search for "dotenv" AND search for "webpack" separately.
+
 **Exit criterion:**
 - Semantic search results retrieved and analyzed (non-empty result set). Move to Phase 2.
 - If all searches returned zero results, skip Phase 2 and proceed directly to Phase 3 (Grep fallback).
@@ -131,15 +137,32 @@ Read key files identified by search and context results:
 - You MUST read specific line ranges rather than entire large files when files are large
 - Look for patterns, control flow, data structures, and error handling
 
+**Query-type adaptations:**
+- **Enumeration:** Use breadth-first strategy — read many files with narrow line ranges (5-10 lines per file) to catalog implementations. Read directory manifest files where all implementations are often listed:
+  - `package.json` (dependencies, scripts)
+  - `index.{ts,js,py}` (module exports)
+  - `__init__.py` (Python package exports)
+- **Flow/Pipeline:** Use `context --callees --max-depth 3` to trace call chains from entry points found in Phase 1. Read orchestration and bootstrap files where components are registered in order:
+  - Bootstrap file patterns: `app.{ts,js,py}`, `index.{ts,js,py}`, `main.{ts,js,py}`, `bootstrap.*`
+  - Search for registration patterns: `app.use`, `register`, `middleware`, `pipe`
+  - Look for registration arrays, plugin lists, and middleware chains.
+
 **Exit criterion:** You understand the implementation well enough to answer the research question. Move to Phase 3.
 
 ### Phase 3: Verify
 
-Run a single Grep sweep to check for coverage gaps -- things your search may have missed.
+Run Grep sweeps to check for coverage gaps -- things your search may have missed.
 
 - Pick 1-2 specific terms or patterns that should appear in any complete answer
 - Use Grep to verify you have not overlooked major files or alternate implementations
 - If Grep reveals significant new files, use Read to examine them (but do NOT return to Phase 1)
+
+**Grep intensity by query type:**
+- **Conceptual:** 1 Grep sweep with 1-2 terms (standard coverage check).
+- **Enumeration:** 2-3 Grep sweeps with complementary patterns. Use broad patterns to catch naming variants (e.g., search for `Renderer` not `UserProfileRenderer`). Example sweeps for "find all renderers": (1) `grep -r "class.*Renderer"`, (2) `grep -r "import.*Renderer"`, (3) `grep -r "type.*Renderer"`.
+- **Flow/Pipeline:** 1-2 Grep sweeps for registration and bootstrapping patterns (e.g., `grep -r "app\.use"`, `grep -r "register"`).
+
+**Realistic expectations:** Multi-Grep improves coverage but may not reach 100% for poorly-documented enumerations. Report what you found honestly rather than over-searching.
 
 **Exit criterion:** No major gaps found, or gaps have been addressed with Read. Move to Phase 4.
 
