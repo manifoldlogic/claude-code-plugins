@@ -1,0 +1,18 @@
+{
+  "name": "rust-analyzer-lsp",
+  "version": "1.0.0",
+  "description": "Rust language server integration via rust-analyzer. Provides code intelligence, diagnostics, go-to-definition, and find-references for .rs files.",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
+  },
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
+  "keywords": [
+    "rust",
+    "rust-analyzer",
+    "lsp",
+    "language-server",
+    "code-intelligence"
+  ]
+}
