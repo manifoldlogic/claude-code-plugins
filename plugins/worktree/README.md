@@ -10,6 +10,7 @@ The Worktree plugin provides Git worktree management capabilities powered by the
 - **Isolated Environments**: Each worktree is a separate directory with its own checkout, preventing conflicts
 - **Safe Merge**: Merge worktrees back to main with built-in safety checks and automatic cleanup
 - **Smart Cleanup**: Remove worktrees with SDD ticket status awareness to prevent accidental cleanup of incomplete work
+- **Sync and Clean**: Pull latest changes and prune stale branches for a worktree in one command
 - **Branch Management**: Create, list, and manage git worktrees with simple commands
 - **Status Tracking**: View all active worktrees and their current state
 - **VS Code Integration**: Automatic workspace file updates when spawning or cleaning up worktrees
@@ -106,6 +107,41 @@ Safely merges the completed feature back to the main branch with automatic clean
 merge-worktree.sh feature-auth --repo myproject --dry-run
 ```
 
+### Syncing and Cleaning a Worktree
+```
+Pull latest changes and prune stale branches for the authentication worktree
+```
+Syncs the worktree with the remote tracking branch and removes stale remote references.
+
+```bash
+# Sync with explicit worktree name
+/worktree:sync-and-clean feature-auth
+
+# Auto-detect from current worktree directory
+/worktree:sync-and-clean
+```
+
+#### Common Issues
+
+**Merge Conflicts**
+If pull fails with merge conflicts:
+- Navigate to the worktree: `cd /workspace/repos/<repo>/<worktree>`
+- Resolve conflicts in the affected files
+- Stage and commit: `git add . && git commit`
+- Or abort the merge: `git -C /workspace/repos/<repo>/<worktree> merge --abort`
+
+**Network Errors**
+If fetch or pull fails due to connectivity issues:
+- Check your connection: `ping github.com`
+- Verify the remote URL: `git -C /workspace/repos/<repo>/<worktree> remote -v`
+- Try a manual fetch: `git -C /workspace/repos/<repo>/<worktree> fetch`
+
+**Worktree Not Found**
+If the worktree name doesn't match any directory:
+- List available worktrees: `ccwt list`
+- Check spelling and case sensitivity
+- Use auto-detection by running the command from within the worktree directory
+
 ### Cleaning Up with Ticket Awareness
 ```
 Remove the experimental-refactor worktree
@@ -185,6 +221,27 @@ Tab names follow the `"<repo> <worktree>"` convention, enabling reliable tab man
 - Set upstream if needed: `git branch -u origin/<branch>`
 - Ensure you've pushed the branch to remote if collaboration is needed
 
+### Sync Failures
+
+**Problem**: Sync operation times out after 120 seconds
+
+**Solution**:
+- Check network connectivity: `ping github.com`
+- For large repositories, run git operations manually with no timeout: `git -C <path> fetch --prune && git -C <path> pull`
+
+**Problem**: Auto-detection fails with "Could not auto-detect worktree"
+
+**Solution**:
+- Ensure you are inside a worktree directory (path must match `/workspace/repos/<repo>/<worktree>`)
+- If running from the main worktree (`/workspace/repos/<repo>`), provide an explicit name: `/worktree:sync-and-clean <name>`
+- List available worktrees: `ccwt list`
+
+**Problem**: Ambiguous worktree name exists in multiple repos
+
+**Solution**:
+- Navigate into the desired worktree directory and run `/worktree:sync-and-clean` with no arguments (auto-detect)
+- Or use a unique worktree name that only exists in one repo
+
 ## Skills Reference
 
 This plugin provides the following skills with detailed documentation:
@@ -204,7 +261,8 @@ plugins/worktree/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── commands/
-│   └── merge.md
+│   ├── merge.md
+│   └── sync-and-clean.md
 ├── skills/
 │   ├── worktree-spawn/
 │   │   └── SKILL.md
