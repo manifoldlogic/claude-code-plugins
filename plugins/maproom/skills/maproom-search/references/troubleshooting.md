@@ -331,29 +331,68 @@ crewchief-maproom search --repo <repo-name> --query "<search terms>"
 crewchief-maproom search --help
 ```
 
-### Embedding Service Configuration Error
+### Error: "Failed to create token provider from ADC"
 
 ```
-Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
+Error: Failed to create embedding service.
 
 Caused by:
     0: Configuration error: Invalid configuration value for credentials:
        Failed to create token provider from ADC
 ```
 
-**Cause:** The `vector-search` subcommand requires an embedding API key to convert queries into vectors. Either `OPENAI_API_KEY` is not set or GCP Application Default Credentials (ADC) are not configured.
+**Cause:** Google Application Default Credentials (ADC) have expired. This is a **credential issue, not a code bug**. The `vector-search` subcommand requires valid credentials to call the embedding API (Vertex AI by default). When ADC tokens expire, the CLI cannot authenticate with the embedding provider.
 
 **Recovery:**
-```bash
-# Check if the environment variable is set
-echo "$OPENAI_API_KEY"
+1. Refresh ADC credentials:
+   ```bash
+   gcloud auth application-default login --no-launch-browser
+   gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+   ```
+2. Verify credentials are valid:
+   ```bash
+   gcloud auth application-default print-access-token
+   ```
+3. Retry the vector-search command:
+   ```bash
+   crewchief-maproom vector-search --repo <repo-name> --query "<search terms>" --format agent
+   ```
+4. If you cannot refresh credentials immediately, fall back to FTS search:
+   ```bash
+   crewchief-maproom search --repo <repo-name> --query "<search terms>" --format agent
+   ```
 
-# Set it for the current session
-export OPENAI_API_KEY="<your-key>"
+**Related Errors:**
+- `invalid_rapt` in error output also indicates expired ADC credentials; use the same resolution steps above.
+- `quota_project_id is required` indicates the quota project is not configured; run `gcloud auth application-default set-quota-project YOUR_PROJECT_ID`.
 
-# If you do not have an API key, use full-text search instead
-crewchief-maproom search --repo <repo-name> --query "<search terms>"
+**Security:** Do not share ADC credentials or access tokens. Do not commit credential files to git.
+
+**Reference:** See [ADC Setup Guide](./adc-setup.md) for detailed setup and refresh instructions. See [Embedding Providers](./embedding-providers.md) for provider configuration details.
+
+### Embedding Provider Misconfiguration
+
 ```
+Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
+```
+
+**Cause:** The CLI error message references `OPENAI_API_KEY`, but this may be misleading if you are using a different embedding provider (e.g., Vertex AI with ADC). The actual cause depends on which provider is configured:
+- If using **Vertex AI** (default): ADC credentials are expired or not configured. See [Error: "Failed to create token provider from ADC"](#error-failed-to-create-token-provider-from-adc) above.
+- If using **OpenAI**: The `OPENAI_API_KEY` environment variable is not set or is invalid.
+
+**Recovery:**
+1. Check which embedding provider is configured:
+   ```bash
+   echo "$MAPROOM_EMBEDDING_PROVIDER"
+   ```
+2. If the variable is unset or set to `vertex-ai`, this is an ADC credential issue. Follow the ADC recovery steps above.
+3. If set to `openai`, set the API key:
+   ```bash
+   export OPENAI_API_KEY="<your-key>"
+   ```
+4. If you see `OPENAI_API_KEY` in the error but are not using OpenAI, the provider may be misconfigured. See [Embedding Providers](./embedding-providers.md) for correct configuration.
+
+**Reference:** See [Embedding Providers](./embedding-providers.md) for the full list of supported providers and their required environment variables.
 
 ### Network Timeout During Vector Search
 
@@ -445,6 +484,53 @@ crewchief-maproom search --repo <repo-name> --query "<terms>" --format agent
 ```
 
 **Note on silent failures:** Some invalid values do not produce errors but return empty results. In particular, `--kind` and `--lang` accept any string without validation — an incorrect value like `--kind Func` (uppercase) silently matches nothing. See [Zero Results with Valid Query](#zero-results-with-valid-query) above for details.
+
+---
+
+## Known Limitations
+
+This section documents known constraints and behaviors that are not bugs but may cause confusion.
+
+### Expired ADC Credentials Cause "Failed to create embedding service"
+
+Google Application Default Credentials (ADC) expire periodically and must be refreshed. When they expire, any `vector-search` or `generate-embeddings` command that uses Vertex AI will fail with:
+
+```
+Error: Failed to create embedding service.
+
+Caused by:
+    0: Configuration error: Invalid configuration value for credentials:
+       Failed to create token provider from ADC
+```
+
+This is **not a code bug**. It is a credential expiry issue. Refresh credentials with:
+```bash
+gcloud auth application-default login --no-launch-browser
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+```
+
+See [ADC Setup Guide](./adc-setup.md) for detailed instructions.
+
+### text-embedding-004 Is Not Available via Gemini REST API
+
+The `text-embedding-004` model used by maproom for embeddings is only available through the **Vertex AI API**, not through the Gemini REST API. Attempting to use the Gemini REST API endpoint for embeddings will fail. This means:
+- ADC credentials (Google Cloud authentication) are required for the default embedding provider.
+- The `GOOGLE_API_KEY` environment variable (used for Gemini REST API) is **not sufficient** for embedding generation.
+- You must use either the Vertex AI provider (with ADC) or the OpenAI provider (with `OPENAI_API_KEY`).
+
+See [Embedding Providers](./embedding-providers.md) for supported providers and configuration.
+
+### Cross-Provider Re-indexing Required When Switching Providers
+
+Embeddings generated by one provider (e.g., Vertex AI with `text-embedding-004`) are **not compatible** with embeddings from another provider (e.g., OpenAI with `text-embedding-ada-002`). If you switch embedding providers, you must regenerate all embeddings:
+
+```bash
+crewchief-maproom generate-embeddings
+```
+
+Failure to re-index after switching providers will cause vector-search to return poor or zero results, because the query embedding (from the new provider) will be compared against stored embeddings (from the old provider) that exist in a different vector space.
+
+See [Embedding Providers](./embedding-providers.md) for details on provider switching.
 
 ---
 

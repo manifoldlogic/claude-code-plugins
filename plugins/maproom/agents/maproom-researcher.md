@@ -279,11 +279,42 @@ Run `crewchief-maproom scan` in the repo directory first.
 
 **Soft cap warning (6-10 searches):** You've exceeded the target search budget. Evaluate if additional searches are necessary or if you have enough data to proceed to Phase 2. The warning indicates searches remaining, not a hard stop.
 
-**Vector search unavailable:** If vector-search fails because embeddings are missing, fall back to FTS search only. Note this limitation in your findings.
+**Vector search unavailable:** If vector-search fails, determine the cause before falling back:
+1. If the error matches a credential pattern (see Credential Error Recognition below), this is a credential issue — suggest the user refresh credentials, then fall back to FTS search.
+2. If embeddings are missing (no credential error), fall back to FTS search only.
+3. Note the limitation and cause in your findings.
 
 **Read tool failures:** If Read encounters binary files or permission errors, use `crewchief-maproom context --chunk-id <id> --format agent` to get a summary instead. Do not retry the Read on the same file.
 
 **Empty context results:** If `crewchief-maproom context` produces no results, reformulate your query with synonyms or broader terms before assuming the code is absent. This still counts toward your search budget if it triggers a new search call.
+
+### Credential Error Recognition
+
+When analyzing CLI output, recognize these patterns as **credential issues, not code bugs**:
+
+| Error Pattern | Root Cause | Suggested Remediation |
+|---------------|------------|----------------------|
+| "Failed to create token provider from ADC" | Expired Google ADC credentials | Run: `gcloud auth application-default login --no-launch-browser` |
+| "invalid_rapt" | Expired Google authentication token | Same as above — refresh ADC credentials |
+| "quota_project_id is required" | Missing GCP quota project configuration | Run: `gcloud auth application-default set-quota-project <project-id>` |
+| "OPENAI_API_KEY" in error when not using OpenAI | Wrong embedding provider configured | Check `MAPROOM_EMBEDDING_PROVIDER` env var; see embedding-providers.md |
+
+**IMPORTANT:** If the error matches any pattern above, do NOT:
+- Suggest filing a bug against the CLI
+- Investigate the CLI source code for defects
+- Report the failure as an unexpected code error
+
+Instead:
+1. Explain to the user that this is a credential or configuration issue, not a code bug
+2. Provide the exact remediation command from the table above
+3. Fall back to FTS search (`crewchief-maproom search`) for the current session
+4. Reference the ADC setup guide for detailed instructions: `../skills/maproom-search/references/adc-setup.md`
+
+**Distinguishing credential errors from actual code bugs:**
+- **Credential issue:** Error message contains "ADC", "token provider", "invalid_rapt", "quota_project_id", or references an API key for a provider you are not using
+- **Code bug:** Error message references code paths, panics, segfaults, or describes unexpected behavior that occurs even with valid, fresh credentials
+
+**Security:** Do not include actual credentials, access tokens, or project IDs in your findings output. Use placeholders like `YOUR_PROJECT_ID`.
 
 ### CLI and Query Validation
 See Pre-Workflow Checks section above. Version 0.1.0 or higher required; null/empty queries rejected.
