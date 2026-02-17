@@ -302,7 +302,7 @@ For candidates that survive all gates and validation, prepare skill proposals.
 
 ### Example 4: Wrapper-with-Fallback Delegation Pattern
 
-**Observed in:** worktree plugin, maproom plugin, vscode plugin development (across 6+ sessions)
+**Observed in:** worktree plugin, vscode plugin development (across 6+ sessions)
 
 **Pattern:** Implementing plugin commands that delegate to an external CLI tool with graceful fallback when the tool is unavailable. The procedure involves checking tool availability with `command -v`, constructing the delegation command with proper argument forwarding, capturing exit codes, and providing meaningful error messages when the tool is missing.
 

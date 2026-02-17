@@ -112,7 +112,7 @@ For Jira-style ticket IDs:
 
 #### Bug Fixes
 - `MCPSTART_mcp-provider-startup-fix`
-- `MAPROOM_misc-fixes`
+- `HOOKFIX_misc-fixes`
 - `AUTHFIX_authentication-bug-fix`
 
 ### Jira-Based Ticket IDs (From External Tracker)
@@ -266,7 +266,7 @@ A: Yes, for Jira-style IDs like `UIT-9819` or `BE-4567`. The dash is part of the
 A: Yes, if meaningful: `http2-support`, `oauth2-integration`.
 
 **Q: Should I include the parent ticket name?**
-A: Only if it adds clarity: `MAPROOM_search-optimization` is better than `SEARCH_optimization` if there are multiple search systems.
+A: Only if it adds clarity: `APIV2_search-optimization` is better than `SEARCH_optimization` if there are multiple search systems.
 
 **Q: How specific should descriptive-name be?**
 A: Specific enough to distinguish from similar tickets, but general enough to encompass the full scope.

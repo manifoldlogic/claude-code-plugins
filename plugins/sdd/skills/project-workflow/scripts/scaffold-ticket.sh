@@ -315,7 +315,6 @@ main() {
     verbose "Created ticket directory: ${ticket_path}"
 
     # Create directory structure
-    # IMPORTANT: If structure changes, update plugins/maproom/skills/sdd-spec-search/SKILL.md
     mkdir -p "$ticket_path"/{planning,tasks,deliverables}
 
     # --- Determine which documents to generate ---

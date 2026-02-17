@@ -126,7 +126,6 @@ main() {
     info "Creating epic: $folder_name"
 
     # Create directory structure
-    # IMPORTANT: If structure changes, update plugins/maproom/skills/sdd-spec-search/SKILL.md
     mkdir -p "$init_path"/{reference,analysis,decomposition/ticket-summaries}
 
     # Create overview.md
