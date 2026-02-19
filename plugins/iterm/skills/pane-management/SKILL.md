@@ -5,7 +5,7 @@ description: iTerm2 pane management for splitting, listing, and closing panes wi
 
 # Pane Management Skill
 
-**Last Updated:** 2026-02-08
+**Last Updated:** 2026-02-19
 **Plugin:** iterm
 **Scripts Location:** `plugins/iterm/skills/pane-management/scripts/`
 

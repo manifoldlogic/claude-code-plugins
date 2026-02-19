@@ -615,6 +615,117 @@ run_shell_compatibility_tests() {
 }
 
 ##############################################################################
+# Test Category 18: Embedded Newline Rejection (3 tests)
+##############################################################################
+
+test_embedded_newline_exits_3() {
+    local exit_code
+    set +e
+    "$SCRIPT_UNDER_TEST" --dry-run -p 2 "$(printf 'line1\nline2')" >/dev/null 2>&1
+    exit_code=$?
+    set -e
+    assert_exit_code "3" "$exit_code"
+}
+
+test_trailing_newline_exits_3() {
+    local exit_code
+    local text_with_trailing_newline=$'text\n'
+    set +e
+    "$SCRIPT_UNDER_TEST" --dry-run -p 2 "$text_with_trailing_newline" >/dev/null 2>&1
+    exit_code=$?
+    set -e
+    assert_exit_code "3" "$exit_code"
+}
+
+test_embedded_newline_error_mentions_newline() {
+    local output
+    output=$("$SCRIPT_UNDER_TEST" --dry-run -p 2 "$(printf 'line1\nline2')" 2>&1) || true
+    assert_output_contains "$output" "newline"
+}
+
+run_embedded_newline_tests() {
+    section "Embedded Newline Rejection"
+    run_test "send-text: text with embedded newline exits 3" test_embedded_newline_exits_3
+    run_test "send-text: text with trailing newline exits 3" test_trailing_newline_exits_3
+    run_test "send-text: embedded newline error mentions 'newline'" test_embedded_newline_error_mentions_newline
+}
+
+##############################################################################
+# Test Category 19: NO_TABS Sentinel (1 test)
+##############################################################################
+
+test_sentinel_no_tabs() {
+    local output
+    output=$("$SCRIPT_UNDER_TEST" --dry-run -p 2 "hello" 2>&1)
+    assert_output_contains "$output" 'return "NO_TABS"'
+}
+
+run_no_tabs_sentinel_tests() {
+    section "NO_TABS Sentinel"
+    run_test "send-text: dry-run AppleScript contains return \"NO_TABS\"" test_sentinel_no_tabs
+}
+
+##############################################################################
+# Test Category 20: End-of-Options (--) Handling (4 tests)
+##############################################################################
+
+test_double_dash_with_dash_text_exits_0() {
+    local exit_code
+    set +e
+    "$SCRIPT_UNDER_TEST" --dry-run -p 2 -- "-verbose" >/dev/null 2>&1
+    exit_code=$?
+    set -e
+    assert_exit_code "0" "$exit_code"
+}
+
+test_double_dash_sends_dash_text() {
+    local output
+    output=$("$SCRIPT_UNDER_TEST" --dry-run -p 2 -- "-verbose" 2>&1)
+    assert_output_contains "$output" 'write text "-verbose"'
+}
+
+test_double_dash_no_text_exits_3() {
+    local exit_code
+    set +e
+    "$SCRIPT_UNDER_TEST" -p 2 -- >/dev/null 2>&1
+    exit_code=$?
+    set -e
+    assert_exit_code "3" "$exit_code"
+}
+
+test_double_dash_multiple_text_exits_3() {
+    local exit_code
+    set +e
+    "$SCRIPT_UNDER_TEST" -p 2 -- "text1" "text2" >/dev/null 2>&1
+    exit_code=$?
+    set -e
+    assert_exit_code "3" "$exit_code"
+}
+
+run_end_of_options_tests() {
+    section "End-of-Options (--) Handling"
+    run_test "send-text: -- with dash-prefixed text exits 0" test_double_dash_with_dash_text_exits_0
+    run_test "send-text: -- '-verbose' sends literal '-verbose' text" test_double_dash_sends_dash_text
+    run_test "send-text: -- with no text exits 3" test_double_dash_no_text_exits_3
+    run_test "send-text: -- with multiple text args exits 3" test_double_dash_multiple_text_exits_3
+}
+
+##############################################################################
+# Test Category 21: SKILL.md Reference in Help (1 test)
+##############################################################################
+
+test_help_mentions_skill_md_scenario_7() {
+    local output
+    output=$("$SCRIPT_UNDER_TEST" --help 2>&1) || true
+    assert_output_contains "$output" "SKILL.md" && assert_output_contains "$output" "Scenario 7"
+}
+
+run_skill_md_reference_tests() {
+    section "SKILL.md Reference in Help"
+    run_test "send-text: --help mentions SKILL.md Scenario 7" test_help_mentions_skill_md_scenario_7
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -625,7 +736,7 @@ main() {
     echo "========================================================"
     echo ""
 
-    # Run all 17 test categories
+    # Run all 21 test categories
     run_existence_tests
     run_help_tests
     run_argument_happy_path_tests
@@ -643,6 +754,10 @@ main() {
     run_error_path_tests
     run_context_detection_tests
     run_shell_compatibility_tests
+    run_embedded_newline_tests
+    run_no_tabs_sentinel_tests
+    run_end_of_options_tests
+    run_skill_md_reference_tests
 
     # Summary
     echo ""

@@ -130,6 +130,8 @@ NOTES:
   - --submit and --no-newline are mutually exclusive
   - In container mode, requires HOST_USER environment variable
   - Text with special characters (quotes, backslashes) is escaped automatically
+
+See SKILL.md Scenario 7 for compound multi-pane Claude setup workflows.
 EOF
 }
 
@@ -163,6 +165,20 @@ parse_arguments() {
             -h|--help)
                 show_help
                 exit $EXIT_SUCCESS
+                ;;
+            --)
+                shift
+                if [ $# -gt 1 ]; then
+                    iterm_error "Only one text argument allowed"
+                    iterm_error "Use -h or --help for usage information"
+                    return $EXIT_INVALID_ARGS
+                fi
+                if [ $# -eq 1 ]; then
+                    ARG_TEXT="$1"
+                    ARG_TEXT_SET=true
+                    shift
+                fi
+                break
                 ;;
             -*)
                 iterm_error "Unknown option: $1"
@@ -212,6 +228,11 @@ build_applescript() {
     local submit="$3"
     local no_newline="$4"
 
+    # Note: $escaped_text is already escaped for AppleScript string context by
+    # escape_applescript_string() (backslashes doubled, double-quotes escaped).
+    # The surrounding double-quotes in the write_command string below are shell
+    # heredoc content -- they become literal AppleScript double-quotes, not shell
+    # string delimiters.
     local write_command
     if [[ "$submit" == "true" ]]; then
         # --submit mode: write text without newline, then send CR
@@ -229,6 +250,9 @@ build_applescript() {
 tell application "iTerm2"
     if (count of windows) is 0 then
         return "NO_WINDOWS"
+    end if
+    if (count of tabs of first window) is 0 then
+        return "NO_TABS"
     end if
     set sessionCount to count of sessions of current tab of first window
     if sessionCount < $pane then
@@ -277,6 +301,14 @@ main() {
         exit $EXIT_INVALID_ARGS
     fi
 
+    # Reject text with embedded newline characters
+    case "$ARG_TEXT" in
+        *$'\n'*)
+            iterm_error "Text argument cannot contain embedded newlines. Use multiple invocations for multi-line input."
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+
     # Validate mutual exclusivity of --submit and --no-newline
     if [[ "$ARG_SUBMIT" == "true" && "$ARG_NO_NEWLINE" == "true" ]]; then
         iterm_error "--submit and --no-newline are mutually exclusive"
@@ -324,6 +356,10 @@ main() {
     fi
     if [ "$result" = "NO_WINDOWS" ]; then
         iterm_error "No iTerm2 windows are open"
+        exit $EXIT_ITERM_UNAVAILABLE
+    fi
+    if [ "$result" = "NO_TABS" ]; then
+        iterm_error "No tabs are open in the iTerm2 window"
         exit $EXIT_ITERM_UNAVAILABLE
     fi
     if [ "$result" = "INVALID_PANE" ]; then
