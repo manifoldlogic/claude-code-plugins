@@ -5,7 +5,7 @@ description: iTerm2 pane management for splitting, listing, and closing panes wi
 
 # Pane Management Skill
 
-**Last Updated:** 2026-02-08
+**Last Updated:** 2026-02-19
 **Plugin:** iterm
 **Scripts Location:** `plugins/iterm/skills/pane-management/scripts/`
 
@@ -22,6 +22,8 @@ The pane-management skill provides iTerm2 pane management capabilities for Claud
 - Close panes by substring pattern matching with confirmation prompts
 - JSON and table output formats for automation
 - Dry-run mode for all operations (split, list, close)
+- Send text to specific panes by number with newline control
+- Submit commands to Claude Code panes using write-without-newline + carriage return (ASCII 13)
 - Automatic context detection (host vs container mode)
 
 **Important:** This skill splits panes within an existing iTerm2 window. It will not create a new window if none exists. Use the tab-management skill to create new tabs or windows first.
@@ -72,6 +74,7 @@ This skill sources `iterm-utils.sh` from the tab-management skill directory. If 
 | `iterm:split-pane` | Split current session into a new pane with direction, profile, command, and name options | `-d` direction, `-p` profile, `-c` command, `-n` name |
 | `iterm:list-panes` | List all panes across windows and tabs in table or JSON format with optional filtering | `-f` format (table/json), `-w` window filter, `-t` tab filter, `--dry-run` |
 | `iterm:close-pane` | Close panes by substring pattern matching on session names with confirmation prompts | `<pattern>` argument, `--force`, `-w` window filter, `-t` tab filter |
+| `iterm:send-text` | Send arbitrary text to a specific pane by number, with optional submit (CR) or no-newline modes | `-p` pane number, `--submit`, `--no-newline`, `--dry-run` |
 
 ## Decision Tree
 
@@ -92,11 +95,16 @@ User Request
         │   └─ Use iterm:list-panes
         │       ├─ Quick visual check → default table format
         │       └─ Programmatic parsing → -f json
-        └─ Remove a pane?
-            └─ Use iterm:close-pane <pattern>
-                ├─ Preview first → --dry-run "pattern"
-                ├─ With confirmation → "pattern"
-                └─ Automated (no prompts) → --force "pattern"
+        ├─ Remove a pane?
+        │   └─ Use iterm:close-pane <pattern>
+        │       ├─ Preview first → --dry-run "pattern"
+        │       ├─ With confirmation → "pattern"
+        │       └─ Automated (no prompts) → --force "pattern"
+        ├─ Send text to an existing pane?
+        │   └─ Use iterm:send-text -p PANE "text"
+        │       ├─ Shell command (standard newline) → default (no flag)
+        │       ├─ Claude Code session (needs Enter) → --submit
+        │       └─ Partial text (no newline) → --no-newline
 ```
 
 ## Direction Terminology
@@ -154,6 +162,17 @@ This table maps common user requests to exact script invocations. Every command 
 | "close panes matching 'worker' in window 2" | `iterm-close-pane.sh -w 2 "worker"` | Pattern is a positional argument after options |
 | "preview which panes would be closed for 'dev'" | `iterm-close-pane.sh --dry-run "dev"` | Dry-run shows AppleScripts without executing |
 | "close the Logs pane in window 1, tab 1" | `iterm-close-pane.sh -w 1 -t 1 "Logs"` | Combined window and tab filter with pattern |
+
+### Send Text Scenarios
+
+| User Says | Mapped To | Notes |
+|-----------|-----------|-------|
+| "send 'ls' to pane 2" | `iterm-send-text.sh -p 2 "ls"` | Default mode appends newline; standard shell command execution |
+| "send a command to the Claude pane" | `iterm-send-text.sh -p 2 --submit "your-command"` | Use `--submit` for Claude Code panes; CR submits without literal newline in buffer |
+| "start claude in pane 3" | `iterm-send-text.sh -p 3 --submit "claude"` | Sends "claude" + CR to properly launch Claude Code in that pane |
+| "type without pressing enter in pane 1" | `iterm-send-text.sh -p 1 --no-newline "partial"` | Use `--no-newline` for fine-grained input control |
+| "what pane number is the dev server" | `iterm-list-panes.sh` | List panes first to find the target pane number, then use `-p` |
+| "preview what would be sent to pane 2" | `iterm-send-text.sh -p 2 --dry-run "hello"` | Dry-run shows generated AppleScript without executing |
 
 ### Agent Spawn Scenarios
 
@@ -314,6 +333,39 @@ This table maps common user requests to exact script invocations. Every command 
    ```
 
 **Outcome:** The wrapper delegates to `iterm-split-pane.sh` with the correct flags, builds the Claude command with the task description piped in, and sets the pane name from the task. The agent starts running in the new pane immediately. If the plugin script is unavailable, spawn-agent.sh falls back to its built-in AppleScript implementation.
+
+### Scenario 7: Compound Multi-Pane Claude Setup
+
+**Goal:** Set up a 3-pane layout with Claude Code sessions running in two new panes while the main pane remains available for work.
+
+**Steps:**
+
+1. List current panes to confirm the starting state:
+   ```bash
+   iterm-list-panes.sh
+   ```
+
+2. Split vertically to create pane 2 on the right:
+   ```bash
+   iterm-split-pane.sh -d vertical -n "Claude Agent 1"
+   ```
+
+3. Split pane 2 horizontally to create pane 3 below it:
+   ```bash
+   iterm-split-pane.sh -d horizontal -n "Claude Agent 2"
+   ```
+
+4. Send "claude" to pane 2 with `--submit` to properly launch Claude Code there:
+   ```bash
+   iterm-send-text.sh -p 2 --submit "claude"
+   ```
+
+5. Send "claude" to pane 3 with `--submit`:
+   ```bash
+   iterm-send-text.sh -p 3 --submit "claude"
+   ```
+
+**Outcome:** Three panes in one tab -- main pane on the left, two Claude Code sessions on the right. Using `--submit` ensures the `claude` command is submitted correctly (the pane handles it as Enter/Return, not a literal newline). Without `--submit`, the newline appended by standard `write text` would be treated as a literal newline character in the Claude Code input buffer, causing the command to fail.
 
 ## Script Reference
 
@@ -512,6 +564,69 @@ iterm-close-pane.sh --dry-run "feature-branch"
 
 See the [Exit Codes](#exit-codes) section below. This script uses codes 0 (success), 1 (connection failure), 2 (iTerm2 unavailable), 3 (invalid arguments), and 4 (no panes match pattern).
 
+### iterm-send-text.sh
+
+**Purpose:** Send text to a specific pane identified by its 1-based pane number.
+
+**Usage:**
+```bash
+iterm-send-text.sh -p PANE [--submit | --no-newline] [--dry-run] [-h] <text>
+```
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<text>` | Yes | Text to send to the target pane (must be non-empty) |
+
+**Flags:**
+
+| Flag | Long Form | Description | Default |
+|------|-----------|-------------|---------|
+| `-p` | `--pane PANE` | Target pane number (1-based session index) | (required) |
+| | `--submit` | Send text without newline, then send CR (ASCII 13) to simulate Enter | (false) |
+| | `--no-newline` | Send text without any trailing newline | (false) |
+| | `--dry-run` | Show AppleScript without executing | (false) |
+| `-h` | `--help` | Show help message | |
+
+**Flag Clarification:**
+- `-p` in `iterm-send-text.sh` means `--pane`, NOT `--profile`. This differs from `iterm-split-pane.sh` where `-p` means `--profile`.
+- `--submit` and `--no-newline` are mutually exclusive. Using both together exits with code 3.
+- Default behavior (no flag) uses `write text "text"` which appends a standard newline -- works for shell commands, not for Claude Code sessions.
+- `--submit` uses `write text "text" without newline` + `write text (ASCII character 13) without newline` -- correct for Claude Code sessions.
+
+**Text Modes:**
+
+| Mode | When to Use | AppleScript Behavior |
+|------|-------------|---------------------|
+| Default (no flag) | Shell commands | `write text "text"` -- appends newline |
+| `--submit` | Claude Code sessions | `write text "text" without newline` + `write text (ASCII character 13) without newline` |
+| `--no-newline` | Partial input / advanced control | `write text "text" without newline` |
+
+**Examples:**
+
+```bash
+# Send shell command to pane 2 (standard newline)
+iterm-send-text.sh -p 2 "npm test"
+
+# Send command to Claude Code session in pane 3 (use --submit)
+iterm-send-text.sh -p 3 --submit "claude"
+
+# Send text without trailing newline to pane 1
+iterm-send-text.sh -p 1 --no-newline "partial input"
+
+# Preview the AppleScript without sending
+iterm-send-text.sh -p 2 --dry-run --submit "claude"
+
+# Find pane numbers first, then send
+iterm-list-panes.sh
+iterm-send-text.sh -p 2 --submit "claude --dangerously-skip-permissions"
+```
+
+**Exit Codes:**
+
+See the [Exit Codes](#exit-codes) section below. This script uses codes 0 (success), 1 (connection failure), 2 (iTerm2 unavailable or no windows), and 3 (invalid arguments or invalid pane number).
+
 ## Execution Contexts
 
 The script automatically detects whether it is running on the macOS host or inside a container and adapts its execution strategy. This detection uses the shared `iterm-utils.sh` from the tab-management skill.
@@ -676,6 +791,40 @@ Solution:
   ```
 - Single-match closures proceed without prompting regardless of `--force`
 
+### Send-Text-Specific Issues
+
+**"INVALID_PANE" returned (exit code 3)**
+
+The pane number specified with `-p` does not exist in the current tab. The count of sessions in the current tab is less than the requested pane number.
+
+Solution:
+1. List panes to find the correct number:
+   ```bash
+   iterm-list-panes.sh
+   ```
+2. Use the `Pane` column value from the output as the `-p` argument
+3. Note that pane numbers reflect the current tab only -- use `-w` and `-t` filters with `iterm-list-panes.sh` to see pane numbers in a specific tab
+
+**Command sent but not executed in Claude Code pane**
+
+Text was sent but the command was not submitted -- it appears as text in the input buffer without executing.
+
+Solution:
+- Use `--submit` instead of the default mode:
+  ```bash
+  iterm-send-text.sh -p 2 --submit "your-command"
+  ```
+- Default mode uses `write text "text"` which appends a newline (`\n`, ASCII 10). Claude Code treats `\n` as a literal newline in the input buffer, not as Enter/Return. The `--submit` mode sends `\r` (ASCII 13) instead, which iTerm2 interprets as Enter.
+
+**Text sent to wrong pane**
+
+The text appeared in an unexpected pane.
+
+Solution:
+1. Run `iterm-list-panes.sh` to confirm pane numbers before sending
+2. Pane numbers are 1-based session indices within the current tab of the first window
+3. After splits, verify with `iterm-list-panes.sh` since new panes get the next sequential index
+
 ### Infrastructure Issues
 
 For SSH connectivity, HOST_USER configuration, `iterm-utils.sh` sourcing failures, and AppleScript permission issues, see the tab-management SKILL.md Troubleshooting section. These infrastructure issues are shared across tab and pane management skills and are documented in detail there.
@@ -776,6 +925,7 @@ After completing agent work:
 - [iterm-split-pane.sh](./scripts/iterm-split-pane.sh) - Split pane script
 - [iterm-list-panes.sh](./scripts/iterm-list-panes.sh) - List panes script
 - [iterm-close-pane.sh](./scripts/iterm-close-pane.sh) - Close panes script
+- [iterm-send-text.sh](./scripts/iterm-send-text.sh) - Send text to a specific pane by number
 
 **References:**
 - [AppleScript Reference](../tab-management/references/applescript-reference.md) - iTerm2 AppleScript patterns (includes split pane operations after Phase 2 completion)
