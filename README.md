@@ -137,4 +137,4 @@ claude-code-plugins/
 
 ## License
 
-MIT License - see individual plugin READMEs for details.
+MIT License. Individual components may have their own licenses; see plugin directories for details.

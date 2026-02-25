@@ -1,4 +1,9 @@
 *.pyc
 
+# Claude Code settings (personal config)
+.claude/settings.json
+.claude/settings.local.json
+
+# CrewChief runtime state
+.crewchief/
 .crewchief-meta.json
-.crewchief/runs/.crewchief-meta.json

@@ -1,0 +1,48 @@
+{
+  "env": {
+    "SDD_ROOT_DIR": "/path/to/your/sdd/specs",
+    "MAPROOM_DB_ROOT": "/home/vscode/.maproom",
+    "MAPROOM_DATABASE_URL": "sqlite:///home/vscode/.maproom/your-project/maproom.db",
+    "MAPROOM_EMBEDDING_PROVIDER": "google",
+    "GOOGLE_PROJECT_ID": "your-gcp-project-id"
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "additionalDirectories": [
+      "/path/to/your/specs/"
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "crewchief": {
+      "source": {
+        "source": "directory",
+        "path": "/workspace/repos/claude-code-plugins/claude-code-plugins"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Add your session start hooks here'"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Add your notification hooks here'"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "claude-code-dev@crewchief": true
+  }
+}
