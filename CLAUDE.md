@@ -22,9 +22,17 @@ bash plugins/sdd/hooks/test-setup-sdd-env.sh
 bash plugins/sdd/hooks/test-block-dangerous-git.sh
 bash plugins/sdd/hooks/test-warn-sdd-refs.sh
 
-# iTerm plugin tests
-bash plugins/iterm/skills/tab-management/tests/test-core-functions.sh
-bash plugins/iterm/skills/tab-management/tests/test-integration.sh
+# iTerm tab-management tests
+bash plugins/iterm/skills/tab-management/scripts/test-iterm-open-tab.sh
+bash plugins/iterm/skills/tab-management/scripts/test-iterm-close-tab.sh
+bash plugins/iterm/skills/tab-management/scripts/test-iterm-list-tabs.sh
+bash plugins/iterm/skills/tab-management/scripts/test-iterm-utils.sh
+
+# iTerm pane-management tests
+bash plugins/iterm/skills/pane-management/tests/test-split-pane.sh
+bash plugins/iterm/skills/pane-management/tests/test-list-panes.sh
+bash plugins/iterm/skills/pane-management/tests/test-close-pane.sh
+bash plugins/iterm/skills/pane-management/tests/test-iterm-send-text.sh
 ```
 
 No automated CI/CD - tests are executed manually.
@@ -85,9 +93,10 @@ Commands are orchestrators that delegate work - they coordinate but don't do wor
 | `maproom` | Semantic code search via crewchief-maproom CLI |
 | `worktree` | Git worktree management via crewchief CLI |
 | `vscode` | VS Code workspace configuration |
-| `iterm` | iTerm2 tab management (macOS host and container modes) |
+| `iterm` | iTerm2 tab and pane management (macOS host and container modes) |
 | `obsidian` | Obsidian vault management via SSH to host |
 | `game-design` | Game design consultant agents |
+| `rust-analyzer-lsp` | Rust Analyzer LSP configuration |
 | `analysis` | Deep analytical thinking (`/ultrathink` command) |
 
 ## SDD Plugin Core Workflow
@@ -168,7 +177,7 @@ When writing SKILL.md for executable skills, cross-verify all documented flags, 
 | File | Purpose |
 |------|---------|
 | `.claude-plugin/marketplace.json` | Plugin registry |
-| `plugins/sdd/hooks/workflow-guidance.py` | Stop hook providing contextual next steps (1,362 lines) |
+| `plugins/sdd/hooks/workflow-guidance.py` | Stop hook providing contextual next steps |
 | `plugins/sdd/skills/project-workflow/scripts/` | Scaffolding and status scripts |
 | `plugins/sdd/skills/project-workflow/templates/` | Ticket/epic/task templates |
 | `crewchief.config.js` | CrewChief CLI configuration |
