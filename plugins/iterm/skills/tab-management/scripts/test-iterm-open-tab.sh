@@ -537,6 +537,115 @@ test_window_with_all_options() {
 }
 
 ##############################################################################
+# Test: Wait-for-Prompt Flag
+##############################################################################
+
+test_wait_for_prompt_accepted() {
+    local exit_code
+    exit_code=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace >/dev/null 2>&1; echo $?) || true
+
+    [ "$exit_code" = "0" ] || return 1
+    return 0
+}
+
+test_wait_for_prompt_polling_with_directory() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace 2>&1)
+
+    # Should contain polling loop keywords
+    [[ "$output" == *"delay 3"* ]] || return 1
+    [[ "$output" == *"repeat while"* ]] || return 1
+    [[ "$output" == *"is at shell prompt"* ]] || return 1
+    [[ "$output" == *"exit repeat"* ]] || return 1
+    return 0
+}
+
+test_wait_for_prompt_polling_with_command() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -c "echo hello" -d /workspace 2>&1)
+
+    # Should contain polling loop keywords
+    [[ "$output" == *"delay 3"* ]] || return 1
+    [[ "$output" == *"repeat while"* ]] || return 1
+    [[ "$output" == *"is at shell prompt"* ]] || return 1
+    [[ "$output" == *"exit repeat"* ]] || return 1
+    return 0
+}
+
+test_no_polling_without_flag() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run -d /workspace 2>&1)
+
+    # Should NOT contain polling loop keywords
+    if [[ "$output" == *"repeat while"* ]]; then
+        return 1
+    fi
+    if [[ "$output" == *"is at shell prompt"* ]]; then
+        return 1
+    fi
+    return 0
+}
+
+test_wait_for_prompt_dry_run_message() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace 2>&1)
+
+    # Should contain the dry-run info message about wait-for-prompt
+    [[ "$output" == *"Wait-for-prompt: enabled"* ]] || return 1
+    return 0
+}
+
+test_wait_for_prompt_new_window() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -w -d /workspace 2>&1)
+
+    # Should contain polling loop keywords in new window branch
+    [[ "$output" == *"delay 3"* ]] || return 1
+    [[ "$output" == *"repeat while"* ]] || return 1
+    [[ "$output" == *"is at shell prompt"* ]] || return 1
+    [[ "$output" == *"exit repeat"* ]] || return 1
+    return 0
+}
+
+##############################################################################
+# Test: Timeout Warning Block
+##############################################################################
+
+test_wait_for_prompt_timeout_block() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace -p Devcontainer 2>&1)
+
+    # Should contain the timeout check block
+    [[ "$output" == *"waited >= maxWait"* ]] || return 1
+    return 0
+}
+
+##############################################################################
+# Test: Branch 3 Structural Validation (windows-exist path)
+##############################################################################
+
+test_wait_for_prompt_branch3_session_context() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace -p Devcontainer 2>&1)
+
+    # Branch 3 (else block / windows-exist path) uses:
+    #   tell first window
+    #     tell current session of current tab    <-- NO "of first window" suffix
+    #
+    # Branch 2 (then block / no-windows path) uses:
+    #   tell current session of current tab of first window
+    #
+    # Verify Branch 3's session context: "tell current session of current tab"
+    # anchored to end-of-line ($ ensures no trailing "of first window")
+    echo "$output" | grep -q "tell current session of current tab$" || return 1
+
+    # Verify Branch 3's outer "tell first window" block provides the window context
+    echo "$output" | grep -q "tell first window$" || return 1
+
+    return 0
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -646,6 +755,26 @@ main() {
     run_test "All options combined" test_all_options_combined
     run_test "Command without explicit directory" test_command_without_directory
     run_test "Window with all options" test_window_with_all_options
+
+    # Wait-for-Prompt Flag Tests
+    echo ""
+    echo "--- Wait-for-Prompt Flag Tests ---"
+    run_test "Wait-for-prompt flag accepted" test_wait_for_prompt_accepted
+    run_test "Polling loop present with -d" test_wait_for_prompt_polling_with_directory
+    run_test "Polling loop present with -c" test_wait_for_prompt_polling_with_command
+    run_test "No polling without flag" test_no_polling_without_flag
+    run_test "Dry-run message shows wait-for-prompt enabled" test_wait_for_prompt_dry_run_message
+    run_test "Polling loop in new window branch" test_wait_for_prompt_new_window
+
+    # Timeout Warning Block Tests
+    echo ""
+    echo "--- Timeout Warning Block Tests ---"
+    run_test "Timeout block present in wait-for-prompt output" test_wait_for_prompt_timeout_block
+
+    # Branch 3 Structural Validation Tests
+    echo ""
+    echo "--- Branch 3 Structural Validation Tests ---"
+    run_test "Branch 3 session context uses 'tell current session of current tab' without 'of first window'" test_wait_for_prompt_branch3_session_context
 
     # Summary
     echo ""

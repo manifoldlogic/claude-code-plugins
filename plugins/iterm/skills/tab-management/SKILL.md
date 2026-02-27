@@ -100,7 +100,8 @@ What do you need to do?
     +-- Need to execute command in new environment?
     |       |
     |       +-- Opening new worktree for development?
-    |       |       --> Use iterm:open-tab with --directory and --profile "Devcontainer"
+    |       |       --> Use iterm:open-tab with --directory, --profile "Devcontainer",
+    |       |           and --wait-for-prompt (ensures shell is ready before cd)
     |       |
     |       +-- Spawning Claude agent for parallel work?
     |       |       --> Use iterm:open-tab with --command "claude ..."
@@ -141,16 +142,18 @@ After creating a worktree, open a tab connected to it:
 # Open tab in the new worktree directory using Devcontainer profile
 iterm-open-tab.sh --directory "/workspace/repos/my-project/feature-branch" \
                   --profile "Devcontainer" \
+                  --wait-for-prompt \
                   --name "worktree: feature-branch"
 ```
 
 **What happens:**
 1. Script detects execution context (host/container)
-2. Builds AppleScript for tab creation
+2. Builds AppleScript for tab creation with polling loop
 3. Opens new tab in frontmost window (or creates window if none exist)
 4. Tab uses "Devcontainer" profile which auto-connects to container
-5. Navigates to specified directory
-6. Sets tab title to "worktree: feature-branch"
+5. Polling loop waits for shell prompt (up to 15 seconds)
+6. Once prompt detected (or timeout), navigates to specified directory
+7. Sets tab title to "worktree: feature-branch"
 
 ### Scenario 2: Spawning Claude Agent in New Tab
 
@@ -258,8 +261,11 @@ iterm-open-tab.sh [OPTIONS]
 | `-c` | `--command CMD` | Command to execute after tab opens | (none) |
 | `-n` | `--name NAME` | Tab title | (profile default) |
 | `-w` | `--window` | Create new window instead of tab | (false) |
+| | `--wait-for-prompt` | Wait for shell prompt before sending command | (false) |
 | | `--dry-run` | Show AppleScript without executing | (false) |
 | `-h` | `--help` | Display help information | |
+
+**Note on `--wait-for-prompt`:** Inserts an AppleScript polling loop that checks `is at shell prompt` before sending the shell command. Uses a 3-second initial delay (`WAIT_INITIAL_DELAY`), then polls every 1 second (`WAIT_POLL_INTERVAL`) for up to 12 iterations (`WAIT_MAX_POLL`) — 15-second total maximum. If the prompt is not detected within that window, the command is sent anyway and a warning is logged to Apple System Log. Requires iTerm2 Shell Integration to be enabled on the macOS host (`iTerm2 > Install Shell Integration`). Has no effect when directory and command are both empty. Typical use case: opening a tab with the Devcontainer profile, where the container shell takes several seconds to become ready after `docker exec`.
 
 **Examples:**
 
@@ -556,6 +562,22 @@ Tab opens but shows profile not found or uses Default profile.
    docker exec -it devcontainer /bin/zsh
    ```
 
+### Issue: "--wait-for-prompt times out (command sent late)"
+
+**Symptoms:**
+- Tab opens with Devcontainer profile
+- A 15-second delay occurs before the `cd` command runs
+- Warning logged to Apple System Log: "shell prompt not detected after 15 seconds"
+
+**Cause:** iTerm2 Shell Integration is not installed, so `is at shell prompt` always returns false.
+
+**Solution:**
+1. Install Shell Integration in iTerm2: `iTerm2 > Install Shell Integration`
+2. Restart your terminal session
+3. Verify with: `iTerm2 > Shell Integration > Check Installation`
+
+**Note:** Even without Shell Integration, the command will still execute after the timeout — it just takes longer.
+
 ### Issue: "Tab opens but command doesn't execute"
 
 **Symptoms:**
@@ -642,6 +664,12 @@ open_iterm_tab() {
     local directory="$1"
     local profile="${2:-Devcontainer}"
     local name="$3"
+    local wait_flag=""
+
+    # Wait for shell prompt when using Devcontainer profile
+    if [ "$profile" = "Devcontainer" ]; then
+        wait_flag="--wait-for-prompt"
+    fi
 
     local plugin_script="$ITERM_PLUGIN/scripts/iterm-open-tab.sh"
 
@@ -649,9 +677,10 @@ open_iterm_tab() {
         "$plugin_script" \
             --directory "$directory" \
             --profile "$profile" \
+            ${wait_flag:+"$wait_flag"} \
             --name "$name"
     else
-        # Fallback to original implementation
+        # Fallback to original implementation (inline AppleScript with polling)
         open_iterm_tab_original "$@"
     fi
 }
