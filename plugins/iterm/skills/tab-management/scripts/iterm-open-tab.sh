@@ -91,7 +91,7 @@ OPTIONS:
                           Inserts an AppleScript polling loop (3s initial delay,
                           up to 12s polling, 15s total). Use with Devcontainer
                           profile when container startup takes a few seconds.
-                          Has no effect if no shell command is specified.
+                          Has no effect when directory and command are both empty.
   -h, --help              Show help
 
 EXIT CODES:
