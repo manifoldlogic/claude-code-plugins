@@ -621,6 +621,31 @@ test_wait_for_prompt_timeout_block() {
 }
 
 ##############################################################################
+# Test: Branch 3 Structural Validation (windows-exist path)
+##############################################################################
+
+test_wait_for_prompt_branch3_session_context() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace -p Devcontainer 2>&1)
+
+    # Branch 3 (else block / windows-exist path) uses:
+    #   tell first window
+    #     tell current session of current tab    <-- NO "of first window" suffix
+    #
+    # Branch 2 (then block / no-windows path) uses:
+    #   tell current session of current tab of first window
+    #
+    # Verify Branch 3's session context: "tell current session of current tab"
+    # anchored to end-of-line ($ ensures no trailing "of first window")
+    echo "$output" | grep -q "tell current session of current tab$" || return 1
+
+    # Verify Branch 3's outer "tell first window" block provides the window context
+    echo "$output" | grep -q "tell first window$" || return 1
+
+    return 0
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -745,6 +770,11 @@ main() {
     echo ""
     echo "--- Timeout Warning Block Tests ---"
     run_test "Timeout block present in wait-for-prompt output" test_wait_for_prompt_timeout_block
+
+    # Branch 3 Structural Validation Tests
+    echo ""
+    echo "--- Branch 3 Structural Validation Tests ---"
+    run_test "Branch 3 session context uses 'tell current session of current tab' without 'of first window'" test_wait_for_prompt_branch3_session_context
 
     # Summary
     echo ""
