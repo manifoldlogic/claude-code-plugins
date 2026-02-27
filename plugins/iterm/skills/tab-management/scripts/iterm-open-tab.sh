@@ -64,6 +64,11 @@ trap _cleanup_temp_script EXIT INT TERM
 DEFAULT_DIRECTORY="/workspace"
 DEFAULT_PROFILE="Devcontainer"
 
+# Polling timing constants for --wait-for-prompt
+WAIT_INITIAL_DELAY=3   # Seconds to wait before polling starts (let docker exec begin)
+WAIT_MAX_POLL=12       # Maximum polling iterations (total max = INITIAL_DELAY + MAX_POLL seconds)
+WAIT_POLL_INTERVAL=1   # Seconds between each "is at shell prompt" check
+
 ##############################################################################
 # Usage Information
 ##############################################################################
@@ -274,18 +279,18 @@ build_applescript() {
         # Add polling loop if wait_for_prompt is enabled and command exists
         if [[ "$wait_for_prompt" == "true" && -n "$shell_command" ]]; then
             script="$script
-        delay 3
-        set maxWait to 12
+        delay ${WAIT_INITIAL_DELAY}
+        set maxWait to ${WAIT_MAX_POLL}
         set waited to 0
         repeat while waited < maxWait
             if is at shell prompt then
                 exit repeat
             end if
-            delay 1
+            delay ${WAIT_POLL_INTERVAL}
             set waited to waited + 1
         end repeat
         if waited >= maxWait then
-            log \"spawn-worktree: shell prompt not detected after 15 seconds; sending command anyway\"
+            log \"spawn-worktree: shell prompt not detected after $((WAIT_INITIAL_DELAY + WAIT_MAX_POLL)) seconds; sending command anyway\"
         end if"
         fi
 
@@ -315,18 +320,18 @@ end tell"
         # Add polling loop if wait_for_prompt is enabled and command exists
         if [[ "$wait_for_prompt" == "true" && -n "$shell_command" ]]; then
             script="$script
-            delay 3
-            set maxWait to 12
+            delay ${WAIT_INITIAL_DELAY}
+            set maxWait to ${WAIT_MAX_POLL}
             set waited to 0
             repeat while waited < maxWait
                 if is at shell prompt then
                     exit repeat
                 end if
-                delay 1
+                delay ${WAIT_POLL_INTERVAL}
                 set waited to waited + 1
             end repeat
             if waited >= maxWait then
-                log \"spawn-worktree: shell prompt not detected after 15 seconds; sending command anyway\"
+                log \"spawn-worktree: shell prompt not detected after $((WAIT_INITIAL_DELAY + WAIT_MAX_POLL)) seconds; sending command anyway\"
             end if"
         fi
 
@@ -352,18 +357,18 @@ end tell"
         # Add polling loop if wait_for_prompt is enabled and command exists
         if [[ "$wait_for_prompt" == "true" && -n "$shell_command" ]]; then
             script="$script
-                delay 3
-                set maxWait to 12
+                delay ${WAIT_INITIAL_DELAY}
+                set maxWait to ${WAIT_MAX_POLL}
                 set waited to 0
                 repeat while waited < maxWait
                     if is at shell prompt then
                         exit repeat
                     end if
-                    delay 1
+                    delay ${WAIT_POLL_INTERVAL}
                     set waited to waited + 1
                 end repeat
                 if waited >= maxWait then
-                    log \"spawn-worktree: shell prompt not detected after 15 seconds; sending command anyway\"
+                    log \"spawn-worktree: shell prompt not detected after $((WAIT_INITIAL_DELAY + WAIT_MAX_POLL)) seconds; sending command anyway\"
                 end if"
         fi
 
