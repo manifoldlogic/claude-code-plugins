@@ -15,6 +15,7 @@
 #     -n, --name NAME         Set tab title
 #     -w, --window            Create in new window instead of new tab
 #     --dry-run               Show what would be executed
+#     --wait-for-prompt       Wait for shell prompt before sending command
 #     -h, --help              Show help
 #
 # EXIT CODES:
@@ -81,6 +82,11 @@ OPTIONS:
   -n, --name NAME         Set tab title
   -w, --window            Create in new window instead of new tab
   --dry-run               Show what would be executed
+  --wait-for-prompt       Wait for shell prompt before sending shell command.
+                          Inserts an AppleScript polling loop (3s initial delay,
+                          up to 12s polling, 15s total). Use with Devcontainer
+                          profile when container startup takes a few seconds.
+                          Has no effect if no shell command is specified.
   -h, --help              Show help
 
 EXIT CODES:
@@ -128,6 +134,7 @@ parse_arguments() {
     ARG_NAME=""
     ARG_NEW_WINDOW=false
     ARG_DRY_RUN=false
+    ARG_WAIT_FOR_PROMPT=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -169,6 +176,10 @@ parse_arguments() {
                 ;;
             --dry-run)
                 ARG_DRY_RUN=true
+                shift
+                ;;
+            --wait-for-prompt)
+                ARG_WAIT_FOR_PROMPT=true
                 shift
                 ;;
             -h|--help)
@@ -216,6 +227,7 @@ build_applescript() {
     local command="${3:-}"
     local name="${4:-}"
     local new_window="${5:-false}"
+    local wait_for_prompt="${6:-false}"
 
     # Escape values for AppleScript
     local escaped_profile escaped_directory escaped_name escaped_command
@@ -259,6 +271,21 @@ build_applescript() {
         set name to \"$escaped_name\""
         fi
 
+        # Add polling loop if wait_for_prompt is enabled and command exists
+        if [[ "$wait_for_prompt" == "true" && -n "$shell_command" ]]; then
+            script="$script
+        delay 3
+        set maxWait to 12
+        set waited to 0
+        repeat while waited < maxWait
+            if is at shell prompt then
+                exit repeat
+            end if
+            delay 1
+            set waited to waited + 1
+        end repeat"
+        fi
+
         # Add command execution if provided
         if [[ -n "$shell_command" ]]; then
             script="$script
@@ -282,6 +309,21 @@ end tell"
             set name to \"$escaped_name\""
         fi
 
+        # Add polling loop if wait_for_prompt is enabled and command exists
+        if [[ "$wait_for_prompt" == "true" && -n "$shell_command" ]]; then
+            script="$script
+            delay 3
+            set maxWait to 12
+            set waited to 0
+            repeat while waited < maxWait
+                if is at shell prompt then
+                    exit repeat
+                end if
+                delay 1
+                set waited to waited + 1
+            end repeat"
+        fi
+
         # Add command execution if provided
         if [[ -n "$shell_command" ]]; then
             script="$script
@@ -299,6 +341,21 @@ end tell"
         if [[ -n "$name" ]]; then
             script="$script
                 set name to \"$escaped_name\""
+        fi
+
+        # Add polling loop if wait_for_prompt is enabled and command exists
+        if [[ "$wait_for_prompt" == "true" && -n "$shell_command" ]]; then
+            script="$script
+                delay 3
+                set maxWait to 12
+                set waited to 0
+                repeat while waited < maxWait
+                    if is at shell prompt then
+                        exit repeat
+                    end if
+                    delay 1
+                    set waited to waited + 1
+                end repeat"
         fi
 
         # Add command execution if provided
@@ -334,11 +391,15 @@ main() {
         "$ARG_PROFILE" \
         "$ARG_COMMAND" \
         "$ARG_NAME" \
-        "$ARG_NEW_WINDOW")
+        "$ARG_NEW_WINDOW" \
+        "$ARG_WAIT_FOR_PROMPT")
 
     # Dry-run mode: print script and exit
     if [[ "$ARG_DRY_RUN" == "true" ]]; then
         iterm_info "Dry-run mode: Showing AppleScript that would be executed"
+        if [[ "$ARG_WAIT_FOR_PROMPT" == "true" ]]; then
+            iterm_info "Wait-for-prompt: enabled (polling loop will be inserted before write text)"
+        fi
         echo ""
         echo "$applescript"
         echo ""
