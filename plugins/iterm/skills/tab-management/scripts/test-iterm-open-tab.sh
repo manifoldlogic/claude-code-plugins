@@ -608,6 +608,19 @@ test_wait_for_prompt_new_window() {
 }
 
 ##############################################################################
+# Test: Timeout Warning Block
+##############################################################################
+
+test_wait_for_prompt_timeout_block() {
+    local output
+    output=$("$OPEN_TAB_SCRIPT" --dry-run --wait-for-prompt -d /workspace -p Devcontainer 2>&1)
+
+    # Should contain the timeout check block
+    [[ "$output" == *"waited >= maxWait"* ]] || return 1
+    return 0
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -727,6 +740,11 @@ main() {
     run_test "No polling without flag" test_no_polling_without_flag
     run_test "Dry-run message shows wait-for-prompt enabled" test_wait_for_prompt_dry_run_message
     run_test "Polling loop in new window branch" test_wait_for_prompt_new_window
+
+    # Timeout Warning Block Tests
+    echo ""
+    echo "--- Timeout Warning Block Tests ---"
+    run_test "Timeout block present in wait-for-prompt output" test_wait_for_prompt_timeout_block
 
     # Summary
     echo ""

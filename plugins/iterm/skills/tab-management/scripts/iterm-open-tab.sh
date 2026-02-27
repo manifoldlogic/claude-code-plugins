@@ -283,7 +283,10 @@ build_applescript() {
             end if
             delay 1
             set waited to waited + 1
-        end repeat"
+        end repeat
+        if waited >= maxWait then
+            log \"spawn-worktree: shell prompt not detected after 15 seconds; sending command anyway\"
+        end if"
         fi
 
         # Add command execution if provided
@@ -321,7 +324,10 @@ end tell"
                 end if
                 delay 1
                 set waited to waited + 1
-            end repeat"
+            end repeat
+            if waited >= maxWait then
+                log \"spawn-worktree: shell prompt not detected after 15 seconds; sending command anyway\"
+            end if"
         fi
 
         # Add command execution if provided
@@ -355,7 +361,10 @@ end tell"
                     end if
                     delay 1
                     set waited to waited + 1
-                end repeat"
+                end repeat
+                if waited >= maxWait then
+                    log \"spawn-worktree: shell prompt not detected after 15 seconds; sending command anyway\"
+                end if"
         fi
 
         # Add command execution if provided
