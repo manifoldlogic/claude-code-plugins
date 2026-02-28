@@ -22,7 +22,7 @@ Add the marketplace and install plugins:
 | **sdd** | Spec-Driven Development - epic planning, ticket execution, and task-based implementation |
 | **github-actions** | GitHub Actions workflow creation, optimization, and troubleshooting |
 | **claude-code-dev** | Development tools for Claude Code: skills, commands, hooks, and plugins |
-| **maproom** | Semantic code search using crewchief-maproom CLI |
+| **maproom** | Semantic code search using maproom CLI |
 | **worktree** | Git worktree management using crewchief CLI |
 | **vscode** | VS Code workspace configuration management |
 | **game-design** | Game design consultant agents synthesized from legendary designers |

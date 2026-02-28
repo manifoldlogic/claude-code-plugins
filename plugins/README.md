@@ -35,14 +35,14 @@ GitHub Actions workflow creation, optimization, and troubleshooting.
 ### Maproom
 **Version:** 0.1.0
 
-Semantic code search using the crewchief-maproom CLI.
+Semantic code search using the maproom CLI.
 
 **Features:**
 - Semantic code search by concept (not just text matching)
 - Full-text search (FTS) and vector similarity search
 - Query formulation guidance for effective searches
 - Architecture exploration and code navigation
-- Integration with crewchief-maproom CLI
+- Integration with maproom CLI
 
 **[Read More →](maproom/README.md)**
 

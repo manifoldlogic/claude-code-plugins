@@ -413,12 +413,12 @@ Error: Merge failed: Merge conflict in src/app.ts
 ### Maproom Cleanup Failures
 ```
 Warning: Maproom binary not found - database cleanup skipped
-         Install maproom or run: crewchief-maproom db cleanup-stale --confirm
+         Install maproom or run: maproom db cleanup-stale --confirm
 ```
 
 **Solution**: Maproom cleanup is best-effort. If the binary isn't available, clean up manually:
 ```bash
-crewchief-maproom db cleanup-stale --confirm
+maproom db cleanup-stale --confirm
 ```
 
 Common maproom cleanup issues:

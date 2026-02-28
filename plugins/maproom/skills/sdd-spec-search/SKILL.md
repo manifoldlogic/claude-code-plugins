@@ -55,14 +55,14 @@ If empty, `SDD_ROOT_DIR` was not configured. The SDD plugin's `setup-sdd-env.js`
 **Step 2: Verify the spec repo is indexed in maproom**
 
 ```bash
-crewchief-maproom status
+maproom status
 ```
 
 Look for a repository entry whose path matches or contains `SDD_ROOT_DIR`. If no matching repository appears, the spec directory has not been scanned. See the Fallback section below.
 
 **Step 3: Identify the maproom repo name**
 
-The maproom repo name is assigned during `crewchief-maproom scan --repo <name>`. It does not follow a fixed formula. Use `crewchief-maproom status` to find the repo name whose worktree path matches `SDD_ROOT_DIR`.
+The maproom repo name is assigned during `maproom scan --repo <name>`. It does not follow a fixed formula. Use `maproom status` to find the repo name whose worktree path matches `SDD_ROOT_DIR`.
 
 Example: If `SDD_ROOT_DIR=/workspace/_SPECS/claude-code-plugins` and status shows:
 ```
@@ -141,7 +141,7 @@ The spec directory under `SDD_ROOT_DIR` contains the following structure:
 
 ### Fallback: When Spec Repo Is Not Indexed
 
-If `crewchief-maproom status` does not show the spec directory, fall back to Grep and Glob:
+If `maproom status` does not show the spec directory, fall back to Grep and Glob:
 
 **Find a ticket by ID:**
 ```bash
@@ -160,7 +160,7 @@ The fallback approach is slower and less precise than maproom search but works w
 
 #### Multiple Spec Repositories
 
-If `crewchief-maproom status` shows multiple repos with overlapping paths:
+If `maproom status` shows multiple repos with overlapping paths:
 
 1. Use the repo with the **longest matching path prefix** for your `SDD_ROOT_DIR`
 2. Example:
@@ -173,9 +173,9 @@ See [multi-repo-guide.md](../maproom-search/references/multi-repo-guide.md) for 
 
 ### Troubleshooting Common Issues
 
-#### "command not found: crewchief-maproom"
+#### "command not found: maproom"
 
-- **Symptom**: Shell returns "command not found" when running `crewchief-maproom`
+- **Symptom**: Shell returns "command not found" when running `maproom`
 - **Cause**: CLI not installed or not in PATH
 - **Solution**: Install via npm (`npm install -g @crewchief/maproom`) or use fallback Grep/Glob search as described in the Fallback section above. See `maproom-search` skill (`plugins/maproom/skills/maproom-search/SKILL.md`) for full installation and setup guidance.
 
@@ -183,13 +183,13 @@ See [multi-repo-guide.md](../maproom-search/references/multi-repo-guide.md) for 
 
 - **Symptom**: Search returns a "repository not found" error
 - **Cause**: Incorrect repo name or repo not indexed
-- **Solution**: Run `crewchief-maproom status` to list all indexed repositories and find the correct name matching your `SDD_ROOT_DIR` path. The repo name is assigned during `crewchief-maproom scan --repo <name>` and does not follow a fixed formula.
+- **Solution**: Run `maproom status` to list all indexed repositories and find the correct name matching your `SDD_ROOT_DIR` path. The repo name is assigned during `maproom scan --repo <name>` and does not follow a fixed formula.
 
 #### "no results found" / empty results
 
 - **Symptom**: Search returns no matches for a query that should have results
 - **Cause**: Query too specific, wrong search mode, or content not yet indexed
-- **Solution**: Try `vector-search` instead of FTS (or vice versa) based on the FTS vs Vector Search table above. Broaden query terms, remove overly specific identifiers, and verify the repo is indexed with `crewchief-maproom status`. If the repo shows zero chunks, re-run `crewchief-maproom scan`.
+- **Solution**: Try `vector-search` instead of FTS (or vice versa) based on the FTS vs Vector Search table above. Broaden query terms, remove overly specific identifiers, and verify the repo is indexed with `maproom status`. If the repo shows zero chunks, re-run `maproom scan`.
 
 #### SDD_ROOT_DIR unset or incorrect
 
@@ -211,17 +211,17 @@ See [multi-repo-guide.md](../maproom-search/references/multi-repo-guide.md) for 
 
 **Search:**
 ```bash
-crewchief-maproom search --repo claude-code-plugins-specs --query "APIV2"
+maproom search --repo claude-code-plugins-specs --query "APIV2"
 ```
 
 **What this finds:** All chunks containing the ticket ID, including the README, planning documents, and task files. Results include `heading_1`, `heading_2`, and `markdown_section` chunks from the ticket's directory.
 
 **Follow-up:** Read the `architecture.md` file from the search results to get the full design context:
 ```bash
-crewchief-maproom search --repo claude-code-plugins-specs --query "APIV2 architecture decision rationale"
+maproom search --repo claude-code-plugins-specs --query "APIV2 architecture decision rationale"
 ```
 
-> **Note:** Example repo names like `claude-code-plugins-specs` are placeholders. Replace with your actual repo name from `crewchief-maproom status`. The repo name must match your `SDD_ROOT_DIR` path.
+> **Note:** Example repo names like `claude-code-plugins-specs` are placeholders. Replace with your actual repo name from `maproom status`. The repo name must match your `SDD_ROOT_DIR` path.
 
 ### Example 2: Search for Design Rationale Across All Tickets
 
@@ -229,14 +229,14 @@ crewchief-maproom search --repo claude-code-plugins-specs --query "APIV2 archite
 
 **Search:**
 ```bash
-crewchief-maproom vector-search --repo claude-code-plugins-specs --query "plugin system design decisions"
+maproom vector-search --repo claude-code-plugins-specs --query "plugin system design decisions"
 ```
 
 **Why vector search:** The query describes a concept. Different tickets may use varied terminology ("plugin architecture", "extension system", "hook framework") that vector search can match semantically.
 
 **Narrowing results:** If results span too many tickets, add more specific terms:
 ```bash
-crewchief-maproom vector-search --repo claude-code-plugins-specs --query "plugin loading registration lifecycle"
+maproom vector-search --repo claude-code-plugins-specs --query "plugin loading registration lifecycle"
 ```
 
 ### Example 3: Find All Tickets Related to a Domain
@@ -245,12 +245,12 @@ crewchief-maproom vector-search --repo claude-code-plugins-specs --query "plugin
 
 **Search:**
 ```bash
-crewchief-maproom vector-search --repo claude-code-plugins-specs --query "authentication authorization security access control"
+maproom vector-search --repo claude-code-plugins-specs --query "authentication authorization security access control"
 ```
 
 **Follow-up with FTS:** After identifying relevant ticket IDs from vector search results, use FTS to find their specific task files:
 ```bash
-crewchief-maproom search --repo claude-code-plugins-specs --query "AUTHZ"
+maproom search --repo claude-code-plugins-specs --query "AUTHZ"
 ```
 
 ### Example 4: Search Epic Analysis Documents
@@ -259,14 +259,14 @@ crewchief-maproom search --repo claude-code-plugins-specs --query "AUTHZ"
 
 **Search:**
 ```bash
-crewchief-maproom vector-search --repo claude-code-plugins-specs --query "domain model entities boundaries research synthesis"
+maproom vector-search --repo claude-code-plugins-specs --query "domain model entities boundaries research synthesis"
 ```
 
 **What this finds:** Chunks from `analysis/domain-model.md` and `analysis/research-synthesis.md` files across epics, showing how prior work structured domain analysis.
 
 **Alternative with FTS for specific epic content:**
 ```bash
-crewchief-maproom search --repo claude-code-plugins-specs --query "opportunity map constraints"
+maproom search --repo claude-code-plugins-specs --query "opportunity map constraints"
 ```
 
 ### Example 5: Find Quality Strategy Patterns
@@ -275,7 +275,7 @@ crewchief-maproom search --repo claude-code-plugins-specs --query "opportunity m
 
 **Search:**
 ```bash
-crewchief-maproom vector-search --repo claude-code-plugins-specs --query "testing strategy coverage requirements quality gates"
+maproom vector-search --repo claude-code-plugins-specs --query "testing strategy coverage requirements quality gates"
 ```
 
 **What this finds:** Chunks from `planning/quality-strategy.md` files across tickets, showing testing approaches, coverage thresholds, and quality gate definitions used in prior work.

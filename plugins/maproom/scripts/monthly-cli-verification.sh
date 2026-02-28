@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # monthly-cli-verification.sh - Automated CLI flag verification
 #
-# Verifies that crewchief-maproom CLI flags have not drifted from the
+# Verifies that maproom CLI flags have not drifted from the
 # documented baseline. Detects flag deprecation, renaming, or behavior
 # changes before agents encounter failures.
 #
@@ -26,7 +26,7 @@ USAGE:
   monthly-cli-verification.sh [--help] [--baseline FILE]
 
 DESCRIPTION:
-  Captures current crewchief-maproom CLI help output and compares it
+  Captures current maproom CLI help output and compares it
   against the documented baseline. Reports any flags that have been
   added, removed, renamed, or changed.
 
@@ -36,7 +36,7 @@ OPTIONS:
                        Default: uses embedded expected flags
 
 CHECKS:
-  1. CLI availability (crewchief-maproom in PATH)
+  1. CLI availability (maproom in PATH)
   2. Version consistency (matches documented version)
   3. search --help flag presence (5 expected flags)
   4. vector-search --help flag presence (6 expected flags)
@@ -114,28 +114,28 @@ record_pass() {
 # ---------------------------------------------------------------------------
 CHECK_COUNT=$((CHECK_COUNT + 1))
 echo "Check 1: CLI availability"
-if ! command -v crewchief-maproom >/dev/null 2>&1; then
-  record_drift "crewchief-maproom not found in PATH"
+if ! command -v maproom >/dev/null 2>&1; then
+  record_drift "maproom not found in PATH"
   echo ""
   echo "=========================================="
   echo "CLI Verification FAILED"
   echo "=========================================="
-  echo "crewchief-maproom CLI is not installed or not in PATH."
+  echo "maproom CLI is not installed or not in PATH."
   echo "Cannot proceed with verification."
   echo ""
   echo "$DIFF_OUTPUT"
   exit 1
 fi
-record_pass "crewchief-maproom found in PATH"
+record_pass "maproom found in PATH"
 
 # ---------------------------------------------------------------------------
 # Check 2: Version consistency
 # ---------------------------------------------------------------------------
 CHECK_COUNT=$((CHECK_COUNT + 1))
 echo "Check 2: Version consistency"
-CURRENT_VERSION=$(crewchief-maproom --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+CURRENT_VERSION=$(maproom --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
 if [ -z "$CURRENT_VERSION" ]; then
-  record_drift "Could not determine crewchief-maproom version"
+  record_drift "Could not determine maproom version"
 elif [ "$CURRENT_VERSION" != "$EXPECTED_VERSION" ]; then
   record_drift "Version changed: expected $EXPECTED_VERSION, got $CURRENT_VERSION"
 else
@@ -147,7 +147,7 @@ fi
 # ---------------------------------------------------------------------------
 CHECK_COUNT=$((CHECK_COUNT + 1))
 echo "Check 3: search --help flag presence"
-SEARCH_HELP=$(crewchief-maproom search --help 2>&1 || true)
+SEARCH_HELP=$(maproom search --help 2>&1 || true)
 
 missing_search=""
 for flag in $SEARCH_EXPECTED_FLAGS; do
@@ -191,7 +191,7 @@ fi
 # ---------------------------------------------------------------------------
 CHECK_COUNT=$((CHECK_COUNT + 1))
 echo "Check 4: vector-search --help flag presence"
-VSEARCH_HELP=$(crewchief-maproom vector-search --help 2>&1 || true)
+VSEARCH_HELP=$(maproom vector-search --help 2>&1 || true)
 
 missing_vsearch=""
 for flag in $VSEARCH_EXPECTED_FLAGS; do
@@ -289,13 +289,13 @@ echo "=========================================="
 echo "Current CLI Help Output (for CI logs)"
 echo "=========================================="
 echo ""
-echo "--- crewchief-maproom --version ---"
-crewchief-maproom --version 2>&1 || true
+echo "--- maproom --version ---"
+maproom --version 2>&1 || true
 echo ""
-echo "--- crewchief-maproom search --help ---"
+echo "--- maproom search --help ---"
 echo "$SEARCH_HELP"
 echo ""
-echo "--- crewchief-maproom vector-search --help ---"
+echo "--- maproom vector-search --help ---"
 echo "$VSEARCH_HELP"
 
 # ---------------------------------------------------------------------------

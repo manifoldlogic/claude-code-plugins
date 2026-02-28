@@ -135,7 +135,7 @@ This document defines 5 manual test cases for end-to-end behavioral validation o
 
 **Expected Behavior:**
 - Phase 1-2: Agent executes up to 5 search commands
-- Hook intercepts 6th `crewchief-maproom search` or `crewchief-maproom vector-search` call
+- Hook intercepts 6th `maproom search` or `maproom vector-search` call
 - Hook returns exit code 2 with error message: "Search cap exceeded: 5/5 searches used."
 - Agent receives block signal and transitions to synthesis with available data
 
@@ -150,16 +150,16 @@ This document defines 5 manual test cases for end-to-end behavioral validation o
 | Test | Input | Expected | Actual | Pass/Fail |
 |------|-------|----------|--------|-----------|
 | Non-maproom command | `ls -la` | exit 0 (allow) | exit 0 | PASS |
-| Search #1 | `crewchief-maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
-| Search #2 | `crewchief-maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
-| Search #3 | `crewchief-maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
-| Search #4 | `crewchief-maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
-| Search #5 | `crewchief-maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
-| Search #6 | `crewchief-maproom search --query overflow` | exit 2 (block) | exit 2 | PASS |
-| vector-search #7 | `crewchief-maproom vector-search --query test` | exit 2 (block) | exit 2 | PASS |
-| Wrong agent name | `crewchief-maproom search` (agent=other) | exit 0 (allow) | exit 0 | PASS |
+| Search #1 | `maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
+| Search #2 | `maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
+| Search #3 | `maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
+| Search #4 | `maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
+| Search #5 | `maproom search --query test` | exit 0 (allow) | exit 0 | PASS |
+| Search #6 | `maproom search --query overflow` | exit 2 (block) | exit 2 | PASS |
+| vector-search #7 | `maproom vector-search --query test` | exit 2 (block) | exit 2 | PASS |
+| Wrong agent name | `maproom search` (agent=other) | exit 0 (allow) | exit 0 | PASS |
 | Non-Bash tool | Read tool call | exit 0 (allow) | exit 0 | PASS |
-| Non-search maproom cmd | `crewchief-maproom status` | exit 0 (allow) | exit 0 | PASS |
+| Non-search maproom cmd | `maproom status` | exit 0 (allow) | exit 0 | PASS |
 
 **Hook Unit Test Status:** ALL 11 TESTS PASS
 
@@ -177,20 +177,20 @@ This document defines 5 manual test cases for end-to-end behavioral validation o
 ```
 
 **Expected Behavior:**
-- Agent passes the query to `crewchief-maproom search` with proper quoting
+- Agent passes the query to `maproom search` with proper quoting
 - No command injection occurs (query treated as literal search text)
 - Agent produces search results or "not found" as normal
 - Shell metacharacters in query do not escape into command execution
 
 **Pass Criteria:**
 - [ ] No unquoted shell metacharacters in generated Bash commands
-- [ ] `crewchief-maproom search` receives the query as a single argument
+- [ ] `maproom search` receives the query as a single argument
 - [ ] No evidence of command injection (no `rm` execution, no errors from injected commands)
 - [ ] Agent behavior identical to a benign query (same phases, same structure)
 - [ ] Hook correctly parses the command without false positive/negative
 
 **Security Analysis (Static):**
-The maproom-researcher agent prompt includes Critical Rule: "ALWAYS quote ALL variables and arguments in shell commands". The `crewchief-maproom` CLI accepts queries via `--query "..."` flag with double-quote wrapping. The PreToolUse hook `enforce-search-cap.py` uses `re.search()` on the full command string, which correctly identifies `crewchief-maproom search` regardless of query content.
+The maproom-researcher agent prompt includes Critical Rule: "ALWAYS quote ALL variables and arguments in shell commands". The `maproom` CLI accepts queries via `--query "..."` flag with double-quote wrapping. The PreToolUse hook `enforce-search-cap.py` uses `re.search()` on the full command string, which correctly identifies `maproom search` regardless of query content.
 
 Additionally, the existing `block-catastrophic-commands.py` hook (from the SDD plugin) would catch `rm -rf /` patterns as a second layer of defense.
 
@@ -238,7 +238,7 @@ Additionally, the existing `block-catastrophic-commands.py` hook (from the SDD p
 ### Environment Assessment
 
 ```
-$ crewchief-maproom status
+$ maproom status
 
 Repository: manifoldlogic/claude-code-plugins
   Worktree: MAPAGENT
@@ -284,7 +284,7 @@ Total index size: 78.43 MB
    - Feature search: "Find all caching implementations"
    - Error tracing: "Trace the error handling flow from API to database"
 3. **Metrics to capture:**
-   - `crewchief-maproom search` latency per call (time command)
+   - `maproom search` latency per call (time command)
    - Total wall-clock time per query
    - Number of relevant results per search
    - Agent search count (should stay within 5-search cap)

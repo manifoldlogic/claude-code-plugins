@@ -24,7 +24,7 @@
     {
       "name": "maproom",
       "source": "./plugins/maproom",
-      "description": "Semantic code search using crewchief-maproom CLI"
+      "description": "Semantic code search using maproom CLI"
     },
     {
       "name": "obsidian",

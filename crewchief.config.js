@@ -1,6 +1,6 @@
 export default {
   repository: {
-    maproomBinaryPath: "/usr/local/share/nvm/versions/node/v20.19.6/lib/node_modules/@crewchief/cli/bin/linux-arm64/crewchief-maproom",
+    maproomBinaryPath: "/usr/local/share/nvm/versions/node/v20.19.6/lib/node_modules/@crewchief/cli/bin/linux-arm64/maproom",
     mainBranch: "main",
     worktreeBasePath: '/workspace/repos/claude-code-plugins'
   },

@@ -68,7 +68,7 @@ If this prints a long token string (starting with `ya29.`), ADC is configured co
 ### Step 5: Test Vector Search
 
 ```bash
-crewchief-maproom vector-search --repo YOUR_REPO --query "test query" --format agent
+maproom vector-search --repo YOUR_REPO --query "test query" --format agent
 ```
 
 If this returns search results without credential errors, setup is complete.
@@ -217,7 +217,7 @@ Use this checklist to confirm ADC is fully configured:
 - [ ] ADC credentials file exists: `ls ~/.config/gcloud/application_default_credentials.json`
 - [ ] Credentials file contains quota project: `grep quota_project_id ~/.config/gcloud/application_default_credentials.json`
 - [ ] Access token is valid: `gcloud auth application-default print-access-token` (prints a token, not an error)
-- [ ] Vector search works: `crewchief-maproom vector-search --repo YOUR_REPO --query "test" --format agent` (returns results without credential errors)
+- [ ] Vector search works: `maproom vector-search --repo YOUR_REPO --query "test" --format agent` (returns results without credential errors)
 
 ## Related Documentation
 

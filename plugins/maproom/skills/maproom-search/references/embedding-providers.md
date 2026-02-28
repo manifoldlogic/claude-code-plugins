@@ -57,7 +57,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 **Generate embeddings:**
 
 ```bash
-crewchief-maproom generate-embeddings
+maproom generate-embeddings
 ```
 
 ### OpenAI
@@ -89,7 +89,7 @@ export MAPROOM_EMBEDDING_DIMENSION=1536
 **Generate embeddings:**
 
 ```bash
-crewchief-maproom generate-embeddings
+maproom generate-embeddings
 ```
 
 ### Ollama
@@ -139,7 +139,7 @@ export MAPROOM_EMBEDDING_DIMENSION=768
 ollama serve &
 
 # Generate embeddings
-crewchief-maproom generate-embeddings
+maproom generate-embeddings
 ```
 
 **Docker networking note:** The CLI auto-detects Docker environments and adjusts the Ollama endpoint accordingly. If Ollama runs on the Docker host and the CLI runs inside a container, the CLI resolves the endpoint automatically.
@@ -159,13 +159,13 @@ export MAPROOM_EMBEDDING_PROVIDER=openai
 export OPENAI_API_KEY=YOUR_OPENAI_API_KEY
 
 # 2. Regenerate all embeddings with the new provider
-crewchief-maproom generate-embeddings
+maproom generate-embeddings
 
 # 3. Verify vector search works with the new provider
-crewchief-maproom vector-search --repo YOUR_REPO --query "test query" --format agent
+maproom vector-search --repo YOUR_REPO --query "test query" --format agent
 ```
 
-**Warning:** Until embeddings are regenerated, vector search results will be unreliable or empty. Full-text search (`crewchief-maproom search`) is unaffected by provider changes since it does not use embeddings.
+**Warning:** Until embeddings are regenerated, vector search results will be unreliable or empty. Full-text search (`maproom search`) is unaffected by provider changes since it does not use embeddings.
 
 ## Environment Variable Summary
 

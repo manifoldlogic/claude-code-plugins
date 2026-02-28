@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # compare-cli-flags.sh - Automated baseline diff tool for CLI flags
 #
-# Compares current crewchief-maproom CLI flags against the baseline
+# Compares current maproom CLI flags against the baseline
 # documented in cli-flag-verification.md. Extracts flags from both
 # 'search --help' and 'vector-search --help' outputs, then diffs
 # against the baseline flag tables.
@@ -28,7 +28,7 @@ USAGE:
   compare-cli-flags.sh [--help] [--baseline FILE]
 
 DESCRIPTION:
-  Compares current crewchief-maproom CLI help output against the baseline
+  Compares current maproom CLI help output against the baseline
   documented in cli-flag-verification.md. Extracts flag names from both
   the baseline document and live CLI output, then reports any discrepancies.
 
@@ -121,8 +121,8 @@ fi
 # ---------------------------------------------------------------------------
 # Check CLI availability
 # ---------------------------------------------------------------------------
-if ! command -v crewchief-maproom >/dev/null 2>&1; then
-  echo "Error: crewchief-maproom not found in PATH"
+if ! command -v maproom >/dev/null 2>&1; then
+  echo "Error: maproom not found in PATH"
   echo "Install the CLI or ensure it is available before running this script."
   exit 2
 fi
@@ -130,7 +130,7 @@ fi
 # ---------------------------------------------------------------------------
 # Get current CLI version
 # ---------------------------------------------------------------------------
-CURRENT_VERSION=$(crewchief-maproom --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+CURRENT_VERSION=$(maproom --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
 if [ -z "$CURRENT_VERSION" ]; then
   CURRENT_VERSION="unknown"
 fi
@@ -211,8 +211,8 @@ extract_flags_from_help() {
   echo "$1" | grep -E '^\s+--[a-z]' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]].*//' | sort -u
 }
 
-SEARCH_HELP=$(crewchief-maproom search --help 2>&1 || true)
-VSEARCH_HELP=$(crewchief-maproom vector-search --help 2>&1 || true)
+SEARCH_HELP=$(maproom search --help 2>&1 || true)
+VSEARCH_HELP=$(maproom vector-search --help 2>&1 || true)
 
 CURRENT_SEARCH_FLAGS=$(extract_flags_from_help "$SEARCH_HELP")
 CURRENT_VSEARCH_FLAGS=$(extract_flags_from_help "$VSEARCH_HELP")
@@ -221,13 +221,13 @@ current_search_count=$(echo "$CURRENT_SEARCH_FLAGS" | grep -c "^--" || true)
 current_vsearch_count=$(echo "$CURRENT_VSEARCH_FLAGS" | grep -c "^--" || true)
 
 if [ "$current_search_count" -eq 0 ]; then
-  echo "Warning: Could not extract any flags from 'crewchief-maproom search --help'."
+  echo "Warning: Could not extract any flags from 'maproom search --help'."
   echo "The CLI help output format may have changed."
   exit 2
 fi
 
 if [ "$current_vsearch_count" -eq 0 ]; then
-  echo "Warning: Could not extract any flags from 'crewchief-maproom vector-search --help'."
+  echo "Warning: Could not extract any flags from 'maproom vector-search --help'."
   echo "The CLI help output format may have changed."
   exit 2
 fi
@@ -303,7 +303,7 @@ fi
 echo "CLI Flag Drift Report"
 echo "====================="
 echo "Baseline: cli-flag-verification.md"
-echo "Current:  crewchief-maproom $CURRENT_VERSION"
+echo "Current:  maproom $CURRENT_VERSION"
 echo ""
 
 # --- search section ---

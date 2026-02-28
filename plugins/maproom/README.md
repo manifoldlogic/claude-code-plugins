@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Maproom plugin provides semantic code search capabilities powered by the crewchief-maproom CLI. It enables Claude Code to search, analyze, and understand codebases using both full-text search (FTS) and vector-based semantic search. With Maproom, you can find code by concept rather than just exact text matches, explore relationships between code elements, and gain architectural insights across large codebases.
+The Maproom plugin provides semantic code search capabilities powered by the maproom CLI. It enables Claude Code to search, analyze, and understand codebases using both full-text search (FTS) and vector-based semantic search. With Maproom, you can find code by concept rather than just exact text matches, explore relationships between code elements, and gain architectural insights across large codebases.
 
 ## Features
 
@@ -25,7 +25,7 @@ Search across multiple repositories by configuring repo-specific search strategi
    ```
 2. Customize repo entries for your workspace (paths, descriptions, search guidance)
 3. Set environment variables for path portability (`MAPROOM_REPOS_ROOT`, `MAPROOM_SPECS_ROOT`)
-4. Index each repo with `crewchief-maproom scan`
+4. Index each repo with `maproom scan`
 
 See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) for detailed setup instructions, search strategies by repo type, and cross-repo search patterns.
 
@@ -33,24 +33,24 @@ See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) 
 
 Before using the Maproom plugin, ensure you have:
 
-1. **crewchief-maproom CLI installed**: The plugin requires the `crewchief-maproom` command-line tool to be available in your system PATH
-2. **Minimum crewchief-maproom version**: 0.1.0. Verify your version:
+1. **maproom CLI installed**: The plugin requires the `maproom` command-line tool to be available in your system PATH
+2. **Minimum maproom version**: 0.1.0. Verify your version:
    ```bash
-   crewchief-maproom --version
+   maproom --version
    ```
-3. **Indexed database**: Your codebase must be scanned using `crewchief-maproom scan` before searching
+3. **Indexed database**: Your codebase must be scanned using `maproom scan` before searching
 4. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
 
 To verify your setup:
 ```bash
 # Check CLI is installed
-crewchief-maproom --version
+maproom --version
 
 # Index your repository
-crewchief-maproom scan
+maproom scan
 
 # Verify indexing succeeded
-crewchief-maproom status
+maproom status
 ```
 
 ## Installation
@@ -98,10 +98,10 @@ Uses context expansion to show where validateCart is called throughout the codeb
 ## Troubleshooting
 
 ### CLI Not Found
-**Problem**: Plugin reports `crewchief-maproom: command not found`
+**Problem**: Plugin reports `maproom: command not found`
 
 **Solution**:
-- Verify the CLI is installed: `command -v crewchief-maproom`
+- Verify the CLI is installed: `command -v maproom`
 - Ensure it's in your PATH
 - If using a development build, run `pnpm build` in the crewchief repository
 
@@ -109,8 +109,8 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Problem**: Search returns "no repositories indexed" or empty results
 
 **Solution**:
-- Run `crewchief-maproom scan` to index your codebase
-- Check indexing status: `crewchief-maproom status`
+- Run `maproom scan` to index your codebase
+- Check indexing status: `maproom status`
 - Verify database exists: `ls -la ~/.maproom/maproom.db`
 
 ### No Results Found
@@ -119,16 +119,16 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Solution**:
 - Try different search terms or phrasing
 - Use more specific queries (2-3 core technical terms work best)
-- Check if the repository is actually indexed: `crewchief-maproom status`
+- Check if the repository is actually indexed: `maproom status`
 - Verify file types are indexed (use `--file-type` filter if needed)
 - Try different search modes: hybrid (default), fts, or vector
-- For very recent code changes, re-index: `crewchief-maproom scan --force`
+- For very recent code changes, re-index: `maproom scan --force`
 
 ### Stale Results
 **Problem**: Search results don't reflect recent code changes
 
 **Solution**:
-- Re-index the repository: `crewchief-maproom scan`
+- Re-index the repository: `maproom scan`
 - The daemon auto-refreshes but may need manual reindexing for major changes
 
 ### Performance Issues
@@ -151,12 +151,12 @@ The maproom semantic index requires periodic scanning to stay current with codeb
 
 **Scan command:**
 ```bash
-crewchief-maproom scan [--repo-path /path/to/repo]
+maproom scan [--repo-path /path/to/repo]
 ```
 
 **Index freshness check:**
 ```bash
-crewchief-maproom status  # Shows last scan timestamp
+maproom status  # Shows last scan timestamp
 ```
 
 **Note:** The maproom-researcher agent does NOT automatically trigger index scans. Users must ensure the index is current before invoking the agent for accurate semantic search results.
@@ -165,7 +165,7 @@ crewchief-maproom status  # Shows last scan timestamp
 
 ### Monthly CLI Verification
 
-**Purpose:** Detect crewchief-maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
+**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
 
 **Automation:** This procedure is automated via GitHub Actions (see `.github/workflows/monthly-cli-verification.yml`). The workflow runs on the first Friday of each month and creates a GitHub issue if drift is detected. Manual execution is still supported for ad-hoc verification using the `workflow_dispatch` trigger or by running the script directly:
 ```bash
@@ -184,18 +184,18 @@ bash plugins/maproom/scripts/monthly-cli-verification.sh
   ```bash
   cd plugins/maproom
   ```
-- [ ] Run `crewchief-maproom --version` and verify the version matches the documented version (currently 0.1.0):
+- [ ] Run `maproom --version` and verify the version matches the documented version (currently 0.1.0):
   ```bash
-  crewchief-maproom --version
+  maproom --version
   ```
-- [ ] Run `crewchief-maproom search --help` and verify all expected flags are present:
+- [ ] Run `maproom search --help` and verify all expected flags are present:
   ```bash
-  crewchief-maproom search --help
+  maproom search --help
   ```
   Confirm these 5 flags exist in the `search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`
-- [ ] Run `crewchief-maproom vector-search --help` and verify all expected flags are present:
+- [ ] Run `maproom vector-search --help` and verify all expected flags are present:
   ```bash
-  crewchief-maproom vector-search --help
+  maproom vector-search --help
   ```
   Confirm all 6 flags exist in the `vector-search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`, `--threshold`
 - [ ] Compare output against the baseline verification deliverable and check for any discrepancies (new flags, removed flags, renamed flags, changed defaults, changed accepted values):

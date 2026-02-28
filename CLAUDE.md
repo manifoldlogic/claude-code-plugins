@@ -90,7 +90,7 @@ Commands are orchestrators that delegate work - they coordinate but don't do wor
 | `sdd` | Spec-Driven Development workflow (epics → tickets → tasks) |
 | `github-actions` | CI/CD workflow creation and optimization |
 | `claude-code-dev` | Tools for creating new skills and managing marketplaces |
-| `maproom` | Semantic code search via crewchief-maproom CLI |
+| `maproom` | Semantic code search via maproom CLI |
 | `worktree` | Git worktree management via crewchief CLI |
 | `vscode` | VS Code workspace configuration |
 | `iterm` | iTerm2 tab and pane management (macOS host and container modes) |

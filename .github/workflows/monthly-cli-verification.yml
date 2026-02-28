@@ -40,15 +40,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install crewchief-maproom
+      - name: Install maproom
         if: steps.check-date.outputs.is_first_friday == 'true' || github.event_name == 'workflow_dispatch'
         run: |
-          npm install -g crewchief-maproom || {
-            echo "::warning::crewchief-maproom npm install failed, attempting cargo install"
+          npm install -g maproom || {
+            echo "::warning::maproom npm install failed, attempting cargo install"
             if command -v cargo >/dev/null 2>&1; then
-              cargo install crewchief-maproom
+              cargo install maproom
             else
-              echo "::error::Neither npm nor cargo install succeeded for crewchief-maproom"
+              echo "::error::Neither npm nor cargo install succeeded for maproom"
               exit 1
             fi
           }
@@ -79,7 +79,7 @@ jobs:
           ### What happened
 
           The monthly CLI verification workflow detected changes in the
-          \`crewchief-maproom\` CLI flags or behavior that differ from the
+          \`maproom\` CLI flags or behavior that differ from the
           documented baseline.
 
           ### Impact

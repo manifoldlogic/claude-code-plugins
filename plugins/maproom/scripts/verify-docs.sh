@@ -188,7 +188,7 @@ fi
 # ===========================================================================
 human_echo "Check 3: Bare search commands in SKILL.md (only in Output Formats section)"
 # Find search/vector-search commands that do NOT include --format agent
-bare_lines=$(grep -n "crewchief-maproom search\|crewchief-maproom vector-search" "$SKILL_MD" | grep -v "\-\-format agent" || true)
+bare_lines=$(grep -n "maproom search\|maproom vector-search" "$SKILL_MD" | grep -v "\-\-format agent" || true)
 if [ -n "$bare_lines" ]; then
   # Find the line range for the Output Formats section
   # Start: line with "## Output Formats"
@@ -235,7 +235,7 @@ fi
 # ===========================================================================
 human_echo "Check 4: Bare search commands in multi-repo-guide.md (zero in code blocks)"
 # Find lines with search commands missing --format agent
-bare_lines=$(grep -n "crewchief-maproom search\|crewchief-maproom vector-search" "$MULTI_REPO_MD" | grep -v "\-\-format agent" || true)
+bare_lines=$(grep -n "maproom search\|maproom vector-search" "$MULTI_REPO_MD" | grep -v "\-\-format agent" || true)
 if [ -z "$bare_lines" ]; then
   report_pass "No bare search commands found"
   json_add_result 4 "Bare search commands in multi-repo-guide.md" "pass" 0 0 "No bare search commands found"
@@ -251,7 +251,7 @@ else
     # Extract content after line number (remove "NNN:" prefix)
     content=$(echo "$line" | sed 's/^[0-9]*://')
     # Check if content starts with the command (possibly indented) or $ prompt
-    if echo "$content" | grep -qE "^\s*(crewchief-maproom|\\\$\s*crewchief-maproom)"; then
+    if echo "$content" | grep -qE "^\s*(maproom|\\\$\s*maproom)"; then
       bare_commands=$((bare_commands + 1))
       human_echo "    WARNING: Bare command: $line"
     fi

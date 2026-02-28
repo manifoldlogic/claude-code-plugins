@@ -2,7 +2,7 @@
 """
 PreToolUse hook: Enforce two-tier search cap for maproom-researcher agent.
 
-Tracks invocations of `crewchief-maproom search` and `crewchief-maproom vector-search`
+Tracks invocations of `maproom search` and `maproom vector-search`
 per session using a soft/hard cap threshold system:
 
   - Searches 1-5 (below soft cap): allowed silently (exit 0)
@@ -71,7 +71,7 @@ def write_count(counter_path, count):
 
 def is_maproom_search(command):
     """Check if a Bash command contains a maproom search or vector-search call."""
-    return bool(re.search(r"crewchief-maproom\s+(search|vector-search)", command))
+    return bool(re.search(r"maproom\s+(search|vector-search)", command))
 
 
 def main():

@@ -8,32 +8,32 @@ When a search command fails or produces unexpected results, follow this systemat
 
 **1. Verify CLI installed**
 ```bash
-command -v crewchief-maproom
-# Expected: /path/to/crewchief-maproom
+command -v maproom
+# Expected: /path/to/maproom
 ```
 
 **2. Check CLI version**
 ```bash
-crewchief-maproom --version
+maproom --version
 # Expected: >= 0.1.0 (minimum version for this documentation)
 ```
 
 **3. Verify database status**
 ```bash
-crewchief-maproom status
+maproom status
 # Expected: List of indexed repositories
 ```
 
 **4. Test basic search**
 ```bash
-crewchief-maproom search --repo <repo> --query "test" --format agent
+maproom search --repo <repo> --query "test" --format agent
 # Expected: At least some results (if repo is indexed and non-empty)
 ```
 
 **5. Enable debug mode**
 ```bash
 # Add --debug flag to see detailed scoring and ranking information
-crewchief-maproom search --repo <repo> --query "test" --format agent --debug
+maproom search --repo <repo> --query "test" --format agent --debug
 ```
 
 If all steps pass but your specific search still fails, check:
@@ -55,52 +55,52 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 **Fix:**
 1. Re-run embedding generation with a smaller batch size:
    ```bash
-   crewchief-maproom generate-embeddings --batch-size 25
+   maproom generate-embeddings --batch-size 25
    ```
 2. Verify embeddings completed:
    ```bash
-   crewchief-maproom status
+   maproom status
    ```
 
 **Prevention:** Use `--batch-size 25` when generating embeddings for repositories with large files or code chunks.
 
 ### Vector Search Returns No Results
 
-**Symptom:** `crewchief-maproom vector-search` completes without errors but returns an empty result set.
+**Symptom:** `maproom vector-search` completes without errors but returns an empty result set.
 
 **Root Cause:** Embeddings have not been generated for the repository. Vector search requires pre-computed embeddings; without them, there is nothing to match against.
 
 **Fix:**
 1. Check embedding status:
    ```bash
-   crewchief-maproom status
+   maproom status
    ```
 2. If embeddings are missing, generate them:
    ```bash
-   crewchief-maproom generate-embeddings
+   maproom generate-embeddings
    ```
 3. Re-run your vector search after embeddings complete.
 
-**Prevention:** Always run `crewchief-maproom status` before your first vector search to confirm embeddings are available.
+**Prevention:** Always run `maproom status` before your first vector search to confirm embeddings are available.
 
 ### No Repositories Indexed
 
-**Symptom:** `crewchief-maproom status` shows no repositories, or search returns "no repositories indexed."
+**Symptom:** `maproom status` shows no repositories, or search returns "no repositories indexed."
 
 **Root Cause:** The repository has not been scanned. Maproom requires an initial scan to discover and index code chunks before any search works.
 
 **Fix:**
 1. Initialize the database (first time only):
    ```bash
-   crewchief-maproom db migrate
+   maproom db migrate
    ```
 2. Scan the repository:
    ```bash
-   crewchief-maproom scan
+   maproom scan
    ```
 3. Verify the scan succeeded:
    ```bash
-   crewchief-maproom status
+   maproom status
    ```
 
 **Prevention:** Follow the First-Time Setup workflow in SKILL.md whenever starting with a new repository.
@@ -114,11 +114,11 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 **Fix:**
 1. Re-scan the repository to pick up changes:
    ```bash
-   crewchief-maproom scan
+   maproom scan
    ```
 2. If embeddings also need refreshing:
    ```bash
-   crewchief-maproom generate-embeddings
+   maproom generate-embeddings
    ```
 
 **Prevention:** Re-scan after significant code changes (branch switches, large merges, refactors) to keep the index current.
@@ -136,7 +136,7 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 2. Reduce your query to 2-3 core technical terms. Remove filler words like "how", "what", "show me".
 3. If using vector search, verify embeddings are available:
    ```bash
-   crewchief-maproom status
+   maproom status
    ```
 
 **Prevention:** Consult the Choosing Search Type section in SKILL.md to pick the right search mode. Review [search-best-practices.md](./search-best-practices.md) for query optimization techniques, especially anti-patterns 4 and 5.
@@ -173,7 +173,7 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
 - `#` starts an inline comment in zsh/bash — everything after it is silently dropped
 - `$` triggers variable expansion — `$name` becomes the value of the `name` variable (often empty)
 - `!` triggers history expansion in interactive shells — `!test` tries to expand the last command starting with "test"
-- `|` creates a pipe — `auth|login` pipes the output of `crewchief-maproom search ... auth` into a `login` command
+- `|` creates a pipe — `auth|login` pipes the output of `maproom search ... auth` into a `login` command
 
 An empty string query (`--query ""`) causes an FTS5 SQL syntax error (`Error: fts5: syntax error near ""`) and exits with code 1.
 
@@ -181,41 +181,41 @@ An empty string query (`--query ""`) causes an FTS5 SQL syntax error (`Error: ft
 1. Always wrap `--query` values in quotes. Double quotes protect against most metacharacters:
    ```bash
    # Correct - double quotes protect # and |
-   crewchief-maproom search --repo <repo> --query "function#handler" --format agent
-   crewchief-maproom search --repo <repo> --query "auth|login" --format agent
+   maproom search --repo <repo> --query "function#handler" --format agent
+   maproom search --repo <repo> --query "auth|login" --format agent
    ```
 2. For queries containing `$` or `!`, use single quotes to prevent all shell expansion:
    ```bash
    # Correct - single quotes protect $ from variable expansion
-   crewchief-maproom search --repo <repo> --query '$variable_name' --format agent
+   maproom search --repo <repo> --query '$variable_name' --format agent
 
    # Correct - single quotes protect ! from history expansion
-   crewchief-maproom search --repo <repo> --query '!important_function' --format agent
+   maproom search --repo <repo> --query '!important_function' --format agent
    ```
 3. Alternatively, escape individual characters with a backslash inside double quotes:
    ```bash
    # Correct - backslash escapes $ inside double quotes
-   crewchief-maproom search --repo <repo> --query "\$variable_name" --format agent
+   maproom search --repo <repo> --query "\$variable_name" --format agent
    ```
 4. Never pass an empty query. Empty strings cause an FTS5 SQL error (`fts5: syntax error near ""`):
    ```bash
    # Wrong - empty query causes SQL error (exit code 1)
-   crewchief-maproom search --repo <repo> --query "" --format agent
+   maproom search --repo <repo> --query "" --format agent
 
    # Correct - always provide at least one search term
-   crewchief-maproom search --repo <repo> --query "config" --format agent
+   maproom search --repo <repo> --query "config" --format agent
    ```
 
 **Common incorrect patterns:**
 ```bash
 # Wrong - unquoted query; | creates a pipe
-crewchief-maproom search --repo <repo> --query auth|login --format agent
+maproom search --repo <repo> --query auth|login --format agent
 
 # Wrong - unquoted query; # starts a comment, everything after is dropped
-crewchief-maproom search --repo <repo> --query test#handler --format agent
+maproom search --repo <repo> --query test#handler --format agent
 
 # Wrong - double quotes with bare $; shell expands $name to empty string
-crewchief-maproom search --repo <repo> --query "$name_pattern" --format agent
+maproom search --repo <repo> --query "$name_pattern" --format agent
 ```
 
 **Prevention:** When constructing `--query` values programmatically, always wrap the value in single quotes to prevent all shell interpretation. If the query itself must contain single quotes, use double quotes with backslash escaping for `$` and `!`. Before executing a search, validate that the query string is non-empty.
@@ -229,7 +229,7 @@ crewchief-maproom search --repo <repo> --query "$name_pattern" --format agent
 **Fix:**
 1. Re-run your search with the `--debug` flag to see the full score breakdown:
    ```bash
-   crewchief-maproom search --repo <repo> --query "your query" --format agent --debug
+   maproom search --repo <repo> --query "your query" --format agent --debug
    ```
 2. Review the debug output, which shows:
    - Score calculations for each result
@@ -238,7 +238,7 @@ crewchief-maproom search --repo <repo> --query "$name_pattern" --format agent
 3. Use the score breakdown to identify the issue:
    - If scores are uniformly low, refine your query to use more specific terms
    - If irrelevant results score high, check whether a different search type (`search` vs. `vector-search`) is more appropriate
-   - If expected results are missing entirely, verify the repository index is up to date with `crewchief-maproom status`
+   - If expected results are missing entirely, verify the repository index is up to date with `maproom status`
 
 **Prevention:** When investigating search quality issues, always start with `--debug` to get objective scoring data before adjusting queries or filters. See also the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for the full systematic troubleshooting sequence.
 
@@ -259,24 +259,24 @@ Error: Repository not found: <repo-name>
 **Recovery:**
 ```bash
 # List all indexed repositories and their names
-crewchief-maproom status
+maproom status
 
 # If the repository is not listed, scan it
-crewchief-maproom scan
+maproom scan
 ```
 
 ### Command Not Found
 
 ```
-command not found: crewchief-maproom
+command not found: maproom
 ```
 
-**Cause:** The `crewchief-maproom` binary is not installed or is not on the shell `PATH`.
+**Cause:** The `maproom` binary is not installed or is not on the shell `PATH`.
 
 **Recovery:**
 ```bash
 # Check if the binary exists anywhere
-command -v crewchief-maproom
+command -v maproom
 
 # If not found, verify installation method (npm or cargo)
 # The binary may also be available via the crewchief CLI alias:
@@ -294,16 +294,16 @@ No repositories indexed (example)
 **Recovery:**
 ```bash
 # Check current database state
-crewchief-maproom status
+maproom status
 
 # Initialize the database if needed
-crewchief-maproom db migrate
+maproom db migrate
 
 # Scan the repository to populate the index
-crewchief-maproom scan
+maproom scan
 
 # Verify the scan succeeded
-crewchief-maproom status
+maproom status
 ```
 
 See also the [No Repositories Indexed](#no-repositories-indexed) scenario earlier in this document for full root cause analysis and prevention steps.
@@ -315,7 +315,7 @@ error: the following required arguments were not provided:
   --repo <REPO>
   --query <QUERY>
 
-Usage: crewchief-maproom search --repo <REPO> --query <QUERY>
+Usage: maproom search --repo <REPO> --query <QUERY>
 
 For more information, try '--help'.
 ```
@@ -325,10 +325,10 @@ For more information, try '--help'.
 **Recovery:**
 ```bash
 # Include both required flags
-crewchief-maproom search --repo <repo-name> --query "<search terms>"
+maproom search --repo <repo-name> --query "<search terms>"
 
 # Check help for the full flag list
-crewchief-maproom search --help
+maproom search --help
 ```
 
 ### Error: "Failed to create token provider from ADC"
@@ -355,11 +355,11 @@ Caused by:
    ```
 3. Retry the vector-search command:
    ```bash
-   crewchief-maproom vector-search --repo <repo-name> --query "<search terms>" --format agent
+   maproom vector-search --repo <repo-name> --query "<search terms>" --format agent
    ```
 4. If you cannot refresh credentials immediately, fall back to FTS search:
    ```bash
-   crewchief-maproom search --repo <repo-name> --query "<search terms>" --format agent
+   maproom search --repo <repo-name> --query "<search terms>" --format agent
    ```
 
 **Related Errors:**
@@ -396,7 +396,7 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
 
 ### Network Timeout During Vector Search
 
-**Symptom:** `crewchief-maproom vector-search` hangs or times out during embedding generation. The command does not return results or an error within the expected time frame.
+**Symptom:** `maproom vector-search` hangs or times out during embedding generation. The command does not return results or an error within the expected time frame.
 
 **Root Cause:** The OpenAI API is unreachable due to network connectivity issues. Vector search requires a live API call to generate query embeddings — unlike FTS search, it cannot operate offline.
 
@@ -409,19 +409,19 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
    ```bash
    # Retry after a short wait
    sleep 2
-   crewchief-maproom vector-search --repo <repo> --query "<terms>" --format agent
+   maproom vector-search --repo <repo> --query "<terms>" --format agent
    ```
 3. If retries fail, fall back to FTS search which requires no API connectivity:
    ```bash
    # FTS search works entirely offline against the local index
-   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   maproom search --repo <repo> --query "<terms>" --format agent
    ```
 
 **Prevention:** Before running vector-search, verify network connectivity is stable. If working in an environment with intermittent network access, prefer FTS search (`search`) over `vector-search` for reliability. See the Choosing Search Type section in [SKILL.md](../SKILL.md) for guidance on when each search type is appropriate.
 
 ### Rate Limit Exceeded
 
-**Symptom:** `crewchief-maproom vector-search` fails with a rate limit error, such as a 429 status code or a message indicating too many requests.
+**Symptom:** `maproom vector-search` fails with a rate limit error, such as a 429 status code or a message indicating too many requests.
 
 **Root Cause:** The OpenAI API is throttling requests because the rate limit has been exceeded. This can happen when running many vector searches in quick succession or when other applications share the same API key.
 
@@ -430,12 +430,12 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
    ```bash
    # Wait for the rate limit window to reset, then retry
    sleep 4
-   crewchief-maproom vector-search --repo <repo> --query "<terms>" --format agent
+   maproom vector-search --repo <repo> --query "<terms>" --format agent
    ```
 2. If immediate results are needed, fall back to FTS search which does not call the OpenAI API:
    ```bash
    # FTS search is not subject to OpenAI rate limits
-   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   maproom search --repo <repo> --query "<terms>" --format agent
    ```
 3. If rate limiting persists, check whether other processes are consuming the same API quota.
 
@@ -443,7 +443,7 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
 
 ### OpenAI API Degraded Performance
 
-**Symptom:** `crewchief-maproom vector-search` completes but takes significantly longer than normal (e.g., 10+ seconds instead of 1-2 seconds for query embedding generation).
+**Symptom:** `maproom vector-search` completes but takes significantly longer than normal (e.g., 10+ seconds instead of 1-2 seconds for query embedding generation).
 
 **Root Cause:** The OpenAI API is experiencing degraded service. The API is reachable and responding, but response times are elevated beyond normal operating parameters.
 
@@ -451,13 +451,13 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
 1. Switch to FTS search for faster results that do not depend on the API:
    ```bash
    # FTS search operates against the local index with no API latency
-   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   maproom search --repo <repo> --query "<terms>" --format agent
    ```
 2. Retry vector-search later when API performance has recovered (max 3 retries with 2-4-8 second backoff):
    ```bash
    # Check if performance has improved
    sleep 8
-   crewchief-maproom vector-search --repo <repo> --query "<terms>" --format agent
+   maproom vector-search --repo <repo> --query "<terms>" --format agent
    ```
 3. If degraded performance persists, use FTS search for the remainder of the session.
 
@@ -477,10 +477,10 @@ For more information, try '--help'.
 **Recovery:**
 ```bash
 # Check valid values for the flag in question
-crewchief-maproom search --help
+maproom search --help
 
 # Use one of the accepted values
-crewchief-maproom search --repo <repo-name> --query "<terms>" --format agent
+maproom search --repo <repo-name> --query "<terms>" --format agent
 ```
 
 **Note on silent failures:** Some invalid values do not produce errors but return empty results. In particular, `--kind` and `--lang` accept any string without validation — an incorrect value like `--kind Func` (uppercase) silently matches nothing. See [Zero Results with Valid Query](#zero-results-with-valid-query) above for details.
@@ -525,7 +525,7 @@ See [Embedding Providers](./embedding-providers.md) for supported providers and 
 Embeddings generated by one provider (e.g., Vertex AI with `text-embedding-004`) are **not compatible** with embeddings from another provider (e.g., OpenAI with `text-embedding-ada-002`). If you switch embedding providers, you must regenerate all embeddings:
 
 ```bash
-crewchief-maproom generate-embeddings
+maproom generate-embeddings
 ```
 
 Failure to re-index after switching providers will cause vector-search to return poor or zero results, because the query embedding (from the new provider) will be compared against stored embeddings (from the old provider) that exist in a different vector space.
@@ -536,11 +536,11 @@ See [Embedding Providers](./embedding-providers.md) for details on provider swit
 
 ## Edge Case Handling
 
-This section documents boundary conditions, resource errors, and concurrency scenarios tested against `crewchief-maproom` version 0.1.0. Each entry records empirical CLI behavior observed during testing.
+This section documents boundary conditions, resource errors, and concurrency scenarios tested against `maproom` version 0.1.0. Each entry records empirical CLI behavior observed during testing.
 
 ### SQLite Lock Contention (GAP-006) -- HIGH PRIORITY
 
-**Symptom:** When multiple agents or processes run `crewchief-maproom search` or `crewchief-maproom scan` concurrently against the same repository, commands may fail with SQLite lock errors such as `SQLITE_BUSY` or connection pool timeouts.
+**Symptom:** When multiple agents or processes run `maproom search` or `maproom scan` concurrently against the same repository, commands may fail with SQLite lock errors such as `SQLITE_BUSY` or connection pool timeouts.
 
 **Root Cause:** The maproom database uses SQLite, which has limited write concurrency. Concurrent read-only operations (searches) are handled well by SQLite's WAL mode. However, concurrent write operations (scan while searching) or access to a locked database can cause contention.
 
@@ -553,7 +553,7 @@ This section documents boundary conditions, resource errors, and concurrency sce
 1. If you encounter a `SQLITE_BUSY` or connection pool timeout error during concurrent operations, retry the failed command after a short delay:
    ```bash
    sleep 2
-   crewchief-maproom search --repo <repo> --query "<terms>" --format agent
+   maproom search --repo <repo> --query "<terms>" --format agent
    ```
 2. Avoid running multiple `scan` commands against the same repository simultaneously. Concurrent reads (searches) are safe.
 3. If contention persists, serialize write operations (scan, generate-embeddings) and allow only read operations (search, vector-search) to run concurrently.
@@ -583,13 +583,13 @@ This section documents boundary conditions, resource errors, and concurrency sce
 3. Do not rely on `--k=-1` to mean "return all results" — while it works in practice (due to unsigned integer wrapping), this is undocumented behavior. Use a large explicit value like `--k 10000` instead.
    ```bash
    # Correct - explicit positive value
-   crewchief-maproom search --repo <repo> --query "<terms>" --k 20 --format agent
+   maproom search --repo <repo> --query "<terms>" --k 20 --format agent
 
    # Avoid - undocumented wrapping behavior
-   crewchief-maproom search --repo <repo> --query "<terms>" --k=-1 --format agent
+   maproom search --repo <repo> --query "<terms>" --k=-1 --format agent
    ```
 
-**Prevention:** Validate that `--k` is a positive integer (>= 1) before executing search commands. The practical upper bound is the total number of indexed chunks (check with `crewchief-maproom status`). Values above the chunk count simply return all results.
+**Prevention:** Validate that `--k` is a positive integer (>= 1) before executing search commands. The practical upper bound is the total number of indexed chunks (check with `maproom status`). Values above the chunk count simply return all results.
 
 ### Invalid `--threshold` Values (GAP-002)
 
@@ -613,10 +613,10 @@ This section documents boundary conditions, resource errors, and concurrency sce
 1. Only use `--threshold` with the `vector-search` subcommand, never with `search`:
    ```bash
    # Correct - threshold with vector-search
-   crewchief-maproom vector-search --repo <repo> --query "<terms>" --threshold 0.7 --format agent
+   maproom vector-search --repo <repo> --query "<terms>" --threshold 0.7 --format agent
 
    # Wrong - threshold is not a search flag
-   crewchief-maproom search --repo <repo> --query "<terms>" --threshold 0.7 --format agent
+   maproom search --repo <repo> --query "<terms>" --threshold 0.7 --format agent
    ```
 2. Use values in the documented range of 0.0 to 1.0 (cosine similarity score).
 3. When passing negative values, use equals syntax (`--threshold=-0.5`) to avoid shell parse ambiguity — though negative thresholds are semantically meaningless for cosine similarity.
@@ -646,10 +646,10 @@ This section documents boundary conditions, resource errors, and concurrency sce
 2. If previews appear as only `...`, check that `--preview-length` is not set to 0.
    ```bash
    # Correct - reasonable preview length
-   crewchief-maproom search --repo <repo> --query "<terms>" --preview-length 150 --format agent
+   maproom search --repo <repo> --query "<terms>" --preview-length 150 --format agent
 
    # Avoid - zero produces empty previews
-   crewchief-maproom search --repo <repo> --query "<terms>" --preview-length 0 --format agent
+   maproom search --repo <repo> --query "<terms>" --preview-length 0 --format agent
    ```
 
 **Prevention:** Use positive values for `--preview-length`. Omit the flag to use the format-appropriate default (120 for `--format agent`, 200 for `--format json`). Very large values are safe but produce verbose output.
@@ -658,7 +658,7 @@ This section documents boundary conditions, resource errors, and concurrency sce
 
 **Note:** This edge case has not been tested empirically due to the risk of destabilizing the shared development environment. Simulating disk-full conditions requires filling the filesystem, which could affect other processes and services.
 
-**Symptom (predicted):** `crewchief-maproom scan` fails mid-operation when the filesystem runs out of space. The SQLite database may be left in an inconsistent state if the write-ahead log (WAL) cannot be flushed.
+**Symptom (predicted):** `maproom scan` fails mid-operation when the filesystem runs out of space. The SQLite database may be left in an inconsistent state if the write-ahead log (WAL) cannot be flushed.
 
 **Root Cause (predicted):** SQLite requires disk space to maintain the WAL file (`maproom.db-wal`) and shared memory file (`maproom.db-shm`) alongside the main database. During `scan`, the CLI writes new chunks to the database. If disk space is exhausted, SQLite write operations fail.
 
@@ -678,13 +678,13 @@ Error: database or disk is full
    df -h ~/.maproom/
 
    # Free space, then re-scan
-   crewchief-maproom scan
+   maproom scan
    ```
 2. If the database is corrupted after a disk-full event, delete and rebuild:
    ```bash
    rm ~/.maproom/<repo>/maproom.db*
-   crewchief-maproom db migrate
-   crewchief-maproom scan
+   maproom db migrate
+   maproom scan
    ```
 
 **Prevention:** Ensure at least 2x the expected database size is available before running `scan` or `generate-embeddings`. Check the current database size with `ls -lh ~/.maproom/<repo>/maproom.db*`. For reference, a repository with 6,450 chunks produces a ~67 MB database with a ~40 MB WAL file.
@@ -733,10 +733,10 @@ Caused by:
    ```
 2. Verify the fix:
    ```bash
-   crewchief-maproom search --repo <repo> --query "test" --format agent --k 1
+   maproom search --repo <repo> --query "test" --format agent --k 1
    ```
 
-**Prevention:** Do not modify permissions on the `~/.maproom/` directory or its contents. If running in a container or restricted environment, ensure the database directory is writable by the user running `crewchief-maproom`. The CLI will retry database connections with exponential backoff for approximately 25 seconds before timing out — a long-running `ERROR unable to open database file` log stream is the primary symptom of permission issues.
+**Prevention:** Do not modify permissions on the `~/.maproom/` directory or its contents. If running in a container or restricted environment, ensure the database directory is writable by the user running `maproom`. The CLI will retry database connections with exponential backoff for approximately 25 seconds before timing out — a long-running `ERROR unable to open database file` log stream is the primary symptom of permission issues.
 
 ### Large `--k` Values and Memory (GAP-007)
 
@@ -761,10 +761,10 @@ Caused by:
 3. If the CLI rejects a value with "number too large to fit in target type", reduce `--k` to a value within the i64 range.
    ```bash
    # Correct - practical upper bound
-   crewchief-maproom search --repo <repo> --query "<terms>" --k 100 --format agent
+   maproom search --repo <repo> --query "<terms>" --k 100 --format agent
 
    # Avoid - unnecessarily large, slower execution
-   crewchief-maproom search --repo <repo> --query "<terms>" --k 999999 --format agent
+   maproom search --repo <repo> --query "<terms>" --k 999999 --format agent
    ```
 
-**Prevention:** Keep `--k` values proportional to the expected result set size. Check `crewchief-maproom status` to see total chunk counts per repository. For a repository with 6,450 chunks, `--k 100` covers the top 1.5% of results. Very large `--k` values (999,999+) cause longer execution times (~25 seconds vs. <1 second) and produce large output volumes (~750 KB) without improving result quality, since all additional results are lower-relevance matches.
+**Prevention:** Keep `--k` values proportional to the expected result set size. Check `maproom status` to see total chunk counts per repository. For a repository with 6,450 chunks, `--k 100` covers the top 1.5% of results. Very large `--k` values (999,999+) cause longer execution times (~25 seconds vs. <1 second) and produce large output volumes (~750 KB) without improving result quality, since all additional results are lower-relevance matches.

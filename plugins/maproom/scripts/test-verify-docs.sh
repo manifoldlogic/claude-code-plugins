@@ -75,7 +75,7 @@ cp "$SKILL_MD" "$BACKUP_SKILL"
 # Append a bare search command OUTSIDE the Output Formats section
 # (appended at end of file, which is after the last section)
 echo "" >> "$SKILL_MD"
-echo 'crewchief-maproom search --repo myrepo --query "injected test"' >> "$SKILL_MD"
+echo 'maproom search --repo myrepo --query "injected test"' >> "$SKILL_MD"
 
 # Run verify-docs.sh and expect failure (non-zero exit)
 if ! "$VERIFY_SCRIPT" >/dev/null 2>&1; then

@@ -22,7 +22,7 @@ import unittest
 HOOK_PATH = os.path.join(os.path.dirname(__file__), "enforce-search-cap.py")
 
 # Standard maproom search command used in most tests
-MAPROOM_SEARCH_CMD = "crewchief-maproom search 'test query'"
+MAPROOM_SEARCH_CMD = "maproom search 'test query'"
 
 
 def run_hook(json_input, env_vars=None, session_id=None):
@@ -228,7 +228,7 @@ class TestBypassPaths:
         sid = "test-bypass-maproom-context"
         input_json = json.dumps({
             "tool_name": "Bash",
-            "tool_input": {"command": "crewchief-maproom context /path/to/file"},
+            "tool_input": {"command": "maproom context /path/to/file"},
         })
         exit_code, stdout, stderr = run_hook(input_json, session_id=sid)
         assert exit_code == 0
