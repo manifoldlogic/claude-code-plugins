@@ -7,3 +7,6 @@
 # CrewChief runtime state
 .crewchief/
 .crewchief-meta.json
+.crewchief/runs/.crewchief-meta.json
+
+*.local.*
