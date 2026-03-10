@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 # Test runner for setup-sdd-env.js hook
 # Validates that the SDD environment setup hook correctly:
 # 1. Creates the SDD directory structure
@@ -20,7 +20,7 @@ FAILURES=0
 TESTS_RUN=0
 
 # Colors for output (if terminal supports it)
-if [[ -t 1 ]]; then
+if [ -t 1 ]; then
     GREEN='\033[0;32m'
     RED='\033[0;31m'
     YELLOW='\033[0;33m'
@@ -44,7 +44,7 @@ echo "============================================"
 echo ""
 
 # Verify hook exists
-if [[ ! -f "$HOOK_PATH" ]]; then
+if [ ! -f "$HOOK_PATH" ]; then
     echo -e "${RED}ERROR: Hook not found at $HOOK_PATH${NC}"
     exit 1
 fi
@@ -96,7 +96,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && [ -d "$test_sdd_root" ]; then
+if [ $exit_code -eq 0 ] && [ -d "$test_sdd_root" ]; then
     pass
 else
     fail "SDD_ROOT not created or exit code not 0 (got $exit_code)"
@@ -110,7 +110,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && verify_dirs "$test_sdd_root"; then
+if [ $exit_code -eq 0 ] && verify_dirs "$test_sdd_root"; then
     pass
 else
     fail "Not all 9 directories created"
@@ -130,7 +130,7 @@ for dir in epics tickets archive/tickets archive/epics reference research scratc
         missing_dirs="$missing_dirs $dir"
     fi
 done
-if [[ $exit_code -eq 0 ]] && [ -z "$missing_dirs" ]; then
+if [ $exit_code -eq 0 ] && [ -z "$missing_dirs" ]; then
     pass
 else
     fail "Missing directories:$missing_dirs"
@@ -148,7 +148,7 @@ SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
 # Directory creation is now unconditional; existing content should be preserved
-if [[ $exit_code -eq 0 ]] && [ -f "$test_sdd_root/marker.txt" ] && verify_dirs "$test_sdd_root"; then
+if [ $exit_code -eq 0 ] && [ -f "$test_sdd_root/marker.txt" ] && verify_dirs "$test_sdd_root"; then
     pass
 else
     fail "Hook should create directories in existing SDD_ROOT while preserving existing content"
@@ -176,7 +176,7 @@ else
     # Assert all pre-existing directories still exist
     elif ! verify_dirs "$test_sdd_root"; then
         fail "Pre-existing directories were lost during upgrade"
-    elif [[ $exit_code -ne 0 ]]; then
+    elif [ $exit_code -ne 0 ]; then
         fail "Hook exited with non-zero code ($exit_code)"
     else
         pass
@@ -198,7 +198,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH
 exit_code=$?
 set -e
 template_dest="$test_sdd_root/reference/work-task-template.md"
-if [[ $exit_code -eq 0 ]] && [ -f "$template_dest" ]; then
+if [ $exit_code -eq 0 ] && [ -f "$template_dest" ]; then
     pass
 else
     fail "Template not copied to $template_dest"
@@ -217,7 +217,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q "Original Content" "$test_sdd_root/reference/work-task-template.md"; then
+if [ $exit_code -eq 0 ] && grep -q "Original Content" "$test_sdd_root/reference/work-task-template.md"; then
     pass
 else
     fail "Existing template was overwritten (should be skipped)"
@@ -234,7 +234,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH
 exit_code=$?
 set -e
 template_dest="$test_sdd_root/reference/work-task-template.md"
-if [[ $exit_code -eq 0 ]] && [ ! -f "$template_dest" ]; then
+if [ $exit_code -eq 0 ] && [ ! -f "$template_dest" ]; then
     pass
 else
     fail "Template copied when source doesn't exist (should skip)"
@@ -249,7 +249,7 @@ SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
 template_dest="$test_sdd_root/reference/work-task-template.md"
-if [[ $exit_code -eq 0 ]] && [ ! -f "$template_dest" ]; then
+if [ $exit_code -eq 0 ] && [ ! -f "$template_dest" ]; then
     pass
 else
     fail "Template copied when CLAUDE_PLUGIN_ROOT not set (should skip)"
@@ -270,7 +270,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH
 exit_code=$?
 set -e
 spec_dest="$test_sdd_root/spec/README.md"
-if [[ $exit_code -eq 0 ]] && [ -f "$spec_dest" ]; then
+if [ $exit_code -eq 0 ] && [ -f "$spec_dest" ]; then
     pass
 else
     fail "spec/README.md not copied to $spec_dest"
@@ -289,7 +289,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q "Original Spec README - DO NOT OVERWRITE" "$test_sdd_root/spec/README.md"; then
+if [ $exit_code -eq 0 ] && grep -q "Original Spec README - DO NOT OVERWRITE" "$test_sdd_root/spec/README.md"; then
     pass
 else
     fail "Existing spec/README.md was overwritten (should be skipped)"
@@ -306,7 +306,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH
 exit_code=$?
 set -e
 spec_dest="$test_sdd_root/spec/README.md"
-if [[ $exit_code -eq 0 ]] && [ ! -f "$spec_dest" ]; then
+if [ $exit_code -eq 0 ] && [ ! -f "$spec_dest" ]; then
     pass
 else
     fail "spec/README.md created when source template doesn't exist (should skip)"
@@ -342,7 +342,7 @@ set -e
 # When SDD_ROOT_DIR is set (truthy), no append happens - this is correct behavior
 # We need to verify that with the workaround approach:
 # Check that a successful run with writable SDD_ROOT produces proper directories
-if [[ $exit_code -eq 0 ]] && verify_dirs "$test_sdd_root"; then
+if [ $exit_code -eq 0 ] && verify_dirs "$test_sdd_root"; then
     # We verified hook works; the env file update logic is tested in Test 18/20
     pass
 else
@@ -360,7 +360,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && ! grep -q "export SDD_ROOT_DIR" "$test_env_file"; then
+if [ $exit_code -eq 0 ] && ! grep -q "export SDD_ROOT_DIR" "$test_env_file"; then
     pass
 else
     fail "SDD_ROOT_DIR appended when already set (should skip)"
@@ -375,7 +375,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]]; then
+if [ $exit_code -eq 0 ]; then
     pass
 else
     fail "Hook failed when CLAUDE_ENV_FILE not set (should exit 0)"
@@ -402,7 +402,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH
 second_exit=$?
 second_dirs=$(find "$test_sdd_root" -type d 2>/dev/null | sort | wc -l)
 set -e
-if [[ $first_exit -eq 0 ]] && [[ $second_exit -eq 0 ]] && [[ "$first_dirs" == "$second_dirs" ]]; then
+if [ $first_exit -eq 0 ] && [ $second_exit -eq 0 ] && [ "$first_dirs" = "$second_dirs" ]; then
     pass
 else
     fail "State differs after second run (first=$first_dirs, second=$second_dirs)"
@@ -423,7 +423,7 @@ set -e
 # Count how many times SDD_ROOT_DIR appears (should be 0 since SDD_ROOT_DIR was set)
 # The || true prevents grep from returning non-zero when no matches
 sdd_count=$(grep -c "SDD_ROOT_DIR" "$test_env_file" || true)
-if [[ "$sdd_count" -eq 0 ]]; then
+if [ "$sdd_count" -eq 0 ]; then
     pass
 else
     fail "Expected 0 SDD_ROOT_DIR entries when env var set, got $sdd_count"
@@ -445,7 +445,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]]; then
+if [ $exit_code -eq 0 ]; then
     pass
 else
     fail "Hook did not exit 0 on success (got $exit_code)"
@@ -465,7 +465,7 @@ exit_code=$?
 set -e
 # Restore permissions for cleanup
 chmod 644 "$test_env_file"
-if [[ $exit_code -eq 0 ]]; then
+if [ $exit_code -eq 0 ]; then
     pass
 else
     fail "Hook did not exit 0 with read-only env file (got $exit_code)"
@@ -486,7 +486,7 @@ exit_code=$?
 set -e
 # Restore permissions for cleanup
 chmod 755 "$test_sdd_root/reference"
-if [[ $exit_code -eq 0 ]]; then
+if [ $exit_code -eq 0 ]; then
     pass
 else
     fail "Hook did not exit 0 with read-only reference dir (got $exit_code)"
@@ -500,7 +500,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && verify_dirs "$test_sdd_root"; then
+if [ $exit_code -eq 0 ] && verify_dirs "$test_sdd_root"; then
     pass
 else
     fail "Hook failed with minimal environment (got $exit_code)"
@@ -524,7 +524,7 @@ set +e
 # Run inline node to verify the default value logic
 default_value=$(env -i PATH="$PATH" HOME="$HOME" node -e "console.log(process.env.SDD_ROOT_DIR || '/app/.sdd')" 2>/dev/null)
 set -e
-if [[ "$default_value" == "/app/.sdd" ]]; then
+if [ "$default_value" = "/app/.sdd" ]; then
     pass
 else
     fail "Default SDD_ROOT is not /app/.sdd (got: $default_value)"
@@ -541,7 +541,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH
 exit_code=$?
 set -e
 template_dest="$test_sdd_root/reference/work-task-template.md"
-if [[ $exit_code -eq 0 ]] && grep -q "Mock Task Template" "$template_dest"; then
+if [ $exit_code -eq 0 ] && grep -q "Mock Task Template" "$template_dest"; then
     pass
 else
     fail "Template content not correctly copied"
@@ -561,12 +561,12 @@ set +e
 # Alternative: verify the string format used in the hook code directly
 format_check=$(grep -o 'export SDD_ROOT_DIR="\${SDD_ROOT}"' "$HOOK_PATH" 2>/dev/null || true)
 set -e
-if [[ -n "$format_check" ]]; then
+if [ -n "$format_check" ]; then
     pass
 else
     # Check alternative format in code
     format_check2=$(grep 'appendFileSync' "$HOOK_PATH" | grep 'export SDD_ROOT_DIR')
-    if [[ -n "$format_check2" ]]; then
+    if [ -n "$format_check2" ]; then
         pass
     else
         fail "Env file export syntax not found in hook code"
@@ -644,7 +644,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="TASKINT"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="TASKINT"' "$test_env_file"; then
     pass
 else
     fail "CLAUDE_TASK_LIST_ID not set from session state (expected TASKINT)"
@@ -662,7 +662,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="FALLBACK"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="FALLBACK"' "$test_env_file"; then
     pass
 else
     fail "CLAUDE_TASK_LIST_ID not set from task files fallback (expected FALLBACK)"
@@ -680,7 +680,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && ! grep -q 'CLAUDE_TASK_LIST_ID' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && ! grep -q 'CLAUDE_TASK_LIST_ID' "$test_env_file"; then
     pass
 else
     fail "CLAUDE_TASK_LIST_ID should not be set when all tasks are complete"
@@ -700,7 +700,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="PRIORITY"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="PRIORITY"' "$test_env_file"; then
     pass
 else
     fail "Session state should take priority over task files (expected PRIORITY, not FALLBACK)"
@@ -718,7 +718,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" SDD_TASKS_API_ENABLED="false" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && ! grep -q 'CLAUDE_TASK_LIST_ID' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && ! grep -q 'CLAUDE_TASK_LIST_ID' "$test_env_file"; then
     pass
 else
     fail "CLAUDE_TASK_LIST_ID should not be set when SDD_TASKS_API_ENABLED=false"
@@ -736,7 +736,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" SDD_TASKS_API_ENABLED="true" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="ENABLED"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="ENABLED"' "$test_env_file"; then
     pass
 else
     fail "CLAUDE_TASK_LIST_ID should be set when SDD_TASKS_API_ENABLED=true"
@@ -755,7 +755,7 @@ set +e
 env -i PATH="$PATH" HOME="$HOME" SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="DEFAULT"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="DEFAULT"' "$test_env_file"; then
     pass
 else
     fail "CLAUDE_TASK_LIST_ID should be set by default (no flag)"
@@ -777,7 +777,7 @@ SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH"
 exit_code=$?
 set -e
 # Should exit 0 and fall back to task file detection
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="VALID"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="VALID"' "$test_env_file"; then
     pass
 else
     fail "Should handle invalid JSON gracefully and fall back to task files"
@@ -796,7 +796,7 @@ set +e
 SDD_ROOT_DIR="$test_sdd_root" CLAUDE_ENV_FILE="$test_env_file" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="NOSESSION"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="NOSESSION"' "$test_env_file"; then
     pass
 else
     fail "Should handle missing session states dir and fall back to task files"
@@ -825,7 +825,7 @@ exit_code=$?
 set -e
 # For Jira-style IDs, we use the full ID before underscore (AUTH-123 has no underscore, so full ID)
 # Actually the code splits on '_' so AUTH-123 stays as AUTH-123
-if [[ $exit_code -eq 0 ]] && grep -q 'CLAUDE_TASK_LIST_ID="AUTH-123"' "$test_env_file"; then
+if [ $exit_code -eq 0 ] && grep -q 'CLAUDE_TASK_LIST_ID="AUTH-123"' "$test_env_file"; then
     pass
 else
     fail "Should detect Jira-style ticket ID (AUTH-123)"
@@ -843,7 +843,7 @@ echo "Test Results"
 echo "============================================"
 echo ""
 echo "Tests run: $TESTS_RUN"
-if [[ $FAILURES -eq 0 ]]; then
+if [ $FAILURES -eq 0 ]; then
     echo -e "${GREEN}All tests PASSED${NC}"
     exit 0
 else
