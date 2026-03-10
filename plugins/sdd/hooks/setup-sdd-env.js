@@ -61,7 +61,7 @@ if (pluginRoot) {
       fs.copyFileSync(specReadmeSrc, specReadmeDest);
     }
   } catch {
-    // Silently ignore copy errors - template may not exist yet (created in LIVESPEC.1002)
+    // Silently ignore copy errors - template may not exist in all environments
   }
 }
 
