@@ -615,7 +615,60 @@ echo "Archive may proceed."
 | Invalid path characters | Rejected with specific error message |
 | Path traversal attempt | Rejected: "Path traversal not allowed" |
 
-<!-- Step 5.6 (Skill Curation Opportunity) removed in RMSKILL ticket -->
+### Step 5.6: Merge Verification
+
+**VALIDATION: Verify the ticket's work has been merged to the default branch before proceeding.**
+
+This step ensures that only completed, merged work progresses to spec extraction. Unmerged or abandoned work must not contribute requirements to the project spec.
+
+1. Check if the current directory is a git repository:
+   ```bash
+   git rev-parse --git-dir 2>/dev/null
+   ```
+   If this command fails, the current directory is not a git repository. Warn the user:
+   > "WARNING: Not inside a git repository. Cannot verify merge status for {TICKET_ID}."
+
+   Ask the user for confirmation to proceed without merge verification. If they decline, cancel the archive operation.
+
+2. Detect detached HEAD state:
+   ```bash
+   git symbolic-ref --quiet HEAD
+   ```
+   If this command exits with a non-zero status, the repository is in a detached HEAD state. Treat this as "cannot determine merge status" and skip directly to sub-step 6 (user prompt).
+
+3. Determine the default branch:
+   ```bash
+   DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+   ```
+   If `DEFAULT_BRANCH` is empty or the command fails, fall back to `"main"`.
+
+4. Run the primary merge check — search commit messages on the default branch for the ticket ID being archived:
+   ```bash
+   git log ${DEFAULT_BRANCH} --oneline --grep="{TICKET_ID}" | grep -q .
+   ```
+   This check survives squash merges and deleted branches because it searches commit message history rather than branch state.
+
+5. If the primary check fails, run the fallback merge check — look for the ticket branch in branches merged to the default branch:
+   ```bash
+   git branch --merged ${DEFAULT_BRANCH} | grep {ticket-branch}
+   ```
+   This catches cases where the ticket ID does not appear in commit messages.
+
+6. **Evaluate results — either check passing means the work is merged:**
+   - If **either** the primary check (sub-step 4) or the fallback check (sub-step 5) passes, the work is considered merged. Proceed to the next step.
+   - If **neither** check passes, present the user with the following prompt:
+
+   > "Could not confirm that {TICKET_ID} has been merged to {DEFAULT_BRANCH}. How would you like to proceed?"
+   >
+   > **(a)** Work is merged via squash merge or different branch name — proceed to spec extraction
+   > **(b)** Archive as abandoned/cancelled — skip spec extraction and proceed to Step 6
+   > **(c)** Cancel the archive operation
+
+   If the user selects **(a)**, proceed to the next step normally.
+
+   If the user selects **(b)**, note the abandoned/cancelled disposition so that the spec extraction step (Step 5.7) is skipped, and proceed directly to Step 6.
+
+   If the user selects **(c)**, stop the archive operation immediately.
 
 ### Step 6: Archive
 
