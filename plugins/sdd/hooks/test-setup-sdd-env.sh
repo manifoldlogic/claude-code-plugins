@@ -81,6 +81,8 @@ setup_mock_plugin() {
     mkdir -p "$plugin_dir/skills/project-workflow/templates/ticket"
     echo "# Mock Task Template" > "$plugin_dir/skills/project-workflow/templates/ticket/task-template.md"
     echo "This is a mock template for testing." >> "$plugin_dir/skills/project-workflow/templates/ticket/task-template.md"
+    echo "# Project Spec README" > "$plugin_dir/skills/project-workflow/templates/spec-readme.md"
+    echo "This is the spec readme template." >> "$plugin_dir/skills/project-workflow/templates/spec-readme.md"
 }
 
 echo "--- Directory Creation Tests ---"
@@ -251,6 +253,63 @@ if [[ $exit_code -eq 0 ]] && [ ! -f "$template_dest" ]; then
     pass
 else
     fail "Template copied when CLAUDE_PLUGIN_ROOT not set (should skip)"
+fi
+
+echo ""
+echo "--- spec-readme.md Copy Tests ---"
+echo ""
+
+# Test 31: Copy spec/README.md when source template exists and destination is absent
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Copy spec/README.md when source exists and destination is absent"
+test_sdd_root="$TEST_DIR/test31_sdd"
+test_plugin="$TEST_DIR/test31_plugin"
+setup_mock_plugin "$test_plugin"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+spec_dest="$test_sdd_root/spec/README.md"
+if [[ $exit_code -eq 0 ]] && [ -f "$spec_dest" ]; then
+    pass
+else
+    fail "spec/README.md not copied to $spec_dest"
+fi
+
+# Test 32: Skip copy when spec/README.md already exists (preserve original content)
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Skip copy when spec/README.md already exists"
+test_sdd_root="$TEST_DIR/test32_sdd"
+test_plugin="$TEST_DIR/test32_plugin"
+setup_mock_plugin "$test_plugin"
+# Pre-create spec directory with existing README.md
+mkdir -p "$test_sdd_root/spec"
+echo "# Original Spec README - DO NOT OVERWRITE" > "$test_sdd_root/spec/README.md"
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+if [[ $exit_code -eq 0 ]] && grep -q "Original Spec README - DO NOT OVERWRITE" "$test_sdd_root/spec/README.md"; then
+    pass
+else
+    fail "Existing spec/README.md was overwritten (should be skipped)"
+fi
+
+# Test 33: Skip copy gracefully when spec-readme.md template is missing
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Skip copy gracefully when spec-readme.md template is missing"
+test_sdd_root="$TEST_DIR/test33_sdd"
+test_plugin="$TEST_DIR/test33_plugin"
+mkdir -p "$test_plugin"  # Plugin without any templates
+set +e
+SDD_ROOT_DIR="$test_sdd_root" CLAUDE_PLUGIN_ROOT="$test_plugin" node "$HOOK_PATH" > /dev/null 2>&1
+exit_code=$?
+set -e
+spec_dest="$test_sdd_root/spec/README.md"
+if [[ $exit_code -eq 0 ]] && [ ! -f "$spec_dest" ]; then
+    pass
+else
+    fail "spec/README.md created when source template doesn't exist (should skip)"
 fi
 
 echo ""
