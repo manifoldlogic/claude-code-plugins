@@ -648,6 +648,8 @@ This step ensures that only completed, merged work progresses to spec extraction
    ```
    This check survives squash merges and deleted branches because it searches commit message history rather than branch state.
 
+   > **Note:** `--grep` performs a substring match, so a ticket ID like `AUTH` could match commits containing `AUTHENTICATION`. In practice this is acceptable because SDD ticket IDs use structured uppercase identifiers (e.g., `AUTH-001`, `LIVESPEC.4007`) that are unlikely to appear as substrings in unrelated commit messages. If false positives are suspected, manually inspect the `git log` output before proceeding.
+
 5. If the primary check fails, run the fallback merge check — look for the ticket branch in branches merged to the default branch:
    ```bash
    git branch --merged ${DEFAULT_BRANCH} | grep {ticket-branch}
@@ -761,6 +763,8 @@ SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
 mkdir -p "$SDD_ROOT/logs"
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|TICKET_ARCHIVED|{TICKET_ID}|-|archive|Completed, {X}/{X} tasks verified" >> "$SDD_ROOT/logs/workflow.log"
 ```
+
+Include in the log entry's description which spec files were created or modified during Step 5.7 (Spec Extraction), or note "no spec files extracted" if the step was skipped or produced no changes. This ensures the archive audit trail captures the spec extraction outcome for future traceability.
 
 ### Step 9: Collect Metrics
 
