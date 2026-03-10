@@ -60,6 +60,7 @@ verify_dirs() {
     [ -d "$sdd_root/research" ] || return 1
     [ -d "$sdd_root/scratchpad" ] || return 1
     [ -d "$sdd_root/logs" ] || return 1
+    [ -d "$sdd_root/spec" ] || return 1
     return 0
 }
 
@@ -101,7 +102,7 @@ fi
 
 # Test 2: Create all 8 subdirectories correctly
 TESTS_RUN=$((TESTS_RUN + 1))
-echo "Test $TESTS_RUN: Create all 8 subdirectories correctly"
+echo "Test $TESTS_RUN: Create all 9 subdirectories correctly"
 test_sdd_root="$TEST_DIR/test2_sdd"
 set +e
 SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
@@ -110,7 +111,7 @@ set -e
 if [[ $exit_code -eq 0 ]] && verify_dirs "$test_sdd_root"; then
     pass
 else
-    fail "Not all 8 directories created"
+    fail "Not all 9 directories created"
 fi
 
 # Test 3: Verify each directory exists individually
@@ -122,7 +123,7 @@ SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
 missing_dirs=""
-for dir in epics tickets archive/tickets archive/epics reference research scratchpad logs; do
+for dir in epics tickets archive/tickets archive/epics reference research scratchpad logs spec; do
     if [ ! -d "$test_sdd_root/$dir" ]; then
         missing_dirs="$missing_dirs $dir"
     fi
@@ -133,22 +134,51 @@ else
     fail "Missing directories:$missing_dirs"
 fi
 
-# Test 4: Skip creation when SDD_ROOT already exists
+# Test 4: Create directories even when SDD_ROOT already exists (idempotent)
 TESTS_RUN=$((TESTS_RUN + 1))
-echo "Test $TESTS_RUN: Skip creation when SDD_ROOT already exists"
+echo "Test $TESTS_RUN: Create directories even when SDD_ROOT already exists (idempotent)"
 test_sdd_root="$TEST_DIR/test4_sdd"
 mkdir -p "$test_sdd_root"
-# Create marker file to verify directory wasn't modified
+# Create marker file to verify existing content is preserved
 echo "marker" > "$test_sdd_root/marker.txt"
 set +e
 SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
 exit_code=$?
 set -e
-# When SDD_ROOT exists, hook should skip directory creation
-if [[ $exit_code -eq 0 ]] && [ -f "$test_sdd_root/marker.txt" ] && [ ! -d "$test_sdd_root/epics" ]; then
+# Directory creation is now unconditional; existing content should be preserved
+if [[ $exit_code -eq 0 ]] && [ -f "$test_sdd_root/marker.txt" ] && verify_dirs "$test_sdd_root"; then
     pass
 else
-    fail "Hook modified existing SDD_ROOT (should skip when directory exists)"
+    fail "Hook should create directories in existing SDD_ROOT while preserving existing content"
+fi
+
+# Test 5 (was): Upgrade path - existing SDD_ROOT without spec/ gets spec/ created
+TESTS_RUN=$((TESTS_RUN + 1))
+echo "Test $TESTS_RUN: Upgrade path - existing SDD_ROOT without spec/ gets spec/ created"
+test_sdd_root="$TEST_DIR/test_upgrade_sdd"
+# Create all 8 original directories (simulating a pre-LIVESPEC installation)
+for dir in epics tickets archive/tickets archive/epics reference research scratchpad logs; do
+    mkdir -p "$test_sdd_root/$dir"
+done
+# Verify spec/ does NOT exist yet
+if [ -d "$test_sdd_root/spec" ]; then
+    fail "spec/ should not exist before upgrade test runs"
+else
+    set +e
+    SDD_ROOT_DIR="$test_sdd_root" node "$HOOK_PATH" > /dev/null 2>&1
+    exit_code=$?
+    set -e
+    # Assert spec/ now exists
+    if [ ! -d "$test_sdd_root/spec" ]; then
+        fail "spec/ was not created during upgrade path"
+    # Assert all pre-existing directories still exist
+    elif ! verify_dirs "$test_sdd_root"; then
+        fail "Pre-existing directories were lost during upgrade"
+    elif [[ $exit_code -ne 0 ]]; then
+        fail "Hook exited with non-zero code ($exit_code)"
+    else
+        pass
+    fi
 fi
 
 echo ""
