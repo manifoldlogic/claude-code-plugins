@@ -652,6 +652,8 @@ This step ensures that only completed, merged work progresses to spec extraction
    ```bash
    git branch --merged ${DEFAULT_BRANCH} | grep {ticket-branch}
    ```
+   Where `{ticket-branch}` is the git branch name for this ticket (often the same as `{TICKET_ID}` in lowercase, or the branch you were working on — check with `git branch` if unsure).
+
    This catches cases where the ticket ID does not appear in commit messages.
 
 6. **Evaluate results — either check passing means the work is merged:**
