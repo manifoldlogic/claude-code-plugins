@@ -163,6 +163,9 @@ test_validate_ssh_host_success() {
 
 ##############################################################################
 # 6. validate_cmux() not installed
+# Note: validate_cmux() only checks binary existence (test -x CMUX_BIN via SSH).
+# It does NOT check whether the cmux daemon is running. Daemon running state
+# is verified separately in cmux-check.sh check 5 (cmux ping -> PONG).
 ##############################################################################
 
 test_validate_cmux_not_installed() {
