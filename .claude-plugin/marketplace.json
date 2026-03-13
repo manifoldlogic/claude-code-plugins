@@ -60,6 +60,11 @@
       "name": "rust-analyzer-lsp",
       "source": "./plugins/rust-analyzer-lsp",
       "description": "Rust language server integration via rust-analyzer for code intelligence, diagnostics, and navigation"
+    },
+    {
+      "name": "cmux",
+      "source": "./plugins/cmux",
+      "description": "cmux terminal management for macOS host via SSH from devcontainers"
     }
   ]
 }
