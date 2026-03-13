@@ -314,6 +314,13 @@ For comprehensive diagnostics, run `cmux-check.sh` which validates all five prer
 
 ## Issue #373 Reference
 
-cmux CLI has an upstream limitation (Issue #373): the CLI does not work when invoked from SSH remote sessions. Commands fail with "Access denied" even when socketControlMode is configured, because the CLI was designed to be called from processes running directly inside cmux.
+Two distinct issues affect cmux CLI usage from devcontainers. They are independent and require separate fixes:
 
-The workaround adopted by this plugin is to SSH from the devcontainer to the macOS host and execute the cmux binary there. From the host's perspective, the SSH session originates locally, so cmux accepts the connection (provided socketControlMode is set to `allowAll`). This SSH-wrapping pattern is the foundation of all cmux operations in this plugin and is encapsulated by the `cmux-ssh.sh` helper script.
+1. **"Access denied" error** -- caused by socketControlMode not being set to `allowAll`. By default, cmux's socket mode blocks connections from processes that did not originate inside cmux. Setting `socketControlMode` to `allowAll` resolves this error, allowing the macOS host's SSH daemon to connect to the cmux socket:
+   ```bash
+   defaults write com.cmuxterm.app socketControlMode -string allowAll
+   ```
+
+2. **Issue #373 (separate limitation)** -- the cmux CLI does not work when invoked from SSH remote sessions, even with socketControlMode correctly configured. The CLI was designed to be called from processes running directly on the host, not from within remote sessions. This is an upstream limitation unrelated to socket permissions.
+
+This plugin's SSH-to-host pattern resolves both issues together. By SSHing from the devcontainer to the macOS host and executing the cmux binary there, the CLI runs directly on the host (satisfying Issue #373), and with socketControlMode set to `allowAll`, the SSH session is permitted to connect to the cmux socket (resolving the "Access denied" error). This SSH-wrapping pattern is the foundation of all cmux operations in this plugin and is encapsulated by the `cmux-ssh.sh` helper script.
