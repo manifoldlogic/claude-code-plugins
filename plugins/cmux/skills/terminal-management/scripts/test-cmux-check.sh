@@ -376,6 +376,27 @@ test_quiet_mode_failure() {
 }
 
 ##############################################################################
+# 11. HOST_USER not set - stdout is clean (diagnostics go to stderr)
+##############################################################################
+
+test_host_user_not_set_stdout_clean() {
+    echo ""
+    echo "--- HOST_USER Not Set: stdout Clean ---"
+
+    local exit_code=0
+    local stdout_only=""
+    stdout_only=$(
+        HOST_USER="" bash "$SCRIPT_DIR/cmux-check.sh" 2>/dev/null
+    ) || exit_code=$?
+
+    if [ -z "$stdout_only" ]; then
+        pass "HOST_USER not set produces no stdout"
+    else
+        fail "HOST_USER not set produces no stdout" "got stdout: $stdout_only"
+    fi
+}
+
+##############################################################################
 # Main
 ##############################################################################
 
@@ -395,6 +416,7 @@ main() {
     test_partial_failure
     test_quiet_mode_success
     test_quiet_mode_failure
+    test_host_user_not_set_stdout_clean
 
     echo ""
     echo "========================================"
