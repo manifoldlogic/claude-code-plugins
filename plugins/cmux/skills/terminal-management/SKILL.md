@@ -184,7 +184,7 @@ cmux-ssh.sh --dry-run send --workspace workspace:1 "it's a test"
 | `--dry-run` | Print the SSH command without executing it |
 | `-h`, `--help` | Print usage information and exit |
 
-The `--dry-run` flag is useful for debugging SSH command construction and verifying argument escaping before execution.
+The `--dry-run` flag is useful for debugging SSH command construction and verifying argument escaping before execution. Its output is for inspection only -- do not copy-paste it into a shell, as the escaping is optimized for SSH transport and may not work in a local context. Always use `cmux-ssh.sh` directly to execute commands.
 
 ## Decision Tree
 
