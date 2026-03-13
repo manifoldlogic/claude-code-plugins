@@ -35,6 +35,7 @@ set -euo pipefail
 ##############################################################################
 
 readonly CMUX_BIN="${CMUX_BIN_OVERRIDE:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
+readonly CMUX_PING_RESPONSE="PONG"
 
 ##############################################################################
 # Output Functions (all write to stderr with [cmux] prefix)

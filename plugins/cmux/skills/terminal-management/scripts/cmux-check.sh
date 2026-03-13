@@ -114,7 +114,7 @@ if [ "$all_passed" = true ]; then
         "${HOST_USER}@host.docker.internal" \
         "'${CMUX_BIN}' ping" 2>/dev/null) || true
 
-    if [ "$ping_result" = "PONG" ]; then
+    if [ "$ping_result" = "$CMUX_PING_RESPONSE" ]; then
         check_pass "cmux daemon is running"
     else
         check_fail "cmux daemon is not running"
