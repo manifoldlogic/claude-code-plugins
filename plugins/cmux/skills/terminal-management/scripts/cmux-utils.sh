@@ -26,6 +26,7 @@
 #
 # ENVIRONMENT VARIABLES:
 #   HOST_USER - macOS host username (required for container mode)
+#   CMUX_BIN_OVERRIDE - Override default cmux binary path (optional)
 
 set -euo pipefail
 
@@ -33,7 +34,7 @@ set -euo pipefail
 # Constants
 ##############################################################################
 
-readonly CMUX_BIN="/Applications/cmux.app/Contents/Resources/bin/cmux"
+readonly CMUX_BIN="${CMUX_BIN_OVERRIDE:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
 
 ##############################################################################
 # Output Functions (all write to stderr with [cmux] prefix)

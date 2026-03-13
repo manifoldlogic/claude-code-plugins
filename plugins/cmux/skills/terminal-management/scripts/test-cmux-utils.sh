@@ -335,6 +335,7 @@ test_cmux_bin_constant() {
 
     local cmux_bin_value=""
     cmux_bin_value=$(
+        unset CMUX_BIN_OVERRIDE
         source "$SCRIPT_DIR/cmux-utils.sh" 2>/dev/null
         echo "$CMUX_BIN"
     )

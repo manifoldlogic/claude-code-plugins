@@ -272,7 +272,19 @@ $SSH "$CMUX list-workspaces"
 cmux-ssh.sh list-workspaces
 ```
 
-## CMUX_WORKSPACE_ID and CMUX_SURFACE_ID
+## Environment Variables
+
+### CMUX_BIN_OVERRIDE
+
+Set `CMUX_BIN_OVERRIDE` to use a custom cmux binary path instead of the default `/Applications/cmux.app/Contents/Resources/bin/cmux`. This is useful when cmux is installed in a non-standard location (e.g., Homebrew, custom builds, or Linux hosts).
+
+```bash
+export CMUX_BIN_OVERRIDE="/usr/local/bin/cmux"
+```
+
+When set, all scripts (`cmux-utils.sh`, `cmux-ssh.sh`, `cmux-check.sh`) will use this path instead of the default.
+
+### CMUX_WORKSPACE_ID and CMUX_SURFACE_ID
 
 cmux sets the environment variables `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` in shells running directly inside cmux on the macOS host. These variables identify which workspace and surface the shell belongs to.
 

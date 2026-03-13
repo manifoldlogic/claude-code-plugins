@@ -39,6 +39,22 @@ defaults write com.cmuxterm.app socketControlMode -string allowAll
 # Open cmux → Settings → Socket Access Mode → "Allow All"
 ```
 
+### CMUX_BIN_OVERRIDE (optional)
+
+Override the default cmux binary path (`/Applications/cmux.app/Contents/Resources/bin/cmux`) when cmux is installed in a non-standard location:
+
+```bash
+export CMUX_BIN_OVERRIDE="/usr/local/bin/cmux"
+```
+
+Or set it in `devcontainer.json`:
+
+```json
+"remoteEnv": {
+  "CMUX_BIN_OVERRIDE": "/usr/local/bin/cmux"
+}
+```
+
 ### HOST_USER
 
 The `HOST_USER` environment variable tells the plugin which macOS user account to SSH into. Add it to your `devcontainer.json`:
