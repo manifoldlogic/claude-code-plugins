@@ -1,0 +1,5 @@
+{
+  "name": "cmux",
+  "version": "0.1.0",
+  "description": "cmux terminal management for macOS host via SSH from devcontainers"
+}
