@@ -196,7 +196,7 @@ The `--dry-run` flag is useful for debugging SSH command construction and verify
 | "Open a devcontainer in a new workspace" | See Scenario 3 in Common Scenarios below |
 | "Check if cmux is working" | Run `cmux-check.sh` (checks socketControlMode and connectivity) |
 | "Verify a command ran correctly" | `cmux-ssh.sh read-screen --workspace workspace:N --lines 20` |
-| "I don't know the cmux command for X" | `cmux-ssh.sh -- --help` to see CLI reference |
+| "I don't know the cmux command for X" | `$SSH "$CMUX --help"` to see CLI reference (see Command Reference) |
 | "cmux says 'Access denied'" | Fix socketControlMode: `defaults write com.cmuxterm.app socketControlMode -string allowAll` |
 | "Rename a workspace" | `cmux-ssh.sh rename-workspace --workspace workspace:N 'New Name'` |
 | "Close a workspace" | `cmux-ssh.sh close-workspace --workspace workspace:N` |
