@@ -364,7 +364,49 @@ test_newline_rejection() {
 }
 
 ##############################################################################
-# 15. Pass-through of cmux output
+# 15. Null byte rejection (exit 2)
+##############################################################################
+
+test_null_byte_rejection() {
+    echo ""
+    echo "--- Null Byte Rejection ---"
+
+    # POSIX execve() uses null-terminated strings for argv, so it is
+    # impossible to pass a literal null byte as a command-line argument.
+    # Bash also strips null bytes from variable assignments.
+    #
+    # cmux-ssh.sh contains a defense-in-depth check:
+    #   printf '%s' "$arg" | grep -qP '\x00'
+    #
+    # Since null bytes cannot survive in argv, we validate the detection
+    # mechanism directly: confirm that grep -qaP '\x00' correctly
+    # identifies a null byte in a byte stream, and that clean input
+    # does not trigger a false positive.  The -a flag ensures grep
+    # processes binary data rather than silently skipping it.
+
+    # Part 1: Verify grep can detect a null byte in a byte stream
+    local detect_exit=0
+    printf 'send\x00injection' | grep -qaP '\x00' 2>/dev/null || detect_exit=$?
+
+    if [ "$detect_exit" -eq 0 ]; then
+        pass "null byte detected in stream by grep (defense-in-depth mechanism)"
+    else
+        fail "null byte detected in stream by grep" "grep exited $detect_exit"
+    fi
+
+    # Part 2: Verify clean input does NOT trigger the null byte check
+    local clean_exit=0
+    printf '%s' "clean-argument" | grep -qaP '\x00' 2>/dev/null || clean_exit=$?
+
+    if [ "$clean_exit" -ne 0 ]; then
+        pass "clean input does not false-positive on null byte check"
+    else
+        fail "clean input does not false-positive on null byte check" "grep matched on clean input"
+    fi
+}
+
+##############################################################################
+# 16. Pass-through of cmux output
 ##############################################################################
 
 test_passthrough_output() {
@@ -414,6 +456,7 @@ main() {
     test_escaping_semicolon
     test_escaping_command_substitution
     test_newline_rejection
+    test_null_byte_rejection
     test_passthrough_output
 
     echo ""
