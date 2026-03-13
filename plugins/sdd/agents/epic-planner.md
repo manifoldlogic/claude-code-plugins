@@ -50,6 +50,26 @@ You work within this structure:
 ### Phase 1: Research & Discovery
 
 1. **Understand the Vision**: Read overview.md to understand intent
+
+#### Step 1.5: Spec Consultation
+
+**Purpose**: Understand what has been established in the project specification before exploring the problem space
+
+Before gathering broader context, check for an existing project specification that captures accumulated domain requirements.
+
+1. **List spec files**: Run `ls ${SDD_ROOT_DIR}/spec/*.md`
+2. **If spec files exist**:
+   - Read ALL spec domain files (do not selectively choose — read every file to avoid missing requirements in files with unexpected names)
+   - Note established requirements that the epic should respect
+   - Identify areas where the epic may extend or modify existing spec requirements
+   - Use spec knowledge as domain awareness to inform research direction and scope boundaries
+3. **If no spec files exist** (the `ls` command returns nothing):
+   - Proceed without error — this is expected for new projects or early-stage work
+4. **If spec files exist but none are relevant** to this epic:
+   - Proceed normally — do NOT force artificial connections
+
+**Scale assumption**: The spec directory is expected to contain 10-50 files, each under 500 lines. Reading all files is practical and intentional.
+
 2. **Gather Context**: Search codebase for related implementations
 3. **Research Externally**: Look for industry solutions and patterns
 4. **Collect Reference Materials**: Document sources in reference/

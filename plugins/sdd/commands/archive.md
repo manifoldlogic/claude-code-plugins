@@ -615,7 +615,127 @@ echo "Archive may proceed."
 | Invalid path characters | Rejected with specific error message |
 | Path traversal attempt | Rejected: "Path traversal not allowed" |
 
-<!-- Step 5.6 (Skill Curation Opportunity) removed in RMSKILL ticket -->
+### Step 5.6: Merge Verification
+
+**VALIDATION: Verify the ticket's work has been merged to the default branch before proceeding.**
+
+This step ensures that only completed, merged work progresses to spec extraction. Unmerged or abandoned work must not contribute requirements to the project spec.
+
+1. Check if the current directory is a git repository:
+   ```bash
+   git rev-parse --git-dir 2>/dev/null
+   ```
+   If this command fails, the current directory is not a git repository. Warn the user:
+   > "WARNING: Not inside a git repository. Cannot verify merge status for {TICKET_ID}."
+
+   Ask the user for confirmation to proceed without merge verification. If they decline, cancel the archive operation.
+
+2. Detect detached HEAD state:
+   ```bash
+   git symbolic-ref --quiet HEAD
+   ```
+   If this command exits with a non-zero status, the repository is in a detached HEAD state. Treat this as "cannot determine merge status" and skip directly to sub-step 6 (user prompt).
+
+3. Determine the default branch:
+   ```bash
+   DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+   ```
+   If `DEFAULT_BRANCH` is empty or the command fails, fall back to `"main"`.
+
+4. Run the primary merge check — search commit messages on the default branch for the ticket ID being archived:
+   ```bash
+   git log ${DEFAULT_BRANCH} --oneline --grep="{TICKET_ID}" | grep -q .
+   ```
+   This check survives squash merges and deleted branches because it searches commit message history rather than branch state.
+
+   > **Note:** `--grep` performs a substring match, so a ticket ID like `AUTH` could match commits containing `AUTHENTICATION`. In practice this is acceptable because SDD ticket IDs use structured uppercase identifiers (e.g., `AUTH-001`, `LIVESPEC.4007`) that are unlikely to appear as substrings in unrelated commit messages. If false positives are suspected, manually inspect the `git log` output before proceeding.
+
+5. If the primary check fails, run the fallback merge check — look for the ticket branch in branches merged to the default branch:
+   ```bash
+   git branch --merged ${DEFAULT_BRANCH} | grep {ticket-branch}
+   ```
+   Where `{ticket-branch}` is the git branch name for this ticket (often the same as `{TICKET_ID}` in lowercase, or the branch you were working on — check with `git branch` if unsure).
+
+   This catches cases where the ticket ID does not appear in commit messages.
+
+6. **Evaluate results — either check passing means the work is merged:**
+   - If **either** the primary check (sub-step 4) or the fallback check (sub-step 5) passes, the work is considered merged. Proceed to the next step.
+   - If **neither** check passes, present the user with the following prompt:
+
+   > "Could not confirm that {TICKET_ID} has been merged to {DEFAULT_BRANCH}. How would you like to proceed?"
+   >
+   > **(a)** Work is merged via squash merge or different branch name — proceed to spec extraction
+   > **(b)** Archive as abandoned/cancelled — skip spec extraction and proceed to Step 6
+   > **(c)** Cancel the archive operation
+
+   If the user selects **(a)**, proceed to the next step normally.
+
+   If the user selects **(b)**, note the abandoned/cancelled disposition so that the spec extraction step (Step 5.7) is skipped, and proceed directly to Step 6.
+
+   If the user selects **(c)**, stop the archive operation immediately.
+
+### Step 5.7: Spec Extraction
+
+**PURPOSE: Extract specification-worthy requirements from the ticket's planning documents into domain-organized spec files.**
+
+If the archive disposition from Step 5.6 is "abandoned/cancelled" (the user selected option **(b)**), **skip this step entirely** and proceed directly to Step 6.
+
+1. **List existing spec files** to avoid creating duplicates with synonymous names:
+   ```bash
+   ls ${SDD_ROOT_DIR}/spec/*.md 2>/dev/null
+   ```
+   If the command returns no results (directory does not exist or is empty), note that no spec files exist yet and proceed. If the `spec/` directory itself does not exist, skip this step gracefully — the spec infrastructure may not be deployed in this environment.
+
+2. **Read the ticket's planning documents** to identify specification-worthy requirements:
+   - `${SDD_ROOT_DIR}/tickets/${TICKET_ID}_*/planning/analysis.md`
+   - `${SDD_ROOT_DIR}/tickets/${TICKET_ID}_*/planning/architecture.md`
+   - `${SDD_ROOT_DIR}/tickets/${TICKET_ID}_*/planning/prd.md`
+   - `${SDD_ROOT_DIR}/tickets/${TICKET_ID}_*/planning/plan.md`
+   - All completed task files in `${SDD_ROOT_DIR}/tickets/${TICKET_ID}_*/tasks/*.md`
+
+   If planning documents contain minimal or no substantive content, write minimal or no requirements rather than inventing them. Only extract requirements that are clearly stated or strongly implied by the planning documents.
+
+3. **Identify requirements** that belong in the project specification. Apply these quality criteria:
+   - Requirements MUST be concrete and minimal — no vague or aspirational statements
+   - Use the strongest applicable requirement level (prefer MUST over SHOULD when the requirement is truly mandatory)
+   - Each requirement SHOULD be a single, testable statement
+   - Requirements MUST include the source ticket ID — omitting `[Source: {TICKET_ID}]` is an error
+   - Avoid implementation details — capture WHAT the system must do, not HOW it does it
+   - If modifying an existing requirement, UPDATE the existing statement and add the new ticket as an additional source
+
+4. **Write requirements using the exact format:**
+   ```
+   - The system MUST/SHOULD/MAY {requirement}. [Source: {TICKET_ID}]
+   ```
+
+   Example of a well-formed requirement:
+   ```
+   - The system MUST validate all user inputs before processing. [Source: INPUT-001]
+   ```
+
+   Source annotation is mandatory. Every requirement MUST end with `[Source: {TICKET_ID}]` where `{TICKET_ID}` is the ticket being archived. Omitting the source annotation is an error.
+
+5. **Determine the domain** for each requirement and match it to an existing spec file from the list obtained in sub-step 1:
+   - **Prefer extending an existing file** over creating a new one. If a file with a semantically equivalent name already exists (e.g., `auth.md` vs `authentication.md`), use the existing file rather than creating a new one.
+   - Group related requirements under a single domain when possible.
+
+6. **Update or create domain spec files:**
+
+   **If the domain file already exists:**
+   - Read the existing file to find the most appropriate section for the new requirements.
+   - Append the requirements to that section.
+   - If no existing section fits, add a new subsection at the end of the file before any closing content.
+
+   **If creating a new domain file** (`${SDD_ROOT_DIR}/spec/{domain}.md`):
+   - Add the heading: `# {Domain Name} Specification`
+   - Add the RFC 2119 boilerplate immediately after the heading:
+     ```
+     The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+     "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
+     interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
+     ```
+   - Add a section heading appropriate to the requirements (e.g., `## Input Validation`)
+   - Add the requirements in the format specified in sub-step 4.
 
 ### Step 6: Archive
 
@@ -643,6 +763,8 @@ SDD_ROOT="${SDD_ROOT_DIR:-/app/.sdd}"
 mkdir -p "$SDD_ROOT/logs"
 echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")|TICKET_ARCHIVED|{TICKET_ID}|-|archive|Completed, {X}/{X} tasks verified" >> "$SDD_ROOT/logs/workflow.log"
 ```
+
+Include in the log entry's description which spec files were created or modified during Step 5.7 (Spec Extraction), or note "no spec files extracted" if the step was skipped or produced no changes. This ensures the archive audit trail captures the spec extraction outcome for future traceability.
 
 ### Step 9: Collect Metrics
 

@@ -71,6 +71,25 @@ Before writing any documents:
 3. **Check Existing Patterns**: How are similar things done?
 4. **Identify Constraints**: What limits exist?
 
+### Step 2.5: Spec Consultation
+
+**Purpose**: Incorporate existing project specification requirements into planning
+
+Before writing any documents, check for an existing project specification that may contain requirements relevant to this ticket.
+
+1. **List spec files**: Run `ls ${SDD_ROOT_DIR}/spec/*.md`
+2. **If spec files exist**:
+   - Read ALL spec domain files (do not selectively choose — read every file to avoid missing requirements in files with unexpected names)
+   - Note existing requirements that relate to the current ticket's scope
+   - Identify potential conflicts between the ticket scope and existing requirements
+   - Reference relevant spec requirements in analysis.md (by section name or requirement statement)
+3. **If no spec files exist** (the `ls` command returns nothing):
+   - Note "No existing specification found" and proceed — this is expected for new projects
+4. **If spec files exist but none are relevant** to this ticket:
+   - Note "No relevant existing requirements found" and proceed — do NOT force artificial references
+
+**Scale assumption**: The spec directory is expected to contain 10-50 files, each under 500 lines. Reading all files is practical and intentional.
+
 ### Step 3: Analysis Document
 
 **Purpose**: Deep understanding of the problem

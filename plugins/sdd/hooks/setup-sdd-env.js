@@ -9,28 +9,27 @@
  * 4. Detect active tickets and set CLAUDE_TASK_LIST_ID (Tasks API integration)
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const SDD_ROOT = process.env.SDD_ROOT_DIR || '/app/.sdd';
+const SDD_ROOT = process.env.SDD_ROOT_DIR || "/app/.sdd";
 
 // Directories to create under SDD_ROOT
 const directories = [
-  'epics',
-  'tickets',
-  'archive/tickets',
-  'archive/epics',
-  'reference',
-  'research',
-  'scratchpad',
-  'logs'
+  "epics",
+  "tickets",
+  "archive/tickets",
+  "archive/epics",
+  "reference",
+  "research",
+  "scratchpad",
+  "logs",
+  "spec",
 ];
 
-// Create directory structure if not exists
-if (!fs.existsSync(SDD_ROOT)) {
-  for (const dir of directories) {
-    fs.mkdirSync(path.join(SDD_ROOT, dir), { recursive: true });
-  }
+// Create directory structure (idempotent - recursive:true is safe on existing dirs)
+for (const dir of directories) {
+  fs.mkdirSync(path.join(SDD_ROOT, dir), { recursive: true });
 }
 
 // Copy reference template if plugin root available and template doesn't exist
@@ -38,9 +37,9 @@ const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
 if (pluginRoot) {
   const templateSrc = path.join(
     pluginRoot,
-    'skills/project-workflow/templates/ticket/task-template.md'
+    "skills/project-workflow/templates/ticket/task-template.md",
   );
-  const templateDest = path.join(SDD_ROOT, 'reference/work-task-template.md');
+  const templateDest = path.join(SDD_ROOT, "reference/work-task-template.md");
 
   try {
     if (fs.existsSync(templateSrc) && !fs.existsSync(templateDest)) {
@@ -48,6 +47,21 @@ if (pluginRoot) {
     }
   } catch {
     // Silently ignore copy errors (matches bash behavior)
+  }
+
+  // Copy spec README template if it exists and destination doesn't
+  const specReadmeSrc = path.join(
+    pluginRoot,
+    "skills/project-workflow/templates/spec-readme.md",
+  );
+  const specReadmeDest = path.join(SDD_ROOT, "spec/README.md");
+
+  try {
+    if (fs.existsSync(specReadmeSrc) && !fs.existsSync(specReadmeDest)) {
+      fs.copyFileSync(specReadmeSrc, specReadmeDest);
+    }
+  } catch {
+    // Silently ignore copy errors - template may not exist in all environments
   }
 }
 
@@ -74,7 +88,7 @@ if (envFile && !process.env.SDD_ROOT_DIR) {
  * @returns {string|null} - Ticket ID if found, null otherwise
  */
 function detectTicketFromSessionState(sddRoot) {
-  const stateDir = path.join(sddRoot, '.sdd-session-states');
+  const stateDir = path.join(sddRoot, ".sdd-session-states");
 
   if (!fs.existsSync(stateDir)) {
     return null;
@@ -82,19 +96,19 @@ function detectTicketFromSessionState(sddRoot) {
 
   try {
     const files = fs.readdirSync(stateDir);
-    const jsonFiles = files.filter((f) => f.endsWith('.json'));
+    const jsonFiles = files.filter((f) => f.endsWith(".json"));
 
     // Check each session state file for ticket_id
     for (const file of jsonFiles) {
       const filePath = path.join(stateDir, file);
       try {
-        const content = fs.readFileSync(filePath, 'utf8');
+        const content = fs.readFileSync(filePath, "utf8");
         const data = JSON.parse(content);
 
         // Validate session state has ticket_id
-        if (data && typeof data.ticket_id === 'string' && data.ticket_id) {
+        if (data && typeof data.ticket_id === "string" && data.ticket_id) {
           // Extract just the ticket prefix (e.g., "TASKINT" from "TASKINT_description")
-          const ticketId = data.ticket_id.split('_')[0];
+          const ticketId = data.ticket_id.split("_")[0];
           return ticketId;
         }
       } catch {
@@ -113,7 +127,8 @@ function detectTicketFromSessionState(sddRoot) {
  * Pattern to match unchecked "Task completed" checkbox in task files.
  * Matches: - [ ] **Task completed** or - [ ] Task completed
  */
-const TASK_INCOMPLETE_PATTERN = /^[\s]*-\s*\[\s\]\s*\*{0,2}Task completed\*{0,2}/m;
+const TASK_INCOMPLETE_PATTERN =
+  /^[\s]*-\s*\[\s\]\s*\*{0,2}Task completed\*{0,2}/m;
 
 /**
  * Detect active ticket by scanning tickets directory for uncompleted tasks.
@@ -123,7 +138,7 @@ const TASK_INCOMPLETE_PATTERN = /^[\s]*-\s*\[\s\]\s*\*{0,2}Task completed\*{0,2}
  * @returns {string|null} - Ticket ID if found, null otherwise
  */
 function detectTicketFromTaskFiles(sddRoot) {
-  const ticketsDir = path.join(sddRoot, 'tickets');
+  const ticketsDir = path.join(sddRoot, "tickets");
 
   if (!fs.existsSync(ticketsDir)) {
     return null;
@@ -133,7 +148,7 @@ function detectTicketFromTaskFiles(sddRoot) {
     const ticketDirs = fs.readdirSync(ticketsDir);
 
     for (const ticketDir of ticketDirs) {
-      const tasksDir = path.join(ticketsDir, ticketDir, 'tasks');
+      const tasksDir = path.join(ticketsDir, ticketDir, "tasks");
 
       if (!fs.existsSync(tasksDir) || !fs.statSync(tasksDir).isDirectory()) {
         continue;
@@ -142,18 +157,18 @@ function detectTicketFromTaskFiles(sddRoot) {
       try {
         const taskFiles = fs.readdirSync(tasksDir);
         const mdFiles = taskFiles.filter(
-          (f) => f.endsWith('.md') && !f.includes('_INDEX')
+          (f) => f.endsWith(".md") && !f.includes("_INDEX"),
         );
 
         for (const taskFile of mdFiles) {
           const taskPath = path.join(tasksDir, taskFile);
           try {
-            const content = fs.readFileSync(taskPath, 'utf8');
+            const content = fs.readFileSync(taskPath, "utf8");
 
             // Check if task has unchecked "Task completed" checkbox
             if (TASK_INCOMPLETE_PATTERN.test(content)) {
               // Extract ticket ID prefix (e.g., "TASKINT" from "TASKINT_description")
-              const ticketId = ticketDir.split('_')[0];
+              const ticketId = ticketDir.split("_")[0];
               return ticketId;
             }
           } catch {
@@ -195,7 +210,7 @@ function detectActiveTicket(sddRoot) {
 
 // Only set CLAUDE_TASK_LIST_ID if SDD_TASKS_API_ENABLED is not 'false'
 // (default is enabled)
-if (process.env.SDD_TASKS_API_ENABLED !== 'false') {
+if (process.env.SDD_TASKS_API_ENABLED !== "false") {
   try {
     const activeTicket = detectActiveTicket(SDD_ROOT);
 
@@ -203,7 +218,7 @@ if (process.env.SDD_TASKS_API_ENABLED !== 'false') {
       try {
         fs.appendFileSync(
           envFile,
-          `export CLAUDE_TASK_LIST_ID="${activeTicket}"\n`
+          `export CLAUDE_TASK_LIST_ID="${activeTicket}"\n`,
         );
       } catch {
         // Silently ignore if we can't write to env file
