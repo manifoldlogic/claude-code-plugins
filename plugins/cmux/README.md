@@ -69,7 +69,7 @@ Then rebuild the container: F1 > "Dev Containers: Rebuild Container"
 
 ## Verify Setup
 
-Run the `cmux-check.sh` script to confirm all prerequisites are met:
+Run the `cmux-check.sh` script from the repository root to confirm all prerequisites are met:
 
 ```bash
 bash plugins/cmux/skills/terminal-management/scripts/cmux-check.sh
