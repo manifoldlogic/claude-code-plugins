@@ -7,7 +7,7 @@ argument-hint: [worktree-name or empty to auto-detect]
 
 ## Context
 
-This command merges a completed worktree back to the base branch (default: main) and tears down the associated environment. The full workflow includes PR status verification, main branch sync, merge via CrewChief CLI, VS Code workspace folder removal, and iTerm tab closure.
+This command merges a completed worktree back to the base branch (default: main) and tears down the associated environment. The full workflow includes PR status verification, main branch sync, merge via CrewChief CLI, and VS Code workspace folder removal.
 
 User input: $ARGUMENTS (optional worktree name; if empty, merge-worktree.sh auto-detects from the current working directory)
 
@@ -70,7 +70,7 @@ Run the constructed command and capture the exit code.
 
 Handle the exit code from merge-worktree.sh:
 
-- **Exit 0 -- Success:** Report that the worktree was merged, the workspace was updated, and the tab was closed. Summarize the script output.
+- **Exit 0 -- Success:** Report that the worktree was merged and the workspace was updated. Summarize the script output.
 
 - **Exit 7 -- Merge failed:** Report that the merge failed. Explain that the worktree remains intact for manual conflict resolution. Suggest:
   - Navigate to the main worktree and run `git merge --continue` after resolving conflicts
@@ -79,8 +79,6 @@ Handle the exit code from merge-worktree.sh:
 - **Exit 8 -- PR check blocked:** Report that a PR for this branch is still OPEN. Suggest:
   - Close or merge the PR on GitHub first, then retry
   - Or re-run with `--skip-pr-check` to bypass PR verification
-
-- **Exit 10 -- Success with warnings:** Report that the merge succeeded but some cleanup operations failed (e.g., workspace removal or tab close). List the warnings from the script output and suggest manual cleanup if needed.
 
 - **Other exit codes:** Report the error with the exit code. Direct the user to the SKILL.md exit code table for troubleshooting:
   - Exit 2: Missing prerequisites (crewchief CLI not installed)
