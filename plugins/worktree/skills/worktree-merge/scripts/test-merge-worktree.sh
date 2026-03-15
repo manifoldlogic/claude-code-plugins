@@ -8,8 +8,8 @@
 #   - CWD auto-detection logic (valid worktree paths, main worktree rejection, non-workspace paths)
 #   - Help flag output
 #   - Dry-run output
-#   - Exit codes (all documented codes 0-10)
-#   - Flag combinations (--skip-pr-check, --skip-workspace, --skip-tab-close, --yes, --verbose)
+#   - Exit codes (all documented codes 0-9)
+#   - Flag combinations (--skip-pr-check, --skip-workspace, --yes, --verbose)
 #   - Integration tests with mocked dependencies
 #
 # USAGE:
@@ -183,15 +183,6 @@ exit 0
 MOCKEOF
     chmod +x "$TEST_TMP/mock-bin/workspace-folder.sh"
 
-    # Create mock iterm-close-tab.sh
-    mkdir -p "$TEST_TMP/mock-iterm/skills/tab-management/scripts"
-    cat > "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh" << 'MOCKEOF'
-#!/bin/sh
-echo "MOCK_ITERM_CLOSE_TAB: $*" >> "${MOCK_LOG:-/dev/null}"
-exit 0
-MOCKEOF
-    chmod +x "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh"
-
     # Create mock log file
     touch "$TEST_TMP/mock.log"
 }
@@ -214,7 +205,6 @@ run_script() {
     LAST_OUTPUT=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" "$@" 2>&1
     ) || LAST_EXIT=$?
     debug_msg "run_script exit=$LAST_EXIT args='$*'"
@@ -235,7 +225,6 @@ run_script_in_dir() {
         cd "$work_dir" && \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" "$@" 2>&1
     ) || LAST_EXIT=$?
     debug_msg "run_script_in_dir dir=$work_dir exit=$LAST_EXIT args='$*'"
@@ -413,7 +402,6 @@ run_cwd_detection_tests() {
         cd "$test_repo_base/feature-branch" && \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "auto-detect from worktree dir exits 0 (dry-run)"
@@ -426,7 +414,6 @@ run_cwd_detection_tests() {
         cd "$test_repo_base/feature-branch/src/deep/dir" && \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "auto-detect from nested path exits 0 (dry-run)"
@@ -457,7 +444,6 @@ run_cwd_detection_tests() {
         cd "/workspace/repos/repo-with-dashes/worktree_underscore_123" && \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "hyphens and underscores in names exits 0 (dry-run)"
@@ -489,7 +475,6 @@ run_dry_run_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" feature-dry --repo "_test_dryrun_$$" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--dry-run exits 0"
@@ -505,7 +490,6 @@ run_dry_run_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" feature-dry --repo "_test_dryrun_$$" --strategy squash --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--dry-run with --strategy squash exits 0"
@@ -516,7 +500,6 @@ run_dry_run_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" feature-dry --repo "_test_dryrun_$$" --skip-pr-check --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--dry-run with --skip-pr-check exits 0"
@@ -528,7 +511,6 @@ run_dry_run_tests() {
         cd "$test_repo/feature-dry" && \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--dry-run with auto-detection exits 0"
@@ -577,7 +559,6 @@ run_exit_code_tests() {
     exit_code=0
     PATH="$TEST_TMP/mock-bin:$PATH" \
     MOCK_LOG="$TEST_TMP/mock.log" \
-    ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
     bash "$SCRIPT_UNDER_TEST" nonexistent-wt --repo "_test_exit4_$$" --yes >/dev/null 2>&1 || exit_code=$?
     assert_exit_code "4" "$exit_code" "exit 4: worktree directory not found"
     rm -rf "$test_repo_4" 2>/dev/null || true
@@ -595,7 +576,6 @@ run_exit_code_tests() {
     exit_code=0
     PATH="$TEST_TMP/mock-bin:$PATH" \
     MOCK_LOG="$TEST_TMP/mock.log" \
-    ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
     bash "$SCRIPT_UNDER_TEST" locked-wt --repo "_test_exit6_$$" --yes >/dev/null 2>&1 || exit_code=$?
     kill "$lock_pid" 2>/dev/null || true
     wait "$lock_pid" 2>/dev/null || true
@@ -618,7 +598,6 @@ MOCKEOF
     MOCK_CREWCHIEF_EXIT=1 \
     PATH="$TEST_TMP/mock-bin:$PATH" \
     MOCK_LOG="$TEST_TMP/mock.log" \
-    ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
     bash "$SCRIPT_UNDER_TEST" fail-wt --repo "_test_exit7_$$" --yes --skip-pr-check >/dev/null 2>&1 || exit_code=$?
     assert_exit_code "7" "$exit_code" "exit 7: merge failed (crewchief error)"
     rm -rf "$test_repo_7" 2>/dev/null || true
@@ -645,7 +624,6 @@ MOCKEOF
     exit_code=0
     PATH="$TEST_TMP/mock-bin:$PATH" \
     MOCK_LOG="$TEST_TMP/mock.log" \
-    ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
     bash "$SCRIPT_UNDER_TEST" pr-open-wt --repo "_test_exit8_$$" --yes >/dev/null 2>&1 || exit_code=$?
     assert_exit_code "8" "$exit_code" "exit 8: PR is OPEN and non-draft"
     rm -rf "$test_repo_8" 2>/dev/null || true
@@ -663,38 +641,8 @@ MOCKEOF
     exit_code=0
     PATH="$TEST_TMP/mock-bin:$PATH" \
     MOCK_LOG="$TEST_TMP/mock.log" \
-    ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
     bash "$SCRIPT_UNDER_TEST" some-wt --repo "nonexistent_repo_$$" --dry-run >/dev/null 2>&1 || exit_code=$?
     assert_exit_code "9" "$exit_code" "exit 9: main worktree not found (dry-run resolves path)"
-
-    # Exit 10: success with warnings (merge ok, cleanup failed)
-    local test_repo_10="/workspace/repos/_test_exit10_$$"
-    mkdir -p "$test_repo_10/_test_exit10_$$" 2>/dev/null || true
-    mkdir -p "$test_repo_10/warn-wt" 2>/dev/null || true
-    # Mock iterm-close-tab.sh to fail
-    cat > "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh" << 'MOCKEOF'
-#!/bin/sh
-exit 1
-MOCKEOF
-    chmod +x "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh"
-    exit_code=0
-    output=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        WORKSPACE_FILE="/nonexistent/path/workspace.code-workspace" \
-        bash "$SCRIPT_UNDER_TEST" warn-wt --repo "_test_exit10_$$" --yes --skip-pr-check --skip-workspace 2>&1
-    ) || exit_code=$?
-    assert_exit_code "10" "$exit_code" "exit 10: success with warnings (tab close failed)"
-    rm -rf "$test_repo_10" 2>/dev/null || true
-
-    # Reset mock iterm-close-tab.sh
-    cat > "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh" << 'MOCKEOF'
-#!/bin/sh
-echo "MOCK_ITERM_CLOSE_TAB: $*" >> "${MOCK_LOG:-/dev/null}"
-exit 0
-MOCKEOF
-    chmod +x "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh"
 
     # Exit 0: full successful merge (all mocks succeed)
     local test_repo_0="/workspace/repos/_test_exit0_$$"
@@ -704,7 +652,6 @@ MOCKEOF
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" ok-wt --repo "_test_exit0_$$" --yes --skip-pr-check --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "exit 0: successful merge with all skips"
@@ -731,7 +678,6 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" --skip-pr-check --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--skip-pr-check with --dry-run exits 0"
@@ -742,30 +688,17 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" --skip-workspace --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--skip-workspace with --dry-run exits 0"
     # Workspace update should be skipped in dry-run output
     assert_contains "$output" "--skip-workspace" "--skip-workspace noted in dry-run"
 
-    # Test: --skip-tab-close disables tab close
-    exit_code=0
-    output=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" --skip-tab-close --dry-run 2>&1
-    ) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "--skip-tab-close with --dry-run exits 0"
-    assert_contains "$output" "--skip-tab-close" "--skip-tab-close noted in dry-run"
-
     # Test: --verbose enables debug output
     exit_code=0
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" --verbose --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--verbose with --dry-run exits 0"
@@ -776,7 +709,6 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" --yes --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "--yes with --dry-run exits 0"
@@ -786,9 +718,8 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" \
-            --skip-pr-check --skip-workspace --skip-tab-close --yes --verbose --dry-run 2>&1
+            --skip-pr-check --skip-workspace --yes --verbose --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "all flags combined with --dry-run exits 0"
     assert_contains "$output" "DRY RUN" "all flags combined shows DRY RUN"
@@ -799,9 +730,8 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" \
-            --skip-pr-check --skip-workspace --skip-tab-close --yes 2>&1
+            --skip-pr-check --skip-workspace --yes 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "all skip flags combined - actual merge exits 0"
     assert_contains "$output" "Worktree Merge Complete" "all skip flags - merge complete"
@@ -811,9 +741,8 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" \
-            -y --skip-pr-check --skip-workspace --skip-tab-close 2>&1
+            -y --skip-pr-check --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "-y short flag works for skip confirmation"
 
@@ -822,7 +751,6 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" -s cherry-pick --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "-s cherry-pick with --dry-run exits 0"
@@ -833,7 +761,6 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt -r "_test_flags_$$" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "-r short flag for repo works"
@@ -844,7 +771,6 @@ run_flag_combination_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" flag-wt --repo "_test_flags_$$" -b develop --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "-b develop with --dry-run exits 0"
@@ -879,8 +805,7 @@ run_integration_tests() {
         cd "$test_repo/integ-wt/src/deep" && \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" --yes --skip-pr-check --skip-workspace --skip-tab-close 2>&1
+        bash "$SCRIPT_UNDER_TEST" --yes --skip-pr-check --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "integration: auto-detect from nested path succeeds"
     assert_contains "$output" "Auto-detected from cwd" "integration: auto-detect message shown"
@@ -892,8 +817,7 @@ run_integration_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --strategy squash --yes --skip-pr-check --skip-workspace --skip-tab-close 2>&1
+        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --strategy squash --yes --skip-pr-check --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "integration: merge with squash strategy succeeds"
     # Check mock log for crewchief invocation
@@ -909,51 +833,18 @@ run_integration_tests() {
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-pr-check --skip-workspace --skip-tab-close 2>&1
+        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-pr-check --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "integration: merge with default ff strategy succeeds"
     mock_log_content=$(cat "$TEST_TMP/mock.log" 2>/dev/null || echo "")
     assert_contains "$mock_log_content" "worktree merge integ-wt" "integration: crewchief receives merge with default strategy"
     assert_not_contains "$mock_log_content" "--strategy" "integration: no --strategy flag for default ff"
 
-    # Test: iterm-close-tab invoked with correct pattern
-    : > "$TEST_TMP/mock.log"
-    cat > "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh" << 'MOCKEOF'
-#!/bin/sh
-echo "MOCK_ITERM_CLOSE_TAB: $*" >> "${MOCK_LOG:-/dev/null}"
-exit 0
-MOCKEOF
-    chmod +x "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh"
-    exit_code=0
-    output=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-pr-check --skip-workspace 2>&1
-    ) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "integration: merge with tab close succeeds"
-    mock_log_content=$(cat "$TEST_TMP/mock.log" 2>/dev/null || echo "")
-    assert_contains "$mock_log_content" "MOCK_ITERM_CLOSE_TAB" "integration: iterm-close-tab was called"
-    # Tab pattern should be "repo worktree"
-    assert_contains "$mock_log_content" "_test_integ_$$ integ-wt" "integration: tab close pattern is 'repo worktree'"
-
-    # Test: tab pattern captured BEFORE cwd change (verified by correct pattern in log)
-    # The tab pattern is "$REPO $WORKTREE_NAME" set before cd to main worktree.
-    # If it were captured after cd, it might be wrong. The pattern check above validates this.
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if printf '%s' "$mock_log_content" | grep -qF "_test_integ_$$ integ-wt"; then
-        pass "integration: tab pattern captured before cwd change (correct pattern)"
-    else
-        fail "integration: tab pattern captured before cwd change" "pattern not found in mock log"
-    fi
-
     # Test: main worktree path validation (neither path exists -> exit 9)
     exit_code=0
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" somewt --repo "totally_nonexistent_$$" --dry-run 2>&1
     ) || exit_code=$?
     assert_exit_code "9" "$exit_code" "integration: nonexistent repo -> exit 9 (main worktree not found)"
@@ -970,7 +861,6 @@ MOCKEOF
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
         bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes 2>&1
     ) || exit_code=$?
     assert_exit_code "8" "$exit_code" "integration: open PR blocks merge (exit 8)"
@@ -995,8 +885,7 @@ MOCKEOF
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-workspace --skip-tab-close 2>&1
+        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "integration: draft PR allows merge (exit 0)"
     assert_contains "$output" "DRAFT" "integration: draft PR noted in output"
@@ -1020,8 +909,7 @@ MOCKEOF
     output=$(
         PATH="$TEST_TMP/mock-bin:$PATH" \
         MOCK_LOG="$TEST_TMP/mock.log" \
-        ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
-        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-workspace --skip-tab-close 2>&1
+        bash "$SCRIPT_UNDER_TEST" integ-wt --repo "_test_integ_$$" --yes --skip-workspace 2>&1
     ) || exit_code=$?
     assert_exit_code "0" "$exit_code" "integration: merged PR allows merge (exit 0)"
 
