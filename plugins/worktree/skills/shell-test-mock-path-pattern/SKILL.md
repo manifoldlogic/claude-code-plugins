@@ -12,7 +12,7 @@ tags: [testing, shell-scripting, mocking, test-pattern, worktree]
 
 This skill documents the pattern for testing shell scripts that invoke external commands (like `crewchief`, `gh`, `jq`, etc.) without requiring those commands to be installed or configured. The pattern creates temporary mock executables, adds them to PATH for test execution, and logs invocations to a file for assertion verification.
 
-This approach is used in `test-merge-worktree.sh` (1089 lines, 110 tests) and provides a lightweight alternative to complex mocking frameworks. The pattern is particularly valuable for integration tests that verify argument passing and command orchestration without executing real operations.
+This approach is used in `test-merge-worktree.sh` (977 lines, 103 tests) and provides a lightweight alternative to complex mocking frameworks. The pattern is particularly valuable for integration tests that verify argument passing and command orchestration without executing real operations.
 
 ## When to Use
 
@@ -148,7 +148,7 @@ Test script structure:
 
 ```bash
 #!/usr/bin/env zsh
-SCRIPT_UNDER_TEST="/workspace/.devcontainer/scripts/merge-worktree.sh"
+SCRIPT_UNDER_TEST="plugins/worktree/skills/worktree-merge/scripts/merge-worktree.sh"
 
 # Setup
 TEST_TMP=$(mktemp -d)
@@ -368,7 +368,7 @@ For these cases, consider:
 ## References
 
 - Ticket: WTMERGE
-- Implementation: `/workspace/.devcontainer/scripts/test-merge-worktree.sh` (1089 lines, 110 tests)
+- Implementation: `plugins/worktree/skills/worktree-merge/scripts/test-merge-worktree.sh` (977 lines, 103 tests)
   - Lines 150-197: setup() function creating mock-bin and stub commands
   - Lines 500-599: Test execution with PATH override
   - Lines 546-643: Exit code tests using mock failures
