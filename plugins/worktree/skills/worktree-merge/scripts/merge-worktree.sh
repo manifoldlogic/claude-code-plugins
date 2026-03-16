@@ -6,9 +6,9 @@
 #
 # DESCRIPTION:
 #   Orchestrates the merge of a git worktree back to the base branch, including
-#   PR status verification, main branch sync, merge via crewchief CLI, VS Code
-#   workspace folder removal, and iTerm tab closure. This is the merge companion
-#   to spawn-worktree.sh and cleanup-worktree.sh.
+#   PR status verification, main branch sync, merge via crewchief CLI, and VS Code
+#   workspace folder removal. This is the merge companion to spawn-worktree.sh
+#   and cleanup-worktree.sh.
 #
 #   The script delegates the actual git merge to `crewchief worktree merge`,
 #   handling all pre-merge checks and post-merge cleanup automatically.
@@ -36,7 +36,6 @@
 #   -y, --yes                   Skip confirmation prompts (passed through to crewchief)
 #   --skip-pr-check             Skip PR status verification
 #   --skip-workspace            Skip VS Code workspace removal
-#   --skip-tab-close            Skip iTerm tab closure
 #   --dry-run                   Show what would be done without making changes
 #   --verbose                   Enable debug logging to stderr for troubleshooting
 #   -h, --help                  Show this help message and exit
@@ -64,7 +63,6 @@
 #   7  - Merge failed (crewchief merge returned error; no cleanup attempted)
 #   8  - PR check blocked (PR is OPEN and non-draft)
 #   9  - Main worktree not found at expected paths
-#   10 - Success with warnings (merge succeeded but cleanup operations failed)
 #
 # EXAMPLES:
 #
@@ -82,8 +80,6 @@
 #        [OK] Worktree merged successfully
 #        [INFO] Removing from VS Code workspace...
 #        [OK] Workspace updated
-#        [INFO] Closing iTerm tab...
-#        [OK] Tab closed
 #
 #   2. Explicit Arguments - Specify repo and worktree
 #      $ merge-worktree.sh feature-auth --repo myproject --yes
@@ -133,8 +129,6 @@
 #   Solution: The worktree remains intact. Resolve conflicts manually in the main
 #     worktree and retry, or abort with: git merge --abort
 #
-#   Warning: "Could not close tab"
-#   Solution: Close the tab manually. The merge succeeded; this is cosmetic.
 #
 
 set -euo pipefail
@@ -169,10 +163,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Section 2: Configuration
 ##############################################################################
 
-# iTerm plugin integration (default to main repo plugins directory, allow override)
-ITERM_PLUGIN_DIR="${ITERM_PLUGIN_DIR:-/workspace/repos/claude-code-plugins/claude-code-plugins/plugins/iterm}"
-ITERM_CLOSE_TAB_SCRIPT="$ITERM_PLUGIN_DIR/skills/tab-management/scripts/iterm-close-tab.sh"
-
 # Default values
 DEFAULT_WORKSPACE="/workspace/workspace.code-workspace"
 DEFAULT_BASE_BRANCH="main"
@@ -189,7 +179,6 @@ BASE_BRANCH="$DEFAULT_BASE_BRANCH"
 SKIP_CONFIRMATION=false
 SKIP_PR_CHECK=false
 SKIP_WORKSPACE=false
-SKIP_TAB_CLOSE=false
 DRY_RUN=false
 
 # Global array to collect warnings
@@ -223,7 +212,6 @@ OPTIONS:
   -y, --yes                   Skip confirmation prompts (passed through to crewchief)
   --skip-pr-check             Skip PR status verification
   --skip-workspace            Skip VS Code workspace removal
-  --skip-tab-close            Skip iTerm tab closure
   --dry-run                   Show what would be done without making changes
   --verbose                   Enable debug logging to stderr
   -h, --help                  Show this help message and exit
@@ -251,7 +239,6 @@ EXIT CODES:
   7   Merge failed (crewchief merge returned error)
   8   PR check blocked (PR is OPEN and non-draft)
   9   Main worktree not found
-  10  Success with warnings (merge ok, cleanup failed)
 
 EXAMPLES:
   # Auto-detect from cwd (inside worktree directory)
@@ -277,7 +264,6 @@ REQUIREMENTS:
   - CrewChief CLI (crewchief worktree merge) installed
   - For PR checks: gh CLI installed and authenticated
   - For workspace: jq installed and workspace file exists
-  - For tab close: iterm-close-tab.sh available
 
 NOTE:
   The script must change to the main worktree directory before running the
@@ -607,10 +593,6 @@ while [[ $# -gt 0 ]]; do
             SKIP_WORKSPACE=true
             shift
             ;;
-        --skip-tab-close)
-            SKIP_TAB_CLOSE=true
-            shift
-            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -699,7 +681,7 @@ case "$STRATEGY" in
 esac
 
 debug "Parsed arguments: REPO=$REPO WORKTREE_NAME=$WORKTREE_NAME"
-debug "Flags: DRY_RUN=$DRY_RUN SKIP_WORKSPACE=$SKIP_WORKSPACE SKIP_PR_CHECK=$SKIP_PR_CHECK SKIP_TAB_CLOSE=$SKIP_TAB_CLOSE SKIP_CONFIRMATION=$SKIP_CONFIRMATION"
+debug "Flags: DRY_RUN=$DRY_RUN SKIP_WORKSPACE=$SKIP_WORKSPACE SKIP_PR_CHECK=$SKIP_PR_CHECK SKIP_CONFIRMATION=$SKIP_CONFIRMATION"
 debug "Strategy=$STRATEGY BaseBranch=$BASE_BRANCH"
 debug "WORKSPACE_FILE=${WORKSPACE_FILE:-<auto>}"
 
@@ -840,15 +822,6 @@ if [[ "$DRY_RUN" == true ]]; then
         local_step=$((local_step + 1))
     fi
 
-    if [[ "$SKIP_TAB_CLOSE" != true ]]; then
-        dry_run_msg "$local_step. Close iTerm tab:"
-        echo "     iterm-close-tab.sh --force \"$REPO $WORKTREE_NAME\""
-        echo ""
-    else
-        dry_run_msg "$local_step. Tab close: SKIPPED (--skip-tab-close)"
-        echo ""
-    fi
-
     echo "=========================================="
     exit 0
 fi
@@ -898,10 +871,6 @@ debug "Main worktree path: $MAIN_WORKTREE_PATH"
 
 # Step 4: Sync main branch (non-fatal)
 sync_main_branch "$MAIN_WORKTREE_PATH" "$BASE_BRANCH"
-
-# Capture tab pattern BEFORE changing directory
-TAB_PATTERN="$REPO $WORKTREE_NAME"
-debug "Captured tab pattern: $TAB_PATTERN"
 
 # Step 5: Confirmation prompt
 if [[ "$SKIP_CONFIRMATION" != true ]]; then
@@ -956,25 +925,6 @@ fi
 RESOLVED_WORKSPACE=$(resolve_workspace_file)
 remove_from_workspace "$WORKTREE_PATH" "$RESOLVED_WORKSPACE"
 
-# Step 8: Close iTerm tab (last operation, non-fatal)
-if [[ "$SKIP_TAB_CLOSE" == true ]]; then
-    info "Skipping tab close (--skip-tab-close flag)"
-else
-    debug "Attempting to close iTerm tab with pattern: $TAB_PATTERN"
-    if [ -x "$ITERM_CLOSE_TAB_SCRIPT" ]; then
-        if "$ITERM_CLOSE_TAB_SCRIPT" --force "$TAB_PATTERN"; then
-            success "Tab closed"
-        else
-            warn "Could not close tab '$TAB_PATTERN'. Please close manually."
-            WARNINGS+=("Tab close failed for: $TAB_PATTERN")
-        fi
-    else
-        warn "iTerm plugin not available at: $ITERM_CLOSE_TAB_SCRIPT"
-        warn "Skipping tab close"
-        WARNINGS+=("Tab close skipped - iTerm plugin not available")
-    fi
-fi
-
 ##############################################################################
 # Summary
 ##############################################################################
@@ -1001,16 +951,6 @@ else
     fi
 fi
 
-if [[ "$SKIP_TAB_CLOSE" == true ]]; then
-    info "Tab close: Skipped"
-else
-    if [[ " ${WARNINGS[*]} " =~ "Tab close" ]]; then
-        warn "Tab close: Failed (see warnings above)"
-    else
-        success "Tab close: Done"
-    fi
-fi
-
 # Display warnings if any
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
     echo ""
@@ -1019,13 +959,9 @@ if [[ ${#WARNINGS[@]} -gt 0 ]]; then
         warn "$warning"
     done
 
-    # If there are warnings but merge succeeded, exit 10
     echo ""
-    echo "=========================================="
-    echo ""
-    warn "Merge succeeded but some cleanup operations failed."
+    warn "Merge succeeded but some cleanup operations had issues."
     warn "Manual cleanup may be needed (see warnings above)."
-    exit 10
 fi
 
 echo ""

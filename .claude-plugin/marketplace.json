@@ -65,6 +65,11 @@
       "name": "cmux",
       "source": "./plugins/cmux",
       "description": "cmux terminal management for macOS host via SSH from devcontainers"
+    },
+    {
+      "name": "devx",
+      "source": "./plugins/devx",
+      "description": "Developer experience orchestration layer for multi-plugin development workflows"
     }
   ]
 }

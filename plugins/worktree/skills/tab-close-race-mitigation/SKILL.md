@@ -1,3 +1,7 @@
+**Status: Archived** -- This skill documents an iTerm-specific race condition that is no longer relevant. The worktree plugin no longer manages terminal tabs.
+
+---
+
 ---
 name: tab-close-race-mitigation
 description: Capture iTerm tab pattern before directory changes to prevent race condition in self-closing scripts

@@ -12,7 +12,7 @@ tags: [testing, shell-scripting, mocking, test-pattern, worktree]
 
 This skill documents the pattern for testing shell scripts that invoke external commands (like `crewchief`, `gh`, `jq`, etc.) without requiring those commands to be installed or configured. The pattern creates temporary mock executables, adds them to PATH for test execution, and logs invocations to a file for assertion verification.
 
-This approach is used in `test-merge-worktree.sh` (1089 lines, 110 tests) and provides a lightweight alternative to complex mocking frameworks. The pattern is particularly valuable for integration tests that verify argument passing and command orchestration without executing real operations.
+This approach is used in `test-merge-worktree.sh` (977 lines, 103 tests) and provides a lightweight alternative to complex mocking frameworks. The pattern is particularly valuable for integration tests that verify argument passing and command orchestration without executing real operations.
 
 ## When to Use
 
@@ -76,18 +76,6 @@ Do not use this pattern for:
    chmod +x "$TEST_TMP/mock-bin/workspace-folder.sh"
    ```
 
-4. **For scripts in subdirectories (like iTerm plugin), create directory structure:**
-   ```bash
-   # Mock iterm-close-tab.sh (preserves expected path structure)
-   mkdir -p "$TEST_TMP/mock-iterm/skills/tab-management/scripts"
-   cat > "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh" << 'MOCKEOF'
-   #!/bin/sh
-   echo "MOCK_ITERM_CLOSE_TAB: $*" >> "${MOCK_LOG:-/dev/null}"
-   exit 0
-   MOCKEOF
-   chmod +x "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh"
-   ```
-
 ### Test Execution Phase: Override PATH and Capture Invocations
 
 1. **Execute script under test with PATH override:**
@@ -95,7 +83,6 @@ Do not use this pattern for:
    # Prepend mock-bin to PATH so mocks are found first
    PATH="$TEST_TMP/mock-bin:$PATH" \
    MOCK_LOG="$TEST_TMP/mock.log" \
-   ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
    bash "$SCRIPT_UNDER_TEST" feature-x --repo myproject --yes 2>&1
    ```
 
@@ -137,7 +124,7 @@ Do not use this pattern for:
    last_call=$(echo "$mock_log" | tail -1)
 
    assert_contains "$first_call" "MOCK_GH_CALLED" "PR check happens first"
-   assert_contains "$last_call" "MOCK_ITERM_CLOSE_TAB" "tab close happens last"
+   assert_contains "$last_call" "MOCK_WORKSPACE_FOLDER_CALLED" "workspace update happens last"
    ```
 
 ### Teardown Phase: Cleanup
@@ -161,7 +148,7 @@ Test script structure:
 
 ```bash
 #!/usr/bin/env zsh
-SCRIPT_UNDER_TEST="/workspace/.devcontainer/scripts/merge-worktree.sh"
+SCRIPT_UNDER_TEST="plugins/worktree/skills/worktree-merge/scripts/merge-worktree.sh"
 
 # Setup
 TEST_TMP=$(mktemp -d)
@@ -292,14 +279,6 @@ echo "STEP:workspace-folder $*" >> "${MOCK_LOG:-/dev/null}"
 exit 0
 EOF
     chmod +x "$TEST_TMP/mock-bin/workspace-folder.sh"
-
-    mkdir -p "$TEST_TMP/mock-iterm/skills/tab-management/scripts"
-    cat > "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh" << 'EOF'
-#!/bin/sh
-echo "STEP:iterm-close-tab $*" >> "${MOCK_LOG:-/dev/null}"
-exit 0
-EOF
-    chmod +x "$TEST_TMP/mock-iterm/skills/tab-management/scripts/iterm-close-tab.sh"
 }
 
 setup_all_mocks
@@ -307,7 +286,6 @@ setup_all_mocks
 # Execute
 PATH="$TEST_TMP/mock-bin:$PATH" \
 MOCK_LOG="$TEST_TMP/mock.log" \
-ITERM_PLUGIN_DIR="$TEST_TMP/mock-iterm" \
 bash "$SCRIPT_UNDER_TEST" feature-x --repo myproject --yes 2>&1
 
 # Verify sequence
@@ -320,7 +298,6 @@ done
 # 1. gh (PR check)
 # 2. crewchief (merge)
 # 3. workspace-folder (workspace cleanup)
-# 4. iterm-close-tab (tab close)
 ```
 
 ## Key Patterns and Best Practices
@@ -391,7 +368,7 @@ For these cases, consider:
 ## References
 
 - Ticket: WTMERGE
-- Implementation: `/workspace/.devcontainer/scripts/test-merge-worktree.sh` (1089 lines, 110 tests)
+- Implementation: `plugins/worktree/skills/worktree-merge/scripts/test-merge-worktree.sh` (977 lines, 103 tests)
   - Lines 150-197: setup() function creating mock-bin and stub commands
   - Lines 500-599: Test execution with PATH override
   - Lines 546-643: Exit code tests using mock failures

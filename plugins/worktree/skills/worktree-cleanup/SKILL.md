@@ -16,10 +16,9 @@ The cleanup-worktree.sh script orchestrates the complete worktree removal workfl
 2. Prompt for confirmation if incomplete work is detected
 3. Remove git worktree using CrewChief CLI
 4. Optionally delete the associated git branch
-5. Automatically close the associated iTerm tab
-6. Remove worktree folder from VS Code workspace file
+5. Remove worktree folder from VS Code workspace file
 
-Unlike basic `git worktree remove` or `ccwt clean`, cleanup-worktree.sh provides safety features including ticket status checking and confirmation prompts to prevent accidental data loss. It also automatically closes the iTerm tab associated with the worktree, keeping your terminal environment in sync with your worktree lifecycle.
+Unlike basic `git worktree remove` or `ccwt clean`, cleanup-worktree.sh provides safety features including ticket status checking and confirmation prompts to prevent accidental data loss.
 
 **KEY SAFETY FEATURES:**
 - Automatic detection of associated SDD tickets
@@ -52,7 +51,7 @@ Unlike basic `git worktree remove` or `ccwt clean`, cleanup-worktree.sh provides
 - You're still actively working in the worktree
 - You need to switch to a different worktree (use worktree-management)
 - Work hasn't been merged yet (commit and merge first)
-- You want to preserve the worktree for later (just close the tab instead)
+- You want to preserve the worktree for later
 
 ## Prerequisites
 
@@ -68,7 +67,6 @@ Unlike basic `git worktree remove` or `ccwt clean`, cleanup-worktree.sh provides
 **Optional:**
 - SDD plugin installed (for ticket status checking)
 - SDD_ROOT_DIR environment variable configured
-- iTerm plugin installed (for automatic tab closing after worktree removal)
 
 ### Verification Commands
 
@@ -126,11 +124,6 @@ All environment variables can be overridden by CLI flags (flags take precedence)
   - Default: None (ticket checking skipped if unset)
   - Used by SDD plugin to locate tickets
 
-- `ITERM_PLUGIN_DIR` - Path to the iTerm plugin directory
-  - Default: Auto-detected from the plugins directory
-  - Override to use a custom iTerm plugin installation path
-  - Used to locate `iterm-close-tab.sh` for automatic tab closing
-
 ## Ticket Detection Behavior
 
 When SDD_ROOT_DIR is configured, the cleanup script automatically:
@@ -156,26 +149,6 @@ The script searches for tickets in this order:
 2. Active tickets (prefix match, e.g., "FEAT" matches "FEAT_feature-name")
 3. Archived tickets (same matching rules)
 
-## Automatic Tab Closing
-
-When a worktree is successfully removed, cleanup-worktree.sh automatically closes the associated iTerm tab using pattern matching.
-
-**How it works:**
-- After worktree removal, the script calls `iterm-close-tab.sh` with the pattern `"<repo> <worktree>"`
-- Uses `--force` flag to avoid confirmation prompts (cleanup already confirmed)
-- Tab close is non-fatal: if it fails, a warning is shown but cleanup succeeds
-
-**Requirements:**
-- iTerm plugin must be installed at the expected path
-- Tab must have been created with the standard naming convention (`"<repo> <worktree>"`, e.g., `"crewchief MAPR-0001"`)
-
-**Behavior:**
-- Tab close succeeds: No additional output (included in cleanup summary)
-- Tab close fails: Warning shown, cleanup still succeeds
-- Plugin not available: Warning "iTerm plugin not available, skipping tab close"
-
-**Pattern matching:** The pattern `"<repo> <worktree>"` is constructed from the `--repo` argument and the worktree name. For example, `cleanup-worktree.sh MAPR-0001 --repo crewchief` generates the pattern `"crewchief MAPR-0001"`, which matches tabs created by `spawn-worktree.sh` using the same naming convention.
-
 ## Examples
 
 ### 1. Basic Usage - Remove completed worktree
@@ -193,13 +166,11 @@ cleanup-worktree.sh feature-auth --repo myproject
 [OK] Worktree removed
 [INFO] Deleting branch 'feature-auth'...
 [OK] Branch deleted
-[INFO] Closing iTerm tab: "myproject feature-auth"
-[OK] Tab closed successfully
 [INFO] Removing from VS Code workspace...
 [OK] Workspace updated
 ```
 
-**Use case:** Standard workflow after completing and merging feature work. Ticket is complete, so no confirmation needed. The associated iTerm tab is automatically closed.
+**Use case:** Standard workflow after completing and merging feature work. Ticket is complete, so no confirmation needed.
 
 ### 2. Cleanup with Incomplete Ticket
 
@@ -230,8 +201,6 @@ cleanup-worktree.sh experiment --repo myproject --keep-branch
 [INFO] Removing worktree 'experiment' from repository 'myproject'...
 [OK] Worktree removed
 [INFO] Keep branch: yes (--keep-branch specified)
-[INFO] Closing iTerm tab: "myproject experiment"
-[OK] Tab closed successfully
 [INFO] Removing from VS Code workspace...
 [OK] Workspace updated
 ```
@@ -287,10 +256,7 @@ Commands that would run:
      git -C /workspace/repos/myproject/myproject fetch --prune
      git -C /workspace/repos/myproject/myproject branch -d feature-test
 
-  3. Close iTerm tab:
-     iterm-close-tab.sh --force "myproject feature-test"
-
-  4. Update workspace:
+  3. Update workspace:
      workspace-folder.sh remove repos/myproject/feature-test
 ```
 
@@ -310,31 +276,6 @@ cleanup-worktree.sh hotfix --repo myproject --skip-workspace
 ```
 
 **Use case:** When you've already removed the folder from workspace manually, or don't use VS Code workspaces.
-
-### 7. Full Cleanup with Tab Close
-
-```bash
-cleanup-worktree.sh MAPR-0001 --repo crewchief
-```
-
-**Output:**
-```
-[INFO] Checking ticket status...
-[OK] Ticket MAPR-0001 is archived and ready for cleanup
-[INFO] Removing worktree: MAPR-0001
-[OK] Worktree removed successfully
-[INFO] Closing iTerm tab: "crewchief MAPR-0001"
-[OK] Tab closed successfully
-[INFO] Removing from VS Code workspace...
-[OK] Workspace updated
-
-Cleanup Summary:
-  Worktree removed
-  Tab closed
-  Workspace updated
-```
-
-**Use case:** Complete cleanup of a finished worktree. The tab created by `spawn-worktree.sh` is automatically closed as part of the cleanup, keeping your terminal environment tidy.
 
 ## Exit Codes
 
@@ -428,35 +369,10 @@ cleanup-worktree.sh feature --repo myproject --skip-workspace
 cleanup-worktree.sh feature-xyz --repo myproject --keep-branch
 ```
 
-### Tab not closed after cleanup
-
-```
-[WARN] iTerm plugin not available, skipping tab close
-```
-
-**Solution:** Verify the iTerm plugin is installed and accessible. Check that the plugin directory exists at the expected location:
-```bash
-ls plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh
-```
-If the plugin is installed at a non-standard location, set the `ITERM_PLUGIN_DIR` environment variable to the correct path.
-
-### Warning about tab close failure
-
-```
-[WARN] Failed to close iTerm tab (non-fatal)
-```
-
-**Solution:** This warning is non-fatal and does not affect the cleanup result. The worktree was still removed successfully. Common causes:
-- The tab name does not match the expected pattern `"<repo> <worktree>"`
-- The tab was already closed manually
-- iTerm2 is not running or not accessible (e.g., SSH connection issue in container mode)
-
-Check that the tab was created using `spawn-worktree.sh` with the standard naming convention. Tabs created manually or with different naming will not be matched.
-
 ## Related Skills
 
-- **worktree-spawn** - Create new worktrees with full environment setup
+- **worktree-spawn** - Create new worktrees with workspace integration
 - **worktree-management** - Core git worktree operations (create, use, merge, clean)
 - **workspace-folder.sh** - Manages folders in VS Code workspace files
 
-For worktree creation with iTerm and workspace integration, see the worktree-spawn skill.
+For worktree creation with workspace integration, see the worktree-spawn skill.

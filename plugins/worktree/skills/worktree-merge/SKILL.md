@@ -16,9 +16,8 @@ The merge-worktree.sh script orchestrates the complete merge-and-teardown workfl
 2. Sync the main branch with origin before merging
 3. Merge the worktree into the base branch via CrewChief CLI
 4. Remove the worktree folder from the VS Code workspace file
-5. Automatically close the associated iTerm tab
 
-Unlike a manual `crewchief worktree merge` or `git merge`, merge-worktree.sh provides safety features including PR status verification, main branch sync, and post-merge environment cleanup. It is the merge companion to spawn-worktree.sh and cleanup-worktree.sh.
+Unlike a manual `crewchief worktree merge` or `git merge`, merge-worktree.sh provides safety features including PR status verification, main branch sync, and post-merge environment cleanup.
 
 **KEY SAFETY FEATURES:**
 - PR status verification blocks merge when a PR is still OPEN (non-draft)
@@ -33,7 +32,7 @@ Unlike a manual `crewchief worktree merge` or `git merge`, merge-worktree.sh pro
 ### Use merge-worktree.sh when:
 - Work in a worktree is complete and ready to merge back to main
 - The associated PR is merged, closed, or does not exist
-- You want PR check + main sync + merge + workspace update + tab close in one command
+- You want PR check + main sync + merge + workspace update in one command
 - You are inside the devcontainer environment
 
 ### Use cleanup-worktree.sh when:
@@ -45,18 +44,17 @@ Unlike a manual `crewchief worktree merge` or `git merge`, merge-worktree.sh pro
 ### Use crewchief worktree merge directly when:
 - You need manual control over the merge process
 - You are working outside the devcontainer
-- You want to merge without any environment cleanup (workspace, tab)
+- You want to merge without any environment cleanup (workspace)
 - You are scripting and want direct control over each step
 
 ### Use crewchief worktree remove when:
 - Cleaning up a worktree without merging any code
 - The repository is in an unexpected state and you need low-level removal
-- You do not need workspace or tab cleanup
+- You do not need workspace cleanup
 
 ### Do NOT use merge when:
 - You are still actively working in the worktree
 - The associated PR is still OPEN and under review (close or merge the PR first)
-- You want to preserve the worktree for later (just close the tab instead)
 - You are in the main worktree (navigate to the feature worktree first)
 
 ## Prerequisites
@@ -72,7 +70,6 @@ Unlike a manual `crewchief worktree merge` or `git merge`, merge-worktree.sh pro
 
 **Optional:**
 - gh CLI installed and authenticated (for PR status checks; degrades gracefully if absent)
-- iTerm plugin installed (for automatic tab closing after merge)
 
 ### Verification Commands
 
@@ -93,9 +90,6 @@ command -v gh && gh auth status
 
 # Verify workspace-folder.sh script
 ls ~/.devcontainer/scripts/workspace-folder.sh
-
-# Verify iterm-close-tab.sh (optional)
-ls plugins/iterm/skills/tab-management/scripts/iterm-close-tab.sh
 ```
 
 ## Usage
@@ -125,7 +119,6 @@ When auto-detection is used, the script parses the current working directory pat
 - `-y, --yes` - Skip confirmation prompts (passed through to crewchief)
 - `--skip-pr-check` - Skip PR status verification
 - `--skip-workspace` - Skip VS Code workspace folder removal
-- `--skip-tab-close` - Skip iTerm tab closure
 - `--dry-run` - Show what would be done without making changes
 - `--verbose` - Enable debug logging to stderr for troubleshooting
 - `-h, --help` - Show help message and exit
@@ -137,11 +130,6 @@ All environment variables can be overridden by CLI flags (flags take precedence)
 - `WORKSPACE_FILE` - Path to VS Code workspace file
   - Default: Auto-detect `/workspace/workspace.code-workspace`
   - Overridden by `-w/--workspace` flag
-
-- `ITERM_PLUGIN_DIR` - Path to the iTerm plugin directory
-  - Default: `/workspace/repos/claude-code-plugins/claude-code-plugins/plugins/iterm`
-  - Override to use a custom iTerm plugin installation path
-  - Used to locate `iterm-close-tab.sh` for automatic tab closing
 
 ## Examples
 
@@ -163,7 +151,6 @@ merge-worktree.sh PANE-001 --repo crewchief --yes
 [OK] Worktree merged successfully
 [INFO] Removing worktree from VS Code workspace...
 [OK] Workspace updated
-[OK] Tab closed
 
 ==========================================
   Worktree Merge Complete
@@ -173,7 +160,6 @@ merge-worktree.sh PANE-001 --repo crewchief --yes
 [INFO] Strategy: ff
 [INFO] Repository: crewchief
 [OK] Workspace: Updated
-[OK] Tab close: Done
 ```
 
 **Use case:** Standard merge after completing feature work. The `--yes` flag skips the confirmation prompt for scripted or agent-driven usage.
@@ -198,8 +184,6 @@ merge-worktree.sh
 [OK] Worktree merged successfully
 [INFO] Removing worktree from VS Code workspace...
 [OK] Workspace updated
-[INFO] Closing iTerm tab...
-[OK] Tab closed
 ```
 
 **Use case:** Convenient merge when you are already inside the worktree directory. No arguments needed -- both repo and worktree are detected from the path.
@@ -239,9 +223,6 @@ Planned operations:
 
 [DRY-RUN] 4. Remove from workspace:
      workspace-folder.sh remove /workspace/repos/crewchief/PANE-001 -w "/workspace/workspace.code-workspace"
-
-[DRY-RUN] 5. Close iTerm tab:
-     iterm-close-tab.sh --force "crewchief PANE-001"
 
 ==========================================
 ```
@@ -293,7 +274,6 @@ merge-worktree.sh PANE-001 --repo crewchief --strategy squash --yes
 [INFO] Strategy: squash
 [INFO] Repository: crewchief
 [OK] Workspace: Updated
-[OK] Tab close: Done
 ```
 
 **Use case:** Squash all commits from the worktree branch into a single commit on the base branch. Valid strategies are `ff` (fast-forward, default), `squash`, and `cherry-pick`.
@@ -319,10 +299,10 @@ merge-worktree.sh PANE-001 --repo crewchief --base-branch develop --yes
 
 **Use case:** Merge into a branch other than `main`. Useful for repositories that use `develop`, `staging`, or other branch naming conventions.
 
-### 7. Skip Cleanup Operations
+### 7. Skip Workspace Update
 
 ```bash
-merge-worktree.sh PANE-001 --repo crewchief --skip-workspace --skip-tab-close --yes
+merge-worktree.sh PANE-001 --repo crewchief --skip-workspace --yes
 ```
 
 **Output:**
@@ -336,7 +316,6 @@ merge-worktree.sh PANE-001 --repo crewchief --skip-workspace --skip-tab-close --
 [INFO] Merging worktree 'PANE-001' into 'main'...
 [OK] Worktree merged successfully
 [INFO] Skipping workspace update (--skip-workspace flag)
-[INFO] Skipping tab close (--skip-tab-close flag)
 
 ==========================================
   Worktree Merge Complete
@@ -346,10 +325,9 @@ merge-worktree.sh PANE-001 --repo crewchief --skip-workspace --skip-tab-close --
 [INFO] Strategy: ff
 [INFO] Repository: crewchief
 [INFO] Workspace: Skipped
-[INFO] Tab close: Skipped
 ```
 
-**Use case:** When you only need the merge operation without workspace or tab cleanup. Useful in environments without VS Code workspaces or without iTerm integration.
+**Use case:** When you only need the merge operation without workspace cleanup. Useful in environments without VS Code workspaces.
 
 ### 8. Error Scenario - PR is Still Open
 
@@ -386,17 +364,12 @@ The script uses specific exit codes to indicate different outcomes:
 | **7** | Merge failed | crewchief merge returned error, merge conflicts | Resolve conflicts in main worktree: `git merge --continue` or `git merge --abort` |
 | **8** | PR check blocked | PR is OPEN and non-draft | Close or merge the PR first, or use `--skip-pr-check` |
 | **9** | Main worktree not found | Main worktree directory does not exist at expected paths | Ensure main worktree exists at `/workspace/repos/<repo>/<repo>` or `/workspace/repos/<repo>` |
-| **10** | Success with warnings | Merge succeeded but workspace removal or tab close failed | Check warnings; manual cleanup may be needed |
 
 ## Known Limitations
 
 ### Single workspace file assumption
 
 The script resolves a single VS Code workspace file using the priority order: `--workspace` flag, `WORKSPACE_FILE` environment variable, then auto-detect at `/workspace/workspace.code-workspace`. If your setup uses multiple workspace files, you must specify the correct one via `--workspace` or use `--skip-workspace` and update workspace files manually.
-
-### Tab close race condition
-
-After the merge completes, the worktree directory is removed by crewchief. The shell's working directory may change, and if iTerm updates the tab title based on the new cwd synchronously before `iterm-close-tab.sh` runs, the pattern match may fail to find the tab. The script mitigates this by capturing the tab pattern before changing directories, and treating tab close failure as non-fatal (exit 10 instead of error). If the tab is not closed automatically, close it manually.
 
 ### PR check targets base branch only
 
@@ -438,23 +411,6 @@ merge-worktree.sh feature-xyz --repo myproject --skip-pr-check --yes
 ls /workspace/repos/myproject/myproject 2>/dev/null || ls /workspace/repos/myproject
 ```
 If the repository is not cloned, clone it first. If the directory structure differs from the expected convention, you may need to create a symlink or restructure.
-
-### Tab close fails
-
-```
-[WARN] Could not close tab 'crewchief PANE-001'. Please close manually.
-```
-
-**Solution:** This warning is non-fatal -- the merge has already succeeded. Close the tab manually in iTerm. Common causes:
-- The tab name does not match the expected pattern `"<repo> <worktree>"` (e.g., `"crewchief PANE-001"`)
-- The tab was already closed manually
-- iTerm2 is not running or not accessible via SSH from the container
-- The iTerm plugin is not installed at the expected path
-
-Verify the iTerm plugin path:
-```bash
-ls "$ITERM_PLUGIN_DIR/skills/tab-management/scripts/iterm-close-tab.sh"
-```
 
 ### Lock contention
 
@@ -519,8 +475,8 @@ merge-worktree.sh feature-auth --repo myproject
 ## Related Skills
 
 - **worktree-cleanup** - Remove worktrees with SDD ticket checking (use when aborting work without merging)
-- **worktree-spawn** - Create new worktrees with full environment setup (iTerm tab, workspace, SDD integration)
+- **worktree-spawn** - Create new worktrees with workspace integration
 - **worktree-management** - Core git worktree operations (create, use, merge, clean) via CrewChief CLI
 - **workspace-folder.sh** - Manages folders in VS Code workspace files
 
-For worktree creation with iTerm and workspace integration, see the worktree-spawn skill. For worktree removal without merging, see the worktree-cleanup skill.
+For worktree creation with workspace integration, see the worktree-spawn skill. For worktree removal without merging, see the worktree-cleanup skill.

@@ -1,3 +1,7 @@
+**Status: Archived** -- This skill is iTerm-specific. The worktree plugin no longer manages terminal tabs. For terminal-integrated workflows, use the devx plugin.
+
+---
+
 ---
 title: worktree-open-all
 description: Open iTerm tabs for all worktrees of a repository

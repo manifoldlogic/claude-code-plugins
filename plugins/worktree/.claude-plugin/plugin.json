@@ -1,6 +1,6 @@
 {
   "name": "worktree",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Git worktree management using the crewchief CLI. Create, manage, and merge parallel development branches safely.",
   "author": {
     "name": "Daniel Bushman",
