@@ -1,4 +1,5 @@
 *.pyc
+__pycache__/
 
 # Claude Code settings (personal config)
 .claude/settings.json
