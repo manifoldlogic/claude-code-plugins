@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 #
 # test-setup-worktree.sh - Tests for setup-worktree.sh worktree setup script
 #
@@ -13,9 +13,9 @@
 #   - Mocked ccwt (crewchief CLI) for worktree creation tests
 #
 # USAGE:
-#   zsh test-setup-worktree.sh           # Run all tests
-#   zsh test-setup-worktree.sh --verbose # Verbose output
-#   zsh test-setup-worktree.sh --help    # Show help
+#   bash test-setup-worktree.sh           # Run all tests
+#   bash test-setup-worktree.sh --verbose # Verbose output
+#   bash test-setup-worktree.sh --help    # Show help
 #
 # EXIT CODES:
 #   0 - All tests passed

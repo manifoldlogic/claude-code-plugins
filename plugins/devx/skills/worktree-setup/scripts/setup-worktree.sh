@@ -31,6 +31,7 @@
 #   --skip-cmux                 Skip cmux workspace creation (steps 4-7)
 #   --skip-workspace            Skip VS Code workspace update (step 3)
 #   --dry-run                   Preview planned operations
+#   --verbose                   Show cmux-ssh.sh invocations and output
 #   -h, --help                  Show this help message and exit
 #
 # EXIT CODES:
@@ -81,6 +82,12 @@ dry_run_msg() {
     printf '\033[0;35m[DRY-RUN]\033[0m %s\n' "$*" >&2
 }
 
+log_verbose() {
+    if [ "$VERBOSE" = "true" ]; then
+        printf '\033[0;36m[VERBOSE]\033[0m %s\n' "$*" >&2
+    fi
+}
+
 ##############################################################################
 # Section 2: Configuration
 ##############################################################################
@@ -93,6 +100,7 @@ WORKSPACE_FOLDER_SCRIPT="${WORKSPACE_FOLDER_SCRIPT:-/workspace/.devcontainer/scr
 
 # Default values
 DEFAULT_BRANCH="main"
+WORKSPACE_REPOS_ROOT="${WORKSPACE_REPOS_ROOT:-/workspace/repos}"
 
 # Variables to be set by argument parsing
 WORKTREE_NAME=""
@@ -102,6 +110,7 @@ WORKSPACE_FILE=""
 SKIP_CMUX=false
 SKIP_WORKSPACE=false
 DRY_RUN=false
+VERBOSE=false
 
 ##############################################################################
 # Section 3: Help Function
@@ -129,6 +138,7 @@ OPTIONS:
   --skip-cmux                 Skip cmux workspace creation (steps 4-7)
   --skip-workspace            Skip VS Code workspace update (step 3)
   --dry-run                   Preview planned operations
+  --verbose                   Show cmux-ssh.sh invocations and output
   -h, --help                  Show this help message and exit
 
 EXIT CODES:
@@ -155,6 +165,8 @@ EXAMPLES:
   setup-worktree.sh TICKET-1 --repo crewchief --skip-workspace
 
 ENVIRONMENT VARIABLES:
+  WORKSPACE_REPOS_ROOT        Root directory for worktree clones
+                              (default: /workspace/repos)
   CMUX_PLUGIN_DIR             Path to cmux plugin directory
                               (default: /workspace/repos/claude-code-plugins/claude-code-plugins/plugins/cmux)
   WORKSPACE_FOLDER_SCRIPT     Path to workspace-folder.sh
@@ -207,6 +219,10 @@ while [ $# -gt 0 ]; do
             DRY_RUN=true
             shift
             ;;
+        --verbose)
+            VERBOSE=true
+            shift
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -254,7 +270,7 @@ if ! printf '%s' "$WORKTREE_NAME" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9_-]*$'; then
 fi
 
 # Compute worktree path
-WORKTREE_PATH="/workspace/repos/$REPO/$WORKTREE_NAME"
+WORKTREE_PATH="$WORKSPACE_REPOS_ROOT/$REPO/$WORKTREE_NAME"
 
 ##############################################################################
 # Section 6: Dry Run Mode
@@ -279,6 +295,7 @@ if [ "$DRY_RUN" = true ]; then
     fi
     echo "  Skip cmux: $SKIP_CMUX"
     echo "  Skip workspace: $SKIP_WORKSPACE"
+    echo "  Verbose: $VERBOSE"
     echo ""
 
     echo "Planned operations:"
@@ -430,6 +447,7 @@ else
     log_info "Step 4: Creating cmux workspace..."
 
     result=""
+    log_verbose "exec: bash $CMUX_SSH_SCRIPT new-workspace"
     result=$( bash "$CMUX_SSH_SCRIPT" new-workspace 2>&1 ) || {
         log_warn "cmux new-workspace failed"
         log_warn "Warning: cmux setup failed. Worktree created at $WORKTREE_PATH. Set up your terminal session manually."
@@ -449,6 +467,7 @@ else
             sleep 0.5
 
             # Rename workspace
+            log_verbose "exec: bash $CMUX_SSH_SCRIPT rename-workspace $workspace_id $WORKTREE_NAME"
             bash "$CMUX_SSH_SCRIPT" rename-workspace "$workspace_id" "$WORKTREE_NAME" > /dev/null 2>&1 || {
                 log_warn "Failed to rename cmux workspace (non-fatal)"
             }
@@ -470,7 +489,9 @@ else
             log_warn "Warning: cmux setup failed. Worktree created at $WORKTREE_PATH. Set up your terminal session manually."
             CMUX_FAILED=true
         else
+            log_verbose "exec: bash $CMUX_SSH_SCRIPT send $workspace_id \"docker exec -it $CONTAINER_NAME /bin/zsh\""
             bash "$CMUX_SSH_SCRIPT" send "$workspace_id" "docker exec -it $CONTAINER_NAME /bin/zsh" > /dev/null 2>&1 || true
+            log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key $workspace_id enter"
             bash "$CMUX_SSH_SCRIPT" send-key "$workspace_id" enter > /dev/null 2>&1 || true
             sleep 2
             log_success "Devcontainer session opened (container: $CONTAINER_NAME)"
@@ -480,7 +501,9 @@ else
     # Step 6: Navigate to worktree
     if [ "$CMUX_FAILED" = false ]; then
         log_info "Step 6: Navigating to worktree..."
+        log_verbose "exec: bash $CMUX_SSH_SCRIPT send $workspace_id \"cd $WORKTREE_PATH\""
         bash "$CMUX_SSH_SCRIPT" send "$workspace_id" "cd $WORKTREE_PATH" > /dev/null 2>&1 || true
+        log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key $workspace_id enter"
         bash "$CMUX_SSH_SCRIPT" send-key "$workspace_id" enter > /dev/null 2>&1 || true
         sleep 0.5
         log_success "Navigated to $WORKTREE_PATH"
@@ -489,7 +512,9 @@ else
     # Step 7: Launch claude
     if [ "$CMUX_FAILED" = false ]; then
         log_info "Step 7: Launching claude..."
+        log_verbose "exec: bash $CMUX_SSH_SCRIPT send $workspace_id \"claude\""
         bash "$CMUX_SSH_SCRIPT" send "$workspace_id" "claude" > /dev/null 2>&1 || true
+        log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key $workspace_id enter"
         bash "$CMUX_SSH_SCRIPT" send-key "$workspace_id" enter > /dev/null 2>&1 || true
         log_success "Claude launched"
     fi
@@ -519,6 +544,7 @@ elif [ "${CMUX_FAILED:-false}" = true ]; then
     log_warn "cmux: Failed (worktree was still created successfully)"
 else
     log_success "cmux: Workspace ready"
+    log_info "cmux workspace: $REPO $WORKTREE_NAME"
 fi
 
 echo ""
