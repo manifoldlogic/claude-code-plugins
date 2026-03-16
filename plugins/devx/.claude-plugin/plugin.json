@@ -1,6 +1,6 @@
 {
   "name": "devx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Developer experience orchestration layer for multi-plugin development workflows. Composes worktree, cmux, and vscode plugins into streamlined commands.",
   "author": {
     "name": "Daniel Bushman",
@@ -8,11 +8,5 @@
     "url": "https://github.com/manifoldlogic/claude-code-plugins"
   },
   "repository": "https://github.com/manifoldlogic/claude-code-plugins",
-  "keywords": [
-    "orchestration",
-    "worktree",
-    "cmux",
-    "devcontainer",
-    "workflow"
-  ]
+  "keywords": ["orchestration", "worktree", "cmux", "devcontainer", "workflow"]
 }
