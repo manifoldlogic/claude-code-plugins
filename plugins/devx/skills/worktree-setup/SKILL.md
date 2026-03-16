@@ -12,15 +12,15 @@ description: Create a git worktree with VS Code workspace and cmux terminal setu
 
 The setup-worktree.sh script orchestrates the complete worktree creation and environment setup workflow by combining multiple operations into a single command:
 
-1. Validate prerequisites (ccwt, workspace-folder.sh, cmux-check.sh)
-2. Create the git worktree via CrewChief CLI (`ccwt create`)
+1. Validate prerequisites (crewchief, workspace-folder.sh, cmux-check.sh)
+2. Create the git worktree via CrewChief CLI (`crewchief worktree create`)
 3. Add the worktree folder to the VS Code workspace file
 4. Create a cmux terminal workspace
 5. Open a devcontainer session in the new workspace
 6. Navigate to the worktree directory
 7. Launch claude in the new session
 
-Unlike running `ccwt create` manually, setup-worktree.sh provides end-to-end environment setup including terminal management and workspace integration.
+Unlike running `crewchief worktree create` manually, setup-worktree.sh provides end-to-end environment setup including terminal management and workspace integration.
 
 **KEY FEATURES:**
 - Full environment orchestration in a single command
@@ -78,7 +78,9 @@ When `DEVCONTAINER_NAME` is not set, the script attempts to auto-detect the cont
 docker ps --filter name=devcontainer --format '{{.Names}}' | head -1
 ```
 
-If auto-detection fails (no matching container found), the script warns and skips cmux steps 5-7. The worktree and workspace setup (steps 1-3) still complete successfully.
+Setting `DEVCONTAINER_NAME` explicitly is the preferred method. The docker auto-detection fallback may fail with a permission-denied error if the Docker socket is not accessible from within the container. When this happens, the script warns and skips cmux steps 5-7.
+
+If auto-detection fails (no matching container found or Docker is inaccessible), the script warns and skips cmux steps 5-7. The worktree and workspace setup (steps 1-3) still complete successfully.
 
 ## Decision Tree
 
@@ -97,14 +99,14 @@ If auto-detection fails (no matching container found), the script warns and skip
 - The workspace-folder.sh script is not available
 - You manage your VS Code workspace configuration manually
 
-### Use ccwt create directly when:
+### Use crewchief worktree create directly when:
 - You only need the git worktree without any environment setup
 - You are working outside the devcontainer
 - You want full manual control over every step
 - You are scripting and want to compose your own workflow
 
 ### Do NOT use setup-worktree.sh when:
-- The worktree already exists (ccwt create will fail)
+- The worktree already exists (crewchief worktree create will fail)
 - You want to merge or remove a worktree (use merge-worktree.sh or cleanup-worktree.sh instead)
 - You are on a host machine without Docker (cmux steps will fail)
 
@@ -114,7 +116,7 @@ If auto-detection fails (no matching container found), the script warns and skip
 
 **Required:**
 - Running inside the devcontainer
-- CrewChief CLI (`ccwt create`) installed and on PATH
+- CrewChief CLI (`crewchief worktree create`) installed and on PATH
 - Git repositories in `/workspace/repos` directory
 
 **Optional (graceful degradation when absent):**
@@ -126,7 +128,7 @@ If auto-detection fails (no matching container found), the script warns and skip
 
 ```bash
 # Check CrewChief CLI
-command -v ccwt
+command -v crewchief
 
 # Check cmux scripts
 ls "$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-check.sh"
@@ -196,10 +198,10 @@ Resolved parameters:
 Planned operations:
 
 [DRY-RUN] Step 1: Validate prerequisites
-     Check: ccwt, workspace-folder.sh, cmux-check.sh
+     Check: crewchief, workspace-folder.sh, cmux-check.sh
 
 [DRY-RUN] Step 2: Create worktree
-     ccwt create TICKET-1 --repo crewchief --branch main
+     crewchief worktree create TICKET-1 --repo crewchief --branch main
 
 [DRY-RUN] Step 3: Update VS Code workspace
      workspace-folder.sh add /workspace/repos/crewchief/TICKET-1
@@ -360,9 +362,9 @@ DEVCONTAINER_NAME="devx-container-1" setup-worktree.sh TICKET-1 --repo crewchief
 |-----------|---------|---------------|----------|
 | **0** | Success | Worktree created, all steps completed or gracefully skipped | (Success - no action needed) |
 | **1** | Usage error | Missing worktree name, missing `--repo`, missing flag value | Check syntax with `--help` |
-| **2** | Prerequisite failure | ccwt not found, cmux-check.sh returned non-zero | Install ccwt or use `--skip-cmux` |
+| **2** | Prerequisite failure | crewchief not found, cmux-check.sh returned non-zero | Install crewchief or use `--skip-cmux` |
 | **3** | Unrecognized option | Unknown flag (e.g., `--skip-tab-close`, `--nonsense`) | Check valid options with `--help` |
-| **4** | Worktree creation failure | ccwt create returned non-zero, worktree already exists | Check `ccwt list`, verify repo name |
+| **4** | Worktree creation failure | crewchief worktree create returned non-zero, worktree already exists | Check `crewchief worktree list`, verify repo name |
 
 ## Known Limitations
 
@@ -372,7 +374,7 @@ The script is designed to run inside the devcontainer. Host-mode execution is no
 
 ### No worktree name validation
 
-The script does not validate worktree name characters (e.g., slashes, spaces). Invalid names are passed through to `ccwt create`, which handles its own validation. Names starting with a hyphen are caught as unrecognized options (exit 3).
+The script does not validate worktree name characters (e.g., slashes, spaces). Invalid names are passed through to `crewchief worktree create`, which handles its own validation. Names starting with a hyphen are caught as unrecognized options (exit 3).
 
 ### cmux failure is non-fatal for steps 1-3
 
@@ -422,6 +424,24 @@ The script uses a single workspace file. Specify `--workspace` to target a speci
    ```
 3. If you do not need terminal setup, use `--skip-cmux`
 
+### Docker container detection failed
+
+```
+[WARN] Docker container detection failed
+```
+
+**What this means:** The script attempted to auto-detect the container name via `docker ps` but the Docker socket is not accessible from within the container, resulting in a permission-denied error. cmux steps 5-7 are skipped, but the worktree and workspace setup (steps 1-3) still complete.
+
+**What to do:**
+1. Set `DEVCONTAINER_NAME` explicitly to bypass Docker auto-detection:
+   ```bash
+   DEVCONTAINER_NAME="your-container-name" setup-worktree.sh TICKET-1 --repo crewchief
+   ```
+2. Or export it in your shell profile so it persists across sessions:
+   ```bash
+   export DEVCONTAINER_NAME="your-container-name"
+   ```
+
 ### workspace-folder.sh not found
 
 ```
@@ -442,18 +462,18 @@ The script uses a single workspace file. Specify `--workspace` to target a speci
    ```
 3. If you do not use VS Code workspaces, this warning is safe to ignore
 
-### ccwt create fails (exit 4)
+### crewchief worktree create fails (exit 4)
 
 ```
-[ERROR] Worktree creation failed (ccwt create returned non-zero)
+[ERROR] Worktree creation failed (crewchief worktree create returned non-zero)
 ```
 
-**What this means:** The `ccwt create` command failed. Common causes include the worktree already existing or the repository not being found.
+**What this means:** The `crewchief worktree create` command failed. Common causes include the worktree already existing or the repository not being found.
 
 **What to do:**
 1. Check if the worktree already exists:
    ```bash
-   ccwt list
+   crewchief worktree list
    ls /workspace/repos/<repo>/<worktree-name>
    ```
 2. Verify the repository name:
