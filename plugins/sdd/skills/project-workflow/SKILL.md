@@ -1,6 +1,6 @@
 ---
 name: project-workflow
-description: Orchestrates epics, tickets, and tasks for systematic software development. Use this skill when planning work, creating tickets, managing tasks, or executing development workflows. Includes scripts for scaffolding and status reporting, with Haiku agents for mechanical tasks and Sonnet agents for reasoning.
+description: Orchestrates epics, tickets, and tasks for systematic software development. Use this skill when planning work, creating tickets, managing tasks, or executing development workflows. Includes scripts for scaffolding and status reporting, with Haiku agents for mechanical tasks and Sonnet agents for reasoning. All SDD data (epics, tickets, tasks, archives) lives at $SDD_ROOT_DIR, not in the repo.
 ---
 
 # Project Workflow Skill
