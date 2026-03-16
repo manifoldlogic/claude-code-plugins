@@ -21,7 +21,7 @@ Perfect for teams standardizing development environments, developers managing mu
 
 ```bash
 # Add marketplace (if not already added)
-/plugin marketplace add /workspace/.crewchief/claude-code-plugins
+/plugin marketplace add claude-code-plugins
 
 # Install vscode plugin
 /plugin install vscode@crewchief

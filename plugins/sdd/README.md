@@ -245,7 +245,7 @@ For detailed documentation, see [SKILL.md](skills/project-workflow/SKILL.md).
 /plugin marketplace add claude-code-plugins
 
 # Install SDD plugin
-/plugin install sdd@marketplace-name
+/plugin install sdd@crewchief
 ```
 
 After installation, restart Claude Code to activate the plugin.
@@ -485,13 +485,13 @@ The SDD Loop Controller ("Ralph Wiggum Loop") provides autonomous task execution
 
 ```bash
 # Basic usage - run against default workspace
-./sdd-loop.sh /workspace/repos/
+./sdd-loop.sh /path/to/repos/
 
 # Preview what would happen without executing
-./sdd-loop.sh --dry-run /workspace/repos/
+./sdd-loop.sh --dry-run /path/to/repos/
 
 # Limit iterations for testing
-./sdd-loop.sh --max-iterations 10 /workspace/repos/
+./sdd-loop.sh --max-iterations 10 /path/to/repos/
 ```
 
 ### Key Features
@@ -506,12 +506,12 @@ The SDD Loop Controller ("Ralph Wiggum Loop") provides autonomous task execution
 
 ```bash
 # Via command-line options
-./sdd-loop.sh --max-iterations 50 --max-errors 3 --timeout 3600 /workspace/repos/
+./sdd-loop.sh --max-iterations 50 --max-errors 3 --timeout 3600 /path/to/repos/
 
 # Via environment variables
 export SDD_LOOP_MAX_ITERATIONS=100
 export SDD_LOOP_TIMEOUT=7200
-./sdd-loop.sh /workspace/repos/
+./sdd-loop.sh /path/to/repos/
 ```
 
 ### Exit Codes
@@ -534,7 +534,7 @@ cd /path/to/_SDD/tickets/TICKET_name/
 echo '{"ready": true, "agent_ready": true, "stop_at_phase": 1}' > .autogate.json
 
 # Run loop - will stop after Phase 1 tasks complete
-./sdd-loop.sh /workspace/repos/
+./sdd-loop.sh /path/to/repos/
 ```
 
 ### Documentation

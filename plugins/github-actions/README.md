@@ -29,7 +29,7 @@ The GitHub Actions plugin provides comprehensive CI/CD pipeline management for G
 
 ```bash
 # Add marketplace (if not already added)
-/plugin marketplace add /workspace/.crewchief/claude-code-plugins
+/plugin marketplace add claude-code-plugins
 
 # Install github-actions plugin
 /plugin install github-actions@crewchief

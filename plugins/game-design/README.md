@@ -27,7 +27,7 @@ Rather than imitating individual designers, these agents represent **design role
 /plugin marketplace add claude-code-plugins
 
 # Install game-design plugin
-/plugin install game-design@marketplace-name
+/plugin install game-design@crewchief
 ```
 
 After installation, restart Claude Code to activate the plugin.
@@ -145,5 +145,4 @@ These agents embody key synthesized principles:
 
 ## Links
 
-- [Epic Documentation](/workspace/.sdd/epics/2025-12-21_game-design-agents/)
 - [Repository](https://github.com/manifoldlogic/claude-code-plugins)
