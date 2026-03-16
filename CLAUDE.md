@@ -85,6 +85,8 @@ Commands are orchestrators that delegate work - they coordinate but don't do wor
 
 ## SDD Plugin Core Workflow
 
+Key slash commands for the SDD workflow:
+
 ### Key Commands
 
 | Command | Description |

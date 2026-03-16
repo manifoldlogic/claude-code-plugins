@@ -378,8 +378,8 @@ Folder path does not exist: repos/nonexistent-project
 
 2. Check the path relative to the workspace file location:
    ```bash
-   # If workspace is at /workspace/my-workspace.code-workspace
-   # And you want to add /workspace/repos/frontend
+   # If workspace is at /path/to/my-workspace.code-workspace
+   # And you want to add /path/to/repos/frontend
    # The relative path should be: repos/frontend
    ```
 

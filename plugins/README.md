@@ -32,10 +32,7 @@ A collection of Claude Code plugins for development workflows, project managemen
 
 Install plugins individually:
 ```bash
-/plugin install sdd@crewchief
-/plugin install github-actions@crewchief
-/plugin install maproom@crewchief
-/plugin install worktree@crewchief
+/plugin install <plugin-name>@crewchief
 ```
 
 Or use the plugin manager UI:

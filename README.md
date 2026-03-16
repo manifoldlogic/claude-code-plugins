@@ -35,11 +35,7 @@ Add the marketplace and install plugins:
 
 ## Installation
 
-```bash
-/plugin marketplace add manifoldlogic/claude-code-plugins
-```
-
-Then install individual plugins:
+After adding the marketplace (see Quick Start above), install individual plugins:
 
 ```bash
 /plugin install <plugin-name>@crewchief
