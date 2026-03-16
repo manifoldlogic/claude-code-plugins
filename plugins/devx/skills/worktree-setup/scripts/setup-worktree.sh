@@ -12,7 +12,7 @@
 #
 # REQUIREMENTS:
 #   - Running inside the devcontainer (container-mode only)
-#   - CrewChief CLI (ccwt create) installed
+#   - CrewChief CLI (crewchief worktree create) installed
 #   - workspace-folder.sh script for VS Code workspace updates
 #   - cmux-ssh.sh and cmux-check.sh for terminal session setup (optional)
 #
@@ -39,7 +39,7 @@
 #   1  - Usage error (missing required arguments)
 #   2  - Prerequisite failure (required tools not found)
 #   3  - Unrecognized option
-#   4  - Worktree creation failure (ccwt create failed)
+#   4  - Worktree creation failure (crewchief worktree create failed)
 #
 # EXAMPLES:
 #
@@ -302,11 +302,11 @@ if [ "$DRY_RUN" = true ]; then
     echo ""
 
     dry_run_msg "Step 1: Validate prerequisites"
-    echo "     Check: ccwt, workspace-folder.sh, cmux-check.sh"
+    echo "     Check: crewchief, workspace-folder.sh, cmux-check.sh"
     echo ""
 
     dry_run_msg "Step 2: Create worktree"
-    echo "     ccwt create $WORKTREE_NAME --repo $REPO --branch $BRANCH"
+    echo "     crewchief worktree create $WORKTREE_NAME --repo $REPO --branch $BRANCH"
     echo ""
 
     if [ "$SKIP_WORKSPACE" = true ]; then
@@ -365,9 +365,9 @@ fi
 
 log_info "Step 1: Validating prerequisites..."
 
-# Check ccwt
-if ! command -v ccwt > /dev/null 2>&1; then
-    log_error "ccwt (crewchief worktree CLI) is required but not found"
+# Check crewchief
+if ! command -v crewchief > /dev/null 2>&1; then
+    log_error "crewchief CLI is required but not found"
     exit 2
 fi
 
@@ -402,8 +402,8 @@ log_success "Prerequisites validated"
 
 log_info "Step 2: Creating worktree '$WORKTREE_NAME' in repo '$REPO'..."
 
-if ! ccwt create "$WORKTREE_NAME" --repo "$REPO" --branch "$BRANCH"; then
-    log_error "Worktree creation failed (ccwt create returned non-zero)"
+if ! crewchief worktree create "$WORKTREE_NAME" --repo "$REPO" --branch "$BRANCH"; then
+    log_error "Worktree creation failed (crewchief worktree create returned non-zero)"
     exit 4
 fi
 
@@ -481,18 +481,31 @@ else
         # Detect container name
         CONTAINER_NAME="${DEVCONTAINER_NAME:-}"
         if [ -z "$CONTAINER_NAME" ]; then
-            CONTAINER_NAME=$( docker ps --filter name=devcontainer --format '{{.Names}}' | head -1 ) || CONTAINER_NAME=""
+            CONTAINER_NAME=$( docker ps --filter name=devcontainer --format '{{.Names}}' 2>/dev/null | head -1 ) || true
+            if [ -z "$CONTAINER_NAME" ]; then
+                if ! docker ps > /dev/null 2>&1; then
+                    log_verbose "docker ps failed (permission denied or docker unavailable)"
+                    log_warn "Docker container detection failed. Set DEVCONTAINER_NAME env var."
+                else
+                    log_warn "Could not detect devcontainer name. Set DEVCONTAINER_NAME env var."
+                fi
+                CMUX_FAILED=true
+            fi
         fi
 
         if [ -z "$CONTAINER_NAME" ]; then
-            log_warn "Could not detect devcontainer name. Set DEVCONTAINER_NAME env var."
             log_warn "Warning: cmux setup failed. Worktree created at $WORKTREE_PATH. Set up your terminal session manually."
-            CMUX_FAILED=true
         else
             log_verbose "exec: bash $CMUX_SSH_SCRIPT send $workspace_id \"docker exec -it $CONTAINER_NAME /bin/zsh\""
-            bash "$CMUX_SSH_SCRIPT" send "$workspace_id" "docker exec -it $CONTAINER_NAME /bin/zsh" > /dev/null 2>&1 || true
+            if ! bash "$CMUX_SSH_SCRIPT" send "$workspace_id" "docker exec -it $CONTAINER_NAME /bin/zsh" > /dev/null 2>&1; then
+                log_warn "Failed to send docker exec command to cmux workspace"
+                CMUX_FAILED=true
+            fi
             log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key $workspace_id enter"
-            bash "$CMUX_SSH_SCRIPT" send-key "$workspace_id" enter > /dev/null 2>&1 || true
+            if ! bash "$CMUX_SSH_SCRIPT" send-key "$workspace_id" enter > /dev/null 2>&1; then
+                log_warn "Failed to send enter keypress to cmux workspace"
+                CMUX_FAILED=true
+            fi
             sleep 2
             log_success "Devcontainer session opened (container: $CONTAINER_NAME)"
         fi
