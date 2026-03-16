@@ -48,7 +48,7 @@ This plugin works with any recent rust-analyzer version (tested with 1.93.0). Ol
 Install the plugin using the Claude Code plugin command:
 
 ```
-claude plugin install rust-analyzer-lsp@crewchief --scope project
+/plugin install rust-analyzer-lsp@crewchief --scope project
 ```
 
 ### Migrating from the Official Plugin
@@ -57,7 +57,7 @@ If you have the broken official plugin installed, uninstall it first:
 
 ```
 claude plugin uninstall rust-analyzer-lsp@claude-plugins-official
-claude plugin install rust-analyzer-lsp@crewchief --scope project
+/plugin install rust-analyzer-lsp@crewchief --scope project
 ```
 
 Both plugins register the same LSP server name, so having both installed simultaneously may cause conflicts. Uninstall the official plugin before installing this one.

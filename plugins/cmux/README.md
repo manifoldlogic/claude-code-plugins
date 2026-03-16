@@ -17,12 +17,8 @@ The cmux plugin provides cmux terminal management capabilities for Claude Code, 
 
 ## Installation
 
-The cmux plugin is registered in the CrewChief marketplace. If you are working within this repository, it is already registered and available.
-
-To verify the plugin is registered:
-
-```bash
-jq '.plugins[] | select(.name == "cmux")' .claude-plugin/marketplace.json
+```
+/plugin install cmux@crewchief
 ```
 
 ## Configuration

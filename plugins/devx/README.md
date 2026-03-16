@@ -6,6 +6,12 @@ Developer experience orchestration layer for multi-plugin development workflows.
 
 The devx plugin composes multiple plugins (worktree, cmux, vscode) into streamlined commands that automate common development workflows. Instead of manually running separate commands across plugins, devx provides single-command orchestration.
 
+## Installation
+
+```
+/plugin install devx@crewchief
+```
+
 ## Commands
 
 | Command | Description |

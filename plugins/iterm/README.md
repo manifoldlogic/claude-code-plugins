@@ -37,7 +37,7 @@ The iTerm plugin provides iTerm2 tab and pane management capabilities for Claude
 Install the iTerm plugin using the Claude Code plugin command:
 
 ```
-/plugin install iterm
+/plugin install iterm@crewchief
 ```
 
 Once installed, the plugin skills will be available in your Claude Code sessions.

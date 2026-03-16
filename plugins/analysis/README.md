@@ -41,7 +41,9 @@ Deep analysis and problem solving with multi-dimensional thinking.
 
 ## Installation
 
-This plugin is part of the claude-code-plugins repository and can be installed via the Claude Code plugin system.
+```
+/plugin install analysis@crewchief
+```
 
 ## Version
 

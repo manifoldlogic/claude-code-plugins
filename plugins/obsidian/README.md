@@ -93,7 +93,7 @@ ssh ${HOST_USER}@host.docker.internal "obsidian-cli print-default"
 Install the Obsidian plugin using the Claude Code plugin command:
 
 ```
-/plugin install obsidian
+/plugin install obsidian@crewchief
 ```
 
 Once installed, the plugin skills will be available in your Claude Code sessions.

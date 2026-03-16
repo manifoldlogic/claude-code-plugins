@@ -199,14 +199,13 @@ bash plugins/maproom/scripts/monthly-cli-verification.sh
   ```
   Confirm all 6 flags exist in the `vector-search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`, `--threshold`
 - [ ] Compare output against the baseline verification deliverable and check for any discrepancies (new flags, removed flags, renamed flags, changed defaults, changed accepted values):
-  - **Baseline deliverable:** `planning/deliverables/cli-flag-verification.md` (located at the ticket level in the specs directory)
-  - **Full path:** `/workspace/_SPECS/claude-code-plugins/tickets/MAPAGENT_format-agent-skill/planning/deliverables/cli-flag-verification.md`
+  - **Baseline deliverable:** `planning/deliverables/cli-flag-verification.md` (located at the ticket level in your specs directory)
+  - **Full path:** `/path/to/specs/tickets/MAPAGENT_format-agent-skill/planning/deliverables/cli-flag-verification.md`
 - [ ] Record the verification result:
   - **No discrepancies:** Mark this month's verification as complete. No further action needed.
   - **Discrepancies found:** Create a ticket to update all affected documentation (SKILL.md, multi-repo-guide.md, README.md, and the baseline deliverable itself).
 
-**Task Reference:** The verification procedure follows the steps originally defined in MAPAGENT.0001 (verify-cli-flags task):
-`/workspace/_SPECS/claude-code-plugins/tickets/MAPAGENT_format-agent-skill/tasks/MAPAGENT.0001_verify-cli-flags.md`
+**Task Reference:** The verification procedure follows the steps originally defined in the verify-cli-flags task (task 0001 in the MAPAGENT ticket). Consult your specs directory for the full task file path.
 
 **Success Criteria:** CLI drift is detected within 30 days of occurrence, before a significant number of agent sessions encounter deprecated flags.
 
