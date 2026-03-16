@@ -762,6 +762,81 @@ run_name_validation_tests() {
 }
 
 ##############################################################################
+# Category 11: Graceful Degradation - workspace_id Extraction Failure
+##############################################################################
+
+run_workspace_id_extraction_failure_tests() {
+    section "11. Graceful Degradation: workspace_id Extraction Failure"
+
+    # Override cmux-ssh.sh to return unexpected output for new-workspace
+    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
+#!/bin/bash
+case "$1" in
+  new-workspace) echo "ERROR something failed" ;;
+  rename-workspace|send|send-key) echo "OK" ;;
+  *) echo "unknown command: $1" >&2; exit 1 ;;
+esac
+EOF
+    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
+
+    # Test: workspace_id extraction failure exits 0 (graceful degradation)
+    run_script TICKET-1 --repo crewchief
+    assert_exit_code "0" "$LAST_EXIT" "workspace_id extraction failure exits 0 (graceful)"
+    assert_contains "$LAST_OUTPUT" "Could not extract workspace ID" "workspace_id failure shows extraction warning"
+    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "workspace_id failure still shows completion"
+    assert_contains "$LAST_OUTPUT" "cmux: Failed" "workspace_id failure shows cmux failed in summary"
+
+    # Restore standard cmux-ssh.sh mock
+    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
+#!/bin/bash
+case "$1" in
+  new-workspace) echo "OK workspace:3" ;;
+  rename-workspace|send|send-key) echo "OK" ;;
+  *) echo "unknown command: $1" >&2; exit 1 ;;
+esac
+EOF
+    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
+}
+
+##############################################################################
+# Category 12: Graceful Degradation - DEVCONTAINER_NAME Empty + Docker Unavailable
+##############################################################################
+
+run_devcontainer_name_empty_docker_unavailable_tests() {
+    section "12. Graceful Degradation: DEVCONTAINER_NAME Empty + Docker Unavailable"
+
+    # Create a mock docker that returns empty output (no containers found)
+    cat > "$TEST_TMP/mock-bin/docker" << 'EOF'
+#!/bin/bash
+# Mock docker -- returns empty output (no containers found)
+exit 0
+EOF
+    chmod +x "$TEST_TMP/mock-bin/docker"
+
+    # Run without DEVCONTAINER_NAME and with docker returning empty
+    LAST_EXIT=0
+    LAST_OUTPUT=$(
+        PATH="$TEST_TMP/mock-bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
+    ) || LAST_EXIT=$?
+    debug_msg "run_script (no DEVCONTAINER_NAME) exit=$LAST_EXIT"
+    if [ "$VERBOSE" = "true" ]; then
+        debug_msg "output: $(printf '%s' "$LAST_OUTPUT" | head -10)"
+    fi
+
+    # Test: exits 0 (graceful degradation)
+    assert_exit_code "0" "$LAST_EXIT" "empty DEVCONTAINER_NAME + docker unavailable exits 0 (graceful)"
+    assert_contains "$LAST_OUTPUT" "Could not detect devcontainer name" "empty DEVCONTAINER_NAME shows detection warning"
+    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "empty DEVCONTAINER_NAME still shows completion"
+    assert_contains "$LAST_OUTPUT" "cmux: Failed" "empty DEVCONTAINER_NAME shows cmux failed in summary"
+
+    # Clean up docker mock
+    rm -f "$TEST_TMP/mock-bin/docker"
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -789,6 +864,8 @@ main() {
     run_exit_code_tests
     run_cmux_mock_tests
     run_name_validation_tests
+    run_workspace_id_extraction_failure_tests
+    run_devcontainer_name_empty_docker_unavailable_tests
 
     # Summary
     printf "\n"
