@@ -346,15 +346,15 @@ run_argument_parsing_tests() {
     output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo testrepo --workspace 2>&1) || exit_code=$?
     assert_exit_code "1" "$exit_code" "--workspace with missing value exits 1"
 
-    # Test: valid name with special chars (slash) is accepted by arg parser
-    # The script does not validate name contents - ccwt would handle that
+    # Test: name with slash is rejected by name validation (exit 1)
     exit_code=0
     output=$(
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" "feat/branch" --repo testrepo --dry-run 2>&1
     ) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "name with slash accepted in dry-run (no name validation in script)"
+    assert_exit_code "1" "$exit_code" "name with slash rejected by validation"
+    assert_contains "$output" "Invalid worktree name" "slash name shows invalid name error"
 }
 
 ##############################################################################
@@ -711,6 +711,57 @@ run_cmux_mock_tests() {
 }
 
 ##############################################################################
+# Category 10: Name Validation Tests
+##############################################################################
+
+run_name_validation_tests() {
+    section "10. Name Validation Tests"
+
+    local exit_code=0
+    local output
+
+    # Test: name with slash is rejected
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" "feat/branch" --repo testrepo 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "name with slash exits 1"
+    assert_contains "$output" "Invalid worktree name" "slash name shows invalid name error"
+
+    # Test: name with spaces is rejected
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" "ticket with spaces" --repo testrepo 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "name with spaces exits 1"
+    assert_contains "$output" "Invalid worktree name" "space name shows invalid name error"
+
+    # Test: name starting with digit is valid
+    run_script 1ticket --repo crewchief --dry-run
+    assert_exit_code "0" "$LAST_EXIT" "name starting with digit is valid"
+
+    # Test: name with underscore is valid
+    run_script my_feature --repo crewchief --dry-run
+    assert_exit_code "0" "$LAST_EXIT" "name with underscore is valid"
+
+    # Test: name with dot is rejected
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" "v1.0.0" --repo testrepo 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "name with dot exits 1"
+    assert_contains "$output" "Invalid worktree name" "dot name shows invalid name error"
+
+    # Test: empty name handled by missing-name check before validation
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" --repo testrepo 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "empty name exits 1 (missing name check)"
+
+    # Test: standard ticket ID format is valid
+    run_script DEVX-4001 --repo crewchief --dry-run
+    assert_exit_code "0" "$LAST_EXIT" "DEVX-4001 is a valid name"
+
+    # Test: name with leading hyphen is caught as unrecognized option (exit 3)
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" "-ticket" --repo testrepo 2>&1) || exit_code=$?
+    assert_exit_code "3" "$exit_code" "leading hyphen exits 3 (unrecognized option)"
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -737,6 +788,7 @@ main() {
     run_ccwt_tests
     run_exit_code_tests
     run_cmux_mock_tests
+    run_name_validation_tests
 
     # Summary
     printf "\n"

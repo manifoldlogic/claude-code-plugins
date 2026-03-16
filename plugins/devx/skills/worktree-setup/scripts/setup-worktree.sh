@@ -246,6 +246,13 @@ if [ -z "$REPO" ]; then
     exit 1
 fi
 
+# Validate worktree name format
+if ! printf '%s' "$WORKTREE_NAME" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9_-]*$'; then
+    log_error "Invalid worktree name: '$WORKTREE_NAME'"
+    log_error "Names must start with a letter or digit and contain only letters, digits, hyphens, and underscores."
+    exit 1
+fi
+
 # Compute worktree path
 WORKTREE_PATH="/workspace/repos/$REPO/$WORKTREE_NAME"
 
@@ -394,12 +401,15 @@ if [ "$SKIP_WORKSPACE" = true ]; then
 else
     log_info "Step 3: Updating VS Code workspace..."
 
-    ws_args="add $WORKTREE_PATH"
     if [ -n "$WORKSPACE_FILE" ]; then
-        ws_args="$ws_args -w $WORKSPACE_FILE"
+        ws_result=0
+        bash "$WORKSPACE_FOLDER_SCRIPT" add "$WORKTREE_PATH" -w "$WORKSPACE_FILE" || ws_result=$?
+    else
+        ws_result=0
+        bash "$WORKSPACE_FOLDER_SCRIPT" add "$WORKTREE_PATH" || ws_result=$?
     fi
 
-    if bash "$WORKSPACE_FOLDER_SCRIPT" $ws_args; then
+    if [ "$ws_result" -eq 0 ]; then
         log_success "VS Code workspace updated"
     else
         log_warn "Failed to update VS Code workspace (non-fatal)"
