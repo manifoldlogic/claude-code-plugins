@@ -263,6 +263,12 @@ if ! printf '%s' "$WORKTREE_NAME" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9_-]*$'; then
     exit 1
 fi
 
+# Validate repo name format (must not contain /, ., or spaces)
+if ! printf '%s' "$REPO" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9_-]*$'; then
+    log_error "--repo value '$REPO' is invalid. Use alphanumeric characters, hyphens, and underscores only."
+    exit 1
+fi
+
 ##############################################################################
 # Section 6: Dry Run Mode
 ##############################################################################
@@ -427,25 +433,17 @@ fi
 
 log_info "Step 4: Cleaning up worktree (delegate to cleanup-worktree.sh)..."
 
-# Build cleanup-worktree.sh command arguments
-cleanup_args="$WORKTREE_NAME --repo $REPO"
-if [ "$YES" = true ]; then
-    cleanup_args="$cleanup_args --yes"
-fi
-if [ "$KEEP_BRANCH" = true ]; then
-    cleanup_args="$cleanup_args --keep-branch"
-fi
-if [ "$SKIP_WORKSPACE" = true ]; then
-    cleanup_args="$cleanup_args --skip-workspace"
-fi
-if [ "$VERBOSE" = true ]; then
-    cleanup_args="$cleanup_args --verbose"
-fi
+# Build cleanup-worktree.sh command arguments as an array (prevents word-splitting)
+cleanup_args_array=("$WORKTREE_NAME" "--repo" "$REPO")
+[ "$YES" = "true" ]            && cleanup_args_array+=("--yes")
+[ "$KEEP_BRANCH" = "true" ]    && cleanup_args_array+=("--keep-branch")
+[ "$SKIP_WORKSPACE" = "true" ] && cleanup_args_array+=("--skip-workspace")
+[ "$VERBOSE" = "true" ]        && cleanup_args_array+=("--verbose")
 
-log_verbose "exec: bash $CLEANUP_WORKTREE_SCRIPT $cleanup_args"
+log_verbose "exec: bash $CLEANUP_WORKTREE_SCRIPT ${cleanup_args_array[*]}"
 
 cleanup_exit=0
-bash "$CLEANUP_WORKTREE_SCRIPT" $cleanup_args || cleanup_exit=$?
+bash "$CLEANUP_WORKTREE_SCRIPT" "${cleanup_args_array[@]}" || cleanup_exit=$?
 
 if [ "$cleanup_exit" -eq 5 ]; then
     log_warn "User cancelled worktree cleanup"

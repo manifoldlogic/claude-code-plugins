@@ -447,6 +447,24 @@ run_invalid_name_tests() {
     exit_code=0
     output=$(bash "$SCRIPT_UNDER_TEST" --repo testrepo 2>&1) || exit_code=$?
     assert_exit_code "1" "$exit_code" "empty name exits 1"
+
+    # Test: --repo with slash exits 1
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo "foo/bar" 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "--repo with slash exits 1"
+    assert_contains "$output" "--repo value" "--repo slash shows invalid repo error"
+
+    # Test: --repo with dot exits 1
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo "foo.bar" 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "--repo with dot exits 1"
+    assert_contains "$output" "--repo value" "--repo dot shows invalid repo error"
+
+    # Test: --repo with space exits 1
+    exit_code=0
+    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo "foo bar" 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "--repo with space exits 1"
+    assert_contains "$output" "--repo value" "--repo space shows invalid repo error"
 }
 
 ##############################################################################
