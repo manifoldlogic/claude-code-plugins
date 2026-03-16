@@ -390,8 +390,8 @@ else
                 continue
             fi
             ws_id=$( echo "$line" | grep -oE 'workspace:[0-9]+' ) || continue
-            ws_name=$( echo "$line" | sed -E 's/workspace:[0-9]+ //' | sed 's/ \[selected\]$//' )
-            if [ "$ws_name" = "$WORKTREE_NAME" ]; then
+            ws_name=$( echo "$line" | sed -E 's/^[* ]*workspace:[0-9]+[[:space:]]*//' | sed 's/ \[selected\]$//' )
+            if [ "$ws_name" = "$WORKTREE_NAME" ] || [ "$ws_name" = "$REPO $WORKTREE_NAME" ]; then
                 workspace_id="$ws_id"
                 match_count=$((match_count + 1))
             fi

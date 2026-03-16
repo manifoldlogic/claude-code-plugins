@@ -633,6 +633,42 @@ run_cmux_workspace_match_tests() {
     assert_exit_code "0" "$LAST_EXIT" "workspace with [selected] marker exits 0"
     close_log=$(cat "$TEST_TMP/cmux-close-log")
     assert_contains "$close_log" "workspace:1" "[selected] marker stripped, correct workspace matched"
+
+    # Test: workspace named "REPO WORKTREE" matches when --repo REPO is given
+    reset_mocks
+    printf 'workspace:0 default\nworkspace:5 crewchief TICKET-1\nworkspace:2 other\n' \
+        > "$TEST_TMP/ws-repo-prefix-list"
+
+    LAST_EXIT=0
+    LAST_OUTPUT=$(
+        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
+        CLEANUP_WORKTREE_SCRIPT="$TEST_TMP/mock-cleanup-worktree.sh" \
+        MOCK_CLEANUP_ARGS_FILE="$TEST_TMP/cleanup-args" \
+        MOCK_CMUX_CALL_LOG="$TEST_TMP/cmux-close-log" \
+        MOCK_WORKSPACE_LIST_FILE="$TEST_TMP/ws-repo-prefix-list" \
+        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
+    ) || LAST_EXIT=$?
+    assert_exit_code "0" "$LAST_EXIT" "repo-prefixed workspace name exits 0"
+    close_log=$(cat "$TEST_TMP/cmux-close-log")
+    assert_contains "$close_log" "workspace:5" "repo-prefixed workspace matched workspace:5"
+
+    # Test: real cmux output format with leading spaces and double-space separators
+    reset_mocks
+    printf '  workspace:1  default\n* workspace:2  crewchief  [selected]\n  workspace:6  crewchief TICKET-1\n' \
+        > "$TEST_TMP/ws-real-format-list"
+
+    LAST_EXIT=0
+    LAST_OUTPUT=$(
+        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
+        CLEANUP_WORKTREE_SCRIPT="$TEST_TMP/mock-cleanup-worktree.sh" \
+        MOCK_CLEANUP_ARGS_FILE="$TEST_TMP/cleanup-args" \
+        MOCK_CMUX_CALL_LOG="$TEST_TMP/cmux-close-log" \
+        MOCK_WORKSPACE_LIST_FILE="$TEST_TMP/ws-real-format-list" \
+        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
+    ) || LAST_EXIT=$?
+    assert_exit_code "0" "$LAST_EXIT" "real cmux format with leading spaces exits 0"
+    close_log=$(cat "$TEST_TMP/cmux-close-log")
+    assert_contains "$close_log" "workspace:6" "real cmux format matched workspace:6"
 }
 
 ##############################################################################
