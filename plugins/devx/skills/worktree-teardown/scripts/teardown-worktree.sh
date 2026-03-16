@@ -53,7 +53,7 @@
 #      $ teardown-worktree.sh TICKET-1 --repo crewchief --skip-cmux
 #
 #   4. Dry run to preview
-#      $ teardown-worktree.sh --dry-run TICKET-1 --repo crewchief
+#      $ teardown-worktree.sh TICKET-1 --repo crewchief --dry-run
 #
 #   5. Keep the git branch after teardown
 #      $ teardown-worktree.sh TICKET-1 --repo crewchief --keep-branch
@@ -158,7 +158,7 @@ EXAMPLES:
   teardown-worktree.sh TICKET-1 --repo crewchief --skip-cmux
 
   # Dry run to preview
-  teardown-worktree.sh --dry-run TICKET-1 --repo crewchief
+  teardown-worktree.sh TICKET-1 --repo crewchief --dry-run
 
   # Keep the git branch after teardown
   teardown-worktree.sh TICKET-1 --repo crewchief --keep-branch

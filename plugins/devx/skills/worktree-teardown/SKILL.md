@@ -274,6 +274,8 @@ teardown-worktree.sh TICKET-1 --repo crewchief --skip-cmux --keep-branch --yes
 | **4** | Worktree cleanup failure | cleanup-worktree.sh returned a fatal error | Run `cleanup-worktree.sh` directly with `--verbose` for details; check `ccwt list` |
 | **5** | User cancelled | User declined the confirmation prompt in cleanup-worktree.sh | Re-run with `--yes` to skip the prompt, or verify the worktree should be removed |
 
+Note: cleanup-worktree.sh may exit 1, 2, 3, or 6 (lock failure). These are passed through by teardown-worktree.sh as exit 4.
+
 ## Known Limitations
 
 ### iTerm "skipping tab close" warning
