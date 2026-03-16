@@ -10,7 +10,7 @@
 #   - Exit codes (all documented codes 0-4)
 #   - Flag combinations (--skip-cmux, --skip-workspace)
 #   - Prerequisite validation via mocked cmux scripts
-#   - Mocked ccwt (crewchief CLI) for worktree creation tests
+#   - Mocked crewchief CLI for worktree creation tests
 #
 # USAGE:
 #   bash test-setup-worktree.sh           # Run all tests
@@ -181,18 +181,19 @@ exit 0
 EOF
     chmod +x "$TEST_TMP/mock-workspace-folder.sh"
 
-    # Create mock ccwt in mock-bin and prepend to PATH
+    # Create mock crewchief in mock-bin and prepend to PATH
     mkdir -p "$TEST_TMP/mock-bin"
-    cat > "$TEST_TMP/mock-bin/ccwt" << 'EOF'
+    cat > "$TEST_TMP/mock-bin/crewchief" << 'EOF'
 #!/bin/bash
-# Mock ccwt -- capture invocations, return configurable exit code
-# Handles: ccwt create <worktree> --repo <repo>
-case "${MOCK_CCWT_EXIT:-0}" in
+# Mock crewchief -- capture invocations, return configurable exit code
+# Handles: crewchief worktree create <name> --repo <repo>
+shift 2
+case "${MOCK_CREWCHIEF_EXIT:-0}" in
   0) echo "Created worktree at /workspace/repos/${3:-repo}/${1:-worktree}"; exit 0 ;;
-  *) echo "Error: failed to create worktree" >&2; exit "${MOCK_CCWT_EXIT}" ;;
+  *) echo "Error: failed to create worktree" >&2; exit "${MOCK_CREWCHIEF_EXIT}" ;;
 esac
 EOF
-    chmod +x "$TEST_TMP/mock-bin/ccwt"
+    chmod +x "$TEST_TMP/mock-bin/crewchief"
 }
 
 # Run setup-worktree.sh as a subprocess with mocked environment
@@ -214,9 +215,9 @@ run_script() {
 }
 
 # Run setup-worktree.sh with only CMUX_PLUGIN_DIR and DEVCONTAINER_NAME (no mock bin)
-# Usage: run_script_no_ccwt [args...]
+# Usage: run_script_no_crewchief [args...]
 # Sets: LAST_EXIT, LAST_OUTPUT
-run_script_no_ccwt() {
+run_script_no_crewchief() {
     LAST_EXIT=0
     LAST_OUTPUT=$(
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
@@ -224,7 +225,7 @@ run_script_no_ccwt() {
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" "$@" 2>&1
     ) || LAST_EXIT=$?
-    debug_msg "run_script_no_ccwt exit=$LAST_EXIT args='$*'"
+    debug_msg "run_script_no_crewchief exit=$LAST_EXIT args='$*'"
 }
 
 ##############################################################################
@@ -396,8 +397,8 @@ run_dry_run_tests() {
     run_script TICKET-1 --repo crewchief --dry-run
     assert_contains "$LAST_OUTPUT" "/workspace/repos/crewchief/TICKET-1" "--dry-run shows worktree path"
 
-    # Test: --dry-run shows ccwt create command
-    assert_contains "$LAST_OUTPUT" "ccwt create TICKET-1 --repo crewchief" "--dry-run shows ccwt command"
+    # Test: --dry-run shows crewchief worktree create command
+    assert_contains "$LAST_OUTPUT" "crewchief worktree create TICKET-1 --repo crewchief" "--dry-run shows crewchief command"
 
     # Test: --dry-run shows cmux-ssh.sh commands
     assert_contains "$LAST_OUTPUT" "cmux-ssh.sh" "--dry-run references cmux-ssh.sh"
@@ -530,11 +531,11 @@ PASSEOF
 }
 
 ##############################################################################
-# Category 7: ccwt Mock Tests
+# Category 7: crewchief Mock Tests
 ##############################################################################
 
-run_ccwt_tests() {
-    section "7. ccwt (Worktree Creation) Tests"
+run_crewchief_tests() {
+    section "7. crewchief (Worktree Creation) Tests"
 
     local exit_code=0
     local output
@@ -546,18 +547,18 @@ run_ccwt_tests() {
     assert_contains "$LAST_OUTPUT" "Worktree: TICKET-1" "completion shows worktree name"
     assert_contains "$LAST_OUTPUT" "Repository: crewchief" "completion shows repository"
 
-    # Test: ccwt failure -> exit 4
+    # Test: crewchief failure -> exit 4
     exit_code=0
     output=$(
-        MOCK_CCWT_EXIT=1 \
+        MOCK_CREWCHIEF_EXIT=1 \
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
     ) || exit_code=$?
-    assert_exit_code "4" "$exit_code" "ccwt failure exits 4"
-    assert_contains "$output" "Worktree creation failed" "ccwt failure shows error message"
+    assert_exit_code "4" "$exit_code" "crewchief failure exits 4"
+    assert_contains "$output" "Worktree creation failed" "crewchief failure shows error message"
 
     # Test: successful creation with --skip-cmux
     run_script TICKET-1 --repo crewchief --skip-cmux
@@ -648,15 +649,15 @@ exit 0
 PASSEOF
     chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
 
-    # Exit 4: ccwt creation failure
+    # Exit 4: crewchief creation failure
     exit_code=0
-    MOCK_CCWT_EXIT=1 \
+    MOCK_CREWCHIEF_EXIT=1 \
     PATH="$TEST_TMP/mock-bin:$PATH" \
     CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
     WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
     DEVCONTAINER_NAME="mock-container" \
     bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "4" "$exit_code" "exit 4: ccwt creation failure"
+    assert_exit_code "4" "$exit_code" "exit 4: crewchief creation failure"
 }
 
 ##############################################################################
@@ -697,17 +698,24 @@ run_cmux_mock_tests() {
     assert_exit_code "1" "$exit_code" "mock cmux-ssh.sh unknown command exits 1"
     assert_contains "$output" "unknown command" "mock cmux-ssh.sh unknown command shows error"
 
-    # Test: mock ccwt returns success by default
+    # Test: mock crewchief returns success by default
     exit_code=0
-    output=$(bash "$TEST_TMP/mock-bin/ccwt" create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock ccwt default exits 0"
-    assert_contains "$output" "Created worktree" "mock ccwt shows creation message"
+    output=$(bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
+    assert_exit_code "0" "$exit_code" "mock crewchief default exits 0"
+    assert_contains "$output" "Created worktree" "mock crewchief shows creation message"
 
-    # Test: mock ccwt returns error when MOCK_CCWT_EXIT=1
+    # Test: mock crewchief returns error when MOCK_CREWCHIEF_EXIT=1
     exit_code=0
-    output=$(MOCK_CCWT_EXIT=1 bash "$TEST_TMP/mock-bin/ccwt" create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "mock ccwt with MOCK_CCWT_EXIT=1 exits 1"
-    assert_contains "$output" "Error: failed to create worktree" "mock ccwt failure shows error"
+    output=$(MOCK_CREWCHIEF_EXIT=1 bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
+    assert_exit_code "1" "$exit_code" "mock crewchief with MOCK_CREWCHIEF_EXIT=1 exits 1"
+    assert_contains "$output" "Error: failed to create worktree" "mock crewchief failure shows error"
+
+    # Test: direct mock invocation validates arg positions after shift 2
+    exit_code=0
+    output=$(bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo myrepo 2>&1) || exit_code=$?
+    assert_exit_code "0" "$exit_code" "direct mock invocation exits 0"
+    assert_contains "$output" "TICKET-1" "direct mock invocation output contains worktree name"
+    assert_contains "$output" "myrepo" "direct mock invocation output contains repo name"
 }
 
 ##############################################################################
@@ -837,6 +845,81 @@ EOF
 }
 
 ##############################################################################
+# Category 13: Graceful Degradation - Docker Permission Denied
+##############################################################################
+
+run_docker_permission_denied_tests() {
+    section "13. Graceful Degradation: Docker Permission Denied"
+
+    # Create a mock docker that writes "permission denied" to stderr and fails
+    cat > "$TEST_TMP/mock-bin/docker" << 'EOF'
+#!/bin/bash
+echo "permission denied" >&2
+exit 1
+EOF
+    chmod +x "$TEST_TMP/mock-bin/docker"
+
+    # Run without DEVCONTAINER_NAME so docker probe is triggered
+    LAST_EXIT=0
+    LAST_OUTPUT=$(
+        PATH="$TEST_TMP/mock-bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
+    ) || LAST_EXIT=$?
+    debug_msg "run_script (docker permission denied) exit=$LAST_EXIT"
+
+    # Test: exits 0 (graceful degradation)
+    assert_exit_code "0" "$LAST_EXIT" "docker permission denied exits 0 (graceful)"
+    assert_contains "$LAST_OUTPUT" "Docker container detection failed" "docker permission denied shows detection failed warning"
+    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "docker permission denied still shows completion"
+
+    # Clean up docker mock
+    rm -f "$TEST_TMP/mock-bin/docker"
+}
+
+##############################################################################
+# Category 14: Graceful Degradation - cmux Send Failure
+##############################################################################
+
+run_cmux_send_failure_tests() {
+    section "14. Graceful Degradation: cmux Send Failure"
+
+    # Override cmux-ssh.sh to fail on 'send' subcommand
+    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
+#!/bin/bash
+case "$1" in
+  send) echo "send failed" >&2; exit 1 ;;
+  new-workspace) echo "OK workspace:3" ;;
+  rename-workspace|send-key) echo "OK" ;;
+  *) echo "unknown command: $1" >&2; exit 1 ;;
+esac
+EOF
+    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
+
+    # Run with all other mocks in place
+    run_script TICKET-1 --repo crewchief
+
+    # Test: exits 0 (graceful degradation)
+    assert_exit_code "0" "$LAST_EXIT" "cmux send failure exits 0 (graceful)"
+    # Steps 6-7 content should NOT be present (skipped due to CMUX_FAILED)
+    assert_not_contains "$LAST_OUTPUT" "Step 6:" "cmux send failure skips Step 6"
+    assert_not_contains "$LAST_OUTPUT" "Step 7:" "cmux send failure skips Step 7"
+    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "cmux send failure still shows completion"
+
+    # Restore standard cmux-ssh.sh mock
+    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
+#!/bin/bash
+case "$1" in
+  new-workspace) echo "OK workspace:3" ;;
+  rename-workspace|send|send-key) echo "OK" ;;
+  *) echo "unknown command: $1" >&2; exit 1 ;;
+esac
+EOF
+    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
+}
+
+##############################################################################
 # Main Test Runner
 ##############################################################################
 
@@ -860,12 +943,14 @@ main() {
     run_dry_run_tests
     run_skip_flag_tests
     run_prerequisite_validation_tests
-    run_ccwt_tests
+    run_crewchief_tests
     run_exit_code_tests
     run_cmux_mock_tests
     run_name_validation_tests
     run_workspace_id_extraction_failure_tests
     run_devcontainer_name_empty_docker_unavailable_tests
+    run_docker_permission_denied_tests
+    run_cmux_send_failure_tests
 
     # Summary
     printf "\n"
