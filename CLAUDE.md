@@ -83,31 +83,7 @@ Commands are orchestrators that delegate work - they coordinate but don't do wor
 - Agents handle judgment (planning, verification)
 - Preserves context and extends session longevity
 
-## Available Plugins
-
-| Plugin | Purpose |
-|--------|---------|
-| `sdd` | Spec-Driven Development workflow (epics → tickets → tasks) |
-| `github-actions` | CI/CD workflow creation and optimization |
-| `claude-code-dev` | Tools for creating new skills and managing marketplaces |
-| `maproom` | Semantic code search via maproom CLI |
-| `worktree` | Git worktree management via crewchief CLI |
-| `vscode` | VS Code workspace configuration |
-| `iterm` | iTerm2 tab and pane management (macOS host and container modes) |
-| `obsidian` | Obsidian vault management via SSH to host |
-| `game-design` | Game design consultant agents |
-| `rust-analyzer-lsp` | Rust Analyzer LSP configuration |
-| `analysis` | Deep analytical thinking (`/ultrathink` command) |
-
 ## SDD Plugin Core Workflow
-
-```
-/sdd:plan-ticket → /sdd:review → /sdd:create-tasks → /sdd:do-all-tasks → /sdd:archive
-```
-
-Work hierarchy: Epic (research) → Ticket (planning/execution) → Task (individual work item)
-
-Task execution flow: `implement (Sonnet) → test (Haiku) → verify (Sonnet) → commit (Haiku)`
 
 ### Key Commands
 
@@ -151,14 +127,6 @@ After modifying plugin files, bump the version in `.claude-plugin/plugin.json` u
 
 Verify with: `jq -r '.version' plugins/{name}/.claude-plugin/plugin.json`
 
-## Repo-Local Skills
-
-Curated skills in `.claude/skills/` capture repo-specific patterns:
-- `multi-file-documentation-sync` - Verify identical content blocks across multiple files
-- `shell-script-input-validation` - Validate and reject dangerous input patterns in shell scripts
-- `skill-md-structure` - Two SKILL.md documentation patterns (executable vs reference)
-- `wrapper-with-fallback-pattern` - Plugin delegation with graceful fallback
-
 ## Adding a New Plugin
 
 1. Create directory: `plugins/{name}/`
@@ -171,13 +139,3 @@ Curated skills in `.claude/skills/` capture repo-specific patterns:
 ## Skill Documentation Guidelines
 
 When writing SKILL.md for executable skills, cross-verify all documented flags, defaults, and exit codes against source code. Use cross-references to authoritative SKILL.md docs (e.g., tab-management) instead of duplicating shared prerequisites or execution context content. For CLI tools with multiple operations, include decision trees and natural-language-to-command mapping tables.
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `.claude-plugin/marketplace.json` | Plugin registry |
-| `plugins/sdd/hooks/workflow-guidance.py` | Stop hook providing contextual next steps |
-| `plugins/sdd/skills/project-workflow/scripts/` | Scaffolding and status scripts |
-| `plugins/sdd/skills/project-workflow/templates/` | Ticket/epic/task templates |
-| `crewchief.config.js` | CrewChief CLI configuration |
