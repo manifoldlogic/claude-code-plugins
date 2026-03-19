@@ -209,24 +209,24 @@ Planned operations:
      workspace-folder.sh add /workspace/repos/crewchief/TICKET-1
 
 [DRY-RUN] Step 4: Create cmux workspace
-     cmux-ssh.sh new-workspace
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh new-workspace
      sleep 0.5
-     cmux-ssh.sh rename-workspace <workspace_id> TICKET-1
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh rename-workspace <workspace_id> TICKET-1
 
 [DRY-RUN] Step 5: Open devcontainer session
      Container: <DEVCONTAINER_NAME>
-     cmux-ssh.sh send <workspace_id> "docker exec -it <DEVCONTAINER_NAME> /bin/zsh"
-     cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "docker exec -it <DEVCONTAINER_NAME> /bin/zsh"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
      sleep 2
 
 [DRY-RUN] Step 6: Navigate to worktree
-     cmux-ssh.sh send <workspace_id> "cd /workspace/repos/crewchief/TICKET-1"
-     cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "cd /workspace/repos/crewchief/TICKET-1"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
      sleep 0.5
 
 [DRY-RUN] Step 7: Launch claude
-     cmux-ssh.sh send <workspace_id> "claude"
-     cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "claude"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
 
 ==========================================
 ```
