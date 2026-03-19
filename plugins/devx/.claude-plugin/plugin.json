@@ -1,6 +1,6 @@
 {
   "name": "devx",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Developer experience orchestration layer for multi-plugin development workflows. Composes worktree, cmux, and vscode plugins into streamlined commands.",
   "author": {
     "name": "Daniel Bushman",

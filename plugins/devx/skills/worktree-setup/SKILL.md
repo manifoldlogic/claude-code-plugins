@@ -29,6 +29,8 @@ Unlike running `crewchief worktree create` manually, setup-worktree.sh provides 
 - Skip flags to bypass cmux or workspace steps selectively
 - Two-step send pattern for reliable terminal command execution
 
+> **cmux Execution Context:** cmux terminal commands in this skill execute via SSH to the macOS host using `cmux-ssh.sh`. The script is not on PATH and must be invoked by absolute path: `$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh`. See the cmux terminal-management SKILL.md for the full SSH execution model.
+
 ## The Two-Step Send Pattern
 
 The cmux terminal management uses a **two-step send pattern** for all commands sent to the terminal session. Every command requires two calls to cmux-ssh.sh:
@@ -201,30 +203,30 @@ Planned operations:
      Check: crewchief, workspace-folder.sh, cmux-check.sh
 
 [DRY-RUN] Step 2: Create worktree
-     crewchief worktree create TICKET-1 --repo crewchief --branch main
+     (cd /workspace/repos/crewchief && crewchief worktree create TICKET-1 --branch main)
 
 [DRY-RUN] Step 3: Update VS Code workspace
      workspace-folder.sh add /workspace/repos/crewchief/TICKET-1
 
 [DRY-RUN] Step 4: Create cmux workspace
-     cmux-ssh.sh new-workspace
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh new-workspace
      sleep 0.5
-     cmux-ssh.sh rename-workspace <workspace_id> TICKET-1
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh rename-workspace <workspace_id> TICKET-1
 
 [DRY-RUN] Step 5: Open devcontainer session
      Container: <DEVCONTAINER_NAME>
-     cmux-ssh.sh send <workspace_id> "docker exec -it <DEVCONTAINER_NAME> /bin/zsh"
-     cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "docker exec -it <DEVCONTAINER_NAME> /bin/zsh"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
      sleep 2
 
 [DRY-RUN] Step 6: Navigate to worktree
-     cmux-ssh.sh send <workspace_id> "cd /workspace/repos/crewchief/TICKET-1"
-     cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "cd /workspace/repos/crewchief/TICKET-1"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
      sleep 0.5
 
 [DRY-RUN] Step 7: Launch claude
-     cmux-ssh.sh send <workspace_id> "claude"
-     cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "claude"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
 
 ==========================================
 ```

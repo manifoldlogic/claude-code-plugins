@@ -28,6 +28,8 @@ Unlike running `cleanup-worktree.sh` manually, teardown-worktree.sh also closes 
 - Dry-run mode to preview all planned actions
 - Flag passthrough to cleanup-worktree.sh for fine-grained control
 
+> **cmux Execution Context:** cmux terminal commands in this skill execute via SSH to the macOS host using `cmux-ssh.sh`. The script is not on PATH and must be invoked by absolute path: `$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh`. See the cmux terminal-management SKILL.md for the full SSH execution model.
+
 ## Decision Tree
 
 ### Want to preview what will happen?
