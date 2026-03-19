@@ -181,15 +181,54 @@ exit 0
 EOF
     chmod +x "$TEST_TMP/mock-workspace-folder.sh"
 
+    # Create mock repos directory for cd-first pattern (setup-worktree.sh does cd $WORKSPACE_REPOS_ROOT/$REPO)
+    mkdir -p "$TEST_TMP/repos/crewchief"
+    mkdir -p "$TEST_TMP/repos/myrepo"
+    mkdir -p "$TEST_TMP/repos/myproject"
+    mkdir -p "$TEST_TMP/repos/testrepo"
+    mkdir -p "$TEST_TMP/repos/claude-code-plugins"
+    mkdir -p "$TEST_TMP/repos/webapp"
+
     # Create mock crewchief in mock-bin and prepend to PATH
     mkdir -p "$TEST_TMP/mock-bin"
     cat > "$TEST_TMP/mock-bin/crewchief" << 'EOF'
 #!/bin/bash
 # Mock crewchief -- capture invocations, return configurable exit code
-# Handles: crewchief worktree create <name> --repo <repo>
+# Handles: crewchief worktree create <name> --branch <branch>
+# Rejects --repo flag (not supported by crewchief worktree create; use cd-first pattern)
+# Validates $PWD matches expected repo path
+
+# Scan all arguments for --repo (must reject before any other processing)
+for arg in "$@"; do
+  if [ "$arg" = "--repo" ]; then
+    echo "Error: --repo flag is not supported by crewchief worktree create" >&2
+    exit 1
+  fi
+done
+
+# After "worktree create", expect: <name> [--branch <branch>]
 shift 2
+NAME="${1:-worktree}"
+shift || true
+
+# Parse --branch if present
+BRANCH="main"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --branch) BRANCH="${2:-main}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+# Validate PWD matches expected repo path (WORKSPACE_REPOS_ROOT/<repo>)
+EXPECTED_REPO_ROOT="${WORKSPACE_REPOS_ROOT:-/workspace/repos}"
+case "$PWD" in
+  "$EXPECTED_REPO_ROOT"/*) ;; # OK -- invoked from a repo subdirectory
+  *) echo "Error: expected PWD under $EXPECTED_REPO_ROOT, got $PWD" >&2; exit 1 ;;
+esac
+
 case "${MOCK_CREWCHIEF_EXIT:-0}" in
-  0) echo "Created worktree at /workspace/repos/${3:-repo}/${1:-worktree}"; exit 0 ;;
+  0) echo "Created worktree at $PWD/$NAME"; exit 0 ;;
   *) echo "Error: failed to create worktree" >&2; exit "${MOCK_CREWCHIEF_EXIT}" ;;
 esac
 EOF
@@ -205,6 +244,7 @@ run_script() {
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" "$@" 2>&1
     ) || LAST_EXIT=$?
@@ -395,10 +435,10 @@ run_dry_run_tests() {
 
     # Test: --dry-run shows worktree path
     run_script TICKET-1 --repo crewchief --dry-run
-    assert_contains "$LAST_OUTPUT" "/workspace/repos/crewchief/TICKET-1" "--dry-run shows worktree path"
+    assert_contains "$LAST_OUTPUT" "crewchief/TICKET-1" "--dry-run shows worktree path"
 
     # Test: --dry-run shows crewchief worktree create command
-    assert_contains "$LAST_OUTPUT" "crewchief worktree create TICKET-1 --repo crewchief" "--dry-run shows crewchief command"
+    assert_contains "$LAST_OUTPUT" "crewchief worktree create TICKET-1 --branch main" "--dry-run shows crewchief command (cd-first pattern, no --repo)"
 
     # Test: --dry-run shows cmux-ssh.sh commands
     assert_contains "$LAST_OUTPUT" "cmux-ssh.sh" "--dry-run references cmux-ssh.sh"
@@ -472,6 +512,7 @@ run_prerequisite_validation_tests() {
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/nonexistent-cmux-dir" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
     ) || exit_code=$?
@@ -523,6 +564,7 @@ PASSEOF
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/nonexistent-workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
     ) || exit_code=$?
@@ -554,6 +596,7 @@ run_crewchief_tests() {
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
         DEVCONTAINER_NAME="mock-container" \
         bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
     ) || exit_code=$?
@@ -655,6 +698,7 @@ PASSEOF
     PATH="$TEST_TMP/mock-bin:$PATH" \
     CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
     WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+    WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
     DEVCONTAINER_NAME="mock-container" \
     bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief >/dev/null 2>&1 || exit_code=$?
     assert_exit_code "4" "$exit_code" "exit 4: crewchief creation failure"
@@ -698,24 +742,50 @@ run_cmux_mock_tests() {
     assert_exit_code "1" "$exit_code" "mock cmux-ssh.sh unknown command exits 1"
     assert_contains "$output" "unknown command" "mock cmux-ssh.sh unknown command shows error"
 
-    # Test: mock crewchief returns success by default
+    # Test: mock crewchief returns success for valid invocation (cd-first, no --repo)
+    exit_code=0
+    mkdir -p "$TEST_TMP/repos/crewchief"
+    output=$(cd "$TEST_TMP/repos/crewchief" && WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --branch main 2>&1) || exit_code=$?
+    assert_exit_code "0" "$exit_code" "mock crewchief valid invocation exits 0"
+    assert_contains "$output" "Created worktree" "mock crewchief shows creation message"
+
+    # Test: mock crewchief rejects --repo flag with non-zero exit
     exit_code=0
     output=$(bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock crewchief default exits 0"
-    assert_contains "$output" "Created worktree" "mock crewchief shows creation message"
+    TESTS_RUN=$((TESTS_RUN + 1))
+    if [ "$exit_code" -ne 0 ]; then
+        pass "mock crewchief rejects --repo with non-zero exit"
+    else
+        fail "mock crewchief rejects --repo with non-zero exit" "expected non-zero exit, got $exit_code"
+    fi
+    assert_contains "$output" "Error: --repo flag is not supported by crewchief worktree create" "mock crewchief --repo rejection shows correct error message"
 
     # Test: mock crewchief returns error when MOCK_CREWCHIEF_EXIT=1
     exit_code=0
-    output=$(MOCK_CREWCHIEF_EXIT=1 bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
+    output=$(cd "$TEST_TMP/repos/crewchief" && WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" MOCK_CREWCHIEF_EXIT=1 bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --branch main 2>&1) || exit_code=$?
     assert_exit_code "1" "$exit_code" "mock crewchief with MOCK_CREWCHIEF_EXIT=1 exits 1"
     assert_contains "$output" "Error: failed to create worktree" "mock crewchief failure shows error"
 
-    # Test: direct mock invocation validates arg positions after shift 2
+    # Test: mock crewchief rejects --repo even with different repo name
     exit_code=0
     output=$(bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo myrepo 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "direct mock invocation exits 0"
-    assert_contains "$output" "TICKET-1" "direct mock invocation output contains worktree name"
-    assert_contains "$output" "myrepo" "direct mock invocation output contains repo name"
+    TESTS_RUN=$((TESTS_RUN + 1))
+    if [ "$exit_code" -ne 0 ]; then
+        pass "mock crewchief rejects --repo myrepo with non-zero exit"
+    else
+        fail "mock crewchief rejects --repo myrepo with non-zero exit" "expected non-zero exit, got $exit_code"
+    fi
+    assert_contains "$output" "Error: --repo flag is not supported by crewchief worktree create" "mock crewchief --repo myrepo rejection shows correct error message"
+
+    # Test: mock crewchief validates $PWD matches expected repo path
+    exit_code=0
+    output=$(cd /tmp && WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --branch main 2>&1) || exit_code=$?
+    TESTS_RUN=$((TESTS_RUN + 1))
+    if [ "$exit_code" -ne 0 ]; then
+        pass "mock crewchief rejects invocation from wrong PWD"
+    else
+        fail "mock crewchief rejects invocation from wrong PWD" "expected non-zero exit, got $exit_code"
+    fi
 }
 
 ##############################################################################
@@ -827,6 +897,7 @@ EOF
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
         bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
     ) || LAST_EXIT=$?
     debug_msg "run_script (no DEVCONTAINER_NAME) exit=$LAST_EXIT"
@@ -865,6 +936,7 @@ EOF
         PATH="$TEST_TMP/mock-bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
         bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
     ) || LAST_EXIT=$?
     debug_msg "run_script (docker permission denied) exit=$LAST_EXIT"

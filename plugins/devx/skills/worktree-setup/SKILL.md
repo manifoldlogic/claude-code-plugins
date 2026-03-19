@@ -203,7 +203,7 @@ Planned operations:
      Check: crewchief, workspace-folder.sh, cmux-check.sh
 
 [DRY-RUN] Step 2: Create worktree
-     crewchief worktree create TICKET-1 --repo crewchief --branch main
+     (cd /workspace/repos/crewchief && crewchief worktree create TICKET-1 --branch main)
 
 [DRY-RUN] Step 3: Update VS Code workspace
      workspace-folder.sh add /workspace/repos/crewchief/TICKET-1

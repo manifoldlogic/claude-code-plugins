@@ -306,7 +306,7 @@ if [ "$DRY_RUN" = true ]; then
     echo ""
 
     dry_run_msg "Step 2: Create worktree"
-    echo "     crewchief worktree create $WORKTREE_NAME --repo $REPO --branch $BRANCH"
+    echo "     (cd $WORKSPACE_REPOS_ROOT/$REPO && crewchief worktree create $WORKTREE_NAME --branch $BRANCH)"
     echo ""
 
     if [ "$SKIP_WORKSPACE" = true ]; then
@@ -402,7 +402,7 @@ log_success "Prerequisites validated"
 
 log_info "Step 2: Creating worktree '$WORKTREE_NAME' in repo '$REPO'..."
 
-if ! crewchief worktree create "$WORKTREE_NAME" --repo "$REPO" --branch "$BRANCH"; then
+if ! (cd "$WORKSPACE_REPOS_ROOT/$REPO" && crewchief worktree create "$WORKTREE_NAME" --branch "$BRANCH"); then
     log_error "Worktree creation failed (crewchief worktree create returned non-zero)"
     exit 4
 fi
