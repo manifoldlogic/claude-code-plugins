@@ -23,7 +23,7 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
      - If the current directory matches `/workspace/repos/<repo>` with no subdirectory (i.e., the main worktree), report a specific error:
        "You are in the main worktree. This command is for feature worktrees only.
         Provide a worktree name: `/worktree:sync-and-clean <name>`
-        Use `ccwt list` to see available worktrees."
+        Use `crewchief worktree list` to see available worktrees."
      - If the current directory does not match the `/workspace/repos/<repo>/<worktree>` pattern at all, report a generic error: "Could not auto-detect worktree from current directory. Please provide a worktree name: `/worktree:sync-and-clean <worktree-name>`"
 
 2. Validate worktree name format:
@@ -34,7 +34,7 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
 
 3. Resolve the worktree path:
    - If the worktree name was provided but the repo is unknown, search `/workspace/repos/` for **all** repo directories containing a subdirectory matching the worktree name. Use `ls` to list directories under `/workspace/repos/` and check each one. Track all matching repos, not just the first match.
-   - If **no matches** found, report an error: "Worktree directory not found. Check the worktree name and try again. Use `ccwt list` to see available worktrees."
+   - If **no matches** found, report an error: "Worktree directory not found. Check the worktree name and try again. Use `crewchief worktree list` to see available worktrees."
    - If **multiple matches** found (worktree name exists in more than one repo), report an error and stop processing:
      "Ambiguous: worktree '{name}' exists in multiple repos: {repo1}, {repo2}.
       Run command from within desired worktree for auto-detection:
@@ -42,7 +42,7 @@ User input: $ARGUMENTS (optional worktree name; if empty, auto-detect from the c
         /worktree:sync-and-clean"
    - If **exactly one match** found, construct the full path as `/workspace/repos/<repo>/<worktree>`.
    - Verify the directory exists by checking with `ls -d /workspace/repos/<repo>/<worktree>`.
-   - If the directory does not exist, report an error: "Worktree directory not found at `/workspace/repos/<repo>/<worktree>`. Check the worktree name and try again. Use `ccwt list` to see available worktrees."
+   - If the directory does not exist, report an error: "Worktree directory not found at `/workspace/repos/<repo>/<worktree>`. Check the worktree name and try again. Use `crewchief worktree list` to see available worktrees."
 
 4. Check for uncommitted changes:
    - Run `git -C /workspace/repos/<repo>/<worktree> status --porcelain` to detect uncommitted changes.
