@@ -375,7 +375,7 @@ The 200ms inter-tab delay accounts for iTerm2 needing time to fully initialize e
 
 **Cause:** The repository only has its main worktree. No additional worktrees have been created.
 
-**Solution:** This is expected behavior. Create worktrees first using `spawn-worktree.sh` or `crewchief worktree`, then run open-all-worktrees.sh:
+**Solution:** This is expected behavior. Create worktrees first using `spawn-worktree.sh` or `crewchief worktree create`, then run open-all-worktrees.sh:
 ```bash
 spawn-worktree.sh FEAT-0001 --repo crewchief
 open-all-worktrees.sh --repo crewchief
