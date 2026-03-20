@@ -5,7 +5,7 @@ description: Create a git worktree with VS Code workspace and cmux terminal setu
 
 # Worktree Setup Skill
 
-**Last Updated:** 2026-03-15
+**Last Updated:** 2026-03-20
 **Script Source:** `plugins/devx/skills/worktree-setup/scripts/setup-worktree.sh`
 
 ## Overview
@@ -43,14 +43,42 @@ The cmux terminal management uses a **two-step send pattern** for all commands s
 **Example from the script (Step 5 - Open devcontainer session):**
 ```bash
 # Step 1: Type the docker exec command into the terminal
-cmux-ssh.sh send "$workspace_id" "docker exec -it $CONTAINER_NAME /bin/zsh"
+cmux-ssh.sh send --workspace "$workspace_id" "docker exec -it $CONTAINER_NAME /bin/zsh"
 # Step 2: Press Enter to execute it
-cmux-ssh.sh send-key "$workspace_id" enter
-# Wait for the container shell to initialize
-sleep 2
+cmux-ssh.sh send-key --workspace "$workspace_id" enter
+# Wait for the container shell to be ready (polls read-screen for prompt)
+cmux_wait_prompt "$workspace_id" "$CMUX_SSH_SCRIPT"
 ```
 
 This pattern repeats for every command sent to the terminal: the `cd` navigation in Step 6 and the `claude` launch in Step 7 both use the same two-step approach.
+
+## Readiness Verification
+
+After each two-step send in Steps 4-6, the script verifies that the cmux operation has completed before proceeding. Instead of using fixed-duration `sleep` calls, setup-worktree.sh polls cmux subcommands to detect when the terminal is ready. This is provided by the `cmux-wait.sh` utility library, which the script sources from the cmux plugin at `plugins/cmux/skills/terminal-management/scripts/cmux-wait.sh`.
+
+The library provides two polling functions:
+
+- **`cmux_wait_workspace`** -- Used after creating a new workspace (Step 4). Polls `list-workspaces` via `cmux-ssh.sh` until the newly created workspace ID appears in the output. This confirms that the workspace is registered and ready to receive commands.
+
+- **`cmux_wait_prompt`** -- Used after opening a devcontainer session via `docker exec` (Step 5) and after navigating to the worktree directory with `cd` (Step 6). Polls `read-screen` via `cmux-ssh.sh` and matches the terminal output against a shell prompt pattern using `grep -E`. This confirms that the previous command has finished executing and the shell is ready for the next command.
+
+Both functions poll in a loop with configurable timeouts and intervals. If the timeout expires, the function logs a warning and returns a non-zero exit code. The script treats readiness timeouts as non-fatal -- it logs a warning and continues with the next step.
+
+### Readiness Environment Variables
+
+The following environment variables control polling behavior. Set them before running setup-worktree.sh to override the defaults.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CMUX_WAIT_WS_TIMEOUT` | `5` | Seconds to wait for workspace creation |
+| `CMUX_WAIT_PROMPT_TIMEOUT` | `10` | Seconds to wait for shell prompt after docker exec |
+| `CMUX_WAIT_WS_INTERVAL` | `0.3` | Seconds between workspace polls |
+| `CMUX_WAIT_PROMPT_INTERVAL` | `0.5` | Seconds between prompt polls |
+| `CMUX_PROMPT_PATTERN` | `[^#\$%][\$#%] *$` | grep -E pattern to match shell prompt |
+
+### Fallback When cmux-wait.sh Is Missing
+
+If `cmux-wait.sh` is not found at the expected path, the script defines stub functions that replicate the original sleep-based timing: `cmux_wait_workspace` sleeps for 0.5 seconds and `cmux_wait_prompt` sleeps for 2 seconds. A warning is logged when this fallback activates. The stub functions always return success (exit 0), so the rest of the script proceeds normally. This ensures backward compatibility when the cmux plugin does not include the polling library.
 
 ## DEVCONTAINER_NAME Environment Variable
 
@@ -165,6 +193,7 @@ Both `worktree-name` and `--repo` are required. The worktree name is typically a
 - `--skip-cmux` -- Skip cmux workspace creation (steps 4-7)
 - `--skip-workspace` -- Skip VS Code workspace update (step 3)
 - `--dry-run` -- Preview planned operations without making changes
+- `--verbose` -- Show cmux-ssh.sh invocations and output
 - `-h, --help` -- Show help message and exit
 
 ### Environment Variables
@@ -210,23 +239,23 @@ Planned operations:
 
 [DRY-RUN] Step 4: Create cmux workspace
      $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh new-workspace
-     sleep 0.5
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh rename-workspace <workspace_id> TICKET-1
+     cmux_wait_workspace <workspace_id>
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh rename-workspace --workspace <workspace_id> TICKET-1
 
 [DRY-RUN] Step 5: Open devcontainer session
      Container: <DEVCONTAINER_NAME>
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "docker exec -it <DEVCONTAINER_NAME> /bin/zsh"
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
-     sleep 2
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send --workspace <workspace_id> "docker exec -it <DEVCONTAINER_NAME> /bin/zsh"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key --workspace <workspace_id> enter
+     cmux_wait_prompt <workspace_id>
 
 [DRY-RUN] Step 6: Navigate to worktree
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "cd /workspace/repos/crewchief/TICKET-1"
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
-     sleep 0.5
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send --workspace <workspace_id> "cd /workspace/repos/crewchief/TICKET-1"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key --workspace <workspace_id> enter
+     cmux_wait_prompt <workspace_id>
 
 [DRY-RUN] Step 7: Launch claude
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send <workspace_id> "claude"
-     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key <workspace_id> enter
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send --workspace <workspace_id> "claude"
+     $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh send-key --workspace <workspace_id> enter
 
 ==========================================
 ```

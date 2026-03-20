@@ -5,7 +5,7 @@ description: cmux terminal management for macOS host via SSH from devcontainers.
 
 # Terminal Management Skill
 
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-03-20
 **Plugin:** cmux
 **Scripts Location:** `plugins/cmux/skills/terminal-management/scripts/`
 
@@ -288,8 +288,9 @@ $SSH "$CMUX send --workspace workspace:1 'npm test'"
 # Step 3: Execute it
 $SSH "$CMUX send-key --workspace workspace:1 enter"
 
-# Step 4: Verify with read-screen
-sleep 1  # allow command to run
+# Step 4: Wait for prompt and verify with read-screen
+# Use cmux_wait_prompt for polling, or sleep as a simple fallback
+sleep 1
 $SSH "$CMUX read-screen --workspace workspace:1 --lines 20"
 ```
 
@@ -298,9 +299,12 @@ $SSH "$CMUX read-screen --workspace workspace:1 --lines 20"
 ```bash
 CMUX="/Applications/cmux.app/Contents/Resources/bin/cmux"
 SSH="ssh -o BatchMode=yes -o ConnectTimeout=5 ${HOST_USER}@host.docker.internal"
+CMUX_SSH="$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh"
+source "$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-wait.sh"
 
 # Create the workspace
 $SSH "$CMUX new-workspace"  # note the workspace:N ID returned
+cmux_wait_workspace "workspace:2" "$CMUX_SSH"
 
 # Type docker exec command
 $SSH "$CMUX send --workspace workspace:2 'docker exec -it dev-container_devcontainer-devcontainer-1 /bin/zsh -l'"
@@ -308,8 +312,8 @@ $SSH "$CMUX send --workspace workspace:2 'docker exec -it dev-container_devconta
 # Execute it
 $SSH "$CMUX send-key --workspace workspace:2 enter"
 
-# Wait and verify connection
-sleep 2
+# Wait for shell prompt readiness
+cmux_wait_prompt "workspace:2" "$CMUX_SSH"
 $SSH "$CMUX read-screen --workspace workspace:2 --lines 5"
 ```
 
@@ -351,18 +355,26 @@ $CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh list-workspaces
 
 ## Performance Notes
 
-Each cmux command runs over SSH, adding approximately 200-500ms of latency per invocation. When executing multiple cmux commands in sequence (batch operations), add a small delay between commands to avoid race conditions:
+Each cmux command runs over SSH, adding approximately 200-500ms of latency per invocation. When executing multiple cmux commands in sequence, use the `cmux-wait.sh` polling library to verify readiness instead of fixed `sleep` delays:
 
 ```bash
 CMUX_SSH="$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh"
+source "$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-wait.sh"
 
-$CMUX_SSH new-workspace
-sleep 0.5
+$CMUX_SSH new-workspace  # returns "OK workspace:N"
+cmux_wait_workspace "workspace:2" "$CMUX_SSH"
 $CMUX_SSH rename-workspace --workspace workspace:2 'Build'
-sleep 0.5
 $CMUX_SSH send --workspace workspace:2 'make build'
 $CMUX_SSH send-key --workspace workspace:2 enter
+cmux_wait_prompt "workspace:2" "$CMUX_SSH"
 ```
+
+The `cmux-wait.sh` library provides two polling functions:
+
+- **`cmux_wait_workspace(workspace_id, cmux_ssh_script)`** -- Polls `list-workspaces` until the workspace ID appears. Default timeout: 5s, interval: 0.3s.
+- **`cmux_wait_prompt(workspace_id, cmux_ssh_script)`** -- Polls `read-screen` until a shell prompt pattern is matched. Default timeout: 10s, interval: 0.5s.
+
+Both return 0 on success, 1 on timeout. See `cmux-wait.sh` header for configurable environment variables (`CMUX_WAIT_WS_TIMEOUT`, `CMUX_WAIT_PROMPT_TIMEOUT`, etc.).
 
 For single commands, no delay is needed. The `send` and `send-key` pair can be issued back-to-back without delay since they target the same workspace sequentially.
 
