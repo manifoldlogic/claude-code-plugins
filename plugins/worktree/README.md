@@ -113,7 +113,7 @@ If fetch or pull fails due to connectivity issues:
 
 **Worktree Not Found**
 If the worktree name doesn't match any directory:
-- List available worktrees: `ccwt list`
+- List available worktrees: `crewchief worktree list`
 - Check spelling and case sensitivity
 - Use auto-detection by running the command from within the worktree directory
 
@@ -193,7 +193,7 @@ Preview cleanup operations without making changes using dry-run mode.
 **Solution**:
 - Ensure you are inside a worktree directory (path must match `/workspace/repos/<repo>/<worktree>`)
 - If running from the main worktree (`/workspace/repos/<repo>`), provide an explicit name: `/worktree:sync-and-clean <name>`
-- List available worktrees: `ccwt list`
+- List available worktrees: `crewchief worktree list`
 
 **Problem**: Ambiguous worktree name exists in multiple repos
 

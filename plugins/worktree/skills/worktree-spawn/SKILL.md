@@ -11,7 +11,7 @@ description: Create git worktrees using CrewChief CLI with VS Code workspace int
 
 The worktree-spawn skill orchestrates worktree creation by combining two operations:
 
-1. Create git worktree using CrewChief CLI (`ccwt create`)
+1. Create git worktree using CrewChief CLI (`crewchief worktree create`)
 2. Add worktree folder to VS Code workspace file via `workspace-folder.sh`
 
 ## Naming Rules
@@ -38,7 +38,7 @@ The only transformation applied is validation: names must match [a-zA-Z0-9_-]+ a
 
 ## Decision Tree
 
-### Use ccwt create when:
+### Use crewchief worktree create when:
 - You need to create a new worktree
 - Working inside a devcontainer or any environment with CrewChief CLI
 - You want fine-grained control over each operation
@@ -53,7 +53,7 @@ The only transformation applied is validation: names must match [a-zA-Z0-9_-]+ a
 ### Environment Requirements
 
 - Git repositories in `/workspace/repos` directory
-- CrewChief CLI (`ccwt` command) installed
+- CrewChief CLI (`crewchief worktree` command) installed
 - workspace-folder.sh script available for VS Code workspace updates (optional)
 - jq installed for workspace updates (optional)
 
@@ -61,7 +61,7 @@ The only transformation applied is validation: names must match [a-zA-Z0-9_-]+ a
 
 ```bash
 # Check CrewChief CLI
-command -v ccwt
+command -v crewchief
 
 # Verify workspace-folder.sh script
 ls ~/.devcontainer/scripts/workspace-folder.sh
@@ -72,7 +72,7 @@ ls ~/.devcontainer/scripts/workspace-folder.sh
 ### Creating a Worktree
 
 ```bash
-ccwt create <worktree-name> --repo <repository> --branch <base-branch>
+crewchief worktree create <worktree-name> --repo <repository> --branch <base-branch>
 ```
 
 ### Adding to VS Code Workspace
@@ -87,7 +87,7 @@ workspace-folder.sh add repos/<repo>/<worktree> --name "<repo> (<worktree>)"
 
 ```bash
 # 1. Create worktree from main branch
-ccwt create feature-auth --repo crewchief --branch main
+crewchief worktree create feature-auth --repo crewchief --branch main
 
 # 2. Add to VS Code workspace
 workspace-folder.sh add repos/crewchief/feature-auth --name "crewchief (feature-auth)"
@@ -98,7 +98,7 @@ workspace-folder.sh add repos/crewchief/feature-auth --name "crewchief (feature-
 ### 1. Basic Usage - Create worktree with workspace integration
 
 ```bash
-ccwt create feature-auth --repo crewchief --branch main
+crewchief worktree create feature-auth --repo crewchief --branch main
 workspace-folder.sh add repos/crewchief/feature-auth --name "crewchief (feature-auth)"
 ```
 
@@ -107,7 +107,7 @@ workspace-folder.sh add repos/crewchief/feature-auth --name "crewchief (feature-
 ### 2. Custom Base Branch
 
 ```bash
-ccwt create bugfix-login --repo crewchief --branch develop
+crewchief worktree create bugfix-login --repo crewchief --branch develop
 workspace-folder.sh add repos/crewchief/bugfix-login --name "crewchief (bugfix-login)"
 ```
 
@@ -116,7 +116,7 @@ workspace-folder.sh add repos/crewchief/bugfix-login --name "crewchief (bugfix-l
 ### 3. Skip Workspace Update
 
 ```bash
-ccwt create quick-test --repo crewchief --branch main
+crewchief worktree create quick-test --repo crewchief --branch main
 ```
 
 **Use case:** Quickly create a worktree for temporary testing or experimentation without modifying the workspace file.
@@ -127,7 +127,7 @@ When working with the SDD (Spec-Driven Development) plugin, use worktree names t
 
 ```bash
 # Start work on ticket MAPR-0001
-ccwt create MAPR-0001 --repo crewchief --branch main
+crewchief worktree create MAPR-0001 --repo crewchief --branch main
 workspace-folder.sh add repos/crewchief/MAPR-0001 --name "crewchief (MAPR-0001)"
 ```
 

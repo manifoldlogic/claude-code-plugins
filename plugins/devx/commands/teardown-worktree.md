@@ -86,6 +86,6 @@ Handle the exit code from teardown-worktree.sh:
 
 - **Exit 3 -- Unrecognized option:** Report the unrecognized flag. Show valid options from `--help`. Note that worktree names starting with a hyphen are treated as unrecognized options.
 
-- **Exit 4 -- Worktree cleanup failure:** Report that cleanup-worktree.sh failed. Suggest running `cleanup-worktree.sh` directly with `--verbose` for more detailed error output. Check if the worktree exists with `ccwt list`.
+- **Exit 4 -- Worktree cleanup failure:** Report that cleanup-worktree.sh failed. Suggest running `cleanup-worktree.sh` directly with `--verbose` for more detailed error output. Check if the worktree exists with `crewchief worktree list`.
 
 - **Exit 5 -- User cancelled:** Report that the user declined the confirmation prompt. This is a normal outcome, not an error. The worktree was not removed. Suggest re-running with `--yes` to skip the prompt if the user is certain they want to proceed.

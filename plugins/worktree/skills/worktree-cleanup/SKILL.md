@@ -18,7 +18,7 @@ The cleanup-worktree.sh script orchestrates the complete worktree removal workfl
 4. Optionally delete the associated git branch
 5. Remove worktree folder from VS Code workspace file
 
-Unlike basic `git worktree remove` or `ccwt clean`, cleanup-worktree.sh provides safety features including ticket status checking and confirmation prompts to prevent accidental data loss.
+Unlike basic `git worktree remove` or `crewchief worktree clean`, cleanup-worktree.sh provides safety features including ticket status checking and confirmation prompts to prevent accidental data loss.
 
 **KEY SAFETY FEATURES:**
 - Automatic detection of associated SDD tickets
@@ -35,7 +35,7 @@ Unlike basic `git worktree remove` or `ccwt clean`, cleanup-worktree.sh provides
 - You need confirmation before removing incomplete work
 - You're using VS Code multi-root workspaces
 
-### Use ccwt clean (CrewChief CLI) when:
+### Use crewchief worktree clean (CrewChief CLI) when:
 - You only need worktree removal (no ticket checking)
 - Working outside a devcontainer
 - Scripting where you want direct control
