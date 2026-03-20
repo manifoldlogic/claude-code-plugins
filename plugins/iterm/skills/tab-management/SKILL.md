@@ -727,7 +727,7 @@ cleanup_worktree() {
     iterm-close-tab.sh --force "worktree: $worktree_name"
 
     # Delete the worktree
-    ccwt clean "$worktree_name"
+    crewchief worktree clean "$worktree_name"
 }
 ```
 

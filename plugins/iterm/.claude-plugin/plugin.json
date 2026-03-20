@@ -1,5 +1,5 @@
 {
   "name": "iterm",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "iTerm2 tab and pane management for macOS host and Linux container environments"
 }
