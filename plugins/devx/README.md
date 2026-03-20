@@ -23,7 +23,7 @@ The devx plugin composes multiple plugins (worktree, cmux, vscode) into streamli
 
 The devx plugin delegates to these plugins:
 
-- **worktree** - Git worktree creation via `ccwt create`
+- **worktree** - Git worktree creation via `crewchief worktree create`
 - **cmux** - Terminal workspace management via `cmux`
 - **vscode** - VS Code workspace file management via `workspace-folder.sh`
 

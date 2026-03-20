@@ -60,7 +60,7 @@ Unlike running `cleanup-worktree.sh` manually, teardown-worktree.sh also closes 
 
 **Optional (graceful degradation when absent):**
 - `cmux-check.sh` and `cmux-ssh.sh` at `$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/` -- cmux steps skipped if not found or if cmux-check.sh returns non-zero
-- CrewChief CLI (`ccwt`) -- required by cleanup-worktree.sh for worktree removal
+- CrewChief CLI (`crewchief worktree`) -- required by cleanup-worktree.sh for worktree removal
 - `workspace-folder.sh` -- required by cleanup-worktree.sh for VS Code workspace update (skipped if not found)
 
 ### Verification Commands
@@ -74,7 +74,7 @@ ls "$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-check.sh"
 ls "$CMUX_PLUGIN_DIR/skills/terminal-management/scripts/cmux-ssh.sh"
 
 # Check CrewChief CLI
-command -v ccwt
+command -v crewchief
 ```
 
 ## Usage
@@ -271,7 +271,7 @@ teardown-worktree.sh TICKET-1 --repo crewchief --skip-cmux --keep-branch --yes
 | **1** | Usage error | Missing worktree name, missing `--repo`, missing flag value, invalid name format (contains slash/space/dot) | Check syntax with `--help` |
 | **2** | Prerequisite failure | cleanup-worktree.sh not found, cmux-check.sh returned non-zero | Set `CLEANUP_WORKTREE_SCRIPT` env var or use `--skip-cmux` for cmux issues |
 | **3** | Unrecognized option | Unknown flag, worktree name starting with a hyphen | Check valid options with `--help` |
-| **4** | Worktree cleanup failure | cleanup-worktree.sh returned a fatal error | Run `cleanup-worktree.sh` directly with `--verbose` for details; check `ccwt list` |
+| **4** | Worktree cleanup failure | cleanup-worktree.sh returned a fatal error | Run `cleanup-worktree.sh` directly with `--verbose` for details; check `crewchief worktree list` |
 | **5** | User cancelled | User declined the confirmation prompt in cleanup-worktree.sh | Re-run with `--yes` to skip the prompt, or verify the worktree should be removed |
 
 Note: cleanup-worktree.sh may exit 1, 2, 3, or 6 (lock failure). These are passed through by teardown-worktree.sh as exit 4.
@@ -353,4 +353,4 @@ If cmux workspace identification or closure fails (steps 2-3), the script still 
 
 - **worktree-setup** (`plugins/devx/skills/worktree-setup/SKILL.md`) -- The setup counterpart that creates worktrees and cmux workspaces. Teardown reverses the operations performed by setup.
 - **terminal-management** (`plugins/cmux/skills/terminal-management/SKILL.md`) -- The cmux terminal management skill providing `cmux-ssh.sh` for workspace listing and closure.
-- **worktree-management** -- Core git worktree operations via CrewChief CLI (`ccwt`)
+- **worktree-management** -- Core git worktree operations via CrewChief CLI (`crewchief worktree`)

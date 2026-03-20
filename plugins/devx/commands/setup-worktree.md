@@ -75,10 +75,10 @@ Handle the exit code from setup-worktree.sh:
 
 - **Exit 1 -- Usage error:** Report the missing or invalid argument. Show the correct syntax.
 
-- **Exit 2 -- Prerequisite failure:** Report which prerequisite failed (ccwt not found, cmux-check failed). Suggest installing the missing tool or using `--skip-cmux` to bypass cmux prerequisites.
+- **Exit 2 -- Prerequisite failure:** Report which prerequisite failed (crewchief not found, cmux-check failed). Suggest installing the missing tool or using `--skip-cmux` to bypass cmux prerequisites.
 
 - **Exit 3 -- Unrecognized option:** Report the unrecognized flag. Show valid options from `--help`.
 
-- **Exit 4 -- Worktree creation failure:** Report that ccwt failed to create the worktree. Suggest checking if the worktree already exists (`ccwt list`) or if the repository name is correct.
+- **Exit 4 -- Worktree creation failure:** Report that crewchief worktree failed to create the worktree. Suggest checking if the worktree already exists (`crewchief worktree list`) or if the repository name is correct.
 
 - **Other exit codes:** Report the error with the exit code. Direct the user to the SKILL.md for troubleshooting.
