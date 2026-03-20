@@ -142,9 +142,11 @@ MOCKEOF
 
     # Copy the real cmux-wait.sh into the mock plugin dir so setup-worktree.sh
     # can source it for polling functions
-    if [ -f "$CMUX_WAIT_REAL" ]; then
-        cp "$CMUX_WAIT_REAL" "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-wait.sh"
+    if [ ! -f "$CMUX_WAIT_REAL" ]; then
+        echo "[FAIL] Could not locate cmux-wait.sh: $CMUX_WAIT_REAL" >&2
+        return 1
     fi
+    cp "$CMUX_WAIT_REAL" "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-wait.sh"
 
     # Mock docker
     cat > "$TEST_TMPDIR/bin/docker" <<'MOCKEOF'

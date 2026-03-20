@@ -508,39 +508,66 @@ else
             log_warn "Warning: cmux setup failed. Worktree created at $WORKTREE_PATH. Set up your terminal session manually."
         else
             log_verbose "exec: bash $CMUX_SSH_SCRIPT send --workspace $workspace_id \"docker exec -it $CONTAINER_NAME /bin/zsh\""
+            step5_ok=true
             if ! bash "$CMUX_SSH_SCRIPT" send --workspace "$workspace_id" "docker exec -it $CONTAINER_NAME /bin/zsh" > /dev/null 2>&1; then
                 log_warn "Failed to send docker exec command to cmux workspace"
-                CMUX_FAILED=true
+                step5_ok=false
             fi
             log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key --workspace $workspace_id enter"
-            if ! bash "$CMUX_SSH_SCRIPT" send-key --workspace "$workspace_id" enter > /dev/null 2>&1; then
+            if [ "$step5_ok" = true ] && ! bash "$CMUX_SSH_SCRIPT" send-key --workspace "$workspace_id" enter > /dev/null 2>&1; then
                 log_warn "Failed to send enter keypress to cmux workspace"
+                step5_ok=false
+            fi
+            if [ "$step5_ok" = true ]; then
+                cmux_wait_prompt "$workspace_id" "$CMUX_SSH_SCRIPT" || log_warn "cmux prompt readiness timeout at Step 5, continuing"
+                log_success "Devcontainer session opened (container: $CONTAINER_NAME)"
+            else
                 CMUX_FAILED=true
             fi
-            cmux_wait_prompt "$workspace_id" "$CMUX_SSH_SCRIPT" || log_warn "cmux prompt readiness timeout at Step 5, continuing"
-            log_success "Devcontainer session opened (container: $CONTAINER_NAME)"
         fi
     fi
 
     # Step 6: Navigate to worktree
     if [ "$CMUX_FAILED" = false ]; then
         log_info "Step 6: Navigating to worktree..."
+        step6_ok=true
         log_verbose "exec: bash $CMUX_SSH_SCRIPT send --workspace $workspace_id \"cd $WORKTREE_PATH\""
-        bash "$CMUX_SSH_SCRIPT" send --workspace "$workspace_id" "cd $WORKTREE_PATH" > /dev/null 2>&1 || true
+        if ! bash "$CMUX_SSH_SCRIPT" send --workspace "$workspace_id" "cd $WORKTREE_PATH" > /dev/null 2>&1; then
+            log_warn "Failed to send cd command to cmux workspace"
+            step6_ok=false
+        fi
         log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key --workspace $workspace_id enter"
-        bash "$CMUX_SSH_SCRIPT" send-key --workspace "$workspace_id" enter > /dev/null 2>&1 || true
-        cmux_wait_prompt "$workspace_id" "$CMUX_SSH_SCRIPT" || log_warn "cmux prompt readiness timeout at Step 6, continuing"
-        log_success "Navigated to $WORKTREE_PATH"
+        if [ "$step6_ok" = true ] && ! bash "$CMUX_SSH_SCRIPT" send-key --workspace "$workspace_id" enter > /dev/null 2>&1; then
+            log_warn "Failed to send enter keypress to cmux workspace"
+            step6_ok=false
+        fi
+        if [ "$step6_ok" = true ]; then
+            cmux_wait_prompt "$workspace_id" "$CMUX_SSH_SCRIPT" || log_warn "cmux prompt readiness timeout at Step 6, continuing"
+            log_success "Navigated to $WORKTREE_PATH"
+        else
+            CMUX_FAILED=true
+        fi
     fi
 
     # Step 7: Launch claude
     if [ "$CMUX_FAILED" = false ]; then
         log_info "Step 7: Launching claude..."
+        step7_ok=true
         log_verbose "exec: bash $CMUX_SSH_SCRIPT send --workspace $workspace_id \"claude\""
-        bash "$CMUX_SSH_SCRIPT" send --workspace "$workspace_id" "claude" > /dev/null 2>&1 || true
+        if ! bash "$CMUX_SSH_SCRIPT" send --workspace "$workspace_id" "claude" > /dev/null 2>&1; then
+            log_warn "Failed to send claude command to cmux workspace"
+            step7_ok=false
+        fi
         log_verbose "exec: bash $CMUX_SSH_SCRIPT send-key --workspace $workspace_id enter"
-        bash "$CMUX_SSH_SCRIPT" send-key --workspace "$workspace_id" enter > /dev/null 2>&1 || true
-        log_success "Claude launched"
+        if [ "$step7_ok" = true ] && ! bash "$CMUX_SSH_SCRIPT" send-key --workspace "$workspace_id" enter > /dev/null 2>&1; then
+            log_warn "Failed to send enter keypress to cmux workspace"
+            step7_ok=false
+        fi
+        if [ "$step7_ok" = true ]; then
+            log_success "Claude launched"
+        else
+            CMUX_FAILED=true
+        fi
     fi
 
     if [ "$CMUX_FAILED" = true ]; then

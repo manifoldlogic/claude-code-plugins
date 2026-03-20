@@ -90,10 +90,10 @@ cmux_wait_workspace() {
         fi
 
         output=$(bash "$cmux_ssh_script" list-workspaces 2>/dev/null) || true
-        # Match workspace_id followed by a space to prevent substring false positives
+        # Match workspace_id as the first column to prevent substring false positives
         # (e.g., workspace:3 must not match workspace:33). list-workspaces output
-        # format is "workspace:N name [selected]", so the ID is always followed by a space.
-        if echo "$output" | grep -qF "${workspace_id} "; then
+        # format is "workspace:N name [selected]", so the ID is always column 1.
+        if printf '%s\n' "$output" | awk -v id="$workspace_id" '$1 == id { found = 1; exit } END { exit !found }'; then
             return 0
         fi
 
