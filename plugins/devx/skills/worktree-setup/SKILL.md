@@ -5,7 +5,7 @@ description: Create a git worktree with VS Code workspace and cmux terminal setu
 
 # Worktree Setup Skill
 
-**Last Updated:** 2026-03-15
+**Last Updated:** 2026-03-20
 **Script Source:** `plugins/devx/skills/worktree-setup/scripts/setup-worktree.sh`
 
 ## Overview
@@ -51,6 +51,34 @@ sleep 2
 ```
 
 This pattern repeats for every command sent to the terminal: the `cd` navigation in Step 6 and the `claude` launch in Step 7 both use the same two-step approach.
+
+## Readiness Verification
+
+After each two-step send in Steps 4-6, the script verifies that the cmux operation has completed before proceeding. Instead of using fixed-duration `sleep` calls, setup-worktree.sh polls cmux subcommands to detect when the terminal is ready. This is provided by the `cmux-wait.sh` utility library, which the script sources from the cmux plugin at `plugins/cmux/skills/terminal-management/scripts/cmux-wait.sh`.
+
+The library provides two polling functions:
+
+- **`cmux_wait_workspace`** -- Used after creating a new workspace (Step 4). Polls `list-workspaces` via `cmux-ssh.sh` until the newly created workspace ID appears in the output. This confirms that the workspace is registered and ready to receive commands.
+
+- **`cmux_wait_prompt`** -- Used after opening a devcontainer session via `docker exec` (Step 5) and after navigating to the worktree directory with `cd` (Step 6). Polls `read-screen` via `cmux-ssh.sh` and matches the terminal output against a shell prompt pattern using `grep -E`. This confirms that the previous command has finished executing and the shell is ready for the next command.
+
+Both functions poll in a loop with configurable timeouts and intervals. If the timeout expires, the function logs a warning and returns a non-zero exit code. The script treats readiness timeouts as non-fatal -- it logs a warning and continues with the next step.
+
+### Readiness Environment Variables
+
+The following environment variables control polling behavior. Set them before running setup-worktree.sh to override the defaults.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CMUX_WAIT_WS_TIMEOUT` | `5` | Seconds to wait for workspace creation |
+| `CMUX_WAIT_PROMPT_TIMEOUT` | `10` | Seconds to wait for shell prompt after docker exec |
+| `CMUX_WAIT_WS_INTERVAL` | `0.3` | Seconds between workspace polls |
+| `CMUX_WAIT_PROMPT_INTERVAL` | `0.5` | Seconds between prompt polls |
+| `CMUX_PROMPT_PATTERN` | `[^#\$%][\$#%] *$` | grep -E pattern to match shell prompt |
+
+### Fallback When cmux-wait.sh Is Missing
+
+If `cmux-wait.sh` is not found at the expected path, the script defines stub functions that replicate the original sleep-based timing: `cmux_wait_workspace` sleeps for 0.5 seconds and `cmux_wait_prompt` sleeps for 2 seconds. A warning is logged when this fallback activates. The stub functions always return success (exit 0), so the rest of the script proceeds normally. This ensures backward compatibility when the cmux plugin does not include the polling library.
 
 ## DEVCONTAINER_NAME Environment Variable
 

@@ -5,7 +5,7 @@ description: cmux terminal management for macOS host via SSH from devcontainers.
 
 # Terminal Management Skill
 
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-03-20
 **Plugin:** cmux
 **Scripts Location:** `plugins/cmux/skills/terminal-management/scripts/`
 

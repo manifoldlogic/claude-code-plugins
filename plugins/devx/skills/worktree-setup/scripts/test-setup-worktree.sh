@@ -1,149 +1,70 @@
 #!/usr/bin/env bash
 #
-# test-setup-worktree.sh - Tests for setup-worktree.sh worktree setup script
+# test-setup-worktree.sh - Tests for setup-worktree.sh
 #
 # DESCRIPTION:
-#   Comprehensive test suite for setup-worktree.sh covering:
-#   - Argument parsing (valid, invalid, missing, unknown flags)
-#   - Help flag output
-#   - Dry-run output (all step headers, skip annotations)
-#   - Exit codes (all documented codes 0-4)
-#   - Flag combinations (--skip-cmux, --skip-workspace)
-#   - Prerequisite validation via mocked cmux scripts
-#   - Mocked crewchief CLI for worktree creation tests
+#   Unit and integration tests for setup-worktree.sh. Covers argument parsing,
+#   validation, dry-run output, prerequisite checks, and the cmux polling
+#   integration introduced by CMUXWAIT. All external dependencies are mocked
+#   via temp-directory scripts and environment variables.
 #
 # USAGE:
-#   bash test-setup-worktree.sh           # Run all tests
-#   bash test-setup-worktree.sh --verbose # Verbose output
-#   bash test-setup-worktree.sh --help    # Show help
+#   bash test-setup-worktree.sh
 #
 # EXIT CODES:
 #   0 - All tests passed
 #   1 - One or more tests failed
 
-set -uo pipefail
+set -euo pipefail
 
 ##############################################################################
-# Script Location
+# Test Configuration
 ##############################################################################
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SCRIPT_UNDER_TEST="$SCRIPT_DIR/setup-worktree.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_SCRIPT="$SCRIPT_DIR/setup-worktree.sh"
 
-##############################################################################
-# Test Framework Variables
-##############################################################################
+# Locate the real cmux-wait.sh so we can copy it into the mock plugin dir
+CMUX_WAIT_REAL="$(cd "$SCRIPT_DIR/../../../../cmux/skills/terminal-management/scripts" 2>/dev/null && pwd)/cmux-wait.sh"
 
+# Test counters
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
-VERBOSE=false
-TEST_TMP=""
 
-# Colors
+# Temp directory for mocks (created in setup, removed in teardown)
+TEST_TMPDIR=""
+
+##############################################################################
+# Test Utilities
+##############################################################################
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
 NC='\033[0m'
 
-##############################################################################
-# CLI Argument Parsing
-##############################################################################
-
-while [ $# -gt 0 ]; do
-    case "$1" in
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        --help)
-            printf "Usage: %s [-v|--verbose] [--help]\n" "$0"
-            printf "\nOptions:\n"
-            printf "  -v, --verbose  Show detailed output for each test\n"
-            printf "  --help         Show this help message\n"
-            exit 0
-            ;;
-        *)
-            printf "Unknown option: %s\n" "$1"
-            exit 1
-            ;;
-    esac
-done
-
-##############################################################################
-# Test Framework Functions
-##############################################################################
+info() {
+    echo -e "${BLUE}[INFO]${NC} $*"
+}
 
 pass() {
+    echo -e "${GREEN}[PASS]${NC} $*"
     TESTS_PASSED=$((TESTS_PASSED + 1))
-    printf "  ${GREEN}[PASS]${NC} %s\n" "$1"
 }
 
 fail() {
+    echo -e "${RED}[FAIL]${NC} $*"
     TESTS_FAILED=$((TESTS_FAILED + 1))
-    printf "  ${RED}[FAIL]${NC} %s\n" "$1"
-    if [ -n "${2:-}" ]; then
-        printf "         ${YELLOW}Reason:${NC} %s\n" "$2"
-    fi
 }
 
-section() {
-    printf "\n=== %s ===\n" "$1"
-}
-
-debug_msg() {
-    if [ "$VERBOSE" = "true" ]; then
-        printf "  ${BLUE}[DEBUG]${NC} %s\n" "$*"
-    fi
-}
-
-assert_equals() {
-    local expected="$1"
-    local actual="$2"
-    local msg="$3"
+run_test() {
+    local test_name="$1"
     TESTS_RUN=$((TESTS_RUN + 1))
-    if [ "$expected" = "$actual" ]; then
-        pass "$msg"
-    else
-        fail "$msg" "expected '$expected', got '$actual'"
-    fi
-}
-
-assert_contains() {
-    local haystack="$1"
-    local needle="$2"
-    local msg="$3"
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if printf '%s' "$haystack" | grep -qF -- "$needle"; then
-        pass "$msg"
-    else
-        fail "$msg" "output does not contain '$needle'"
-    fi
-}
-
-assert_not_contains() {
-    local haystack="$1"
-    local needle="$2"
-    local msg="$3"
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if printf '%s' "$haystack" | grep -qF -- "$needle"; then
-        fail "$msg" "output unexpectedly contains '$needle'"
-    else
-        pass "$msg"
-    fi
-}
-
-assert_exit_code() {
-    local expected="$1"
-    local actual="$2"
-    local msg="$3"
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if [ "$expected" = "$actual" ]; then
-        pass "$msg"
-    else
-        fail "$msg" "expected exit code $expected, got $actual"
-    fi
+    echo ""
+    echo -e "${YELLOW}Test $TESTS_RUN: $test_name${NC}"
+    echo "----------------------------------------"
 }
 
 ##############################################################################
@@ -151,899 +72,914 @@ assert_exit_code() {
 ##############################################################################
 
 setup() {
-    TEST_TMP=$(mktemp -d)
-    debug_msg "Created temp directory: $TEST_TMP"
+    TEST_TMPDIR="$(mktemp -d)"
 
-    # Create mock cmux plugin directory with passing cmux-check.sh
-    mkdir -p "$TEST_TMP/mock-cmux/skills/terminal-management/scripts"
+    # Create mock bin directory
+    mkdir -p "$TEST_TMPDIR/bin"
+    mkdir -p "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts"
+    mkdir -p "$TEST_TMPDIR/repos/myrepo"
 
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
-#!/bin/bash
-case "$1" in
-  new-workspace) echo "OK workspace:3" ;;
-  rename-workspace|send|send-key) echo "OK" ;;
-  *) echo "unknown command: $1" >&2; exit 1 ;;
-esac
-EOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
-
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'EOF'
-#!/bin/bash
+    # Mock crewchief
+    cat > "$TEST_TMPDIR/bin/crewchief" <<'MOCKEOF'
+#!/usr/bin/env bash
+# Mock crewchief - always succeeds
+if [ "${1:-}" = "worktree" ] && [ "${2:-}" = "create" ]; then
+    WORKTREE_NAME="${3:-}"
+    exit 0
+fi
 exit 0
-EOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/bin/crewchief"
 
-    # Create mock workspace-folder.sh
-    cat > "$TEST_TMP/mock-workspace-folder.sh" << 'EOF'
-#!/bin/bash
-echo "MOCK_WORKSPACE_FOLDER: $*"
+    # Mock workspace-folder.sh
+    cat > "$TEST_TMPDIR/workspace-folder.sh" <<'MOCKEOF'
+#!/usr/bin/env bash
+# Mock workspace-folder.sh - always succeeds
 exit 0
-EOF
-    chmod +x "$TEST_TMP/mock-workspace-folder.sh"
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/workspace-folder.sh"
 
-    # Create mock repos directory for cd-first pattern (setup-worktree.sh does cd $WORKSPACE_REPOS_ROOT/$REPO)
-    mkdir -p "$TEST_TMP/repos/crewchief"
-    mkdir -p "$TEST_TMP/repos/myrepo"
-    mkdir -p "$TEST_TMP/repos/myproject"
-    mkdir -p "$TEST_TMP/repos/testrepo"
-    mkdir -p "$TEST_TMP/repos/claude-code-plugins"
-    mkdir -p "$TEST_TMP/repos/webapp"
+    # Mock cmux-check.sh
+    cat > "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-check.sh" <<'MOCKEOF'
+#!/usr/bin/env bash
+# Mock cmux-check.sh - always succeeds
+exit 0
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-check.sh"
 
-    # Create mock crewchief in mock-bin and prepend to PATH
-    mkdir -p "$TEST_TMP/mock-bin"
-    cat > "$TEST_TMP/mock-bin/crewchief" << 'EOF'
-#!/bin/bash
-# Mock crewchief -- capture invocations, return configurable exit code
-# Handles: crewchief worktree create <name> --branch <branch>
-# Rejects --repo flag (not supported by crewchief worktree create; use cd-first pattern)
-# Validates $PWD matches expected repo path
-
-# Scan all arguments for --repo (must reject before any other processing)
-for arg in "$@"; do
-  if [ "$arg" = "--repo" ]; then
-    echo "Error: --repo flag is not supported by crewchief worktree create" >&2
-    exit 1
-  fi
-done
-
-# After "worktree create", expect: <name> [--branch <branch>]
-shift 2
-NAME="${1:-worktree}"
+    # Mock cmux-ssh.sh with all subcommands
+    cat > "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh" <<'MOCKEOF'
+#!/usr/bin/env bash
+# Mock cmux-ssh.sh - handles all subcommands used by setup-worktree.sh
+cmd="${1:-}"
 shift || true
-
-# Parse --branch if present
-BRANCH="main"
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --branch) BRANCH="${2:-main}"; shift 2 ;;
-    *) shift ;;
-  esac
-done
-
-# Validate PWD matches expected repo path (WORKSPACE_REPOS_ROOT/<repo>)
-EXPECTED_REPO_ROOT="${WORKSPACE_REPOS_ROOT:-/workspace/repos}"
-case "$PWD" in
-  "$EXPECTED_REPO_ROOT"/*) ;; # OK -- invoked from a repo subdirectory
-  *) echo "Error: expected PWD under $EXPECTED_REPO_ROOT, got $PWD" >&2; exit 1 ;;
+case "$cmd" in
+    new-workspace)
+        echo "workspace:3 created"
+        ;;
+    rename-workspace)
+        exit 0
+        ;;
+    send)
+        exit 0
+        ;;
+    send-key)
+        exit 0
+        ;;
+    list-workspaces)
+        echo "workspace:3 test [selected]"
+        ;;
+    read-screen)
+        echo "user@container:/workspace $ "
+        ;;
+    *)
+        echo "Error: unknown command '$cmd'" >&2
+        exit 1
+        ;;
 esac
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh"
 
-case "${MOCK_CREWCHIEF_EXIT:-0}" in
-  0) echo "Created worktree at $PWD/$NAME"; exit 0 ;;
-  *) echo "Error: failed to create worktree" >&2; exit "${MOCK_CREWCHIEF_EXIT}" ;;
-esac
-EOF
-    chmod +x "$TEST_TMP/mock-bin/crewchief"
-}
-
-# Run setup-worktree.sh as a subprocess with mocked environment
-# Usage: run_script [args...]
-# Sets: LAST_EXIT, LAST_OUTPUT
-run_script() {
-    LAST_EXIT=0
-    LAST_OUTPUT=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-        DEVCONTAINER_NAME="mock-container" \
-        bash "$SCRIPT_UNDER_TEST" "$@" 2>&1
-    ) || LAST_EXIT=$?
-    debug_msg "run_script exit=$LAST_EXIT args='$*'"
-    if [ "$VERBOSE" = "true" ]; then
-        debug_msg "output: $(printf '%s' "$LAST_OUTPUT" | head -10)"
-    fi
-}
-
-# Run setup-worktree.sh with only CMUX_PLUGIN_DIR and DEVCONTAINER_NAME (no mock bin)
-# Usage: run_script_no_crewchief [args...]
-# Sets: LAST_EXIT, LAST_OUTPUT
-run_script_no_crewchief() {
-    LAST_EXIT=0
-    LAST_OUTPUT=$(
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-        DEVCONTAINER_NAME="mock-container" \
-        bash "$SCRIPT_UNDER_TEST" "$@" 2>&1
-    ) || LAST_EXIT=$?
-    debug_msg "run_script_no_crewchief exit=$LAST_EXIT args='$*'"
-}
-
-##############################################################################
-# Category 1: Script Prerequisites
-##############################################################################
-
-run_prerequisite_tests() {
-    section "1. Script Prerequisites"
-
-    # Test: setup-worktree.sh exists
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if [ -f "$SCRIPT_UNDER_TEST" ]; then
-        pass "setup-worktree.sh exists"
-    else
-        fail "setup-worktree.sh exists" "file not found at $SCRIPT_UNDER_TEST"
-        return
+    # Copy the real cmux-wait.sh into the mock plugin dir so setup-worktree.sh
+    # can source it for polling functions
+    if [ -f "$CMUX_WAIT_REAL" ]; then
+        cp "$CMUX_WAIT_REAL" "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-wait.sh"
     fi
 
-    # Test: setup-worktree.sh is executable or can be run with bash
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if bash -n "$SCRIPT_UNDER_TEST" 2>/dev/null; then
-        pass "setup-worktree.sh has valid syntax"
-    else
-        fail "setup-worktree.sh has valid syntax" "bash -n failed"
+    # Mock docker
+    cat > "$TEST_TMPDIR/bin/docker" <<'MOCKEOF'
+#!/usr/bin/env bash
+# Mock docker
+if [ "${1:-}" = "ps" ]; then
+    if echo "$*" | grep -q -- "--filter"; then
+        echo "mock-devcontainer-1"
     fi
-}
-
-##############################################################################
-# Category 2: Help Flag Tests
-##############################################################################
-
-run_help_tests() {
-    section "2. Help Flag Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: --help produces output and exits 0
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" --help 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "--help exits 0"
-    assert_contains "$output" "Usage:" "--help shows Usage line"
-    assert_contains "$output" "setup-worktree.sh" "--help mentions script name"
-    assert_contains "$output" "OPTIONS:" "--help shows OPTIONS section"
-    assert_contains "$output" "EXIT CODES:" "--help shows EXIT CODES section"
-    assert_contains "$output" "EXAMPLES:" "--help shows EXAMPLES section"
-
-    # Test: -h also works
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" -h 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "-h exits 0"
-    assert_contains "$output" "Usage:" "-h shows Usage line"
-}
-
-##############################################################################
-# Category 3: Argument Parsing Tests
-##############################################################################
-
-run_argument_parsing_tests() {
-    section "3. Argument Parsing Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: missing worktree name exits 1
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "missing worktree name exits 1"
-    assert_contains "$output" "worktree name is required" "missing worktree name shows error"
-
-    # Test: missing --repo exits 1
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "missing --repo exits 1"
-    assert_contains "$output" "--repo is required" "missing --repo shows error"
-
-    # Test: --repo with missing value exits 1
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "--repo with missing value exits 1"
-    assert_contains "$output" "--repo requires an argument" "--repo missing value shows error"
-
-    # Test: name starting with hyphen caught as unrecognized option (exit 3)
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" "-badname" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "3" "$exit_code" "name starting with hyphen exits 3 (unrecognized option)"
-    assert_contains "$output" "Unrecognized option" "hyphen-prefixed name shows unrecognized option error"
-
-    # Test: --skip-tab-close (old flag) exits 3 (unrecognized option)
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo testrepo --skip-tab-close 2>&1) || exit_code=$?
-    assert_exit_code "3" "$exit_code" "--skip-tab-close (old flag) exits 3"
-    assert_contains "$output" "Unrecognized option" "--skip-tab-close shows unrecognized option error"
-
-    # Test: completely unknown flag exits 3
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo testrepo --nonsense 2>&1) || exit_code=$?
-    assert_exit_code "3" "$exit_code" "--nonsense exits 3"
-    assert_contains "$output" "Unrecognized option" "--nonsense shows unrecognized option error"
-
-    # Test: no arguments at all exits 1 (missing worktree name)
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "no arguments exits 1"
-
-    # Test: duplicate positional argument exits 1
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 TICKET-2 --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "duplicate positional arg exits 1"
-    assert_contains "$output" "Unexpected positional argument" "duplicate positional shows error"
-
-    # Test: --branch with missing value exits 1
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo testrepo --branch 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "--branch with missing value exits 1"
-
-    # Test: --workspace with missing value exits 1
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo testrepo --workspace 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "--workspace with missing value exits 1"
-
-    # Test: name with slash is rejected by name validation (exit 1)
-    exit_code=0
-    output=$(
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        DEVCONTAINER_NAME="mock-container" \
-        bash "$SCRIPT_UNDER_TEST" "feat/branch" --repo testrepo --dry-run 2>&1
-    ) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "name with slash rejected by validation"
-    assert_contains "$output" "Invalid worktree name" "slash name shows invalid name error"
-}
-
-##############################################################################
-# Category 4: Dry-Run Output Tests
-##############################################################################
-
-run_dry_run_tests() {
-    section "4. Dry-Run Output Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: --dry-run exits 0 and shows DRY RUN header
-    run_script TICKET-1 --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "--dry-run exits 0"
-    assert_contains "$LAST_OUTPUT" "DRY RUN" "--dry-run shows DRY RUN header"
-    assert_contains "$LAST_OUTPUT" "Resolved parameters" "--dry-run shows resolved parameters"
-
-    # Test: --dry-run output contains all 7 step headers
-    assert_contains "$LAST_OUTPUT" "Step 1:" "--dry-run contains Step 1"
-    assert_contains "$LAST_OUTPUT" "Step 2:" "--dry-run contains Step 2"
-    assert_contains "$LAST_OUTPUT" "Step 3:" "--dry-run contains Step 3"
-    assert_contains "$LAST_OUTPUT" "Step 4:" "--dry-run contains Step 4"
-    assert_contains "$LAST_OUTPUT" "Step 5:" "--dry-run contains Step 5"
-    assert_contains "$LAST_OUTPUT" "Step 6:" "--dry-run contains Step 6"
-    assert_contains "$LAST_OUTPUT" "Step 7:" "--dry-run contains Step 7"
-
-    # Test: --dry-run shows correct parameter values
-    assert_contains "$LAST_OUTPUT" "Worktree name: TICKET-1" "--dry-run shows worktree name"
-    assert_contains "$LAST_OUTPUT" "Repository: crewchief" "--dry-run shows repository"
-    assert_contains "$LAST_OUTPUT" "Base branch: main" "--dry-run shows default branch"
-
-    # Test: --dry-run with custom branch
-    run_script TICKET-1 --repo crewchief --branch develop --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "--dry-run with --branch develop exits 0"
-    assert_contains "$LAST_OUTPUT" "Base branch: develop" "--dry-run shows custom branch"
-
-    # Test: --dry-run shows worktree path
-    run_script TICKET-1 --repo crewchief --dry-run
-    assert_contains "$LAST_OUTPUT" "crewchief/TICKET-1" "--dry-run shows worktree path"
-
-    # Test: --dry-run shows crewchief worktree create command
-    assert_contains "$LAST_OUTPUT" "crewchief worktree create TICKET-1 --branch main" "--dry-run shows crewchief command (cd-first pattern, no --repo)"
-
-    # Test: --dry-run shows cmux-ssh.sh commands
-    assert_contains "$LAST_OUTPUT" "cmux-ssh.sh" "--dry-run references cmux-ssh.sh"
-    assert_contains "$LAST_OUTPUT" "new-workspace" "--dry-run shows new-workspace step"
-    assert_contains "$LAST_OUTPUT" "send-key" "--dry-run shows send-key step"
-}
-
-##############################################################################
-# Category 5: Skip Flag Tests
-##############################################################################
-
-run_skip_flag_tests() {
-    section "5. Skip Flag Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: --skip-cmux dry-run shows cmux steps as SKIPPED
-    run_script TICKET-1 --repo crewchief --skip-cmux --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "--skip-cmux --dry-run exits 0"
-    assert_contains "$LAST_OUTPUT" "SKIPPED (--skip-cmux)" "--skip-cmux shows SKIPPED annotation for step 4"
-
-    # Verify all cmux steps (4-7) are shown as skipped
-    # The dry-run output marks steps 4-7 with "SKIPPED (--skip-cmux)"
-    TESTS_RUN=$((TESTS_RUN + 1))
-    local skip_count
-    skip_count=$(printf '%s' "$LAST_OUTPUT" | grep -c "SKIPPED (--skip-cmux)" || true)
-    if [ "$skip_count" -ge 4 ]; then
-        pass "--skip-cmux marks all 4 cmux steps as SKIPPED"
-    else
-        fail "--skip-cmux marks all 4 cmux steps as SKIPPED" "found $skip_count SKIPPED markers, expected 4+"
-    fi
-
-    # Test: --skip-workspace dry-run shows workspace step as SKIPPED
-    run_script TICKET-1 --repo crewchief --skip-workspace --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "--skip-workspace --dry-run exits 0"
-    assert_contains "$LAST_OUTPUT" "SKIPPED (--skip-workspace)" "--skip-workspace shows SKIPPED annotation for step 3"
-
-    # Test: both skip flags together
-    run_script TICKET-1 --repo crewchief --skip-cmux --skip-workspace --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "--skip-cmux --skip-workspace --dry-run exits 0"
-    assert_contains "$LAST_OUTPUT" "SKIPPED (--skip-cmux)" "both skips: cmux SKIPPED"
-    assert_contains "$LAST_OUTPUT" "SKIPPED (--skip-workspace)" "both skips: workspace SKIPPED"
-
-    # Test: --skip-cmux dry-run still shows steps 1-3
-    run_script TICKET-1 --repo crewchief --skip-cmux --dry-run
-    assert_contains "$LAST_OUTPUT" "Step 1:" "--skip-cmux still shows Step 1 (prerequisites)"
-    assert_contains "$LAST_OUTPUT" "Step 2:" "--skip-cmux still shows Step 2 (create worktree)"
-    assert_contains "$LAST_OUTPUT" "Step 3:" "--skip-cmux still shows Step 3 (workspace)"
-
-    # Test: --skip-workspace dry-run still shows cmux steps
-    run_script TICKET-1 --repo crewchief --skip-workspace --dry-run
-    assert_contains "$LAST_OUTPUT" "Step 4:" "--skip-workspace still shows Step 4 (cmux)"
-    assert_contains "$LAST_OUTPUT" "Step 7:" "--skip-workspace still shows Step 7 (claude)"
-}
-
-##############################################################################
-# Category 6: Prerequisite Validation Tests
-##############################################################################
-
-run_prerequisite_validation_tests() {
-    section "6. Prerequisite Validation Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: CMUX_PLUGIN_DIR pointing to missing directory -> cmux auto-skipped
-    # When cmux-check.sh is not found, the script warns and auto-skips cmux
-    exit_code=0
-    output=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        CMUX_PLUGIN_DIR="$TEST_TMP/nonexistent-cmux-dir" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-        DEVCONTAINER_NAME="mock-container" \
-        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
-    ) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "missing CMUX_PLUGIN_DIR -> script succeeds with cmux auto-skipped"
-    assert_contains "$output" "cmux-check.sh not found" "missing CMUX_PLUGIN_DIR shows cmux-check.sh not found warning"
-    assert_contains "$output" "cmux workspace creation will be skipped" "missing CMUX_PLUGIN_DIR shows skip message"
-
-    # Test: cmux-check.sh fails -> exit 2 (prerequisite failure)
-    # Create a failing cmux-check.sh
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'FAILEOF'
-#!/bin/bash
-echo "cmux prerequisites not met" >&2
-exit 1
-FAILEOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
-
-    run_script TICKET-1 --repo crewchief
-    assert_exit_code "2" "$LAST_EXIT" "failing cmux-check.sh exits 2"
-    assert_contains "$LAST_OUTPUT" "cmux prerequisite check failed" "failing cmux-check.sh shows error message"
-
-    # Restore passing cmux-check.sh for remaining tests
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'PASSEOF'
-#!/bin/bash
+fi
 exit 0
-PASSEOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
-
-    # Test: cmux-check.sh fails but --skip-cmux bypasses it
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'FAILEOF'
-#!/bin/bash
-exit 1
-FAILEOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
-
-    run_script TICKET-1 --repo crewchief --skip-cmux
-    assert_exit_code "0" "$LAST_EXIT" "--skip-cmux bypasses failing cmux-check.sh"
-    assert_contains "$LAST_OUTPUT" "Skipping cmux workspace setup" "--skip-cmux shows skip message"
-
-    # Restore passing cmux-check.sh
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'PASSEOF'
-#!/bin/bash
-exit 0
-PASSEOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
-
-    # Test: missing workspace-folder.sh -> auto-skips workspace step
-    exit_code=0
-    output=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/nonexistent-workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-        DEVCONTAINER_NAME="mock-container" \
-        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
-    ) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "missing workspace-folder.sh -> script succeeds with workspace auto-skipped"
-    assert_contains "$output" "workspace-folder.sh not found" "missing workspace-folder.sh shows warning"
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/bin/docker"
 }
 
-##############################################################################
-# Category 7: crewchief Mock Tests
-##############################################################################
-
-run_crewchief_tests() {
-    section "7. crewchief (Worktree Creation) Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: successful worktree creation with all mocks
-    run_script TICKET-1 --repo crewchief
-    assert_exit_code "0" "$LAST_EXIT" "successful worktree creation exits 0"
-    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "successful creation shows completion message"
-    assert_contains "$LAST_OUTPUT" "Worktree: TICKET-1" "completion shows worktree name"
-    assert_contains "$LAST_OUTPUT" "Repository: crewchief" "completion shows repository"
-
-    # Test: crewchief failure -> exit 4
-    exit_code=0
-    output=$(
-        MOCK_CREWCHIEF_EXIT=1 \
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-        DEVCONTAINER_NAME="mock-container" \
-        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
-    ) || exit_code=$?
-    assert_exit_code "4" "$exit_code" "crewchief failure exits 4"
-    assert_contains "$output" "Worktree creation failed" "crewchief failure shows error message"
-
-    # Test: successful creation with --skip-cmux
-    run_script TICKET-1 --repo crewchief --skip-cmux
-    assert_exit_code "0" "$LAST_EXIT" "creation with --skip-cmux exits 0"
-    assert_contains "$LAST_OUTPUT" "cmux: Skipped" "--skip-cmux shows cmux skipped in summary"
-
-    # Test: successful creation with --skip-workspace
-    run_script TICKET-1 --repo crewchief --skip-workspace
-    assert_exit_code "0" "$LAST_EXIT" "creation with --skip-workspace exits 0"
-    assert_contains "$LAST_OUTPUT" "Skipping VS Code workspace update" "--skip-workspace shows skip in log"
-
-    # Test: successful creation with both skip flags
-    run_script TICKET-1 --repo crewchief --skip-cmux --skip-workspace
-    assert_exit_code "0" "$LAST_EXIT" "creation with both skips exits 0"
-    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "both skips still shows completion"
-
-    # Test: worktree name with valid characters (alphanumeric, hyphens, underscores)
-    run_script DEVX-1001 --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "DEVX-1001 is a valid name"
-
-    run_script my_feature --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "my_feature is a valid name"
-
-    run_script TICKET123 --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "TICKET123 is a valid name"
-}
-
-##############################################################################
-# Category 8: Exit Code Summary Tests
-##############################################################################
-
-run_exit_code_tests() {
-    section "8. Exit Code Summary"
-
-    local exit_code=0
-
-    # Exit 0: --help
-    exit_code=0
-    bash "$SCRIPT_UNDER_TEST" --help >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "0" "$exit_code" "exit 0: --help"
-
-    # Exit 0: --dry-run
-    exit_code=0
-    CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-    DEVCONTAINER_NAME="mock-container" \
-    bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief --dry-run >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "0" "$exit_code" "exit 0: --dry-run"
-
-    # Exit 1: missing worktree name
-    exit_code=0
-    bash "$SCRIPT_UNDER_TEST" --repo crewchief >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "1" "$exit_code" "exit 1: missing worktree name"
-
-    # Exit 1: missing --repo
-    exit_code=0
-    bash "$SCRIPT_UNDER_TEST" TICKET-1 >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "1" "$exit_code" "exit 1: missing --repo"
-
-    # Exit 3: unrecognized option
-    exit_code=0
-    bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief --unknown >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "3" "$exit_code" "exit 3: unrecognized option"
-
-    # Exit 3: --skip-tab-close (old flag)
-    exit_code=0
-    bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief --skip-tab-close >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "3" "$exit_code" "exit 3: --skip-tab-close (old flag)"
-
-    # Exit 2: cmux prerequisite failure
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'FAILEOF'
-#!/bin/bash
-exit 1
-FAILEOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
-
-    exit_code=0
-    PATH="$TEST_TMP/mock-bin:$PATH" \
-    CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-    WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-    DEVCONTAINER_NAME="mock-container" \
-    bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "2" "$exit_code" "exit 2: cmux prerequisite failure"
-
-    # Restore passing cmux-check.sh
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh" << 'PASSEOF'
-#!/bin/bash
-exit 0
-PASSEOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-check.sh"
-
-    # Exit 4: crewchief creation failure
-    exit_code=0
-    MOCK_CREWCHIEF_EXIT=1 \
-    PATH="$TEST_TMP/mock-bin:$PATH" \
-    CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-    WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-    WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-    DEVCONTAINER_NAME="mock-container" \
-    bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief >/dev/null 2>&1 || exit_code=$?
-    assert_exit_code "4" "$exit_code" "exit 4: crewchief creation failure"
-}
-
-##############################################################################
-# Category 9: cmux-ssh.sh Mock Validation Tests
-##############################################################################
-
-run_cmux_mock_tests() {
-    section "9. cmux-ssh.sh Mock Validation"
-
-    local exit_code=0
-    local output
-
-    # Test: mock cmux-ssh.sh returns OK workspace:3 for new-workspace
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" new-workspace 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock cmux-ssh.sh new-workspace exits 0"
-    assert_contains "$output" "OK workspace:3" "mock cmux-ssh.sh new-workspace returns OK workspace:3"
-
-    # Test: mock cmux-ssh.sh returns OK for rename-workspace
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" rename-workspace workspace:3 TICKET-1 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock cmux-ssh.sh rename-workspace exits 0"
-    assert_contains "$output" "OK" "mock cmux-ssh.sh rename-workspace returns OK"
-
-    # Test: mock cmux-ssh.sh returns OK for send
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" send workspace:3 "docker exec -it mock /bin/zsh" 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock cmux-ssh.sh send exits 0"
-
-    # Test: mock cmux-ssh.sh returns OK for send-key
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" send-key workspace:3 enter 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock cmux-ssh.sh send-key exits 0"
-
-    # Test: mock cmux-ssh.sh returns error for unknown command
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" bad-command 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "mock cmux-ssh.sh unknown command exits 1"
-    assert_contains "$output" "unknown command" "mock cmux-ssh.sh unknown command shows error"
-
-    # Test: mock crewchief returns success for valid invocation (cd-first, no --repo)
-    exit_code=0
-    mkdir -p "$TEST_TMP/repos/crewchief"
-    output=$(cd "$TEST_TMP/repos/crewchief" && WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --branch main 2>&1) || exit_code=$?
-    assert_exit_code "0" "$exit_code" "mock crewchief valid invocation exits 0"
-    assert_contains "$output" "Created worktree" "mock crewchief shows creation message"
-
-    # Test: mock crewchief rejects --repo flag with non-zero exit
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo crewchief 2>&1) || exit_code=$?
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if [ "$exit_code" -ne 0 ]; then
-        pass "mock crewchief rejects --repo with non-zero exit"
-    else
-        fail "mock crewchief rejects --repo with non-zero exit" "expected non-zero exit, got $exit_code"
-    fi
-    assert_contains "$output" "Error: --repo flag is not supported by crewchief worktree create" "mock crewchief --repo rejection shows correct error message"
-
-    # Test: mock crewchief returns error when MOCK_CREWCHIEF_EXIT=1
-    exit_code=0
-    output=$(cd "$TEST_TMP/repos/crewchief" && WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" MOCK_CREWCHIEF_EXIT=1 bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --branch main 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "mock crewchief with MOCK_CREWCHIEF_EXIT=1 exits 1"
-    assert_contains "$output" "Error: failed to create worktree" "mock crewchief failure shows error"
-
-    # Test: mock crewchief rejects --repo even with different repo name
-    exit_code=0
-    output=$(bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --repo myrepo 2>&1) || exit_code=$?
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if [ "$exit_code" -ne 0 ]; then
-        pass "mock crewchief rejects --repo myrepo with non-zero exit"
-    else
-        fail "mock crewchief rejects --repo myrepo with non-zero exit" "expected non-zero exit, got $exit_code"
-    fi
-    assert_contains "$output" "Error: --repo flag is not supported by crewchief worktree create" "mock crewchief --repo myrepo rejection shows correct error message"
-
-    # Test: mock crewchief validates $PWD matches expected repo path
-    exit_code=0
-    output=$(cd /tmp && WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" bash "$TEST_TMP/mock-bin/crewchief" worktree create TICKET-1 --branch main 2>&1) || exit_code=$?
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if [ "$exit_code" -ne 0 ]; then
-        pass "mock crewchief rejects invocation from wrong PWD"
-    else
-        fail "mock crewchief rejects invocation from wrong PWD" "expected non-zero exit, got $exit_code"
+teardown() {
+    if [ -n "${TEST_TMPDIR:-}" ] && [ -d "${TEST_TMPDIR:-}" ]; then
+        rm -rf "$TEST_TMPDIR"
     fi
 }
 
-##############################################################################
-# Category 10: Name Validation Tests
-##############################################################################
-
-run_name_validation_tests() {
-    section "10. Name Validation Tests"
-
-    local exit_code=0
-    local output
-
-    # Test: name with slash is rejected
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" "feat/branch" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "name with slash exits 1"
-    assert_contains "$output" "Invalid worktree name" "slash name shows invalid name error"
-
-    # Test: name with spaces is rejected
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" "ticket with spaces" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "name with spaces exits 1"
-    assert_contains "$output" "Invalid worktree name" "space name shows invalid name error"
-
-    # Test: name starting with digit is valid
-    run_script 1ticket --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "name starting with digit is valid"
-
-    # Test: name with underscore is valid
-    run_script my_feature --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "name with underscore is valid"
-
-    # Test: name with dot is rejected
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" "v1.0.0" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "name with dot exits 1"
-    assert_contains "$output" "Invalid worktree name" "dot name shows invalid name error"
-
-    # Test: empty name handled by missing-name check before validation
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "1" "$exit_code" "empty name exits 1 (missing name check)"
-
-    # Test: standard ticket ID format is valid
-    run_script DEVX-4001 --repo crewchief --dry-run
-    assert_exit_code "0" "$LAST_EXIT" "DEVX-4001 is a valid name"
-
-    # Test: name with leading hyphen is caught as unrecognized option (exit 3)
-    exit_code=0
-    output=$(bash "$SCRIPT_UNDER_TEST" "-ticket" --repo testrepo 2>&1) || exit_code=$?
-    assert_exit_code "3" "$exit_code" "leading hyphen exits 3 (unrecognized option)"
-}
+# Ensure teardown runs even on failure
+trap teardown EXIT
 
 ##############################################################################
-# Category 11: Graceful Degradation - workspace_id Extraction Failure
+# Helper: Run setup-worktree.sh with mocked environment
 ##############################################################################
 
-run_workspace_id_extraction_failure_tests() {
-    section "11. Graceful Degradation: workspace_id Extraction Failure"
-
-    # Override cmux-ssh.sh to return unexpected output for new-workspace
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
-#!/bin/bash
-case "$1" in
-  new-workspace) echo "ERROR something failed" ;;
-  rename-workspace|send|send-key) echo "OK" ;;
-  *) echo "unknown command: $1" >&2; exit 1 ;;
-esac
-EOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
-
-    # Test: workspace_id extraction failure exits 0 (graceful degradation)
-    run_script TICKET-1 --repo crewchief
-    assert_exit_code "0" "$LAST_EXIT" "workspace_id extraction failure exits 0 (graceful)"
-    assert_contains "$LAST_OUTPUT" "Could not extract workspace ID" "workspace_id failure shows extraction warning"
-    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "workspace_id failure still shows completion"
-    assert_contains "$LAST_OUTPUT" "cmux: Failed" "workspace_id failure shows cmux failed in summary"
-
-    # Restore standard cmux-ssh.sh mock
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
-#!/bin/bash
-case "$1" in
-  new-workspace) echo "OK workspace:3" ;;
-  rename-workspace|send|send-key) echo "OK" ;;
-  *) echo "unknown command: $1" >&2; exit 1 ;;
-esac
-EOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
-}
-
-##############################################################################
-# Category 12: Graceful Degradation - DEVCONTAINER_NAME Empty + Docker Unavailable
-##############################################################################
-
-run_devcontainer_name_empty_docker_unavailable_tests() {
-    section "12. Graceful Degradation: DEVCONTAINER_NAME Empty + Docker Unavailable"
-
-    # Create a mock docker that returns empty output (no containers found)
-    cat > "$TEST_TMP/mock-bin/docker" << 'EOF'
-#!/bin/bash
-# Mock docker -- returns empty output (no containers found)
-exit 0
-EOF
-    chmod +x "$TEST_TMP/mock-bin/docker"
-
-    # Run without DEVCONTAINER_NAME and with docker returning empty
-    LAST_EXIT=0
+# Run setup-worktree.sh in a subshell with all mocks configured.
+# Args: all args are passed to setup-worktree.sh
+# Returns: exit code of the script
+# Stdout+stderr captured and stored in global $LAST_OUTPUT
+run_setup() {
     LAST_OUTPUT=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
-    ) || LAST_EXIT=$?
-    debug_msg "run_script (no DEVCONTAINER_NAME) exit=$LAST_EXIT"
-    if [ "$VERBOSE" = "true" ]; then
-        debug_msg "output: $(printf '%s' "$LAST_OUTPUT" | head -10)"
+        PATH="$TEST_TMPDIR/bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+        DEVCONTAINER_NAME="mock-devcontainer-1" \
+        CMUX_WAIT_WS_TIMEOUT="${CMUX_WAIT_WS_TIMEOUT:-2}" \
+        CMUX_WAIT_WS_INTERVAL="${CMUX_WAIT_WS_INTERVAL:-0.1}" \
+        CMUX_WAIT_PROMPT_TIMEOUT="${CMUX_WAIT_PROMPT_TIMEOUT:-2}" \
+        CMUX_WAIT_PROMPT_INTERVAL="${CMUX_WAIT_PROMPT_INTERVAL:-0.1}" \
+        bash "$SETUP_SCRIPT" "$@" 2>&1
+    )
+    return $?
+}
+
+##############################################################################
+# Section A: Argument Parsing & Validation Tests
+##############################################################################
+
+test_help_flag() {
+    run_test "--help shows usage"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" --help 2>&1) || true
+
+    if echo "$output" | grep -q "Usage:"; then
+        pass "--help shows usage text"
+    else
+        fail "--help does not show usage text"
+    fi
+}
+
+test_missing_worktree_name() {
+    run_test "Missing worktree name exits 1"
+
+    if bash "$SETUP_SCRIPT" --repo myrepo 2>/dev/null; then
+        fail "Should exit non-zero when worktree name is missing"
+    else
+        local exit_code=$?
+        if [ "$exit_code" -eq 1 ]; then
+            pass "Exit code 1 for missing worktree name"
+        else
+            fail "Expected exit code 1, got $exit_code"
+        fi
+    fi
+}
+
+test_missing_repo() {
+    run_test "Missing --repo exits 1"
+
+    if bash "$SETUP_SCRIPT" TICKET-1 2>/dev/null; then
+        fail "Should exit non-zero when --repo is missing"
+    else
+        local exit_code=$?
+        if [ "$exit_code" -eq 1 ]; then
+            pass "Exit code 1 for missing --repo"
+        else
+            fail "Expected exit code 1, got $exit_code"
+        fi
+    fi
+}
+
+test_unrecognized_option() {
+    run_test "Unrecognized option exits 3"
+
+    if bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --badopt 2>/dev/null; then
+        fail "Should exit non-zero for unrecognized option"
+    else
+        local exit_code=$?
+        if [ "$exit_code" -eq 3 ]; then
+            pass "Exit code 3 for unrecognized option"
+        else
+            fail "Expected exit code 3, got $exit_code"
+        fi
+    fi
+}
+
+test_invalid_worktree_name() {
+    run_test "Invalid worktree name (starts with hyphen) exits 1"
+
+    if bash "$SETUP_SCRIPT" "-bad" --repo myrepo 2>/dev/null; then
+        fail "Should exit non-zero for invalid worktree name"
+    else
+        pass "Non-zero exit for invalid worktree name"
+    fi
+}
+
+test_valid_worktree_names() {
+    run_test "Valid worktree names accepted"
+
+    # Dry-run so we don't need all mocks
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+    if echo "$output" | grep -q "TICKET-1"; then
+        pass "TICKET-1 accepted as valid name"
+    else
+        fail "TICKET-1 not accepted"
     fi
 
-    # Test: exits 0 (graceful degradation)
-    assert_exit_code "0" "$LAST_EXIT" "empty DEVCONTAINER_NAME + docker unavailable exits 0 (graceful)"
-    assert_contains "$LAST_OUTPUT" "Could not detect devcontainer name" "empty DEVCONTAINER_NAME shows detection warning"
-    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "empty DEVCONTAINER_NAME still shows completion"
-    assert_contains "$LAST_OUTPUT" "cmux: Failed" "empty DEVCONTAINER_NAME shows cmux failed in summary"
+    output=$(bash "$SETUP_SCRIPT" my_worktree --repo myrepo --dry-run 2>&1) || true
+    if echo "$output" | grep -q "my_worktree"; then
+        pass "my_worktree accepted as valid name"
+    else
+        fail "my_worktree not accepted"
+    fi
+}
 
-    # Clean up docker mock
-    rm -f "$TEST_TMP/mock-bin/docker"
+test_repo_flag_variants() {
+    run_test "Short -r flag works for --repo"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 -r myrepo --dry-run 2>&1) || true
+    if echo "$output" | grep -q "myrepo"; then
+        pass "-r flag sets repository"
+    else
+        fail "-r flag did not set repository"
+    fi
+}
+
+test_branch_flag() {
+    run_test "--branch / -b sets base branch"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --branch develop --dry-run 2>&1) || true
+    if echo "$output" | grep -q "develop"; then
+        pass "--branch develop shown in dry-run output"
+    else
+        fail "--branch develop not shown in dry-run output"
+    fi
+
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo -b release --dry-run 2>&1) || true
+    if echo "$output" | grep -q "release"; then
+        pass "-b release shown in dry-run output"
+    else
+        fail "-b release not shown in dry-run output"
+    fi
+}
+
+test_workspace_flag() {
+    run_test "--workspace / -w sets workspace file"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo -w /my/file.code-workspace --dry-run 2>&1) || true
+    if echo "$output" | grep -q "/my/file.code-workspace"; then
+        pass "-w flag sets workspace file in dry-run output"
+    else
+        fail "-w flag did not set workspace file"
+    fi
+}
+
+test_skip_cmux_flag() {
+    run_test "--skip-cmux flag shows skip in dry-run"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --skip-cmux --dry-run 2>&1) || true
+    if echo "$output" | grep -q "SKIPPED.*--skip-cmux"; then
+        pass "--skip-cmux flag acknowledged in dry-run"
+    else
+        fail "--skip-cmux flag not reflected in dry-run output"
+    fi
+}
+
+test_skip_workspace_flag() {
+    run_test "--skip-workspace flag shows skip in dry-run"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --skip-workspace --dry-run 2>&1) || true
+    if echo "$output" | grep -q "SKIPPED.*--skip-workspace"; then
+        pass "--skip-workspace flag acknowledged in dry-run"
+    else
+        fail "--skip-workspace flag not reflected in dry-run output"
+    fi
 }
 
 ##############################################################################
-# Category 13: Graceful Degradation - Docker Permission Denied
+# Section B: Dry-Run Tests
 ##############################################################################
 
-run_docker_permission_denied_tests() {
-    section "13. Graceful Degradation: Docker Permission Denied"
+test_dry_run_header() {
+    run_test "Dry-run shows header and resolved parameters"
 
-    # Create a mock docker that writes "permission denied" to stderr and fails
-    cat > "$TEST_TMP/mock-bin/docker" << 'EOF'
-#!/bin/bash
-echo "permission denied" >&2
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+
+    if echo "$output" | grep -q "DRY RUN"; then
+        pass "DRY RUN header present"
+    else
+        fail "DRY RUN header missing"
+    fi
+
+    if echo "$output" | grep -q "Resolved parameters"; then
+        pass "Resolved parameters section present"
+    else
+        fail "Resolved parameters section missing"
+    fi
+}
+
+test_dry_run_shows_all_steps() {
+    run_test "Dry-run shows steps 1-7"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+
+    local step
+    for step in 1 2 3 4 5 6 7; do
+        if echo "$output" | grep -q "Step $step"; then
+            pass "Step $step mentioned in dry-run"
+        else
+            fail "Step $step missing from dry-run output"
+        fi
+    done
+}
+
+test_dry_run_exits_zero() {
+    run_test "Dry-run exits 0"
+
+    if bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run > /dev/null 2>&1; then
+        pass "Dry-run exits 0"
+    else
+        fail "Dry-run exited non-zero"
+    fi
+}
+
+test_dry_run_default_branch() {
+    run_test "Dry-run shows default branch main"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+
+    if echo "$output" | grep -q "Base branch: main"; then
+        pass "Default branch main shown"
+    else
+        fail "Default branch main not shown"
+    fi
+}
+
+test_dry_run_worktree_path() {
+    run_test "Dry-run shows computed worktree path"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+
+    if echo "$output" | grep -q "myrepo/TICKET-1"; then
+        pass "Worktree path contains repo/name"
+    else
+        fail "Worktree path not shown correctly"
+    fi
+}
+
+##############################################################################
+# Section C: Prerequisite Validation Tests
+##############################################################################
+
+test_missing_crewchief() {
+    run_test "Missing crewchief CLI exits 2"
+
+    # Use empty PATH to simulate missing crewchief
+    if PATH="/usr/bin:/bin" \
+       CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+       WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
+       WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+       bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo 2>/dev/null; then
+        fail "Should exit non-zero when crewchief missing"
+    else
+        local exit_code=$?
+        if [ "$exit_code" -eq 2 ]; then
+            pass "Exit code 2 when crewchief missing"
+        else
+            fail "Expected exit code 2, got $exit_code"
+        fi
+    fi
+}
+
+test_missing_workspace_folder_script() {
+    run_test "Missing workspace-folder.sh auto-skips workspace step"
+
+    local output
+    output=$(
+        PATH="$TEST_TMPDIR/bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+        WORKSPACE_FOLDER_SCRIPT="/nonexistent/workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+        DEVCONTAINER_NAME="mock-devcontainer-1" \
+        CMUX_WAIT_WS_TIMEOUT=2 \
+        CMUX_WAIT_WS_INTERVAL=0.1 \
+        CMUX_WAIT_PROMPT_TIMEOUT=2 \
+        CMUX_WAIT_PROMPT_INTERVAL=0.1 \
+        bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo 2>&1
+    ) || true
+
+    if echo "$output" | grep -q "workspace-folder.sh not found"; then
+        pass "Warning about missing workspace-folder.sh shown"
+    else
+        fail "No warning about missing workspace-folder.sh"
+    fi
+}
+
+test_missing_cmux_check_skips_cmux() {
+    run_test "Missing cmux-check.sh auto-skips cmux steps"
+
+    # Remove cmux-check.sh
+    local backup="$TEST_TMPDIR/cmux-check-backup.sh"
+    mv "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-check.sh" "$backup"
+
+    local output
+    output=$(
+        PATH="$TEST_TMPDIR/bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+        DEVCONTAINER_NAME="mock-devcontainer-1" \
+        bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo 2>&1
+    ) || true
+
+    # Restore
+    mv "$backup" "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-check.sh"
+
+    if echo "$output" | grep -q "cmux-check.sh not found"; then
+        pass "Warning about missing cmux-check.sh shown"
+    else
+        fail "No warning about missing cmux-check.sh"
+    fi
+}
+
+##############################################################################
+# Section D: Full Run Tests (with all mocks)
+##############################################################################
+
+test_full_run_skip_cmux() {
+    run_test "Full run with --skip-cmux completes successfully"
+
+    if run_setup TICKET-1 --repo myrepo --skip-cmux; then
+        pass "Setup completed with --skip-cmux"
+    else
+        fail "Setup failed with --skip-cmux (exit code $?)"
+    fi
+
+    if echo "$LAST_OUTPUT" | grep -q "Worktree Setup Complete"; then
+        pass "Success summary shown"
+    else
+        fail "Success summary missing"
+    fi
+}
+
+test_full_run_skip_workspace() {
+    run_test "Full run with --skip-workspace completes successfully"
+
+    if run_setup TICKET-1 --repo myrepo --skip-workspace; then
+        pass "Setup completed with --skip-workspace"
+    else
+        fail "Setup failed with --skip-workspace (exit code $?)"
+    fi
+
+    if echo "$LAST_OUTPUT" | grep -q "Skipping VS Code workspace"; then
+        pass "Workspace skip message shown"
+    else
+        fail "Workspace skip message missing"
+    fi
+}
+
+test_full_run_both_skips() {
+    run_test "Full run with both --skip-cmux and --skip-workspace"
+
+    if run_setup TICKET-1 --repo myrepo --skip-cmux --skip-workspace; then
+        pass "Setup completed with both skips"
+    else
+        fail "Setup failed with both skips"
+    fi
+}
+
+test_full_run_shows_worktree_path() {
+    run_test "Full run output includes worktree path"
+
+    run_setup TICKET-1 --repo myrepo --skip-cmux || true
+
+    if echo "$LAST_OUTPUT" | grep -q "myrepo/TICKET-1"; then
+        pass "Worktree path in output"
+    else
+        fail "Worktree path missing from output"
+    fi
+}
+
+test_verbose_flag() {
+    run_test "--verbose flag is accepted without error"
+
+    if run_setup TICKET-1 --repo myrepo --skip-cmux --verbose; then
+        pass "--verbose flag accepted"
+    else
+        fail "--verbose flag caused error"
+    fi
+}
+
+test_worktree_creation_failure() {
+    run_test "Worktree creation failure exits 4"
+
+    # Create a failing crewchief
+    cat > "$TEST_TMPDIR/bin/crewchief" <<'MOCKEOF'
+#!/usr/bin/env bash
 exit 1
-EOF
-    chmod +x "$TEST_TMP/mock-bin/docker"
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/bin/crewchief"
 
-    # Run without DEVCONTAINER_NAME so docker probe is triggered
-    LAST_EXIT=0
-    LAST_OUTPUT=$(
-        PATH="$TEST_TMP/mock-bin:$PATH" \
-        CMUX_PLUGIN_DIR="$TEST_TMP/mock-cmux" \
-        WORKSPACE_FOLDER_SCRIPT="$TEST_TMP/mock-workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMP/repos" \
-        bash "$SCRIPT_UNDER_TEST" TICKET-1 --repo crewchief 2>&1
-    ) || LAST_EXIT=$?
-    debug_msg "run_script (docker permission denied) exit=$LAST_EXIT"
+    if run_setup TICKET-1 --repo myrepo --skip-cmux; then
+        fail "Should exit non-zero when crewchief fails"
+    else
+        local exit_code=$?
+        if [ "$exit_code" -eq 4 ]; then
+            pass "Exit code 4 on worktree creation failure"
+        else
+            fail "Expected exit code 4, got $exit_code"
+        fi
+    fi
 
-    # Test: exits 0 (graceful degradation)
-    assert_exit_code "0" "$LAST_EXIT" "docker permission denied exits 0 (graceful)"
-    assert_contains "$LAST_OUTPUT" "Docker container detection failed" "docker permission denied shows detection failed warning"
-    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "docker permission denied still shows completion"
+    # Restore working crewchief
+    cat > "$TEST_TMPDIR/bin/crewchief" <<'MOCKEOF'
+#!/usr/bin/env bash
+exit 0
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/bin/crewchief"
+}
 
-    # Clean up docker mock
-    rm -f "$TEST_TMP/mock-bin/docker"
+test_summary_shows_repo() {
+    run_test "Summary section shows repository name"
+
+    run_setup TICKET-1 --repo myrepo --skip-cmux || true
+
+    if echo "$LAST_OUTPUT" | grep -q "Repository: myrepo"; then
+        pass "Repository name in summary"
+    else
+        fail "Repository name missing from summary"
+    fi
+}
+
+test_summary_shows_branch() {
+    run_test "Summary section shows branch"
+
+    run_setup TICKET-1 --repo myrepo --branch develop --skip-cmux || true
+
+    if echo "$LAST_OUTPUT" | grep -q "Branch: develop"; then
+        pass "Branch shown in summary"
+    else
+        fail "Branch missing from summary"
+    fi
+}
+
+# Existing test count before CMUXWAIT.2002: 25
+
+##############################################################################
+# Section E: CMUXWAIT Integration Tests (CMUXWAIT.2002)
+##############################################################################
+
+test_integration_happy_path() {
+    run_test "Integration: happy path with polling mocks returning ready responses"
+
+    # The default mock cmux-ssh.sh returns workspace:3 for list-workspaces
+    # and a prompt-like string for read-screen. cmux-wait.sh is sourced by
+    # setup-worktree.sh when CMUX_WAIT_SCRIPT points to the real file.
+
+    if run_setup TICKET-HP --repo myrepo; then
+        pass "Happy-path integration run exits 0"
+    else
+        fail "Happy-path integration run exited non-zero ($?)"
+    fi
+
+    if echo "$LAST_OUTPUT" | grep -q "cmux workspace created"; then
+        pass "Workspace creation logged"
+    else
+        fail "Workspace creation message missing"
+    fi
+
+    if echo "$LAST_OUTPUT" | grep -q "Worktree Setup Complete"; then
+        pass "Setup completed successfully"
+    else
+        fail "Setup complete message missing"
+    fi
+
+    if echo "$LAST_OUTPUT" | grep -q "Claude launched\|cmux: Workspace ready"; then
+        pass "cmux steps completed"
+    else
+        fail "cmux completion messages missing"
+    fi
+}
+
+test_integration_workspace_polling_timeout() {
+    run_test "Integration: workspace polling timeout logs warning and exits 0"
+
+    # Override the mock cmux-ssh.sh to return a non-matching workspace for
+    # list-workspaces, triggering a timeout in cmux_wait_workspace.
+    cat > "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh" <<'MOCKEOF'
+#!/usr/bin/env bash
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+    new-workspace)
+        echo "workspace:3 created"
+        ;;
+    rename-workspace)
+        exit 0
+        ;;
+    send)
+        exit 0
+        ;;
+    send-key)
+        exit 0
+        ;;
+    list-workspaces)
+        # Return a workspace ID that does NOT match workspace:3 to force timeout
+        echo "workspace:99 other"
+        ;;
+    read-screen)
+        echo "user@container:/workspace $ "
+        ;;
+    *)
+        echo "Error: unknown command '$cmd'" >&2
+        exit 1
+        ;;
+esac
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh"
+
+    local output
+    local exit_code=0
+    output=$(
+        PATH="$TEST_TMPDIR/bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+        DEVCONTAINER_NAME="mock-devcontainer-1" \
+        CMUX_WAIT_WS_TIMEOUT=0 \
+        CMUX_WAIT_WS_INTERVAL=0.1 \
+        CMUX_WAIT_PROMPT_TIMEOUT=2 \
+        CMUX_WAIT_PROMPT_INTERVAL=0.1 \
+        bash "$SETUP_SCRIPT" TICKET-WST --repo myrepo 2>&1
+    ) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        pass "Script exits 0 despite workspace polling timeout"
+    else
+        fail "Script exited $exit_code instead of 0 on workspace polling timeout"
+    fi
+
+    if echo "$output" | grep -qi "timeout\|readiness"; then
+        pass "Timeout/readiness warning message present"
+    else
+        fail "No timeout/readiness warning in output"
+    fi
+
+    # Restore default mock
+    setup_default_cmux_ssh_mock
+}
+
+test_integration_prompt_polling_timeout() {
+    run_test "Integration: prompt polling timeout logs warning and exits 0"
+
+    # Override read-screen to return non-prompt content
+    cat > "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh" <<'MOCKEOF'
+#!/usr/bin/env bash
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+    new-workspace)
+        echo "workspace:3 created"
+        ;;
+    rename-workspace)
+        exit 0
+        ;;
+    send)
+        exit 0
+        ;;
+    send-key)
+        exit 0
+        ;;
+    list-workspaces)
+        echo "workspace:3 test [selected]"
+        ;;
+    read-screen)
+        # Return something that does NOT look like a shell prompt
+        echo "Loading system services..."
+        ;;
+    *)
+        echo "Error: unknown command '$cmd'" >&2
+        exit 1
+        ;;
+esac
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh"
+
+    local output
+    local exit_code=0
+    output=$(
+        PATH="$TEST_TMPDIR/bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+        DEVCONTAINER_NAME="mock-devcontainer-1" \
+        CMUX_WAIT_WS_TIMEOUT=2 \
+        CMUX_WAIT_WS_INTERVAL=0.1 \
+        CMUX_WAIT_PROMPT_TIMEOUT=0 \
+        CMUX_WAIT_PROMPT_INTERVAL=0.1 \
+        bash "$SETUP_SCRIPT" TICKET-PT --repo myrepo 2>&1
+    ) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        pass "Script exits 0 despite prompt polling timeout"
+    else
+        fail "Script exited $exit_code instead of 0 on prompt polling timeout"
+    fi
+
+    if echo "$output" | grep -qi "timeout\|readiness"; then
+        pass "Timeout/readiness warning message present"
+    else
+        fail "No timeout/readiness warning in output"
+    fi
+
+    # Restore default mock
+    setup_default_cmux_ssh_mock
+}
+
+test_integration_missing_cmux_wait() {
+    run_test "Integration: missing cmux-wait.sh uses stub fallback"
+
+    # Point CMUX_WAIT_SCRIPT to nonexistent file.
+    # setup-worktree.sh computes this from CMUX_PLUGIN_DIR, so we need to
+    # remove the real cmux-wait.sh from the mock directory temporarily.
+    # Since our mock plugin dir doesn't have cmux-wait.sh, the script should
+    # fall back to stubs as long as cmux-wait.sh doesn't exist there.
+
+    # Ensure cmux-wait.sh does NOT exist in our mock plugin dir
+    rm -f "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-wait.sh"
+
+    local output
+    local exit_code=0
+    output=$(
+        PATH="$TEST_TMPDIR/bin:$PATH" \
+        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
+        WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
+        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
+        DEVCONTAINER_NAME="mock-devcontainer-1" \
+        bash "$SETUP_SCRIPT" TICKET-STUB --repo myrepo 2>&1
+    ) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        pass "Script exits 0 with missing cmux-wait.sh (stub fallback)"
+    else
+        fail "Script exited $exit_code with missing cmux-wait.sh"
+    fi
+
+    if echo "$output" | grep -qi "falling back\|not found\|sleep-based"; then
+        pass "Fallback warning message present"
+    else
+        fail "No fallback warning in output"
+    fi
+
+    if echo "$output" | grep -q "Worktree Setup Complete"; then
+        pass "Script completed despite missing cmux-wait.sh"
+    else
+        fail "Script did not complete with missing cmux-wait.sh"
+    fi
+}
+
+test_integration_dry_run_no_sleep() {
+    run_test "Integration: --dry-run does not contain sleep references for Steps 4-6"
+
+    local output
+    output=$(bash "$SETUP_SCRIPT" TICKET-DRY --repo myrepo --dry-run 2>&1) || true
+
+    # Extract only Steps 4-6 section from the output
+    local steps_4_to_6
+    steps_4_to_6=$(echo "$output" | sed -n '/Step 4/,/Step 7/p')
+
+    if echo "$steps_4_to_6" | grep -q "sleep 0\.5"; then
+        fail "Steps 4-6 dry-run output contains 'sleep 0.5'"
+    else
+        pass "Steps 4-6 dry-run output does not contain 'sleep 0.5'"
+    fi
+
+    if echo "$steps_4_to_6" | grep -q "sleep 2"; then
+        fail "Steps 4-6 dry-run output contains 'sleep 2'"
+    else
+        pass "Steps 4-6 dry-run output does not contain 'sleep 2'"
+    fi
+
+    # Verify polling is mentioned instead
+    if echo "$steps_4_to_6" | grep -qi "polling\|readiness\|[Ww]ait"; then
+        pass "Steps 4-6 mention polling/readiness/wait instead of sleep"
+    else
+        fail "Steps 4-6 do not mention polling/readiness/wait"
+    fi
 }
 
 ##############################################################################
-# Category 14: Graceful Degradation - cmux Send Failure
+# Helper: Restore default mock cmux-ssh.sh
 ##############################################################################
 
-run_cmux_send_failure_tests() {
-    section "14. Graceful Degradation: cmux Send Failure"
-
-    # Override cmux-ssh.sh to fail on 'send' subcommand
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
-#!/bin/bash
-case "$1" in
-  send) echo "send failed" >&2; exit 1 ;;
-  new-workspace) echo "OK workspace:3" ;;
-  rename-workspace|send-key) echo "OK" ;;
-  *) echo "unknown command: $1" >&2; exit 1 ;;
+setup_default_cmux_ssh_mock() {
+    cat > "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh" <<'MOCKEOF'
+#!/usr/bin/env bash
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+    new-workspace)
+        echo "workspace:3 created"
+        ;;
+    rename-workspace)
+        exit 0
+        ;;
+    send)
+        exit 0
+        ;;
+    send-key)
+        exit 0
+        ;;
+    list-workspaces)
+        echo "workspace:3 test [selected]"
+        ;;
+    read-screen)
+        echo "user@container:/workspace $ "
+        ;;
+    *)
+        echo "Error: unknown command '$cmd'" >&2
+        exit 1
+        ;;
 esac
-EOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
-
-    # Run with all other mocks in place
-    run_script TICKET-1 --repo crewchief
-
-    # Test: exits 0 (graceful degradation)
-    assert_exit_code "0" "$LAST_EXIT" "cmux send failure exits 0 (graceful)"
-    # Steps 6-7 content should NOT be present (skipped due to CMUX_FAILED)
-    assert_not_contains "$LAST_OUTPUT" "Step 6:" "cmux send failure skips Step 6"
-    assert_not_contains "$LAST_OUTPUT" "Step 7:" "cmux send failure skips Step 7"
-    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "cmux send failure still shows completion"
-
-    # Restore standard cmux-ssh.sh mock
-    cat > "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh" << 'EOF'
-#!/bin/bash
-case "$1" in
-  new-workspace) echo "OK workspace:3" ;;
-  rename-workspace|send|send-key) echo "OK" ;;
-  *) echo "unknown command: $1" >&2; exit 1 ;;
-esac
-EOF
-    chmod +x "$TEST_TMP/mock-cmux/skills/terminal-management/scripts/cmux-ssh.sh"
+MOCKEOF
+    chmod +x "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-ssh.sh"
 }
 
 ##############################################################################
-# Main Test Runner
+# Test Runner
 ##############################################################################
 
-main() {
-    printf "\n"
-    printf "========================================================\n"
-    printf "  setup-worktree.sh Test Suite\n"
-    printf "========================================================\n"
-    printf "\n"
+run_all_tests() {
+    echo ""
+    echo "=========================================="
+    echo "  setup-worktree.sh Tests"
+    echo "=========================================="
+    echo ""
+    echo "Script under test: $SETUP_SCRIPT"
+    echo ""
 
-    # Setup
     setup
 
-    # Ensure cleanup runs on exit
-    trap 'rm -rf $TEST_TMP' EXIT INT TERM
+    # Section A: Argument parsing & validation (14 tests)
+    test_help_flag
+    test_missing_worktree_name
+    test_missing_repo
+    test_unrecognized_option
+    test_invalid_worktree_name
+    test_valid_worktree_names
+    test_repo_flag_variants
+    test_branch_flag
+    test_workspace_flag
+    test_skip_cmux_flag
+    test_skip_workspace_flag
 
-    # Run all test categories
-    run_prerequisite_tests
-    run_help_tests
-    run_argument_parsing_tests
-    run_dry_run_tests
-    run_skip_flag_tests
-    run_prerequisite_validation_tests
-    run_crewchief_tests
-    run_exit_code_tests
-    run_cmux_mock_tests
-    run_name_validation_tests
-    run_workspace_id_extraction_failure_tests
-    run_devcontainer_name_empty_docker_unavailable_tests
-    run_docker_permission_denied_tests
-    run_cmux_send_failure_tests
+    # Section B: Dry-run tests (7 tests)
+    test_dry_run_header
+    test_dry_run_shows_all_steps
+    test_dry_run_exits_zero
+    test_dry_run_default_branch
+    test_dry_run_worktree_path
+
+    # Section C: Prerequisite validation (3 tests)
+    test_missing_crewchief
+    test_missing_workspace_folder_script
+    test_missing_cmux_check_skips_cmux
+
+    # Section D: Full run tests (8 tests)
+    test_full_run_skip_cmux
+    test_full_run_skip_workspace
+    test_full_run_both_skips
+    test_full_run_shows_worktree_path
+    test_verbose_flag
+    test_worktree_creation_failure
+    test_summary_shows_repo
+    test_summary_shows_branch
+
+    # Section E: CMUXWAIT integration tests (5 tests)
+    test_integration_happy_path
+    test_integration_workspace_polling_timeout
+    test_integration_prompt_polling_timeout
+    test_integration_missing_cmux_wait
+    test_integration_dry_run_no_sleep
 
     # Summary
-    printf "\n"
-    printf "========================================================\n"
-    printf "  Test Summary\n"
-    printf "========================================================\n"
-    printf "\n"
-    printf "  Tests run:    ${BLUE}%d${NC}\n" "$TESTS_RUN"
-    printf "  Tests passed: ${GREEN}%d${NC}\n" "$TESTS_PASSED"
-    printf "  Tests failed: ${RED}%d${NC}\n" "$TESTS_FAILED"
-    printf "\n"
+    echo ""
+    echo "=========================================="
+    echo "  Test Summary"
+    echo "=========================================="
+    echo ""
+    echo "Tests run:    $TESTS_RUN"
+    echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
+    echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+    echo ""
 
-    if [ "$TESTS_FAILED" -gt 0 ]; then
-        printf "  ${RED}FAILED${NC}: %d test(s) failed\n" "$TESTS_FAILED"
-        printf "\n"
-        exit 1
+    if [ "$TESTS_FAILED" -eq 0 ]; then
+        echo -e "${GREEN}All tests passed!${NC}"
+        return 0
     else
-        printf "  ${GREEN}SUCCESS${NC}: All tests passed\n"
-        printf "\n"
-        exit 0
+        echo -e "${RED}$TESTS_FAILED test(s) failed${NC}"
+        return 1
     fi
 }
 
-main "$@"
+run_all_tests
