@@ -537,6 +537,22 @@ The script uses a single workspace file. Specify `--workspace` to target a speci
    ```
 3. If the worktree exists but needs recreation, remove it first and retry
 
+### Running from inside an existing worktree
+
+**What this means:** If you run `setup-worktree.sh` from inside an existing worktree (e.g., `repos/myrepo-TICKET-99/`) rather than the main clone, `git rev-parse --show-toplevel` returns that worktree's root. The new worktree will be created as a sibling of the current worktree, not the main clone. This is expected behavior — a worktree is a valid git repository context.
+
+**What to do:**
+
+1. To confirm which root will be used before running the script:
+   ```bash
+   git rev-parse --show-toplevel
+   ```
+2. To create the new worktree as a sibling of the main clone instead, navigate to the main clone first:
+   ```bash
+   cd /workspace/repos/myrepo
+   setup-worktree.sh TICKET-200
+   ```
+
 ## Related Skills
 
 - **worktree-merge** -- Merge a worktree back to main and clean up environment
