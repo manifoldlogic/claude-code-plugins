@@ -8,6 +8,9 @@
 #   integration introduced by CMUXWAIT. All external dependencies are mocked
 #   via temp-directory scripts and environment variables.
 #
+#   Tests run from inside git-init'd temp repos so setup-worktree.sh can
+#   auto-detect the git root via git rev-parse --show-toplevel.
+#
 # USAGE:
 #   bash test-setup-worktree.sh
 #
@@ -67,6 +70,39 @@ run_test() {
     echo "----------------------------------------"
 }
 
+assert_exit_code() {
+    local expected="$1"
+    local actual="$2"
+    local msg="$3"
+    if [ "$actual" -eq "$expected" ]; then
+        pass "$msg"
+    else
+        fail "$msg (expected exit $expected, got $actual)"
+    fi
+}
+
+assert_contains() {
+    local output="$1"
+    local pattern="$2"
+    local msg="$3"
+    if echo "$output" | grep -q -- "$pattern"; then
+        pass "$msg"
+    else
+        fail "$msg (output did not contain: $pattern)"
+    fi
+}
+
+assert_not_contains() {
+    local output="$1"
+    local pattern="$2"
+    local msg="$3"
+    if echo "$output" | grep -q -- "$pattern"; then
+        fail "$msg (output unexpectedly contained: $pattern)"
+    else
+        pass "$msg"
+    fi
+}
+
 ##############################################################################
 # Setup / Teardown
 ##############################################################################
@@ -77,13 +113,16 @@ setup() {
     # Create mock bin directory
     mkdir -p "$TEST_TMPDIR/bin"
     mkdir -p "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts"
-    mkdir -p "$TEST_TMPDIR/repos/myrepo"
+
+    # Create test git repos (git init required for git rev-parse --show-toplevel)
+    git init "$TEST_TMPDIR/repos/myrepo" > /dev/null 2>&1
 
     # Mock crewchief
     cat > "$TEST_TMPDIR/bin/crewchief" <<'MOCKEOF'
 #!/usr/bin/env bash
-# Mock crewchief - always succeeds
+# Mock crewchief - validates PWD is a git root, always succeeds
 if [ "${1:-}" = "worktree" ] && [ "${2:-}" = "create" ]; then
+    [ -d "$PWD/.git" ] || { echo "error: not in a git root" >&2; exit 1; }
     WORKTREE_NAME="${3:-}"
     exit 0
 fi
@@ -172,19 +211,20 @@ teardown() {
 trap teardown EXIT
 
 ##############################################################################
-# Helper: Run setup-worktree.sh with mocked environment
+# Helper: Run setup-worktree.sh with mocked environment from test git repo
 ##############################################################################
 
 # Run setup-worktree.sh in a subshell with all mocks configured.
+# Runs from inside $TEST_TMPDIR/repos/myrepo (a git-init'd directory).
 # Args: all args are passed to setup-worktree.sh
 # Returns: exit code of the script
 # Stdout+stderr captured and stored in global $LAST_OUTPUT
 run_setup() {
     LAST_OUTPUT=$(
+        cd "$TEST_TMPDIR/repos/myrepo" && \
         PATH="$TEST_TMPDIR/bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
         DEVCONTAINER_NAME="mock-devcontainer-1" \
         CMUX_WAIT_WS_TIMEOUT="${CMUX_WAIT_WS_TIMEOUT:-2}" \
         CMUX_WAIT_WS_INTERVAL="${CMUX_WAIT_WS_INTERVAL:-0.1}" \
@@ -205,62 +245,61 @@ test_help_flag() {
     local output
     output=$(bash "$SETUP_SCRIPT" --help 2>&1) || true
 
-    if echo "$output" | grep -q "Usage:"; then
-        pass "--help shows usage text"
-    else
-        fail "--help does not show usage text"
-    fi
+    assert_contains "$output" "Usage:" "--help shows usage text"
+    assert_not_contains "$output" "--repo" "help must not mention --repo"
+    assert_not_contains "$output" "WORKSPACE_REPOS_ROOT" "help must not mention WORKSPACE_REPOS_ROOT"
 }
 
 test_missing_worktree_name() {
     run_test "Missing worktree name exits 1"
 
-    if bash "$SETUP_SCRIPT" --repo myrepo 2>/dev/null; then
-        fail "Should exit non-zero when worktree name is missing"
-    else
-        local exit_code=$?
-        if [ "$exit_code" -eq 1 ]; then
-            pass "Exit code 1 for missing worktree name"
-        else
-            fail "Expected exit code 1, got $exit_code"
-        fi
-    fi
+    local exit_code=0
+    cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" > /dev/null 2>&1 || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Exit code 1 for missing worktree name"
 }
 
-test_missing_repo() {
-    run_test "Missing --repo exits 1"
+test_not_in_git_repo() {
+    run_test "Running outside git repo exits 1"
 
-    if bash "$SETUP_SCRIPT" TICKET-1 2>/dev/null; then
-        fail "Should exit non-zero when --repo is missing"
-    else
-        local exit_code=$?
-        if [ "$exit_code" -eq 1 ]; then
-            pass "Exit code 1 for missing --repo"
-        else
-            fail "Expected exit code 1, got $exit_code"
-        fi
-    fi
+    local output exit_code=0
+    output=$(cd /tmp && bash "$SETUP_SCRIPT" TICKET-1 2>&1) || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "not-in-git-repo should exit 1"
+    assert_contains "$output" "Not inside a git repository" "error message must mention not inside a git repository"
+}
+
+test_repo_flag_rejected() {
+    run_test "--repo flag is rejected as unrecognized"
+
+    local output exit_code=0
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --repo anything 2>&1) || exit_code=$?
+
+    assert_exit_code 3 "$exit_code" "--repo should be rejected as unrecognized option (exit 3)"
 }
 
 test_unrecognized_option() {
     run_test "Unrecognized option exits 3"
 
-    if bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --badopt 2>/dev/null; then
-        fail "Should exit non-zero for unrecognized option"
-    else
-        local exit_code=$?
-        if [ "$exit_code" -eq 3 ]; then
-            pass "Exit code 3 for unrecognized option"
-        else
-            fail "Expected exit code 3, got $exit_code"
-        fi
-    fi
+    local exit_code=0
+    cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --badopt 2>/dev/null || exit_code=$?
+
+    assert_exit_code 3 "$exit_code" "Exit code 3 for unrecognized option"
+}
+
+test_extra_positional_arg() {
+    run_test "Extra positional argument exits 1"
+
+    local exit_code=0
+    cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 EXTRA 2>/dev/null || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Exit code 1 for extra positional argument"
 }
 
 test_invalid_worktree_name() {
     run_test "Invalid worktree name (starts with hyphen) exits 1"
 
-    if bash "$SETUP_SCRIPT" "-bad" --repo myrepo 2>/dev/null; then
+    if cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" "-bad" 2>/dev/null; then
         fail "Should exit non-zero for invalid worktree name"
     else
         pass "Non-zero exit for invalid worktree name"
@@ -272,86 +311,54 @@ test_valid_worktree_names() {
 
     # Dry-run so we don't need all mocks
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
-    if echo "$output" | grep -q "TICKET-1"; then
-        pass "TICKET-1 accepted as valid name"
-    else
-        fail "TICKET-1 not accepted"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
+    assert_contains "$output" "TICKET-1" "TICKET-1 accepted as valid name"
 
-    output=$(bash "$SETUP_SCRIPT" my_worktree --repo myrepo --dry-run 2>&1) || true
-    if echo "$output" | grep -q "my_worktree"; then
-        pass "my_worktree accepted as valid name"
-    else
-        fail "my_worktree not accepted"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" my_worktree --dry-run 2>&1) || true
+    assert_contains "$output" "my_worktree" "my_worktree accepted as valid name"
 }
 
-test_repo_flag_variants() {
-    run_test "Short -r flag works for --repo"
+test_repo_auto_derived() {
+    run_test "Repository name auto-derived from git root basename"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 -r myrepo --dry-run 2>&1) || true
-    if echo "$output" | grep -q "myrepo"; then
-        pass "-r flag sets repository"
-    else
-        fail "-r flag did not set repository"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
+    assert_contains "$output" "Repository: myrepo" "Repository name auto-derived from git root basename"
 }
 
 test_branch_flag() {
     run_test "--branch / -b sets base branch"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --branch develop --dry-run 2>&1) || true
-    if echo "$output" | grep -q "develop"; then
-        pass "--branch develop shown in dry-run output"
-    else
-        fail "--branch develop not shown in dry-run output"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --branch develop --dry-run 2>&1) || true
+    assert_contains "$output" "develop" "--branch develop shown in dry-run output"
 
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo -b release --dry-run 2>&1) || true
-    if echo "$output" | grep -q "release"; then
-        pass "-b release shown in dry-run output"
-    else
-        fail "-b release not shown in dry-run output"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 -b release --dry-run 2>&1) || true
+    assert_contains "$output" "release" "-b release shown in dry-run output"
 }
 
 test_workspace_flag() {
     run_test "--workspace / -w sets workspace file"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo -w /my/file.code-workspace --dry-run 2>&1) || true
-    if echo "$output" | grep -q "/my/file.code-workspace"; then
-        pass "-w flag sets workspace file in dry-run output"
-    else
-        fail "-w flag did not set workspace file"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 -w /my/file.code-workspace --dry-run 2>&1) || true
+    assert_contains "$output" "/my/file.code-workspace" "-w flag sets workspace file in dry-run output"
 }
 
 test_skip_cmux_flag() {
     run_test "--skip-cmux flag shows skip in dry-run"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --skip-cmux --dry-run 2>&1) || true
-    if echo "$output" | grep -q "SKIPPED.*--skip-cmux"; then
-        pass "--skip-cmux flag acknowledged in dry-run"
-    else
-        fail "--skip-cmux flag not reflected in dry-run output"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --skip-cmux --dry-run 2>&1) || true
+    assert_contains "$output" "SKIPPED.*--skip-cmux" "--skip-cmux flag acknowledged in dry-run"
 }
 
 test_skip_workspace_flag() {
     run_test "--skip-workspace flag shows skip in dry-run"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --skip-workspace --dry-run 2>&1) || true
-    if echo "$output" | grep -q "SKIPPED.*--skip-workspace"; then
-        pass "--skip-workspace flag acknowledged in dry-run"
-    else
-        fail "--skip-workspace flag not reflected in dry-run output"
-    fi
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --skip-workspace --dry-run 2>&1) || true
+    assert_contains "$output" "SKIPPED.*--skip-workspace" "--skip-workspace flag acknowledged in dry-run"
 }
 
 ##############################################################################
@@ -362,26 +369,17 @@ test_dry_run_header() {
     run_test "Dry-run shows header and resolved parameters"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
 
-    if echo "$output" | grep -q "DRY RUN"; then
-        pass "DRY RUN header present"
-    else
-        fail "DRY RUN header missing"
-    fi
-
-    if echo "$output" | grep -q "Resolved parameters"; then
-        pass "Resolved parameters section present"
-    else
-        fail "Resolved parameters section missing"
-    fi
+    assert_contains "$output" "DRY RUN" "DRY RUN header present"
+    assert_contains "$output" "Resolved parameters" "Resolved parameters section present"
 }
 
 test_dry_run_shows_all_steps() {
     run_test "Dry-run shows steps 1-7"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
 
     local step
     for step in 1 2 3 4 5 6 7; do
@@ -396,7 +394,7 @@ test_dry_run_shows_all_steps() {
 test_dry_run_exits_zero() {
     run_test "Dry-run exits 0"
 
-    if bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run > /dev/null 2>&1; then
+    if cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run > /dev/null 2>&1; then
         pass "Dry-run exits 0"
     else
         fail "Dry-run exited non-zero"
@@ -407,26 +405,52 @@ test_dry_run_default_branch() {
     run_test "Dry-run shows default branch main"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
 
-    if echo "$output" | grep -q "Base branch: main"; then
-        pass "Default branch main shown"
-    else
-        fail "Default branch main not shown"
-    fi
+    assert_contains "$output" "Base branch: main" "Default branch main shown"
 }
 
 test_dry_run_worktree_path() {
     run_test "Dry-run shows computed worktree path"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo --dry-run 2>&1) || true
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
 
-    if echo "$output" | grep -q "myrepo/TICKET-1"; then
-        pass "Worktree path contains repo/name"
-    else
-        fail "Worktree path not shown correctly"
-    fi
+    assert_contains "$output" "TICKET-1" "Worktree path contains worktree name"
+}
+
+test_dry_run_git_root() {
+    run_test "Dry-run shows Git root"
+
+    local output
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
+
+    assert_contains "$output" "Git root:" "dry-run must show Git root"
+}
+
+test_dry_run_cd_git_root() {
+    run_test "Dry-run Step 2 shows cd to GIT_ROOT"
+
+    local output
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
+
+    # Step 2 should show: (cd $GIT_ROOT && crewchief worktree create ...)
+    assert_contains "$output" "cd $TEST_TMPDIR/repos/myrepo" "Step 2 references cd to GIT_ROOT"
+}
+
+test_dry_run_subdir_detection() {
+    run_test "Dry-run from subdirectory detects correct git root"
+
+    # Create a subdirectory inside the test git repo
+    mkdir -p "$TEST_TMPDIR/repos/myrepo/subdir/nested"
+
+    local output
+    output=$(cd "$TEST_TMPDIR/repos/myrepo/subdir/nested" && bash "$SETUP_SCRIPT" TICKET-1 --dry-run 2>&1) || true
+    local exit_code=$?
+
+    assert_exit_code 0 "$exit_code" "Dry-run from subdir exits 0"
+    assert_contains "$output" "Git root:" "Git root shown from subdir"
+    assert_contains "$output" "$TEST_TMPDIR/repos/myrepo" "Correct git root detected from subdir"
 }
 
 ##############################################################################
@@ -437,20 +461,14 @@ test_missing_crewchief() {
     run_test "Missing crewchief CLI exits 2"
 
     # Use empty PATH to simulate missing crewchief
-    if PATH="/usr/bin:/bin" \
+    local exit_code=0
+    cd "$TEST_TMPDIR/repos/myrepo" && \
+    PATH="/usr/bin:/bin" \
        CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
        WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
-       WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
-       bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo 2>/dev/null; then
-        fail "Should exit non-zero when crewchief missing"
-    else
-        local exit_code=$?
-        if [ "$exit_code" -eq 2 ]; then
-            pass "Exit code 2 when crewchief missing"
-        else
-            fail "Expected exit code 2, got $exit_code"
-        fi
-    fi
+       bash "$SETUP_SCRIPT" TICKET-1 2>/dev/null || exit_code=$?
+
+    assert_exit_code 2 "$exit_code" "Exit code 2 when crewchief missing"
 }
 
 test_missing_workspace_folder_script() {
@@ -458,23 +476,19 @@ test_missing_workspace_folder_script() {
 
     local output
     output=$(
+        cd "$TEST_TMPDIR/repos/myrepo" && \
         PATH="$TEST_TMPDIR/bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
         WORKSPACE_FOLDER_SCRIPT="/nonexistent/workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
         DEVCONTAINER_NAME="mock-devcontainer-1" \
         CMUX_WAIT_WS_TIMEOUT=2 \
         CMUX_WAIT_WS_INTERVAL=0.1 \
         CMUX_WAIT_PROMPT_TIMEOUT=2 \
         CMUX_WAIT_PROMPT_INTERVAL=0.1 \
-        bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo 2>&1
+        bash "$SETUP_SCRIPT" TICKET-1 2>&1
     ) || true
 
-    if echo "$output" | grep -q "workspace-folder.sh not found"; then
-        pass "Warning about missing workspace-folder.sh shown"
-    else
-        fail "No warning about missing workspace-folder.sh"
-    fi
+    assert_contains "$output" "workspace-folder.sh not found" "Warning about missing workspace-folder.sh shown"
 }
 
 test_missing_cmux_check_skips_cmux() {
@@ -486,22 +500,18 @@ test_missing_cmux_check_skips_cmux() {
 
     local output
     output=$(
+        cd "$TEST_TMPDIR/repos/myrepo" && \
         PATH="$TEST_TMPDIR/bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
         DEVCONTAINER_NAME="mock-devcontainer-1" \
-        bash "$SETUP_SCRIPT" TICKET-1 --repo myrepo 2>&1
+        bash "$SETUP_SCRIPT" TICKET-1 2>&1
     ) || true
 
     # Restore
     mv "$backup" "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-check.sh"
 
-    if echo "$output" | grep -q "cmux-check.sh not found"; then
-        pass "Warning about missing cmux-check.sh shown"
-    else
-        fail "No warning about missing cmux-check.sh"
-    fi
+    assert_contains "$output" "cmux-check.sh not found" "Warning about missing cmux-check.sh shown"
 }
 
 ##############################################################################
@@ -511,39 +521,31 @@ test_missing_cmux_check_skips_cmux() {
 test_full_run_skip_cmux() {
     run_test "Full run with --skip-cmux completes successfully"
 
-    if run_setup TICKET-1 --repo myrepo --skip-cmux; then
+    if run_setup TICKET-1 --skip-cmux; then
         pass "Setup completed with --skip-cmux"
     else
         fail "Setup failed with --skip-cmux (exit code $?)"
     fi
 
-    if echo "$LAST_OUTPUT" | grep -q "Worktree Setup Complete"; then
-        pass "Success summary shown"
-    else
-        fail "Success summary missing"
-    fi
+    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "Success summary shown"
 }
 
 test_full_run_skip_workspace() {
     run_test "Full run with --skip-workspace completes successfully"
 
-    if run_setup TICKET-1 --repo myrepo --skip-workspace; then
+    if run_setup TICKET-1 --skip-workspace; then
         pass "Setup completed with --skip-workspace"
     else
         fail "Setup failed with --skip-workspace (exit code $?)"
     fi
 
-    if echo "$LAST_OUTPUT" | grep -q "Skipping VS Code workspace"; then
-        pass "Workspace skip message shown"
-    else
-        fail "Workspace skip message missing"
-    fi
+    assert_contains "$LAST_OUTPUT" "Skipping VS Code workspace" "Workspace skip message shown"
 }
 
 test_full_run_both_skips() {
     run_test "Full run with both --skip-cmux and --skip-workspace"
 
-    if run_setup TICKET-1 --repo myrepo --skip-cmux --skip-workspace; then
+    if run_setup TICKET-1 --skip-cmux --skip-workspace; then
         pass "Setup completed with both skips"
     else
         fail "Setup failed with both skips"
@@ -553,19 +555,15 @@ test_full_run_both_skips() {
 test_full_run_shows_worktree_path() {
     run_test "Full run output includes worktree path"
 
-    run_setup TICKET-1 --repo myrepo --skip-cmux || true
+    run_setup TICKET-1 --skip-cmux || true
 
-    if echo "$LAST_OUTPUT" | grep -q "myrepo/TICKET-1"; then
-        pass "Worktree path in output"
-    else
-        fail "Worktree path missing from output"
-    fi
+    assert_contains "$LAST_OUTPUT" "TICKET-1" "Worktree path in output"
 }
 
 test_verbose_flag() {
     run_test "--verbose flag is accepted without error"
 
-    if run_setup TICKET-1 --repo myrepo --skip-cmux --verbose; then
+    if run_setup TICKET-1 --skip-cmux --verbose; then
         pass "--verbose flag accepted"
     else
         fail "--verbose flag caused error"
@@ -582,20 +580,22 @@ exit 1
 MOCKEOF
     chmod +x "$TEST_TMPDIR/bin/crewchief"
 
-    if run_setup TICKET-1 --repo myrepo --skip-cmux; then
+    if run_setup TICKET-1 --skip-cmux; then
         fail "Should exit non-zero when crewchief fails"
     else
         local exit_code=$?
-        if [ "$exit_code" -eq 4 ]; then
-            pass "Exit code 4 on worktree creation failure"
-        else
-            fail "Expected exit code 4, got $exit_code"
-        fi
+        assert_exit_code 4 "$exit_code" "Exit code 4 on worktree creation failure"
     fi
 
     # Restore working crewchief
     cat > "$TEST_TMPDIR/bin/crewchief" <<'MOCKEOF'
 #!/usr/bin/env bash
+# Mock crewchief - validates PWD is a git root, always succeeds
+if [ "${1:-}" = "worktree" ] && [ "${2:-}" = "create" ]; then
+    [ -d "$PWD/.git" ] || { echo "error: not in a git root" >&2; exit 1; }
+    WORKTREE_NAME="${3:-}"
+    exit 0
+fi
 exit 0
 MOCKEOF
     chmod +x "$TEST_TMPDIR/bin/crewchief"
@@ -604,25 +604,17 @@ MOCKEOF
 test_summary_shows_repo() {
     run_test "Summary section shows repository name"
 
-    run_setup TICKET-1 --repo myrepo --skip-cmux || true
+    run_setup TICKET-1 --skip-cmux || true
 
-    if echo "$LAST_OUTPUT" | grep -q "Repository: myrepo"; then
-        pass "Repository name in summary"
-    else
-        fail "Repository name missing from summary"
-    fi
+    assert_contains "$LAST_OUTPUT" "Repository: myrepo" "Repository name in summary"
 }
 
 test_summary_shows_branch() {
     run_test "Summary section shows branch"
 
-    run_setup TICKET-1 --repo myrepo --branch develop --skip-cmux || true
+    run_setup TICKET-1 --branch develop --skip-cmux || true
 
-    if echo "$LAST_OUTPUT" | grep -q "Branch: develop"; then
-        pass "Branch shown in summary"
-    else
-        fail "Branch missing from summary"
-    fi
+    assert_contains "$LAST_OUTPUT" "Branch: develop" "Branch shown in summary"
 }
 
 # Existing test count before CMUXWAIT.2002: 25
@@ -638,23 +630,14 @@ test_integration_happy_path() {
     # and a prompt-like string for read-screen. cmux-wait.sh is sourced by
     # setup-worktree.sh when CMUX_WAIT_SCRIPT points to the real file.
 
-    if run_setup TICKET-HP --repo myrepo; then
+    if run_setup TICKET-HP; then
         pass "Happy-path integration run exits 0"
     else
         fail "Happy-path integration run exited non-zero ($?)"
     fi
 
-    if echo "$LAST_OUTPUT" | grep -q "cmux workspace created"; then
-        pass "Workspace creation logged"
-    else
-        fail "Workspace creation message missing"
-    fi
-
-    if echo "$LAST_OUTPUT" | grep -q "Worktree Setup Complete"; then
-        pass "Setup completed successfully"
-    else
-        fail "Setup complete message missing"
-    fi
+    assert_contains "$LAST_OUTPUT" "cmux workspace created" "Workspace creation logged"
+    assert_contains "$LAST_OUTPUT" "Worktree Setup Complete" "Setup completed successfully"
 
     if echo "$LAST_OUTPUT" | grep -q "Claude launched\|cmux: Workspace ready"; then
         pass "cmux steps completed"
@@ -703,16 +686,16 @@ MOCKEOF
     local output
     local exit_code=0
     output=$(
+        cd "$TEST_TMPDIR/repos/myrepo" && \
         PATH="$TEST_TMPDIR/bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
         DEVCONTAINER_NAME="mock-devcontainer-1" \
         CMUX_WAIT_WS_TIMEOUT=0 \
         CMUX_WAIT_WS_INTERVAL=0.1 \
         CMUX_WAIT_PROMPT_TIMEOUT=2 \
         CMUX_WAIT_PROMPT_INTERVAL=0.1 \
-        bash "$SETUP_SCRIPT" TICKET-WST --repo myrepo 2>&1
+        bash "$SETUP_SCRIPT" TICKET-WST 2>&1
     ) || exit_code=$?
 
     if [ "$exit_code" -eq 0 ]; then
@@ -770,16 +753,16 @@ MOCKEOF
     local output
     local exit_code=0
     output=$(
+        cd "$TEST_TMPDIR/repos/myrepo" && \
         PATH="$TEST_TMPDIR/bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
         DEVCONTAINER_NAME="mock-devcontainer-1" \
         CMUX_WAIT_WS_TIMEOUT=2 \
         CMUX_WAIT_WS_INTERVAL=0.1 \
         CMUX_WAIT_PROMPT_TIMEOUT=0 \
         CMUX_WAIT_PROMPT_INTERVAL=0.1 \
-        bash "$SETUP_SCRIPT" TICKET-PT --repo myrepo 2>&1
+        bash "$SETUP_SCRIPT" TICKET-PT 2>&1
     ) || exit_code=$?
 
     if [ "$exit_code" -eq 0 ]; then
@@ -801,24 +784,18 @@ MOCKEOF
 test_integration_missing_cmux_wait() {
     run_test "Integration: missing cmux-wait.sh uses stub fallback"
 
-    # Point CMUX_WAIT_SCRIPT to nonexistent file.
-    # setup-worktree.sh computes this from CMUX_PLUGIN_DIR, so we need to
-    # remove the real cmux-wait.sh from the mock directory temporarily.
-    # Since our mock plugin dir doesn't have cmux-wait.sh, the script should
-    # fall back to stubs as long as cmux-wait.sh doesn't exist there.
-
     # Ensure cmux-wait.sh does NOT exist in our mock plugin dir
     rm -f "$TEST_TMPDIR/cmux-plugin/skills/terminal-management/scripts/cmux-wait.sh"
 
     local output
     local exit_code=0
     output=$(
+        cd "$TEST_TMPDIR/repos/myrepo" && \
         PATH="$TEST_TMPDIR/bin:$PATH" \
         CMUX_PLUGIN_DIR="$TEST_TMPDIR/cmux-plugin" \
         WORKSPACE_FOLDER_SCRIPT="$TEST_TMPDIR/workspace-folder.sh" \
-        WORKSPACE_REPOS_ROOT="$TEST_TMPDIR/repos" \
         DEVCONTAINER_NAME="mock-devcontainer-1" \
-        bash "$SETUP_SCRIPT" TICKET-STUB --repo myrepo 2>&1
+        bash "$SETUP_SCRIPT" TICKET-STUB 2>&1
     ) || exit_code=$?
 
     if [ "$exit_code" -eq 0 ]; then
@@ -833,18 +810,14 @@ test_integration_missing_cmux_wait() {
         fail "No fallback warning in output"
     fi
 
-    if echo "$output" | grep -q "Worktree Setup Complete"; then
-        pass "Script completed despite missing cmux-wait.sh"
-    else
-        fail "Script did not complete with missing cmux-wait.sh"
-    fi
+    assert_contains "$output" "Worktree Setup Complete" "Script completed despite missing cmux-wait.sh"
 }
 
 test_integration_dry_run_no_sleep() {
     run_test "Integration: --dry-run does not contain sleep references for Steps 4-6"
 
     local output
-    output=$(bash "$SETUP_SCRIPT" TICKET-DRY --repo myrepo --dry-run 2>&1) || true
+    output=$(cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-DRY --dry-run 2>&1) || true
 
     # Extract only Steps 4-6 section from the output
     local steps_4_to_6
@@ -922,25 +895,30 @@ run_all_tests() {
 
     setup
 
-    # Section A: Argument parsing & validation (14 tests)
+    # Section A: Argument parsing & validation (15 tests)
     test_help_flag
     test_missing_worktree_name
-    test_missing_repo
+    test_not_in_git_repo
+    test_repo_flag_rejected
     test_unrecognized_option
+    test_extra_positional_arg
     test_invalid_worktree_name
     test_valid_worktree_names
-    test_repo_flag_variants
+    test_repo_auto_derived
     test_branch_flag
     test_workspace_flag
     test_skip_cmux_flag
     test_skip_workspace_flag
 
-    # Section B: Dry-run tests (7 tests)
+    # Section B: Dry-run tests (10 tests)
     test_dry_run_header
     test_dry_run_shows_all_steps
     test_dry_run_exits_zero
     test_dry_run_default_branch
     test_dry_run_worktree_path
+    test_dry_run_git_root
+    test_dry_run_cd_git_root
+    test_dry_run_subdir_detection
 
     # Section C: Prerequisite validation (3 tests)
     test_missing_crewchief

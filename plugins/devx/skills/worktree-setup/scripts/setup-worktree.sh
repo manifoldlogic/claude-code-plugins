@@ -2,7 +2,7 @@
 #
 # setup-worktree.sh - Create git worktree with VS Code and cmux workspace setup
 #
-# Version: 1.0.0
+# Version: 2.0.0
 #
 # DESCRIPTION:
 #   Orchestrates the creation of a git worktree via crewchief CLI, updates the
@@ -17,13 +17,10 @@
 #   - cmux-ssh.sh and cmux-check.sh for terminal session setup (optional)
 #
 # USAGE:
-#   setup-worktree.sh <worktree-name> --repo <repository> [OPTIONS]
+#   setup-worktree.sh <worktree-name> [OPTIONS]
 #
 # POSITIONAL ARGUMENTS:
 #   worktree-name               Name for the worktree (typically a ticket ID)
-#
-# REQUIRED ARGUMENTS:
-#   -r, --repo REPO             Repository name
 #
 # OPTIONAL ARGUMENTS:
 #   -b, --branch BRANCH         Base branch (default: main)
@@ -41,19 +38,22 @@
 #   3  - Unrecognized option
 #   4  - Worktree creation failure (crewchief worktree create failed)
 #
+# NOTE:
+#   Must be run from within a git repository.
+#
 # EXAMPLES:
 #
 #   1. Create worktree with full setup
-#      $ setup-worktree.sh TICKET-1 --repo crewchief
+#      $ setup-worktree.sh TICKET-1
 #
 #   2. Create worktree with custom branch
-#      $ setup-worktree.sh TICKET-1 --repo crewchief --branch develop
+#      $ setup-worktree.sh TICKET-1 --branch develop
 #
 #   3. Skip cmux setup (worktree + workspace only)
-#      $ setup-worktree.sh TICKET-1 --repo crewchief --skip-cmux
+#      $ setup-worktree.sh TICKET-1 --skip-cmux
 #
 #   4. Dry run to preview
-#      $ setup-worktree.sh --dry-run TICKET-1 --repo crewchief
+#      $ setup-worktree.sh --dry-run TICKET-1
 #
 
 set -euo pipefail
@@ -101,11 +101,9 @@ WORKSPACE_FOLDER_SCRIPT="${WORKSPACE_FOLDER_SCRIPT:-/workspace/.devcontainer/scr
 
 # Default values
 DEFAULT_BRANCH="main"
-WORKSPACE_REPOS_ROOT="${WORKSPACE_REPOS_ROOT:-/workspace/repos}"
 
 # Variables to be set by argument parsing
 WORKTREE_NAME=""
-REPO=""
 BRANCH="$DEFAULT_BRANCH"
 WORKSPACE_FILE=""
 SKIP_CMUX=false
@@ -119,9 +117,12 @@ VERBOSE=false
 
 show_help() {
     cat << 'EOF'
-Usage: setup-worktree.sh <worktree-name> --repo <repository> [OPTIONS]
+Usage: setup-worktree.sh <worktree-name> [OPTIONS]
 
 Create a git worktree with VS Code and cmux workspace setup.
+
+Must be run from within a git repository. The repository is detected
+automatically using git rev-parse --show-toplevel.
 
 Orchestrates 7 steps: prerequisite validation, worktree creation, VS Code
 workspace update, cmux workspace creation, devcontainer session, navigation,
@@ -129,9 +130,6 @@ and claude launch.
 
 POSITIONAL ARGUMENTS:
   worktree-name               Name for the worktree (typically a ticket ID)
-
-REQUIRED:
-  -r, --repo REPO             Repository name
 
 OPTIONS:
   -b, --branch BRANCH         Base branch (default: main)
@@ -150,24 +148,22 @@ EXIT CODES:
   4   Worktree creation failure
 
 EXAMPLES:
-  # Create worktree with full setup
-  setup-worktree.sh TICKET-1 --repo crewchief
+  # Create worktree with full setup (run from inside a git repo)
+  setup-worktree.sh TICKET-1
 
   # Create worktree with custom branch
-  setup-worktree.sh TICKET-1 --repo crewchief --branch develop
+  setup-worktree.sh TICKET-1 --branch develop
 
   # Skip cmux setup (worktree + workspace only)
-  setup-worktree.sh TICKET-1 --repo crewchief --skip-cmux
+  setup-worktree.sh TICKET-1 --skip-cmux
 
   # Dry run to preview
-  setup-worktree.sh --dry-run TICKET-1 --repo crewchief
+  setup-worktree.sh --dry-run TICKET-1
 
   # Skip VS Code workspace update
-  setup-worktree.sh TICKET-1 --repo crewchief --skip-workspace
+  setup-worktree.sh TICKET-1 --skip-workspace
 
 ENVIRONMENT VARIABLES:
-  WORKSPACE_REPOS_ROOT        Root directory for worktree clones
-                              (default: /workspace/repos)
   CMUX_PLUGIN_DIR             Path to cmux plugin directory
                               (default: /workspace/repos/claude-code-plugins/claude-code-plugins/plugins/cmux)
   WORKSPACE_FOLDER_SCRIPT     Path to workspace-folder.sh
@@ -184,14 +180,6 @@ EOF
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -r|--repo)
-            if [ -z "${2:-}" ]; then
-                log_error "--repo requires an argument"
-                exit 1
-            fi
-            REPO="$2"
-            shift 2
-            ;;
         -b|--branch)
             if [ -z "${2:-}" ]; then
                 log_error "--branch requires an argument"
@@ -256,13 +244,6 @@ if [ -z "$WORKTREE_NAME" ]; then
     exit 1
 fi
 
-if [ -z "$REPO" ]; then
-    log_error "Error: --repo is required"
-    echo "" >&2
-    show_help
-    exit 1
-fi
-
 # Validate worktree name format
 if ! printf '%s' "$WORKTREE_NAME" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9_-]*$'; then
     log_error "Invalid worktree name: '$WORKTREE_NAME'"
@@ -270,8 +251,13 @@ if ! printf '%s' "$WORKTREE_NAME" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9_-]*$'; then
     exit 1
 fi
 
-# Compute worktree path
-WORKTREE_PATH="$WORKSPACE_REPOS_ROOT/$REPO/$WORKTREE_NAME"
+# Detect git repository root
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    log_error "Not inside a git repository. Run this script from within a git repo."
+    exit 1
+}
+REPO=$(basename "$GIT_ROOT")
+WORKTREE_PATH="$(dirname "$GIT_ROOT")/$WORKTREE_NAME"
 
 ##############################################################################
 # Section 6: Dry Run Mode
@@ -287,6 +273,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "Resolved parameters:"
     echo "  Worktree name: $WORKTREE_NAME"
     echo "  Repository: $REPO"
+    echo "  Git root: $GIT_ROOT"
     echo "  Base branch: $BRANCH"
     echo "  Worktree path: $WORKTREE_PATH"
     if [ -n "$WORKSPACE_FILE" ]; then
@@ -307,7 +294,7 @@ if [ "$DRY_RUN" = true ]; then
     echo ""
 
     dry_run_msg "Step 2: Create worktree"
-    echo "     (cd $WORKSPACE_REPOS_ROOT/$REPO && crewchief worktree create $WORKTREE_NAME --branch $BRANCH)"
+    echo "     (cd $GIT_ROOT && crewchief worktree create $WORKTREE_NAME --branch $BRANCH)"
     echo ""
 
     if [ "$SKIP_WORKSPACE" = true ]; then
@@ -403,7 +390,7 @@ log_success "Prerequisites validated"
 
 log_info "Step 2: Creating worktree '$WORKTREE_NAME' in repo '$REPO'..."
 
-if ! (cd "$WORKSPACE_REPOS_ROOT/$REPO" && crewchief worktree create "$WORKTREE_NAME" --branch "$BRANCH"); then
+if ! (cd "$GIT_ROOT" && crewchief worktree create "$WORKTREE_NAME" --branch "$BRANCH"); then
     log_error "Worktree creation failed (crewchief worktree create returned non-zero)"
     exit 4
 fi
