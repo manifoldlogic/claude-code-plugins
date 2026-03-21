@@ -1,7 +1,7 @@
 # Worktree Plugin
 
 <p align="center">
-  <img src="worktree_hero.svg" alt="Worktree — lifecycle, merge pipeline, safety" width="680">
+  <img src="worktree_hero.svg" alt="Worktree — lifecycle, merge pipeline, safety" width="100%">
 </p>
 
 Git worktree lifecycle management powered by the crewchief CLI. Work on multiple features simultaneously in isolated directories, merge them back through a four-step pipeline, and clean up safely — with SDD ticket awareness that prevents accidental removal of incomplete work.

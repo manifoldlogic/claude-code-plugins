@@ -1,7 +1,7 @@
 # SDD Plugin
 
 <p align="center">
-  <img src="sdd_hero.svg" alt="SDD — hierarchy, agents, workflow" width="680">
+  <img src="sdd_hero.svg" alt="SDD — hierarchy, agents, workflow" width="100%">
 </p>
 
 Spec-Driven Development. Structure ambiguous work into epics, tickets, and tasks. Thirteen agents handle planning, review, implementation, and verification. A strict orchestration pipeline keeps everything moving through document triage, safety gates, and autonomous execution.

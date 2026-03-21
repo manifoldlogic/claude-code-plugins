@@ -1,7 +1,7 @@
 # Game Design Plugin
 
 <p align="center">
-  <img src="game_design_hero.svg" alt="Game Design — sources, personas, thesis" width="680">
+  <img src="game_design_hero.svg" alt="Game Design — sources, personas, thesis" width="100%">
 </p>
 
 Nine specialized design consultants synthesized from fourteen legendary game designers. Each agent represents a design role — not an individual — with complementary perspectives fused into focused expertise.
