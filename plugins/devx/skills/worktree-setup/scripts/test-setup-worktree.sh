@@ -266,7 +266,7 @@ test_not_in_git_repo() {
     output=$(cd /tmp && bash "$SETUP_SCRIPT" TICKET-1 2>&1) || exit_code=$?
 
     assert_exit_code 1 "$exit_code" "not-in-git-repo should exit 1"
-    assert_contains "$output" "ot inside a git repository" "error message must mention not inside a git repository"
+    assert_contains "$output" "Not inside a git repository" "error message must mention not inside a git repository"
 }
 
 test_repo_flag_rejected() {
