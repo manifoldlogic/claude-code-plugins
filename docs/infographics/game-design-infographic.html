@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Design Plugin - Agent Personas Infographic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .breadcrumb {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #64b5f6;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #64b5f6 0%, #81c784 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #b0bec5;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 28px;
+            margin: 50px 0 30px 0;
+            color: #fff;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 28px;
+            background: linear-gradient(180deg, #64b5f6, #81c784);
+            border-radius: 2px;
+        }
+
+        /* Agent Grid */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+
+        .agent-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid;
+            border-radius: 12px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .agent-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: inherit;
+            border-color: inherit;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .agent-role {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .agent-focus {
+            font-size: 13px;
+            color: #90caf9;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            font-style: italic;
+        }
+
+        .agent-designers {
+            font-size: 12px;
+            color: #b0bec5;
+            line-height: 1.6;
+        }
+
+        .agent-designers strong {
+            display: block;
+            color: #fff;
+            margin-top: 8px;
+            margin-bottom: 5px;
+        }
+
+        /* Agent color schemes */
+        .agent-card.mechanics {
+            border-color: #ff6b6b;
+            --accent: #ff6b6b;
+        }
+
+        .agent-card.audio {
+            border-color: #ffd93d;
+            --accent: #ffd93d;
+        }
+
+        .agent-card.psychology {
+            border-color: #6bcf7f;
+            --accent: #6bcf7f;
+        }
+
+        .agent-card.narrative {
+            border-color: #d084d0;
+            --accent: #d084d0;
+        }
+
+        .agent-card.onboarding {
+            border-color: #4ecdc4;
+            --accent: #4ecdc4;
+        }
+
+        .agent-card.constraint {
+            border-color: #ff9ff3;
+            --accent: #ff9ff3;
+        }
+
+        .agent-card.spatial {
+            border-color: #a8e6cf;
+            --accent: #a8e6cf;
+        }
+
+        .agent-card.visual {
+            border-color: #ffd3b6;
+            --accent: #ffd3b6;
+        }
+
+        .agent-card.systems {
+            border-color: #ffaaa5;
+            --accent: #ffaaa5;
+        }
+
+        .agent-card .agent-role {
+            color: var(--accent);
+        }
+
+        /* Consultation Patterns */
+        .patterns-container {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(100, 181, 246, 0.3);
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 60px;
+        }
+
+        .patterns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .pattern {
+            background: rgba(255, 255, 255, 0.04);
+            border-left: 4px solid;
+            padding: 20px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .pattern:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .pattern.p1 {
+            border-left-color: #ff6b6b;
+        }
+
+        .pattern.p2 {
+            border-left-color: #6bcf7f;
+        }
+
+        .pattern.p3 {
+            border-left-color: #d084d0;
+        }
+
+        .pattern.p4 {
+            border-left-color: #ffd93d;
+        }
+
+        .pattern-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pattern-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: inherit;
+            border-color: inherit;
+        }
+
+        .pattern-agents {
+            font-size: 13px;
+            color: #b0bec5;
+            line-height: 1.6;
+        }
+
+        .pattern-agents strong {
+            color: #90caf9;
+        }
+
+        /* Core Principles */
+        .principles-container {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(129, 199, 132, 0.3);
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 60px;
+        }
+
+        .principles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .principle {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(129, 199, 132, 0.5);
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .principle:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(129, 199, 132, 0.2);
+        }
+
+        .principle-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #81c784;
+            margin-bottom: 10px;
+        }
+
+        .principle-text {
+            font-size: 14px;
+            color: #b0bec5;
+            line-height: 1.6;
+        }
+
+        /* Matrix Table */
+        .matrix-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 40px 0 20px 0;
+            color: #fff;
+        }
+
+        .matrix-container {
+            overflow-x: auto;
+            margin-bottom: 60px;
+        }
+
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .matrix-table th,
+        .matrix-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .matrix-table th {
+            background: rgba(100, 181, 246, 0.15);
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #64b5f6;
+        }
+
+        .matrix-table tr:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .matrix-table td:first-child {
+            font-weight: 600;
+            color: #90caf9;
+        }
+
+        /* Designer Reference */
+        .designers-container {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(100, 181, 246, 0.3);
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 60px;
+        }
+
+        .designers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+        }
+
+        .designer-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(100, 181, 246, 0.4);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            transition: all 0.3s ease;
+            font-size: 12px;
+        }
+
+        .designer-badge:hover {
+            background: rgba(100, 181, 246, 0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(100, 181, 246, 0.2);
+        }
+
+        .designer-name {
+            font-weight: 700;
+            color: #64b5f6;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .designer-works {
+            color: #b0bec5;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #757575;
+            font-size: 12px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 32px;
+            }
+
+            .section-title {
+                font-size: 22px;
+            }
+
+            .agents-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .matrix-table {
+                font-size: 12px;
+            }
+
+            .matrix-table th,
+            .matrix-table td {
+                padding: 10px;
+            }
+        }
+
+        /* Accent animations */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .agent-card::before {
+            animation: pulse 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="breadcrumb">claude-code-plugins / plugins / game-design</div>
+            <h1>Game Design Plugin</h1>
+            <p class="subtitle">9 Specialized Agent Personas Synthesized from 14 Legendary Game Designers</p>
+        </div>
+
+        <!-- Agent Personas Grid -->
+        <div class="section-title">Agent Personas</div>
+        <div class="agents-grid">
+            <div class="agent-card mechanics">
+                <div class="agent-role">Core Mechanics Architect</div>
+                <div class="agent-focus">Feel, rhythm, moment-to-moment gameplay</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Miyamoto, Carmack, Jaffe, Koizumi
+                </div>
+            </div>
+
+            <div class="agent-card audio">
+                <div class="agent-role">Audio-Experience Designer</div>
+                <div class="agent-focus">Music, sound design, rhythm integration</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Fox, Rigopulos, Miyamoto
+                </div>
+            </div>
+
+            <div class="agent-card psychology">
+                <div class="agent-role">Player Psychology Guide</div>
+                <div class="agent-focus">Motivation, emotion, difficulty curves</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Miyamoto, Pardo, Rigopulos, Jaffe
+                </div>
+            </div>
+
+            <div class="agent-card narrative">
+                <div class="agent-role">Narrative-Mechanics Weaver</div>
+                <div class="agent-focus">Story through gameplay, environmental storytelling</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Fox, Urquhart, Nomura
+                </div>
+            </div>
+
+            <div class="agent-card onboarding">
+                <div class="agent-role">Onboarding & Accessibility Sage</div>
+                <div class="agent-focus">Tutorial-free teaching, inclusive design</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Miyamoto, Koizumi, Rigopulos, Fox
+                </div>
+            </div>
+
+            <div class="agent-card constraint">
+                <div class="agent-role">Constraint Alchemist</div>
+                <div class="agent-focus">Scope management, limits to features</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Persson, Fox, Carmack
+                </div>
+            </div>
+
+            <div class="agent-card spatial">
+                <div class="agent-role">Spatial & Camera Advisor</div>
+                <div class="agent-focus">Level layout, camera, spatial design</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Koizumi, Tezuka, Ward
+                </div>
+            </div>
+
+            <div class="agent-card visual">
+                <div class="agent-role">Visual Identity Consultant</div>
+                <div class="agent-focus">Art direction, character design, style</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Nomura, Ishii, Miyamoto
+                </div>
+            </div>
+
+            <div class="agent-card systems">
+                <div class="agent-role">Systems Designer</div>
+                <div class="agent-focus">Emergent gameplay, progression systems</div>
+                <div class="agent-designers">
+                    <strong>Source Designers:</strong>
+                    Hedlund, Persson, Pardo
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Agent Consultation Patterns -->
+        <div class="section-title">Multi-Agent Consultation Patterns</div>
+        <div class="patterns-container">
+            <div class="patterns-grid">
+                <div class="pattern p1">
+                    <div class="pattern-title">Rhythm-Based Core Action</div>
+                    <div class="pattern-agents">
+                        <strong>Core Mechanics</strong> + <strong>Audio-Experience</strong><br>
+                        Integrate sound and feedback loops for tactile, musical gameplay moments.
+                    </div>
+                </div>
+
+                <div class="pattern p2">
+                    <div class="pattern-title">Difficulty Curve Mastery</div>
+                    <div class="pattern-agents">
+                        <strong>Player Psychology</strong> + <strong>Onboarding</strong><br>
+                        Design progressive challenge matching skill growth and emotional pacing.
+                    </div>
+                </div>
+
+                <div class="pattern p3">
+                    <div class="pattern-title">Thematic Cohesion</div>
+                    <div class="pattern-agents">
+                        <strong>Narrative-Mechanics Weaver</strong> + <strong>Visual Identity</strong><br>
+                        Ensure story, mechanics, and aesthetics reinforce the same experience.
+                    </div>
+                </div>
+
+                <div class="pattern p4">
+                    <div class="pattern-title">Complex Feature Scoping</div>
+                    <div class="pattern-agents">
+                        <strong>Constraint Alchemist</strong> + <strong>Systems Designer</strong><br>
+                        Transform scope limits into emergent, replayable feature depth.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Principles -->
+        <div class="section-title">6 Core Principles</div>
+        <div class="principles-container">
+            <div class="principles-grid">
+                <div class="principle">
+                    <div class="principle-number">1</div>
+                    <div class="principle-text">Gameplay over Graphics/Story</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-number">2</div>
+                    <div class="principle-text">Draw from Life, Not Other Games</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-number">3</div>
+                    <div class="principle-text">Iterate Constantly</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-number">4</div>
+                    <div class="principle-text">Embrace Constraints</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-number">5</div>
+                    <div class="principle-text">Technology Serves Ideas</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-number">6</div>
+                    <div class="principle-text">Trust Your Instincts</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent × Designer Matrix Table -->
+        <div class="matrix-title">Agent × Designer Synthesis Matrix</div>
+        <div class="matrix-container">
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Agent Role</th>
+                        <th>Design Focus</th>
+                        <th>Source Designers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Core Mechanics Architect</td>
+                        <td>Feel, rhythm, moment-to-moment</td>
+                        <td>Miyamoto, Carmack, Jaffe, Koizumi</td>
+                    </tr>
+                    <tr>
+                        <td>Audio-Experience Designer</td>
+                        <td>Music, sound, rhythm integration</td>
+                        <td>Fox, Rigopulos, Miyamoto</td>
+                    </tr>
+                    <tr>
+                        <td>Player Psychology Guide</td>
+                        <td>Motivation, emotion, difficulty curves</td>
+                        <td>Miyamoto, Pardo, Rigopulos, Jaffe</td>
+                    </tr>
+                    <tr>
+                        <td>Narrative-Mechanics Weaver</td>
+                        <td>Story through gameplay, env storytelling</td>
+                        <td>Fox, Urquhart, Nomura</td>
+                    </tr>
+                    <tr>
+                        <td>Onboarding & Accessibility Sage</td>
+                        <td>Tutorial-free teaching, inclusive</td>
+                        <td>Miyamoto, Koizumi, Rigopulos, Fox</td>
+                    </tr>
+                    <tr>
+                        <td>Constraint Alchemist</td>
+                        <td>Scope management, limits→features</td>
+                        <td>Persson, Fox, Carmack</td>
+                    </tr>
+                    <tr>
+                        <td>Spatial & Camera Advisor</td>
+                        <td>Level layout, camera, space</td>
+                        <td>Koizumi, Tezuka, Ward</td>
+                    </tr>
+                    <tr>
+                        <td>Visual Identity Consultant</td>
+                        <td>Art direction, character design, style</td>
+                        <td>Nomura, Ishii, Miyamoto</td>
+                    </tr>
+                    <tr>
+                        <td>Systems Designer</td>
+                        <td>Emergent gameplay, progression</td>
+                        <td>Hedlund, Persson, Pardo</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 14 Legendary Designers Reference -->
+        <div class="section-title">14 Legendary Designers</div>
+        <div class="designers-container">
+            <div class="designers-grid">
+                <div class="designer-badge">
+                    <span class="designer-name">Miyamoto</span>
+                    <span class="designer-works">Mario, Zelda, Donkey Kong</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Persson</span>
+                    <span class="designer-works">Minecraft</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Tezuka</span>
+                    <span class="designer-works">Mario, Animal Crossing</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Fox</span>
+                    <span class="designer-works">Undertale</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Ishii</span>
+                    <span class="designer-works">Mana Series</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Urquhart</span>
+                    <span class="designer-works">Baldur's Gate, Fallout</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Nomura</span>
+                    <span class="designer-works">FF VII, Kingdom Hearts</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Ward</span>
+                    <span class="designer-works">Burnout</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Jaffe</span>
+                    <span class="designer-works">God of War</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Hedlund</span>
+                    <span class="designer-works">Diablo II</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Rigopulos</span>
+                    <span class="designer-works">Guitar Hero</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Pardo</span>
+                    <span class="designer-works">StarCraft, World of Warcraft</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Koizumi</span>
+                    <span class="designer-works">Mario Galaxy</span>
+                </div>
+                <div class="designer-badge">
+                    <span class="designer-name">Carmack</span>
+                    <span class="designer-works">Doom, Quake</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Game Design Plugin • Multi-Agent Consultation System for Holistic Game Design</p>
+        </div>
+    </div>
+</body>
+</html>

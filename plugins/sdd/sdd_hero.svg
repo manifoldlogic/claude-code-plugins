@@ -1,0 +1,219 @@
+<svg width="100%" viewBox="0 0 680 390" xmlns="http://www.w3.org/2000/svg">
+<rect width="680" height="380" rx="8" fill="#0f1419"/>
+
+<text x="340" y="32" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="28" font-weight="500" fill="#60a5fa" letter-spacing="-1">sdd</text>
+<text x="340" y="52" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="11" fill="#a0aec0" opacity="0.55">spec-driven development · 13 agents · document triage</text>
+
+<line x1="40" y1="66" x2="640" y2="66" stroke="#2d3748" stroke-width="0.3"/>
+
+<!-- ZONE LABELS -->
+<text x="110" y="84" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="9" fill="#a0aec0" opacity="0.4" letter-spacing="0.5">HIERARCHY</text>
+<text x="360" y="84" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="9" fill="#a0aec0" opacity="0.4" letter-spacing="0.5">AGENTS</text>
+<text x="590" y="84" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="9" fill="#a0aec0" opacity="0.4" letter-spacing="0.5">WORKFLOW</text>
+
+<!-- ═══ HIERARCHY: Epic → Ticket → Task ═══ -->
+
+<!-- Epic node -->
+<rect x="60" y="100" width="100" height="28" rx="5" fill="#7F77DD" fill-opacity="0.08" stroke="#7F77DD" stroke-width="0.8" opacity="0.7"/>
+<rect x="60" y="100" width="100" height="10" rx="5" fill="#7F77DD" fill-opacity="0.1"/>
+<text x="110" y="108" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#CECBF6" opacity="0.45">strategic goal</text>
+<text x="110" y="120" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="9" fill="#AFA9EC" opacity="0.75">EPIC</text>
+
+<!-- Epic → Ticket connectors -->
+<line x1="80" y1="128" x2="68" y2="148" stroke="#7F77DD" stroke-width="0.6" opacity="0.35"/>
+<line x1="110" y1="128" x2="110" y2="148" stroke="#7F77DD" stroke-width="0.6" opacity="0.35"/>
+<line x1="140" y1="128" x2="152" y2="148" stroke="#7F77DD" stroke-width="0.6" opacity="0.35"/>
+
+<!-- Ticket 1 (x=38 to 78) -->
+<rect x="38" y="148" width="40" height="22" rx="4" fill="#60a5fa" fill-opacity="0.06" stroke="#60a5fa" stroke-width="0.6" opacity="0.6"/>
+<text x="58" y="162" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="7" fill="#60a5fa" opacity="0.65">ticket</text>
+
+<!-- Ticket 2 (x=85 to 125) -->
+<rect x="85" y="148" width="40" height="22" rx="4" fill="#60a5fa" fill-opacity="0.06" stroke="#60a5fa" stroke-width="0.6" opacity="0.55"/>
+<text x="105" y="162" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="7" fill="#60a5fa" opacity="0.55">ticket</text>
+
+<!-- Ticket 3 (x=132 to 172) -->
+<rect x="132" y="148" width="40" height="22" rx="4" fill="#60a5fa" fill-opacity="0.06" stroke="#60a5fa" stroke-width="0.6" opacity="0.45"/>
+<text x="152" y="162" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="7" fill="#60a5fa" opacity="0.45">ticket</text>
+
+<!-- Ticket → Task connectors -->
+<line x1="48" y1="170" x2="42" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.25"/>
+<line x1="58" y1="170" x2="62" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.25"/>
+<line x1="68" y1="170" x2="82" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.25"/>
+<line x1="100" y1="170" x2="102" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.2"/>
+<line x1="115" y1="170" x2="122" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.2"/>
+<line x1="145" y1="170" x2="142" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.15"/>
+<line x1="158" y1="170" x2="162" y2="188" stroke="#60a5fa" stroke-width="0.5" opacity="0.15"/>
+
+<!-- Task dots -->
+<circle cx="42" cy="194" r="3" fill="#5DCAA5" opacity="0.5"/>
+<circle cx="62" cy="194" r="3" fill="#5DCAA5" opacity="0.5"/>
+<circle cx="82" cy="194" r="3" fill="#5DCAA5" opacity="0.45"/>
+<circle cx="102" cy="194" r="3" fill="#5DCAA5" opacity="0.4"/>
+<circle cx="122" cy="194" r="3" fill="#5DCAA5" opacity="0.35"/>
+<circle cx="142" cy="194" r="3" fill="#5DCAA5" opacity="0.3"/>
+<circle cx="162" cy="194" r="3" fill="#5DCAA5" opacity="0.25"/>
+
+<text x="42" y="208" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.4">task</text>
+<text x="82" y="208" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.35">task</text>
+<text x="122" y="208" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.3">task</text>
+
+<!-- Hierarchy label -->
+<text x="100" y="226" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#a0aec0" opacity="0.2">epic → ticket → task</text>
+
+<!-- Document triage: 12 doc types -->
+<text x="100" y="244" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="7" fill="#EF9F27" opacity="0.35">12 doc types</text>
+
+<!-- Doc type mini-grid (5 × 2 + 2 = 12) -->
+<rect x="38" y="252" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.3"/>
+<rect x="64" y="252" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.3"/>
+<rect x="90" y="252" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.3"/>
+<rect x="116" y="252" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.3"/>
+<rect x="142" y="252" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.25"/>
+
+<rect x="38" y="266" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.25"/>
+<rect x="64" y="266" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.25"/>
+<rect x="90" y="266" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.2"/>
+<rect x="116" y="266" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.2"/>
+<rect x="142" y="266" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.15"/>
+
+<rect x="38" y="280" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.15"/>
+<rect x="64" y="280" width="22" height="10" rx="2" fill="#EF9F27" fill-opacity="0.05" stroke="#EF9F27" stroke-width="0.3" opacity="0.12"/>
+
+<!-- ═══ AGENTS: 13 in constellation ═══ -->
+
+<!-- Central orchestrator -->
+<circle cx="360" cy="185" r="18" fill="#60a5fa" fill-opacity="0.06" stroke="#60a5fa" stroke-width="0.8" opacity="0.5"/>
+<circle cx="360" cy="185" r="8" fill="#60a5fa" fill-opacity="0.15" stroke="#60a5fa" stroke-width="0.5" opacity="0.7"/>
+<text x="360" y="188" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#60a5fa" opacity="0.7">orch</text>
+
+<!-- Outer orbit ring -->
+<circle cx="360" cy="185" r="78" fill="none" stroke="#2d3748" stroke-width="0.3" stroke-dasharray="3 5" opacity="0.2"/>
+
+<!-- Planning cluster (top) -->
+<circle cx="310" cy="110" r="5" fill="#7F77DD" opacity="0.5"/>
+<text x="310" y="103" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#CECBF6" opacity="0.4">epic-plan</text>
+<line x1="315" y1="115" x2="350" y2="175" stroke="#7F77DD" stroke-width="0.4" opacity="0.2"/>
+
+<circle cx="360" cy="105" r="5" fill="#5DCAA5" opacity="0.5"/>
+<text x="360" y="98" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.4">ticket-plan</text>
+<line x1="360" y1="110" x2="360" y2="170" stroke="#5DCAA5" stroke-width="0.4" opacity="0.2"/>
+
+<circle cx="410" cy="110" r="5" fill="#7F77DD" opacity="0.5"/>
+<text x="410" y="103" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#CECBF6" opacity="0.4">task-create</text>
+<line x1="405" y1="115" x2="370" y2="175" stroke="#7F77DD" stroke-width="0.4" opacity="0.2"/>
+
+<!-- Validation cluster (right) -->
+<circle cx="440" cy="140" r="5" fill="#EF9F27" opacity="0.45"/>
+<text x="452" y="137" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#EF9F27" opacity="0.35">verify</text>
+<line x1="435" y1="142" x2="375" y2="180" stroke="#EF9F27" stroke-width="0.3" opacity="0.15"/>
+
+<circle cx="448" cy="172" r="5" fill="#5DCAA5" opacity="0.4"/>
+<text x="460" y="169" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.3">review</text>
+<line x1="443" y1="174" x2="378" y2="185" stroke="#5DCAA5" stroke-width="0.3" opacity="0.15"/>
+
+<circle cx="445" cy="205" r="5" fill="#7F77DD" opacity="0.4"/>
+<text x="457" y="202" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#CECBF6" opacity="0.3">validate</text>
+<line x1="440" y1="207" x2="378" y2="190" stroke="#7F77DD" stroke-width="0.3" opacity="0.15"/>
+
+<!-- Execution cluster (bottom) -->
+<circle cx="418" cy="240" r="5" fill="#EF9F27" opacity="0.35"/>
+<text x="418" y="253" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#EF9F27" opacity="0.3">test</text>
+<line x1="413" y1="237" x2="370" y2="195" stroke="#EF9F27" stroke-width="0.3" opacity="0.12"/>
+
+<circle cx="360" cy="258" r="5" fill="#5DCAA5" opacity="0.35"/>
+<text x="360" y="270" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.3">commit</text>
+<line x1="360" y1="253" x2="360" y2="200" stroke="#5DCAA5" stroke-width="0.3" opacity="0.12"/>
+
+<circle cx="302" cy="240" r="5" fill="#7F77DD" opacity="0.35"/>
+<text x="302" y="253" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#CECBF6" opacity="0.3">update</text>
+<line x1="307" y1="237" x2="350" y2="195" stroke="#7F77DD" stroke-width="0.3" opacity="0.12"/>
+
+<!-- Coordination cluster (left) -->
+<circle cx="275" cy="208" r="5" fill="#5DCAA5" opacity="0.4"/>
+<text x="262" y="205" text-anchor="end" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.3">status</text>
+<line x1="280" y1="206" x2="342" y2="188" stroke="#5DCAA5" stroke-width="0.3" opacity="0.15"/>
+
+<circle cx="270" cy="175" r="5" fill="#EF9F27" opacity="0.4"/>
+<text x="257" y="172" text-anchor="end" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#EF9F27" opacity="0.3">logger</text>
+<line x1="275" y1="177" x2="342" y2="185" stroke="#EF9F27" stroke-width="0.3" opacity="0.15"/>
+
+<circle cx="278" cy="140" r="5" fill="#5DCAA5" opacity="0.45"/>
+<text x="265" y="137" text-anchor="end" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#9FE1CB" opacity="0.35">assign</text>
+<line x1="283" y1="142" x2="345" y2="180" stroke="#5DCAA5" stroke-width="0.3" opacity="0.15"/>
+
+<!-- 13th agent tucked between -->
+<circle cx="330" cy="264" r="4" fill="#EF9F27" opacity="0.25"/>
+<text x="330" y="275" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="4.5" fill="#EF9F27" opacity="0.2">recommend</text>
+<line x1="332" y1="260" x2="355" y2="200" stroke="#EF9F27" stroke-width="0.2" opacity="0.1"/>
+
+<!-- Agent count label -->
+<text x="360" y="290" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="7" fill="#a0aec0" opacity="0.25">13 agents · 4 delegation patterns</text>
+
+<!-- ═══ WORKFLOW: actual pipeline ═══ -->
+
+<rect x="530" y="96" width="120" height="195" rx="6" fill="#1a202c" stroke="#2d3748" stroke-width="0.5" opacity="0.3"/>
+
+<text x="590" y="112" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="7" fill="#a0aec0" opacity="0.45">main pipeline</text>
+
+<!-- plan-ticket -->
+<rect x="545" y="122" width="90" height="14" rx="3" fill="#7F77DD" fill-opacity="0.08" stroke="#7F77DD" stroke-width="0.4" opacity="0.5"/>
+<text x="590" y="132" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#AFA9EC" opacity="0.55">plan-ticket</text>
+
+<line x1="590" y1="136" x2="590" y2="144" stroke="#2d3748" stroke-width="0.4" opacity="0.3"/>
+
+<!-- review -->
+<rect x="545" y="144" width="90" height="14" rx="3" fill="#5DCAA5" fill-opacity="0.06" stroke="#5DCAA5" stroke-width="0.4" opacity="0.5"/>
+<text x="590" y="154" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#9FE1CB" opacity="0.55">review</text>
+
+<line x1="590" y1="158" x2="590" y2="166" stroke="#2d3748" stroke-width="0.4" opacity="0.3"/>
+
+<!-- create-tasks -->
+<rect x="545" y="166" width="90" height="14" rx="3" fill="#60a5fa" fill-opacity="0.06" stroke="#60a5fa" stroke-width="0.4" opacity="0.5"/>
+<text x="590" y="176" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#60a5fa" opacity="0.55">create-tasks</text>
+
+<line x1="590" y1="180" x2="590" y2="188" stroke="#2d3748" stroke-width="0.4" opacity="0.3"/>
+
+<!-- do-all-tasks -->
+<rect x="545" y="188" width="90" height="14" rx="3" fill="#7F77DD" fill-opacity="0.06" stroke="#7F77DD" stroke-width="0.4" opacity="0.45"/>
+<text x="590" y="198" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#AFA9EC" opacity="0.5">do-all-tasks</text>
+
+<line x1="590" y1="202" x2="590" y2="210" stroke="#2d3748" stroke-width="0.4" opacity="0.3"/>
+
+<!-- archive -->
+<rect x="545" y="210" width="90" height="14" rx="3" fill="#5DCAA5" fill-opacity="0.06" stroke="#5DCAA5" stroke-width="0.4" opacity="0.45"/>
+<text x="590" y="220" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#9FE1CB" opacity="0.5">archive</text>
+
+<!-- Loop arrow back -->
+<path d="M635 200 C650 200, 655 160, 635 140" fill="none" stroke="#EF9F27" stroke-width="0.5" stroke-dasharray="2 2" opacity="0.25"/>
+<text x="655" y="170" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5" fill="#EF9F27" opacity="0.25">loop</text>
+
+<!-- Safety features -->
+<line x1="540" y1="232" x2="640" y2="232" stroke="#2d3748" stroke-width="0.3" opacity="0.25"/>
+
+<text x="590" y="245" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="6" fill="#a0aec0" opacity="0.35">safety</text>
+
+<rect x="545" y="252" width="90" height="12" rx="3" fill="#5DCAA5" fill-opacity="0.04" stroke="#5DCAA5" stroke-width="0.4" stroke-dasharray="2 2" opacity="0.4"/>
+<text x="590" y="261" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5.5" fill="#9FE1CB" opacity="0.4">.autogate.json</text>
+
+<rect x="545" y="268" width="90" height="12" rx="3" fill="#EF9F27" fill-opacity="0.04" stroke="#EF9F27" stroke-width="0.4" stroke-dasharray="2 2" opacity="0.35"/>
+<text x="590" y="277" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="5.5" fill="#EF9F27" opacity="0.35">circuit breaker</text>
+
+<!-- ═══ BOTTOM ═══ -->
+<line x1="40" y1="300" x2="640" y2="300" stroke="#2d3748" stroke-width="0.3"/>
+
+<rect x="40" y="312" width="600" height="36" rx="8" fill="#1a202c" stroke="#2d3748" stroke-width="0.5" opacity="0.4"/>
+
+<text x="340" y="328" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="10" fill="#60a5fa" opacity="0.5" font-weight="500">sdd-loop.sh</text>
+<text x="340" y="342" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="9" fill="#a0aec0" opacity="0.3">20 commands · work gates · strict orchestration</text>
+
+<path d="M110 295 L110 312" fill="none" stroke="#2d3748" stroke-width="0.3" opacity="0.2"/>
+<path d="M360 295 L360 312" fill="none" stroke="#2d3748" stroke-width="0.3" opacity="0.2"/>
+<path d="M590 295 L590 312" fill="none" stroke="#2d3748" stroke-width="0.3" opacity="0.2"/>
+
+<text x="90" y="367" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="8" fill="#a0aec0" opacity="0.2">YAML specs</text>
+<text x="230" y="367" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="8" fill="#a0aec0" opacity="0.2">Haiku agents</text>
+<text x="370" y="367" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="8" fill="#a0aec0" opacity="0.2">safety gates</text>
+<text x="500" y="367" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="8" fill="#a0aec0" opacity="0.2">delegation</text>
+<text x="615" y="367" text-anchor="middle" font-family="SF Mono,Fira Code,Roboto Mono,monospace" font-size="8" fill="#a0aec0" opacity="0.2">12 doc types</text>
+</svg>
