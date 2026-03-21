@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maproom Plugin Infographic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d1117;
+            color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #58a6ff;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #8b949e;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 30px;
+        }
+
+        .section h2 {
+            color: #58a6ff;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #58a6ff, #1f6feb);
+            border-radius: 2px;
+        }
+
+        /* Search Modes Grid */
+        .search-modes {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .mode-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-card:hover {
+            border-color: #58a6ff;
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        .mode-title {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .mode-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .badge-fts {
+            background: rgba(48, 192, 120, 0.2);
+            color: #3fb950;
+            border: 1px solid #3fb950;
+        }
+
+        .badge-vector {
+            background: rgba(139, 92, 246, 0.2);
+            color: #c5a3ff;
+            border: 1px solid #c5a3ff;
+        }
+
+        .badge-hybrid {
+            background: rgba(248, 81, 73, 0.2);
+            color: #f85149;
+            border: 1px solid #f85149;
+        }
+
+        .mode-desc {
+            color: #8b949e;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .mode-traits {
+            margin-top: 10px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .trait {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: #8b949e;
+        }
+
+        .trait-icon {
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
+        /* Radial Context Expansion */
+        .context-radial {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 30px 0;
+            gap: 20px;
+        }
+
+        .radial-center {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+            border: 2px solid #58a6ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .radial-items {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .radial-item {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .radial-item.active {
+            border-color: #58a6ff;
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        .radial-icon {
+            font-size: 1.2rem;
+            margin-bottom: 6px;
+        }
+
+        .radial-label {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Features */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .feature-item:last-child {
+            border-bottom: none;
+        }
+
+        .feature-check {
+            color: #3fb950;
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .feature-text {
+            color: #c9d1d9;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .highlight {
+            background: rgba(88, 166, 255, 0.1);
+            color: #79c0ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Graph Section */
+        .graph-section {
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, rgba(31, 111, 235, 0.05) 100%);
+            border: 1px solid #1f6feb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .graph-section h3 {
+            color: #79c0ff;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .graph-types {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .graph-type {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .graph-type .icon {
+            font-size: 1.5rem;
+            margin-bottom: 6px;
+        }
+
+        .graph-type .name {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Config */
+        .config-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .config-label {
+            color: #8b949e;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .config-code {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-size: 0.85rem;
+            background: rgba(88, 166, 255, 0.05);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        /* Verification Timeline */
+        .timeline {
+            margin: 20px 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 12px;
+            margin: 15px 0;
+        }
+
+        .timeline-dot {
+            width: 12px;
+            height: 12px;
+            background: #58a6ff;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+            border: 2px solid #0d1117;
+            box-shadow: 0 0 0 2px #58a6ff;
+        }
+
+        .timeline-content {
+            flex: 1;
+        }
+
+        .timeline-label {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .timeline-desc {
+            color: #8b949e;
+            font-size: 0.9rem;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 15px;
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+        }
+
+        .stat .value {
+            font-size: 1.8rem;
+            color: #58a6ff;
+            font-weight: 700;
+        }
+
+        .stat .label {
+            color: #8b949e;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.85rem;
+            border-top: 1px solid #30363d;
+            padding-top: 20px;
+            margin-top: 40px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .graph-types {
+                grid-template-columns: 1fr;
+            }
+
+            .radial-items {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Maproom Plugin</h1>
+            <p>Semantic Code Search Engine for Claude Code</p>
+        </div>
+
+        <div class="content">
+            <!-- Left Column -->
+            <div>
+                <div class="section">
+                    <h2>Search Modes</h2>
+                    <div class="search-modes">
+                        <div class="mode-card">
+                            <div>
+                                <span class="mode-badge badge-fts">Fast & Precise</span>
+                                <div class="mode-title">FTS</div>
+                            </div>
+                            <div class="mode-desc">
+                                Full-text search with exact keyword matching. Fastest search for known identifiers and patterns.
+                            </div>
+                            <div class="mode-traits">
+                                <div class="trait"><span class="trait-icon">⚡</span> Instant</div>
+                                <div class="trait"><span class="trait-icon">🎯</span> Precise</div>
+                            </div>
+                        </div>
+
+                        <div class="mode-card">
+                            <div>
+                                <span class="mode-badge badge-vector">Semantic</span>
+                                <div class="mode-title">Vector</div>
+                            </div>
+                            <div class="mode-desc">
+                                Semantic search using embeddings. Find conceptually related code even with different names.
+                            </div>
+                            <div class="mode-traits">
+                                <div class="trait"><span class="trait-icon">🧠</span> Concept</div>
+                                <div class="trait"><span class="trait-icon">🔍</span> Fuzzy</div>
+                            </div>
+                        </div>
+
+                        <div class="mode-card">
+                            <div>
+                                <span class="mode-badge badge-hybrid">Combined</span>
+                                <div class="mode-title">Hybrid</div>
+                            </div>
+                            <div class="mode-desc">
+                                Combines FTS and Vector searches for maximum coverage. Best of both worlds.
+                            </div>
+                            <div class="mode-traits">
+                                <div class="trait"><span class="trait-icon">✓</span> Optimal</div>
+                                <div class="trait"><span class="trait-icon">📊</span> Ranked</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Graph Relationships</h2>
+                    <div class="graph-section">
+                        <h3>Dependency Analysis</h3>
+                        <div class="graph-types">
+                            <div class="graph-type">
+                                <div class="icon">📞</div>
+                                <div class="name">Call Graphs</div>
+                            </div>
+                            <div class="graph-type">
+                                <div class="icon">🔗</div>
+                                <div class="name">Dependencies</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+                <div class="section">
+                    <h2>Context Expansion</h2>
+                    <div class="context-radial">
+                        <div class="radial-center">Query Result</div>
+                        <div class="radial-items">
+                            <div class="radial-item active">
+                                <div class="radial-icon">📥</div>
+                                <div class="radial-label">imports</div>
+                            </div>
+                            <div class="radial-item active">
+                                <div class="radial-icon">⬅️</div>
+                                <div class="radial-label">callers</div>
+                            </div>
+                            <div class="radial-item active">
+                                <div class="radial-icon">➡️</div>
+                                <div class="radial-label">callees</div>
+                            </div>
+                            <div class="radial-item active">
+                                <div class="radial-icon">✓</div>
+                                <div class="radial-label">tests</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="color: #8b949e; font-size: 0.9rem; text-align: center; margin-top: 15px;">
+                        Automatically expands context for complete code understanding
+                    </p>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Multi-Repo Configuration</h2>
+                    <div class="config-box">
+                        <div class="config-label">YAML Config Pattern</div>
+                        <div class="config-code">
+repos:<br/>
+&nbsp;&nbsp;frontend: {strategy: hybrid}<br/>
+&nbsp;&nbsp;backend: {strategy: fts}<br/>
+&nbsp;&nbsp;shared: {strategy: vector}
+                        </div>
+                    </div>
+                    <p style="color: #8b949e; font-size: 0.9rem;">
+                        Each repository can define its own search strategy and optimization settings.
+                    </p>
+
+                    <h3 style="color: #58a6ff; margin-top: 20px; margin-bottom: 15px; font-size: 1rem;">Agent Output Format</h3>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <span class="feature-text">Use <span class="highlight">--format agent</span> for optimized LLM context</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <span class="feature-text">Structured JSON output for programmatic consumption</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <span class="feature-text">Reduced verbosity, maximum information density</span>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Monthly CLI Verification</h2>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-label">Run CLI Tests</div>
+                                <div class="timeline-desc">Execute baseline comparison suite</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-label">Generate Diff</div>
+                                <div class="timeline-desc">Automated results comparison</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-label">Update Baseline</div>
+                                <div class="timeline-desc">Lock verified behavior</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <div class="value">3</div>
+                        <div class="label">Search Modes</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value">4</div>
+                        <div class="label">Context Types</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value">∞</div>
+                        <div class="label">Repos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Claude Code Plugin | Dark Theme | 2026
+        </div>
+    </div>
+</body>
+</html>

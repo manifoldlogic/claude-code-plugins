@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDD Plugin Infographic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f1419;
+            color: #e0e6ed;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 2px solid #2d3748;
+            padding-bottom: 30px;
+        }
+
+        .repo-path {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: #a0aec0;
+            letter-spacing: 0.5px;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #cbd5e0;
+            margin-top: 10px;
+        }
+
+        /* Grid Layout */
+        .infographic {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        /* Section */
+        .section {
+            background: #1a202c;
+            border: 1px solid #2d3748;
+            border-radius: 12px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 25px;
+            color: #e2e8f0;
+            border-bottom: 2px solid #4299e1;
+            padding-bottom: 10px;
+        }
+
+        /* Core Concept Section */
+        .hierarchy {
+            background: linear-gradient(135deg, rgba(79, 39, 245, 0.1) 0%, rgba(167, 51, 219, 0.1) 100%);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .hierarchy-level {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .hierarchy-level:last-child {
+            margin-bottom: 0;
+        }
+
+        .hierarchy-box {
+            background: #2d3748;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-weight: 600;
+            color: #667eea;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .hierarchy-arrow {
+            flex: 1;
+            text-align: center;
+            color: #a0aec0;
+            font-weight: bold;
+            margin: 0 10px;
+        }
+
+        /* Document Triage */
+        .triage-tier {
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid;
+        }
+
+        .triage-tier.core {
+            border-left-color: #f56565;
+        }
+
+        .triage-tier.standard {
+            border-left-color: #ed8936;
+        }
+
+        .triage-tier.conditional {
+            border-left-color: #ecc94b;
+        }
+
+        .tier-label {
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .tier-label-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .triage-tier.core .tier-label-dot {
+            background: #f56565;
+        }
+
+        .triage-tier.standard .tier-label-dot {
+            background: #ed8936;
+        }
+
+        .triage-tier.conditional .tier-label-dot {
+            background: #ecc94b;
+        }
+
+        .doc-list {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            color: #cbd5e0;
+        }
+
+        .doc-item {
+            padding: 4px 0;
+        }
+
+        .doc-name {
+            color: #e2e8f0;
+            font-weight: 500;
+        }
+
+        /* Agent Matrix */
+        .agent-tier {
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid;
+        }
+
+        .agent-tier.haiku {
+            border-left-color: #3182ce;
+        }
+
+        .agent-tier.sonnet {
+            border-left-color: #9f7aea;
+        }
+
+        .agent-tier-label {
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .agent-tier-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .agent-tier.haiku .agent-tier-dot {
+            background: #3182ce;
+        }
+
+        .agent-tier.sonnet .agent-tier-dot {
+            background: #9f7aea;
+        }
+
+        .agent-list {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.9;
+            color: #cbd5e0;
+        }
+
+        .agent-item {
+            padding: 3px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .agent-bullet {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            background: currentColor;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .agent-name {
+            color: #e2e8f0;
+        }
+
+        /* Workflow Pipeline */
+        .workflow-pipeline {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .pipeline-stages {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .stage {
+            background: #2d3748;
+            border: 1px solid #4299e1;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #e2e8f0;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .stage-arrow {
+            color: #a0aec0;
+            font-weight: bold;
+        }
+
+        /* Delegation Patterns */
+        .pattern {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #2d3748;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #cbd5e0;
+        }
+
+        .pattern-number {
+            color: #667eea;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+
+        .pattern-desc {
+            color: #e2e8f0;
+            margin-bottom: 6px;
+        }
+
+        .pattern-flow {
+            color: #cbd5e0;
+            font-style: italic;
+        }
+
+        /* Safety Features */
+        .safety-feature {
+            background: rgba(245, 101, 101, 0.1);
+            border-left: 4px solid #f56565;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.6;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        .safety-feature-title {
+            font-weight: 700;
+            color: #f56565;
+            margin-bottom: 4px;
+        }
+
+        .safety-feature-desc {
+            color: #cbd5e0;
+        }
+
+        /* Work Gates */
+        .gates-section {
+            background: rgba(79, 39, 245, 0.1);
+            border: 1px solid #667eea;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .gates-field {
+            background: #2d3748;
+            border-left: 3px solid #667eea;
+            padding: 8px;
+            margin-bottom: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: #cbd5e0;
+        }
+
+        .gates-field-name {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        /* Full-width sections */
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Commands Grid */
+        .commands-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .command-column {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.8;
+            color: #cbd5e0;
+        }
+
+        .command-item {
+            padding: 4px 0;
+        }
+
+        .command-name {
+            color: #48bb78;
+            font-weight: 600;
+        }
+
+        /* Loop Controller Section */
+        .loop-controller {
+            background: rgba(72, 187, 120, 0.1);
+            border: 1px solid #48bb78;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            line-height: 1.7;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        .loop-feature {
+            color: #cbd5e0;
+            margin-bottom: 8px;
+            padding-left: 10px;
+            border-left: 2px solid #48bb78;
+        }
+
+        .loop-feature-key {
+            color: #48bb78;
+            font-weight: 600;
+        }
+
+        /* Decision Tree / Flow Diagram */
+        .decision-tree {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.8;
+            color: #cbd5e0;
+        }
+
+        .tree-node {
+            margin-left: 20px;
+            padding: 4px 0;
+            position: relative;
+        }
+
+        .tree-node::before {
+            content: '├─';
+            position: absolute;
+            left: -15px;
+            color: #a0aec0;
+        }
+
+        .tree-root {
+            margin-left: 0;
+            color: #e2e8f0;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .tree-root::before {
+            content: '';
+        }
+
+        .tree-decision {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .tree-result {
+            color: #48bb78;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding-top: 30px;
+            border-top: 2px solid #2d3748;
+            color: #718096;
+            font-size: 12px;
+        }
+
+        .footer-stat {
+            display: inline-block;
+            margin: 0 20px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-color.red {
+            background: #f56565;
+        }
+
+        .legend-color.orange {
+            background: #ed8936;
+        }
+
+        .legend-color.yellow {
+            background: #ecc94b;
+        }
+
+        .legend-color.blue {
+            background: #3182ce;
+        }
+
+        .legend-color.purple {
+            background: #9f7aea;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .infographic {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            h1 {
+                font-size: 36px;
+            }
+
+            .section {
+                padding: 25px;
+            }
+
+            .commands-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="repo-path">claude-code-plugins / plugins / sdd</div>
+            <h1>SDD Plugin</h1>
+            <p class="subtitle">Spec-Driven Development — Enterprise Workflow Management</p>
+        </div>
+
+        <!-- Main Infographic Grid -->
+        <div class="infographic">
+
+            <!-- Core Concept -->
+            <div class="section">
+                <h2>📋 Core Concept</h2>
+                <p style="font-size: 13px; color: #a0aec0; margin-bottom: 20px;">Epic → Ticket → Task hierarchy with strict orchestration</p>
+                <div class="hierarchy">
+                    <div class="hierarchy-level">
+                        <div class="hierarchy-box">Epic</div>
+                        <div class="hierarchy-arrow">↓</div>
+                    </div>
+                    <div class="hierarchy-level">
+                        <div class="hierarchy-box">Ticket</div>
+                        <div class="hierarchy-arrow">↓</div>
+                    </div>
+                    <div class="hierarchy-level">
+                        <div class="hierarchy-box">Task</div>
+                    </div>
+                </div>
+                <div style="background: rgba(102, 126, 234, 0.15); border-radius: 6px; padding: 12px; margin-top: 15px; font-size: 12px; line-height: 1.6; border-left: 3px solid #667eea;">
+                    <strong style="color: #667eea;">Orchestrator Role</strong><br>
+                    Coordinates work, never executes tasks directly. Delegates to agents based on complexity and requirements.
+                </div>
+            </div>
+
+            <!-- Document Triage System -->
+            <div class="section">
+                <h2>📄 Document Triage (12 Types)</h2>
+
+                <div class="triage-tier core">
+                    <div class="tier-label">
+                        <div class="tier-label-dot"></div>
+                        CORE (Always)
+                    </div>
+                    <div class="doc-list">
+                        <div class="doc-item"><span class="doc-name">analysis.md</span></div>
+                        <div class="doc-item"><span class="doc-name">architecture.md</span></div>
+                        <div class="doc-item"><span class="doc-name">plan.md</span></div>
+                    </div>
+                </div>
+
+                <div class="triage-tier standard">
+                    <div class="tier-label">
+                        <div class="tier-label-dot"></div>
+                        STANDARD (Default, Can N/A-Sign)
+                    </div>
+                    <div class="doc-list">
+                        <div class="doc-item"><span class="doc-name">prd.md</span></div>
+                        <div class="doc-item"><span class="doc-name">quality-strategy.md</span></div>
+                        <div class="doc-item"><span class="doc-name">security-review.md</span></div>
+                    </div>
+                </div>
+
+                <div class="triage-tier conditional">
+                    <div class="tier-label">
+                        <div class="tier-label-dot"></div>
+                        CONDITIONAL (Keyword-Triggered)
+                    </div>
+                    <div class="doc-list">
+                        <div class="doc-item"><span class="doc-name">observability</span>, <span class="doc-name">migration-plan</span></div>
+                        <div class="doc-item"><span class="doc-name">accessibility</span>, <span class="doc-name">api-contract</span></div>
+                        <div class="doc-item"><span class="doc-name">runbook</span>, <span class="doc-name">dependency-audit</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Architecture (Tier 1) -->
+            <div class="section">
+                <h2>🤖 Agent Architecture (13 Total)</h2>
+
+                <div class="agent-tier haiku">
+                    <div class="agent-tier-label">
+                        <div class="agent-tier-dot"></div>
+                        HAIKU (Fast/Cheap — Mechanical)
+                    </div>
+                    <div class="agent-list">
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">status-reporter</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">structure-validator</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">unit-test-runner</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">commit-task</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">workflow-logger</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="agent-tier sonnet">
+                    <div class="agent-tier-label">
+                        <div class="agent-tier-dot"></div>
+                        SONNET (Reasoning — Complex)
+                    </div>
+                    <div class="agent-list">
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">epic-planner</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">ticket-planner</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">ticket-reviewer</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">ticket-updater</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">task-creator</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">verify-task</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">agent-recommender</span>
+                        </div>
+                        <div class="agent-item">
+                            <span class="agent-bullet"></span>
+                            <span class="agent-name">agent-assigner</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delegation Patterns -->
+            <div class="section">
+                <h2>🔄 Delegation Patterns (4 Types)</h2>
+
+                <div class="pattern">
+                    <span class="pattern-number">1</span>
+                    <div class="pattern-desc">Script → Haiku</div>
+                    <div class="pattern-flow">Mechanical tasks: scaffolding, inventory</div>
+                </div>
+
+                <div class="pattern">
+                    <span class="pattern-number">2</span>
+                    <div class="pattern-desc">Sonnet → Script → Haiku</div>
+                    <div class="pattern-flow">Complex decisions, then mechanical execution</div>
+                </div>
+
+                <div class="pattern">
+                    <span class="pattern-number">3</span>
+                    <div class="pattern-desc">Pipeline: Implement → Test → Verify → Commit</div>
+                    <div class="pattern-flow">Sonnet → Haiku → Sonnet → Haiku (quality gates)</div>
+                </div>
+
+                <div class="pattern">
+                    <span class="pattern-number">4</span>
+                    <div class="pattern-desc">Conditional</div>
+                    <div class="pattern-flow">Mechanical→Script, Judgment→Haiku, Reasoning→Sonnet</div>
+                </div>
+            </div>
+
+            <!-- Workflow Pipeline -->
+            <div class="section full-width">
+                <h2>⚙️ Main Workflow Pipeline</h2>
+                <div class="workflow-pipeline">
+                    <div class="pipeline-stages">
+                        <div class="stage">plan-ticket</div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage">review</div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage">create-tasks</div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage">do-all-tasks</div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage">pr</div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage">archive</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Safety Features -->
+            <div class="section">
+                <h2>🛡️ Safety Features</h2>
+
+                <div class="safety-feature">
+                    <div class="safety-feature-title">Circuit Breaker</div>
+                    <div class="safety-feature-desc">Warnings at 25, 40 iterations. Prevents runaway loops.</div>
+                </div>
+
+                <div class="safety-feature">
+                    <div class="safety-feature-title">Catastrophic Filter</div>
+                    <div class="safety-feature-desc">Blocks: <code>rm -rf /</code>, <code>chmod 777 /</code>, <code>dd to /dev/sd*</code></div>
+                </div>
+
+                <div class="safety-feature">
+                    <div class="safety-feature-title">Hook Chain</div>
+                    <div class="safety-feature-desc">Two-stage validation: block-dangerous-git → block-catastrophic-commands</div>
+                </div>
+            </div>
+
+            <!-- Work Gates -->
+            <div class="section">
+                <h2>🚪 Work Gates (.autogate.json)</h2>
+                <div class="gates-section">
+                    <div class="gates-field">
+                        <div class="gates-field-name">ready</div>
+                        <div style="color: #a0aec0; font-size: 11px; margin-top: 4px;">Boolean. Allow autonomous work on item.</div>
+                    </div>
+                    <div class="gates-field">
+                        <div class="gates-field-name">stop_at_phase</div>
+                        <div style="color: #a0aec0; font-size: 11px; margin-top: 4px;">Integer | null. Halt after phase N for review.</div>
+                    </div>
+                    <div style="background: rgba(72, 187, 120, 0.15); border-left: 3px solid #48bb78; padding: 10px; margin-top: 10px; border-radius: 4px; font-size: 11px;">
+                        Integrates with Stop hook. Fail-safe: errors allow work to continue.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loop Controller -->
+            <div class="section">
+                <h2>🔁 Loop Controller (sdd-loop.sh)</h2>
+                <div class="loop-controller">
+                    <div class="loop-feature">
+                        <span class="loop-feature-key">Multi-repo execution</span> — Run across multiple repos autonomously
+                    </div>
+                    <div class="loop-feature">
+                        <span class="loop-feature-key">Configurable limits</span> — Set iteration caps, timeouts, resource constraints
+                    </div>
+                    <div class="loop-feature">
+                        <span class="loop-feature-key">Progress tracking</span> — Monitors state, prevents infinite loops
+                    </div>
+                    <div class="loop-feature">
+                        <span class="loop-feature-key">Graceful shutdown</span> — Respects gates, archives work safely
+                    </div>
+                </div>
+            </div>
+
+            <!-- Commands Overview -->
+            <div class="section full-width">
+                <h2>📝 Commands (20 Total)</h2>
+                <div class="commands-grid">
+                    <div class="command-column">
+                        <div class="command-item"><span class="command-name">start-epic</span></div>
+                        <div class="command-item"><span class="command-name">plan-ticket</span></div>
+                        <div class="command-item"><span class="command-name">review</span></div>
+                        <div class="command-item"><span class="command-name">create-tasks</span></div>
+                        <div class="command-item"><span class="command-name">do-task</span></div>
+                        <div class="command-item"><span class="command-name">do-all-tasks</span></div>
+                        <div class="command-item"><span class="command-name">pr</span></div>
+                        <div class="command-item"><span class="command-name">archive</span></div>
+                        <div class="command-item"><span class="command-name">update</span></div>
+                        <div class="command-item"><span class="command-name">code-review</span></div>
+                    </div>
+                    <div class="command-column">
+                        <div class="command-item"><span class="command-name">pr-comments</span></div>
+                        <div class="command-item"><span class="command-name">fix-pr-feedback</span></div>
+                        <div class="command-item"><span class="command-name">recommend-agents</span></div>
+                        <div class="command-item"><span class="command-name">assign-agents</span></div>
+                        <div class="command-item"><span class="command-name">status</span></div>
+                        <div class="command-item"><span class="command-name">epics-status</span></div>
+                        <div class="command-item"><span class="command-name">tickets-status</span></div>
+                        <div class="command-item"><span class="command-name">tasks-status</span></div>
+                        <div class="command-item"><span class="command-name">mark-ready</span></div>
+                        <div class="command-item"><span class="command-name">import-plan-doc</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Triage Decision Tree -->
+            <div class="section">
+                <h2>🌳 Document Triage Decision Tree</h2>
+                <div class="decision-tree">
+                    <div class="tree-root">Start: New Ticket/Task</div>
+
+                    <div class="tree-node"><span class="tree-decision">Require Core?</span>
+                        <div class="tree-node" style="margin-left: 40px;"><span class="tree-result">→ YES: analysis, architecture, plan (3/3)</span></div>
+                    </div>
+
+                    <div class="tree-node"><span class="tree-decision">Check Keywords?</span>
+                        <div class="tree-node" style="margin-left: 40px;"><span class="tree-result">→ observability, migration, accessibility, api, runbook, audit</span></div>
+                    </div>
+
+                    <div class="tree-node"><span class="tree-decision">Provide Standard?</span>
+                        <div class="tree-node" style="margin-left: 40px;"><span class="tree-result">→ YES: prd, quality, security (or N/A-sign)</span></div>
+                    </div>
+
+                    <div class="tree-node" style="margin-top: 10px;"><span class="tree-result">✓ Triage Complete</span></div>
+                </div>
+            </div>
+
+            <!-- Scripts & Extensibility -->
+            <div class="section">
+                <h2>🔧 Scripts & Extensibility</h2>
+                <div style="font-family: 'Monaco', 'Courier New', monospace; font-size: 12px; line-height: 1.8; color: #cbd5e0;">
+                    <div style="background: rgba(255, 255, 255, 0.02); border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+                        <div style="color: #48bb78; font-weight: 600; margin-bottom: 6px;">Scripts (8)</div>
+                        <div>Mechanical task automation, scaffolding, inventory</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); border-radius: 6px; padding: 12px;">
+                        <div style="color: #667eea; font-weight: 600; margin-bottom: 6px;">Extensible Document Registry</div>
+                        <div>JSON-based configuration for custom documents and triage rules</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="section full-width">
+                <h2>🎨 Legend & Tier System</h2>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color red"></div>
+                        <span><strong>Red:</strong> Core Documents</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color orange"></div>
+                        <span><strong>Orange:</strong> Standard Documents</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color yellow"></div>
+                        <span><strong>Yellow:</strong> Conditional Documents</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color blue"></div>
+                        <span><strong>Blue:</strong> Haiku Agents (Fast)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color purple"></div>
+                        <span><strong>Purple:</strong> Sonnet Agents (Reasoning)</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-stat">13 Agents</div>
+            <div class="footer-stat">20 Commands</div>
+            <div class="footer-stat">12 Document Types</div>
+            <div class="footer-stat">4 Delegation Patterns</div>
+            <div class="footer-stat">2-Tier Safety Chain</div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iTerm Plugin Infographic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d1117;
+            color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #58a6ff;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #8b949e;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 30px;
+        }
+
+        .section h2 {
+            color: #58a6ff;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #58a6ff, #1f6feb);
+            border-radius: 2px;
+        }
+
+        /* Dual Mode Architecture */
+        .architecture {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .mode-box {
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+            border: 2px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-box:hover {
+            border-color: #58a6ff;
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.05) 0%, #161b22 100%);
+        }
+
+        .mode-title {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-size: 1rem;
+        }
+
+        .mode-description {
+            color: #8b949e;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .mode-flow {
+            background: #0d1117;
+            border-left: 3px solid #58a6ff;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #79c0ff;
+            line-height: 1.6;
+        }
+
+        .mode-box.container-mode .mode-flow {
+            border-left-color: #f85149;
+        }
+
+        /* Skills Section */
+        .skills-section {
+            margin: 25px 0;
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .skill-group {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .skill-group.executable {
+            border-left: 3px solid #3fb950;
+        }
+
+        .skill-group.pattern {
+            border-left: 3px solid #d29922;
+        }
+
+        .group-title {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .group-title.exec {
+            color: #3fb950;
+        }
+
+        .group-title.pattern {
+            color: #d29922;
+        }
+
+        .skill-items {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .skill-item {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-size: 0.8rem;
+            padding: 6px;
+            background: rgba(88, 166, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .skill-item.pattern {
+            background: rgba(210, 153, 34, 0.05);
+            color: #d29922;
+        }
+
+        /* Test Coverage Matrix */
+        .matrix {
+            margin: 25px 0;
+        }
+
+        .matrix-title {
+            color: #8b949e;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+        }
+
+        .matrix-cell {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.75rem;
+        }
+
+        .matrix-cell.active {
+            background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+            border-color: #58a6ff;
+            font-weight: 600;
+        }
+
+        .matrix-cell.label {
+            background: transparent;
+            border: none;
+            color: #8b949e;
+            font-weight: 600;
+        }
+
+        /* Test Categories */
+        .test-categories {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .category-num {
+            background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .category-name {
+            color: #c9d1d9;
+        }
+
+        .category-desc {
+            color: #8b949e;
+            font-size: 0.75rem;
+        }
+
+        /* Features List */
+        .features-list {
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .features-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid #21262d;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .features-list li:last-child {
+            border-bottom: none;
+        }
+
+        .features-list li::before {
+            content: '✓';
+            color: #3fb950;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .highlight {
+            background: rgba(88, 166, 255, 0.1);
+            color: #79c0ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Key Box */
+        .key-insight {
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, rgba(31, 111, 235, 0.05) 100%);
+            border: 1px solid #1f6feb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .key-insight::before {
+            content: '⚡ KEY CAPABILITY';
+            display: block;
+            color: #58a6ff;
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .key-insight p {
+            color: #c9d1d9;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 15px;
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+        }
+
+        .stat .value {
+            font-size: 1.8rem;
+            color: #58a6ff;
+            font-weight: 700;
+        }
+
+        .stat .label {
+            color: #8b949e;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.85rem;
+            border-top: 1px solid #30363d;
+            padding-top: 20px;
+            margin-top: 40px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .architecture {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .skill-items {
+                grid-template-columns: 1fr;
+            }
+
+            .matrix-grid {
+                grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💻 iTerm Plugin</h1>
+            <p>iTerm2 Terminal Management via macOS or Linux Container</p>
+        </div>
+
+        <div class="content">
+            <!-- Left Column -->
+            <div>
+                <div class="section">
+                    <h2>Dual-Mode Architecture</h2>
+                    <div class="architecture">
+                        <div class="mode-box">
+                            <div class="mode-title">🍎 macOS Host</div>
+                            <div class="mode-description">Direct local control using AppleScript</div>
+                            <div class="mode-flow">
+                                Plugin<br/>
+                                ↓<br/>
+                                AppleScript<br/>
+                                ↓<br/>
+                                iTerm2 API
+                            </div>
+                        </div>
+                        <div class="mode-box container-mode">
+                            <div class="mode-title">🐧 Linux Container</div>
+                            <div class="mode-description">Remote control via SSH tunneling</div>
+                            <div class="mode-flow">
+                                Plugin<br/>
+                                ↓<br/>
+                                SSH Tunnel<br/>
+                                ↓<br/>
+                                macOS Host<br/>
+                                ↓<br/>
+                                iTunes2 API
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Skills</h2>
+                    <div class="skills-section">
+                        <div class="skill-group executable">
+                            <div class="group-title exec">Executable Skills</div>
+                            <div class="skill-items">
+                                <div class="skill-item">tab-management</div>
+                                <div class="skill-item">pane-management</div>
+                            </div>
+                        </div>
+                        <div class="skill-group pattern">
+                            <div class="group-title pattern">Pattern Skills</div>
+                            <div class="skill-items">
+                                <div class="skill-item pattern">11-category-test</div>
+                                <div class="skill-item pattern">applescript-gen</div>
+                                <div class="skill-item pattern">cross-skill-src</div>
+                                <div class="skill-item pattern">9-section</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="color: #8b949e; font-size: 0.85rem; margin-top: 12px; font-style: italic;">
+                        Pattern skills provide reusable test structures and code generation templates
+                    </p>
+                </div>
+
+                <div class="key-insight">
+                    <p><strong>11-Category Test Structure:</strong> Comprehensive testing across existence, help, dry-run, arguments, exit codes, AppleScript, errors, combined operations, context, edge cases, and shell compatibility.</p>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+                <div class="section">
+                    <h2>Test Coverage</h2>
+                    <div class="matrix">
+                        <div class="matrix-title">87 Tests Distributed Across Categories</div>
+                        <div class="test-categories">
+                            <div class="category-item">
+                                <div class="category-num">1</div>
+                                <div>
+                                    <div class="category-name">Existence</div>
+                                    <div class="category-desc">Verify tool availability</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">2</div>
+                                <div>
+                                    <div class="category-name">Help</div>
+                                    <div class="category-desc">Documentation accessibility</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">3</div>
+                                <div>
+                                    <div class="category-name">Dry-Run</div>
+                                    <div class="category-desc">Safe validation</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">4</div>
+                                <div>
+                                    <div class="category-name">Arguments</div>
+                                    <div class="category-desc">Parameter handling</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">5</div>
+                                <div>
+                                    <div class="category-name">Exit Codes</div>
+                                    <div class="category-desc">Status validation</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">6</div>
+                                <div>
+                                    <div class="category-name">AppleScript</div>
+                                    <div class="category-desc">Script generation</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">7</div>
+                                <div>
+                                    <div class="category-name">Errors</div>
+                                    <div class="category-desc">Error handling</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">8</div>
+                                <div>
+                                    <div class="category-name">Combined Ops</div>
+                                    <div class="category-desc">Multi-step sequences</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">9</div>
+                                <div>
+                                    <div class="category-name">Context</div>
+                                    <div class="category-desc">State preservation</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">10</div>
+                                <div>
+                                    <div class="category-name">Edge Cases</div>
+                                    <div class="category-desc">Boundary conditions</div>
+                                </div>
+                            </div>
+                            <div class="category-item">
+                                <div class="category-num">11</div>
+                                <div>
+                                    <div class="category-name">Shell Compat</div>
+                                    <div class="category-desc">Multi-shell support</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Key Features</h2>
+                    <ul class="features-list">
+                        <li>Profile integration for session management</li>
+                        <li>Directory navigation across panes</li>
+                        <li>Command execution in specific panes</li>
+                        <li>Devcontainer profile support</li>
+                        <li>SSH tunneling for remote containers</li>
+                        <li>AppleScript generation and execution</li>
+                    </ul>
+                </div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <div class="value">87</div>
+                        <div class="label">Tests</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value">11</div>
+                        <div class="label">Categories</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value">2</div>
+                        <div class="label">Modes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Claude Code Plugin | Dark Theme | 2026
+        </div>
+    </div>
+</body>
+</html>

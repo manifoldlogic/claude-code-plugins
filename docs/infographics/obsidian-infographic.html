@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsidian Plugin Infographic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d1117;
+            color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #58a6ff;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #8b949e;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 30px;
+        }
+
+        .section h2 {
+            color: #58a6ff;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #58a6ff, #1f6feb);
+            border-radius: 2px;
+        }
+
+        /* SSH Bridge Architecture */
+        .bridge-architecture {
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, rgba(31, 111, 235, 0.05) 100%);
+            border: 2px solid #1f6feb;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+
+        .bridge-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .bridge-node {
+            background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+            border: 2px solid #58a6ff;
+            border-radius: 8px;
+            padding: 15px 20px;
+            text-align: center;
+            flex: 1;
+            min-width: 100px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .bridge-node.source {
+            background: linear-gradient(135deg, #238636 0%, #0e5a1b 100%);
+            border-color: #3fb950;
+        }
+
+        .bridge-node.transit {
+            background: linear-gradient(135deg, #9e6a03 0%, #6e4002 100%);
+            border-color: #d29922;
+        }
+
+        .bridge-node.target {
+            background: linear-gradient(135deg, #0969da 0%, #1f6feb 100%);
+            border-color: #79c0ff;
+        }
+
+        .bridge-arrow {
+            color: #58a6ff;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .bridge-label {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: #8b949e;
+            margin-top: 5px;
+        }
+
+        /* CRUD Operations */
+        .crud-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .crud-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .crud-card:hover {
+            border-color: #58a6ff;
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        .crud-icon {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .crud-operation {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .crud-desc {
+            color: #8b949e;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        /* Operations Grid */
+        .operations-section {
+            margin: 25px 0;
+        }
+
+        .operations-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .operation-item {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .operation-icon {
+            color: #58a6ff;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .operation-name {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .operation-desc {
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        /* Prerequisites */
+        .prerequisites {
+            background: linear-gradient(135deg, rgba(248, 81, 73, 0.1) 0%, rgba(222, 53, 53, 0.05) 100%);
+            border: 1px solid #f85149;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .prerequisites h3 {
+            color: #f85149;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prerequisites h3::before {
+            content: '📋';
+            font-size: 1.2rem;
+        }
+
+        .prerequisites-list {
+            list-style: none;
+        }
+
+        .prerequisites-list li {
+            padding: 8px 0;
+            color: #c9d1d9;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(248, 81, 73, 0.1);
+        }
+
+        .prerequisites-list li:last-child {
+            border-bottom: none;
+        }
+
+        .prerequisites-list li::before {
+            content: '✓';
+            color: #3fb950;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        /* Security Box */
+        .security-section {
+            background: linear-gradient(135deg, rgba(79, 195, 247, 0.1) 0%, rgba(88, 166, 255, 0.05) 100%);
+            border: 1px solid #58a6ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .security-section h3 {
+            color: #58a6ff;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .security-section h3::before {
+            content: '🔒';
+            font-size: 1.2rem;
+        }
+
+        .security-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .security-item {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.9rem;
+        }
+
+        .security-item-title {
+            font-family: 'Courier New', monospace;
+            color: #79c0ff;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .security-item-desc {
+            color: #8b949e;
+            font-size: 0.85rem;
+        }
+
+        /* Features List */
+        .features-list {
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .features-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid #21262d;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .features-list li:last-child {
+            border-bottom: none;
+        }
+
+        .features-list li::before {
+            content: '✓';
+            color: #3fb950;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .highlight {
+            background: rgba(88, 166, 255, 0.1);
+            color: #79c0ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 15px;
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+        }
+
+        .stat .value {
+            font-size: 1.8rem;
+            color: #58a6ff;
+            font-weight: 700;
+        }
+
+        .stat .label {
+            color: #8b949e;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.85rem;
+            border-top: 1px solid #30363d;
+            padding-top: 20px;
+            margin-top: 40px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .crud-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .bridge-flow {
+                flex-direction: column;
+            }
+
+            .bridge-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📓 Obsidian Plugin</h1>
+            <p>Obsidian Vault Management from Devcontainer via SSH</p>
+        </div>
+
+        <div class="content">
+            <!-- Left Column -->
+            <div>
+                <div class="section">
+                    <h2>SSH Bridge Architecture</h2>
+                    <div class="bridge-architecture">
+                        <div class="bridge-flow">
+                            <div>
+                                <div class="bridge-node source">Container</div>
+                                <div class="bridge-label">Source</div>
+                            </div>
+                            <div class="bridge-arrow">→</div>
+                            <div>
+                                <div class="bridge-node transit">SSH Tunnel<br/>(Encrypted)</div>
+                                <div class="bridge-label">Transport</div>
+                            </div>
+                            <div class="bridge-arrow">→</div>
+                            <div>
+                                <div class="bridge-node">macOS Host</div>
+                                <div class="bridge-label">Relay</div>
+                            </div>
+                            <div class="bridge-arrow">→</div>
+                            <div>
+                                <div class="bridge-node target">obsidian-cli<br/>Vault</div>
+                                <div class="bridge-label">Target</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="color: #8b949e; font-size: 0.9rem; text-align: center; margin-top: 15px;">
+                        Encrypted tunnel ensures secure remote vault access from isolated containers
+                    </p>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>CRUD Operations</h2>
+                    <div class="crud-grid">
+                        <div class="crud-card">
+                            <div class="crud-icon">➕</div>
+                            <div class="crud-operation">Create</div>
+                            <div class="crud-desc">Add new notes to vault</div>
+                        </div>
+                        <div class="crud-card">
+                            <div class="crud-icon">📖</div>
+                            <div class="crud-operation">Read</div>
+                            <div class="crud-desc">Retrieve note content</div>
+                        </div>
+                        <div class="crud-card">
+                            <div class="crud-icon">✏️</div>
+                            <div class="crud-operation">Update</div>
+                            <div class="crud-desc">Modify existing notes</div>
+                        </div>
+                        <div class="crud-card">
+                            <div class="crud-icon">🗑️</div>
+                            <div class="crud-operation">Delete</div>
+                            <div class="crud-desc">Remove notes from vault</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Operations</h2>
+                    <div class="operations-section">
+                        <div class="operations-grid">
+                            <div class="operation-item">
+                                <div class="operation-icon">🔍</div>
+                                <div class="operation-name">search</div>
+                                <div class="operation-desc">by name or content</div>
+                            </div>
+                            <div class="operation-item">
+                                <div class="operation-icon">📅</div>
+                                <div class="operation-name">daily-notes</div>
+                                <div class="operation-desc">daily journal access</div>
+                            </div>
+                            <div class="operation-item">
+                                <div class="operation-icon">📝</div>
+                                <div class="operation-name">frontmatter</div>
+                                <div class="operation-desc">YAML metadata</div>
+                            </div>
+                            <div class="operation-item">
+                                <div class="operation-icon">🗂️</div>
+                                <div class="operation-name">multi-vault</div>
+                                <div class="operation-desc">multiple vaults</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+                <div class="prerequisites">
+                    <h3>Prerequisites</h3>
+                    <ul class="prerequisites-list">
+                        <li><span class="highlight">obsidian-cli</span> installed on host</li>
+                        <li>Default vault configured</li>
+                        <li>SSH access from container to host</li>
+                        <li><span class="highlight">HOST_USER</span> environment variable set</li>
+                        <li>SSH keys properly configured</li>
+                    </ul>
+                </div>
+
+                <div class="security-section">
+                    <h3>Security Model</h3>
+                    <div class="security-grid">
+                        <div class="security-item">
+                            <div class="security-item-title">SSH Key Security</div>
+                            <div class="security-item-desc">Keys protected in container, never exposed to vault</div>
+                        </div>
+                        <div class="security-item">
+                            <div class="security-item-title">Least Privilege</div>
+                            <div class="security-item-desc">Minimal vault access permissions</div>
+                        </div>
+                        <div class="security-item">
+                            <div class="security-item-title">No Persistence</div>
+                            <div class="security-item-desc">Vault data never stored in container</div>
+                        </div>
+                        <div class="security-item">
+                            <div class="security-item-title">Encrypted Transit</div>
+                            <div class="security-item-desc">All communication via TLS/SSH</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top: 25px;">
+                    <h2>Key Features</h2>
+                    <ul class="features-list">
+                        <li>Remote vault access from containers via SSH</li>
+                        <li>Full CRUD operations on notes</li>
+                        <li>Content and name-based search</li>
+                        <li>Daily notes integration</li>
+                        <li>YAML frontmatter support</li>
+                        <li>Multi-vault management</li>
+                        <li>Secure encryption via SSH tunnel</li>
+                        <li>No local vault data persistence</li>
+                    </ul>
+                </div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <div class="value">4</div>
+                        <div class="label">CRUD Ops</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value">4</div>
+                        <div class="label">Features</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value">∞</div>
+                        <div class="label">Vaults</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Claude Code Plugin | Dark Theme | 2026
+        </div>
+    </div>
+</body>
+</html>

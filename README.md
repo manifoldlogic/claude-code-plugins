@@ -1,11 +1,5 @@
 # CrewChief Plugins for Claude Code
 
-## Architecture Infographic
-
-A comprehensive technical infographic is available at [`docs/infographic.html`](docs/infographic.html). Open it in a browser for a visual overview of the plugin architecture, marketplace system, MCP tool surface, and plugin dependency graph.
-
----
-
 A collection of Claude Code plugins for development workflows, project management, and CI/CD automation.
 
 ## Quick Start
