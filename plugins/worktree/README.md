@@ -55,7 +55,7 @@ Sync operations are available independently for worktrees you want to keep curre
 Before cleaning up a worktree, the plugin checks for associated SDD tickets:
 
 - **Completed tickets** — Safe to clean. Worktree removal proceeds normally.
-- **In-progress tickets** — Blocked. You're prompted to confirm before cleanup to prevent losing unfinished work.
+- **In-progress tickets** — Requires confirmation. You're prompted before cleanup to prevent losing unfinished work.
 
 ## Skills
 

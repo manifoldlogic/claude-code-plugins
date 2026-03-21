@@ -10,7 +10,7 @@ Spec-Driven Development. Structure ambiguous work into epics, tickets, and tasks
 
 Work decomposes top-down:
 
-```
+```text
 Epic (research/discovery)
     └── Ticket (planning/execution)
             └── Task (individual work item)
@@ -143,10 +143,10 @@ Expect ~20-30% improvement with 3+ independent tasks per phase. Small or linear 
 
 ```bash
 # Preview what would happen
-./sdd-loop.sh --dry-run /path/to/repos/
+./skills/project-workflow/scripts/sdd-loop.sh --dry-run --repos-root /path/to/repos --specs-root /path/to/specs
 
 # Run with limits
-./sdd-loop.sh --max-iterations 50 --max-errors 3 /path/to/repos/
+./skills/project-workflow/scripts/sdd-loop.sh --max-iterations 50 --max-errors 3 --repos-root /path/to/repos --specs-root /path/to/specs
 ```
 
 Phase boundaries via `.autogate.json` stop execution after specific phases for manual review. See [loop examples](skills/project-workflow/scripts/sdd-loop-examples.md) for detailed usage.
@@ -163,7 +163,7 @@ Phase boundaries via `.autogate.json` stop execution after specific phases for m
 {"ready": true}                     // Fully ready (same as no file)
 ```
 
-Gates integrate with the workflow guidance Stop hook — when a gate blocks, the hook exits early with a clear message. Invalid JSON or missing files fail safe (work continues).
+Gates integrate with the workflow guidance Stop hook — when a gate blocks, the hook exits early with a clear message. Invalid JSON or missing files fail-safe (work continues).
 
 Bypass temporarily: `export AUTOGATE_BYPASS=true`
 
