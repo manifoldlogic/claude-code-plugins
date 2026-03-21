@@ -287,6 +287,15 @@ test_unrecognized_option() {
     assert_exit_code 3 "$exit_code" "Exit code 3 for unrecognized option"
 }
 
+test_extra_positional_arg() {
+    run_test "Extra positional argument exits 1"
+
+    local exit_code=0
+    cd "$TEST_TMPDIR/repos/myrepo" && bash "$SETUP_SCRIPT" TICKET-1 EXTRA 2>/dev/null || exit_code=$?
+
+    assert_exit_code 1 "$exit_code" "Exit code 1 for extra positional argument"
+}
+
 test_invalid_worktree_name() {
     run_test "Invalid worktree name (starts with hyphen) exits 1"
 
@@ -892,6 +901,7 @@ run_all_tests() {
     test_not_in_git_repo
     test_repo_flag_rejected
     test_unrecognized_option
+    test_extra_positional_arg
     test_invalid_worktree_name
     test_valid_worktree_names
     test_repo_auto_derived
