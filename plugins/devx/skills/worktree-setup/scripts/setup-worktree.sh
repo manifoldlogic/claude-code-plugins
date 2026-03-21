@@ -2,7 +2,7 @@
 #
 # setup-worktree.sh - Create git worktree with VS Code and cmux workspace setup
 #
-# Version: 1.0.0
+# Version: 2.0.0
 #
 # DESCRIPTION:
 #   Orchestrates the creation of a git worktree via crewchief CLI, updates the
