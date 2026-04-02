@@ -1,6 +1,6 @@
 {
   "name": "crewchief",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "owner": {
     "name": "Daniel Bushman",
     "email": "dbushman@manifoldlogic.com"
@@ -70,6 +70,11 @@
       "name": "devx",
       "source": "./plugins/devx",
       "description": "Developer experience orchestration layer for multi-plugin development workflows"
+    },
+    {
+      "name": "mercury",
+      "source": "./plugins/mercury",
+      "description": "Mercury banking API skill for account management, transactions, payments, and invoicing"
     }
   ]
 }
