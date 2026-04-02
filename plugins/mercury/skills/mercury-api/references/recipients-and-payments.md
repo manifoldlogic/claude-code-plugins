@@ -259,6 +259,11 @@ returns the original result. Rules: unique per request, recommended format
 request. Never reuse a key across different payments — doing so silently returns
 the first payment's result.
 
+**Timeout handling:** If a request times out (no response received), do NOT assume
+the payment failed. Retry using the same idempotency key — Mercury will return the
+original result if the payment already succeeded. Never generate a new idempotency
+key for a timed-out request, as this risks creating a duplicate payment.
+
 ### curl Example
 
 ```bash
@@ -306,7 +311,8 @@ Content-Type: `application/json`
 | idempotencyKey | string | Yes | Unique key to prevent duplicate transfers (same rules as send-money above) |
 
 **Idempotency:** Same rules as send-money above. Unique key per transfer; reuse
-only on retry.
+only on retry. If a transfer request times out, do NOT assume it failed — retry
+with the same idempotency key. Never generate a new key for a timed-out request.
 
 ### curl Example
 

@@ -232,6 +232,7 @@ When a Mercury API call returns an error, interpret the status code and present 
 | 422 | Unprocessable Entity | "The request was valid but Mercury rejected it due to a business rule. Let me check the details." |
 | 429 | Too Many Requests | "Mercury is rate-limiting requests. I'll wait a moment and try again." |
 | 500 | Server Error | "Mercury is experiencing a server issue. I'll retry in a moment." |
+| 503 | Service Unavailable | "Mercury is temporarily down. Wait and retry after 30 seconds." |
 
 Mercury error responses follow the format `{"errors": [{"message": "..."}]}`. Use the `message` field to provide specific context when available.
 
