@@ -18,11 +18,11 @@ The organization endpoint returns an object with these fields:
 | address | object | Organization address with street, city, state, zip fields |
 | status | string | Organization status |
 
-**EIN Handling:** The `ein` field is a sensitive tax identifier. When presenting
-organization data conversationally, acknowledge that the EIN is on file without
-displaying the full number. For example, say "Your organization's EIN is on
-file" rather than printing the actual EIN value. If the user explicitly asks for
-the EIN, you may include it, but do not volunteer it in summaries.
+**EIN Handling:** The `ein` field is a sensitive tax identifier. Always mask the
+EIN when presenting organization data (e.g., "XX-XXX1234"). Never display the
+full EIN in conversational summaries. If the user explicitly requests the full
+EIN, confirm they understand it is sensitive before displaying it. Default to
+the masked format in all other cases.
 
 ## User Object Schema
 

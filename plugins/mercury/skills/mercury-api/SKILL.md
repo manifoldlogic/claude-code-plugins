@@ -228,7 +228,7 @@ When a Mercury API call returns an error, interpret the status code and present 
 | 401 | Unauthorized | "The API token appears to be missing or invalid. Please check that MERCURY_TOKEN is set correctly." |
 | 403 | Forbidden | "The token does not have permission for this operation. This may require a Read and Write token, or the IP address may need to be whitelisted." |
 | 404 | Not Found | "That resource was not found. It may have been deleted or the ID may be incorrect." |
-| 409 | Conflict | "There was a conflict -- this may be a duplicate request. I'll use a new idempotency key and retry." |
+| 409 | Conflict | "There was a conflict (possibly a duplicate request). I'll check the original request status first rather than retrying with a new idempotency key." |
 | 422 | Unprocessable Entity | "The request was valid but Mercury rejected it due to a business rule. Let me check the details." |
 | 429 | Too Many Requests | "Mercury is rate-limiting requests. I'll wait a moment and try again." |
 | 500 | Server Error | "Mercury is experiencing a server issue. I'll retry in a moment." |

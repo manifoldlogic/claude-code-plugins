@@ -95,9 +95,9 @@ plugins/mercury/
 
 **Solution**:
 
-1. Verify your token is set:
+1. Verify your token is set (without printing it):
    ```bash
-   echo $MERCURY_TOKEN
+   [ -n "${MERCURY_TOKEN}" ] && echo "MERCURY_TOKEN is set" || echo "MERCURY_TOKEN is NOT set"
    ```
 2. Confirm the token has not expired in your Mercury dashboard
 3. Regenerate the token if needed and update your environment variable

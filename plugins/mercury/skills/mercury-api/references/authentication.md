@@ -185,8 +185,8 @@ MERCURY_TOKEN=your-token-value-here
 ```
 
 ```bash
-# Load the token
-export $(grep MERCURY_TOKEN .env | xargs)
+# Load only MERCURY_TOKEN safely
+export MERCURY_TOKEN="$(grep -E '^MERCURY_TOKEN=' .env | head -n1 | cut -d= -f2-)"
 ```
 
 ### Verify the Variable Is Set

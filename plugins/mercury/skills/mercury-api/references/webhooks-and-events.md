@@ -3,7 +3,7 @@
 This document covers 8 Mercury API endpoints for webhook management and event
 retrieval. Webhooks let you receive real-time notifications when things happen in
 your Mercury account (transactions, balance changes). Events provide a queryable
-log of past activity. Five endpoints are write operations (CONFIRM) and three are
+log of past activity. Four endpoints are write operations (CONFIRM) and four are
 read-only (SAFE). For authentication, see [authentication.md](authentication.md).
 
 ## Webhook Object Schema
