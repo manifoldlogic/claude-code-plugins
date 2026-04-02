@@ -1,5 +1,23 @@
 {
   "name": "mercury",
   "version": "0.1.0",
-  "description": "Mercury banking integration for account management, transactions, payments, and invoicing"
+  "description": "Mercury banking integration for account management, transactions, payments, and invoicing",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
+  },
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
+  "keywords": [
+    "mercury",
+    "banking",
+    "fintech",
+    "api",
+    "accounts",
+    "transactions",
+    "payments",
+    "invoicing",
+    "treasury",
+    "webhooks"
+  ]
 }
