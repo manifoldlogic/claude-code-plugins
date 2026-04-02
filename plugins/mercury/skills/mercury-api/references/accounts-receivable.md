@@ -138,7 +138,7 @@ Each element in the `lineItems` array describes one line on the invoice:
 ```json
 {
   "customerId": "550e8400-e29b-41d4-a716-446655440000",
-  "destinationAccountId": "660f9511-f3ac-52e5-b827-557766551111",
+  "destinationAccountId": "660f9511-e29b-41d4-a716-446655440001",
   "invoiceDate": "2026-04-01",
   "dueDate": "2026-04-30",
   "lineItems": [
@@ -173,7 +173,7 @@ curl -s -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "customerId": "550e8400-e29b-41d4-a716-446655440000",
-    "destinationAccountId": "660f9511-f3ac-52e5-b827-557766551111",
+    "destinationAccountId": "660f9511-e29b-41d4-a716-446655440001",
     "invoiceDate": "2026-04-01",
     "dueDate": "2026-04-30",
     "lineItems": [{"name": "Consulting", "unitPrice": 150.00, "quantity": 10}],

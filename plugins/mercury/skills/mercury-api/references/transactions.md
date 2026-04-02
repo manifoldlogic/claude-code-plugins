@@ -169,7 +169,7 @@ the request body must not be empty.
 ```json
 {
   "note": "Q1 consulting retainer",
-  "categoryId": "660f9511-f3ac-52e5-b827-557766551111"
+  "categoryId": "660f9511-e29b-41d4-a716-446655440001"
 }
 ```
 

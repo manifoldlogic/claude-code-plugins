@@ -47,58 +47,52 @@ Response envelope:
 Pass `nextPage` as `start_after` to page forward; pass `previousPage` as
 `end_before` to page backward. When `nextPage` is `null`, all results are shown.
 
-## Endpoints
+---
 
-### List All Accounts
-- **Method:** GET
-- **Path:** /api/v1/accounts
-- **Safety:** SAFE
+## GET /api/v1/accounts
+
+**Description:** List all accounts.
+**Safety:** SAFE — execute directly without confirmation.
 
 **Query Parameters:** See Pagination above. **Response Envelope key:** `accounts`
 
-**Response Schema:** Returns an array of Account Objects (see schema above).
+**Response:** Array of Account Objects (see schema above).
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/accounts
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/accounts"
 ```
 
 **Conversational Presentation:**
 > "Found [N] accounts: Your [Account Name] ([kind]) has a balance of $X,XXX.XX available..."
 
-### Get Account by ID
-- **Method:** GET
-- **Path:** /api/v1/account/{accountId}
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/account/{accountId}
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| accountId | UUID | The account to retrieve |
+**Description:** Get account by ID.
+**Safety:** SAFE — execute directly without confirmation.
 
-**Response Schema:** Returns a single Account Object.
+**Path Parameters:** `accountId` (UUID, required) — the account to retrieve.
 
-**Example:**
+**Response:** Single Account Object.
+
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000"
 ```
 
 **Conversational Presentation:**
 > "Your [Account Name] account (status: [status]) has a current balance of $X,XXX.XX and $X,XXX.XX available."
 
-### Get Cards for Account
-- **Method:** GET
-- **Path:** /api/v1/account/{accountId}/cards
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/account/{accountId}/cards
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| accountId | UUID | The account whose cards to list |
+**Description:** Get cards for account.
+**Safety:** SAFE — execute directly without confirmation.
+
+**Path Parameters:** `accountId` (UUID, required) — the account whose cards to list.
 
 **Response Schema:**
 
@@ -109,25 +103,22 @@ curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 | status | string | Card status |
 | lastFourDigits | string | Last four digits of the card number |
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/cards
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/cards"
 ```
 
 **Conversational Presentation:**
 > "Found [N] cards on this account: [Card Name] ending in [lastFourDigits] (status: [status])..."
 
-### Get Account Statements
-- **Method:** GET
-- **Path:** /api/v1/account/{accountId}/statements
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/account/{accountId}/statements
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| accountId | UUID | The account whose statements to list |
+**Description:** Get account statements.
+**Safety:** SAFE — execute directly without confirmation.
+
+**Path Parameters:** `accountId` (UUID, required) — the account whose statements to list.
 
 **Response Schema:**
 
@@ -139,25 +130,22 @@ curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 | startDate | date | Statement period start |
 | endDate | date | Statement period end |
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/statements
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/statements"
 ```
 
 **Conversational Presentation:**
 > "Found [N] statements. Most recent: [Month] [Year], covering [startDate] through [endDate]."
 
-### List Account Transactions
-- **Method:** GET
-- **Path:** /api/v1/account/{accountId}/transactions
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/account/{accountId}/transactions
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| accountId | UUID | The account whose transactions to list |
+**Description:** List account transactions.
+**Safety:** SAFE — execute directly without confirmation.
+
+**Path Parameters:** `accountId` (UUID, required) — the account whose transactions to list.
 
 **Query Parameters:** See Pagination above. **Response Envelope key:** `transactions`
 
@@ -177,9 +165,8 @@ curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 | mercuryCategory | object (nullable) | Mercury-assigned category (id, name) |
 | customCategory | object (nullable) | User-assigned category (id, name) |
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
   "https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/transactions?limit=25"
 ```
 
@@ -189,36 +176,33 @@ curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 For full transaction operations including filtering, metadata updates, and
 attachments, see [transactions.md](transactions.md).
 
-### Get Transaction by ID (Account-Scoped)
-- **Method:** GET
-- **Path:** /api/v1/account/{accountId}/transaction/{transactionId}
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/account/{accountId}/transaction/{transactionId}
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| accountId | UUID | The account containing the transaction |
-| transactionId | UUID | The transaction to retrieve |
+**Description:** Get transaction by ID (account-scoped).
+**Safety:** SAFE — execute directly without confirmation.
 
-**Response Schema:** Same as the transaction object in List Account Transactions.
+**Path Parameters:** `accountId` (UUID, required), `transactionId` (UUID, required).
 
-**Example:**
+**Response:** Same as the transaction object in List Account Transactions.
+
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/transaction/660f9511-f3ac-52e5-b827-557766551111
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/transaction/660f9511-e29b-41d4-a716-446655440001"
 ```
 
 **Conversational Presentation:**
 > "Transaction [bankDescription]: $X,XXX.XX, status [status], posted [Month DD, YYYY]."
 
-This is the account-scoped lookup. For cross-account search and PATCH operations,
-see [transactions.md](transactions.md).
+For cross-account search and PATCH operations, see [transactions.md](transactions.md).
 
-### List All Treasury Accounts
-- **Method:** GET
-- **Path:** /api/v1/treasury
-- **Safety:** SAFE
+---
+
+## GET /api/v1/treasury
+
+**Description:** List all treasury accounts.
+**Safety:** SAFE — execute directly without confirmation.
 
 **Response Schema:**
 
@@ -230,47 +214,41 @@ see [transactions.md](transactions.md).
 | status | string | Account status |
 | createdAt | ISO 8601 | Creation timestamp |
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/treasury
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/treasury"
 ```
 
 **Conversational Presentation:**
 > "Found [N] treasury accounts: [Treasury Name] with a balance of $X,XXX.XX..."
 
-### Get Treasury Transactions
-- **Method:** GET
-- **Path:** /api/v1/treasury/{treasuryId}/transactions
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/treasury/{treasuryId}/transactions
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| treasuryId | UUID | The treasury account whose transactions to list |
+**Description:** Get treasury transactions.
+**Safety:** SAFE — execute directly without confirmation.
+
+**Path Parameters:** `treasuryId` (UUID, required) — the treasury account.
 
 **Query Parameters:** See Pagination above. **Response Envelope key:** `transactions`
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
   "https://api.mercury.com/api/v1/treasury/550e8400-e29b-41d4-a716-446655440000/transactions?limit=25"
 ```
 
 **Conversational Presentation:**
 > "Found [N] transactions in your [Treasury Name] account. Recent: $X,XXX.XX on [Month DD, YYYY]..."
 
-### Get Treasury Statements
-- **Method:** GET
-- **Path:** /api/v1/treasury/{treasuryId}/statements
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/treasury/{treasuryId}/statements
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| treasuryId | UUID | The treasury account whose statements to list |
+**Description:** Get treasury statements.
+**Safety:** SAFE — execute directly without confirmation.
+
+**Path Parameters:** `treasuryId` (UUID, required) — the treasury account.
 
 **Response Schema:**
 
@@ -282,19 +260,20 @@ curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 | startDate | date | Statement period start |
 | endDate | date | Statement period end |
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/treasury/550e8400-e29b-41d4-a716-446655440000/statements
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/treasury/550e8400-e29b-41d4-a716-446655440000/statements"
 ```
 
 **Conversational Presentation:**
 > "Found [N] statements for your treasury account. Most recent: [Month] [Year]."
 
-### List All Credit Accounts
-- **Method:** GET
-- **Path:** /api/v1/credit
-- **Safety:** SAFE
+---
+
+## GET /api/v1/credit
+
+**Description:** List all credit accounts.
+**Safety:** SAFE — execute directly without confirmation.
 
 **Response Schema:**
 
@@ -306,35 +285,30 @@ curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 | status | string | Account status |
 | createdAt | ISO 8601 | Creation timestamp |
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  https://api.mercury.com/api/v1/credit
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  "https://api.mercury.com/api/v1/credit"
 ```
 
 **Conversational Presentation:**
 > "Found [N] credit accounts: [Credit Account Name] with a current balance of $X,XXX.XX..."
 
-### Download Statement PDF
-- **Method:** GET
-- **Path:** /api/v1/account/{accountId}/statement/{statementId}/pdf
-- **Safety:** SAFE
+---
 
-**Path Parameters:**
+## GET /api/v1/account/{accountId}/statement/{statementId}/pdf
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| accountId | UUID | The account owning the statement |
-| statementId | UUID | The statement to download |
+**Description:** Download statement PDF.
+**Safety:** SAFE — execute directly without confirmation.
+
+**Path Parameters:** `accountId` (UUID, required), `statementId` (UUID, required).
 
 **Response:** Binary PDF data with **Content-Type:** `application/pdf` (not JSON).
 Save the response to a file rather than attempting to parse it as JSON.
 
-**Example:**
 ```bash
-curl -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
   -o statement.pdf \
-  https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/statement/660f9511-f3ac-52e5-b827-557766551111/pdf
+  "https://api.mercury.com/api/v1/account/550e8400-e29b-41d4-a716-446655440000/statement/660f9511-e29b-41d4-a716-446655440001/pdf"
 ```
 
 **Conversational Presentation:**

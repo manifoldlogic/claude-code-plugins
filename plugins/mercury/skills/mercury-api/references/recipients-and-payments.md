@@ -139,79 +139,37 @@ Do not execute until the user confirms.
 
 Content-Type: `application/json`
 
-```json
-{
-  "name": "Acme Corp",
-  "emails": ["billing@example.com"],
-  "electronicRoutingInfo": {
-    "accountNumber": "1234567890",
-    "routingNumber": "021000021",
-    "electronicAccountType": "businessChecking",
-    "address": {
-      "address1": "123 Main St",
-      "city": "San Francisco",
-      "region": "CA",
-      "postalCode": "94105",
-      "country": "US"
-    }
-  },
-  "domesticWireRoutingInfo": {
-    "accountNumber": "1234567890",
-    "routingNumber": "021000021",
-    "address": {
-      "address1": "123 Main St",
-      "city": "San Francisco",
-      "region": "CA",
-      "postalCode": "94105",
-      "country": "US"
-    }
-  },
-  "checkInfo": {
-    "address": {
-      "address1": "123 Main St",
-      "city": "San Francisco",
-      "region": "CA",
-      "postalCode": "94105",
-      "country": "US"
-    }
-  }
-}
-```
-
-### Field Reference
-
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | name | string | Yes | Recipient name |
 | emails | array of strings | No | Email addresses for payment notifications |
-| electronicRoutingInfo | object | No | ACH routing (accountNumber, routingNumber, electronicAccountType, address) |
-| domesticWireRoutingInfo | object | No | Wire routing (accountNumber, routingNumber, address) |
-| checkInfo | object | No | Check mailing (address only) |
-
-**electronicRoutingInfo fields:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| accountNumber | string | Yes (if provided) | Bank account number |
-| routingNumber | string | Yes (if provided) | Bank routing number (9 digits) |
-| electronicAccountType | string | Yes (if provided) | businessChecking, businessSavings, personalChecking, or personalSavings |
-| address | object | Yes (if provided) | address1, city, region (2-letter state), postalCode, country (2-letter) |
-
-**domesticWireRoutingInfo fields:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| accountNumber | string | Yes (if provided) | Bank account number |
-| routingNumber | string | Yes (if provided) | Bank routing number (9 digits) |
-| address | object | Yes (if provided) | address1, city, region, postalCode, country |
-
-**checkInfo fields:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| address | object | Yes (if provided) | Mailing address: address1, city, region, postalCode, country |
+| electronicRoutingInfo | object | No | ACH routing — see electronicRoutingInfo Object schema above |
+| domesticWireRoutingInfo | object | No | Wire routing — see domesticWireRoutingInfo Object schema above |
+| checkInfo | object | No | Check mailing — see checkInfo Object schema above |
 
 At least one routing info section should be provided to make the recipient usable.
+All nested object fields match the Recipient Object Schema at the top of this
+document. When a routing section is included, all its fields are required except
+`defaultForBenefitOf` (wire only, optional).
+
+### curl Example
+
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer ${MERCURY_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corp",
+    "emails": ["billing@example.com"],
+    "electronicRoutingInfo": {
+      "accountNumber": "1234567890",
+      "routingNumber": "021000021",
+      "electronicAccountType": "businessChecking",
+      "address": {"address1": "123 Main St", "city": "San Francisco", "region": "CA", "postalCode": "94105", "country": "US"}
+    }
+  }' \
+  "https://api.mercury.com/api/v1/recipient"
+```
 
 **Response:** Returns the created Recipient Object.
 
@@ -270,34 +228,15 @@ curl -s -X POST \
 
 ## POST /api/v1/account/{accountId}/request-send-money
 
-### Request Send Money
-
-> **CRITICAL -- MONEY MOVEMENT.** This endpoint sends real money. Display all
-> details (amount, source account, destination, payment method) in human-readable
-> form and require explicit "yes" confirmation before executing. Never execute
-> silently. Cowork policy: this is a hard requirement.
-
 **Description:** Request to send money from a Mercury account to a recipient.
 **Safety:** CRITICAL — money movement, requires explicit "yes" confirmation.
 
-### CRITICAL Gate
+> **CRITICAL:** Display amount, source account, recipient, and payment method.
+> Format as "$X,XXX.XX". Wait for explicit "yes" before executing. Example:
+> "CRITICAL: This will send $5,000.00 from Operating Account to Acme Corp via
+> ACH. This moves real money and cannot be undone. Reply 'yes' to proceed."
 
-Before executing this request, you MUST:
-1. Display ALL details: amount, source account name, recipient name, payment method.
-2. Format the amount as "$X,XXX.XX" with commas and two decimal places.
-3. Present the confirmation prompt exactly as shown below.
-4. Wait for the user to reply "yes" before executing.
-
-**Example confirmation language:**
-> "CRITICAL: This will send $5,000.00 from your Operating Account to Acme Corp
-> via ACH. This moves real money and cannot be undone. Please confirm by replying
-> 'yes' to proceed."
-
-### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| accountId | UUID | Yes | The Mercury account to send money from |
+**Path Parameters:** `accountId` (UUID, required) — the account to send from.
 
 ### Request Body
 
@@ -314,18 +253,11 @@ Content-Type: `application/json`
 
 ### Idempotency Key
 
-The `idempotencyKey` prevents duplicate payments if the request is retried (e.g.,
-after a network timeout). The same key sent twice returns the original result
-rather than creating a second payment.
-
-**Rules:**
-- Must be unique per payment request.
-- Recommended format: UUID or `"payment-{date}-{random}"` (e.g., `"payment-20260402-x7k9m"`).
-- Do NOT reuse a key from a previous payment.
-- If a payment fails and you retry, use the SAME key to avoid a duplicate.
-
-**Anti-pattern:** Reusing one key for multiple different payments causes all
-subsequent payments to silently return the first payment's result.
+The `idempotencyKey` prevents duplicate payments on retry. Same key sent twice
+returns the original result. Rules: unique per request, recommended format
+`"payment-{date}-{random}"`, reuse the SAME key only when retrying a failed
+request. Never reuse a key across different payments — doing so silently returns
+the first payment's result.
 
 ### curl Example
 
@@ -340,7 +272,7 @@ curl -s -X POST \
     "idempotencyKey": "payment-20260402-x7k9m",
     "note": "March consulting invoice"
   }' \
-  "https://api.mercury.com/api/v1/account/660f9511-f3ac-52e5-b827-557766551111/request-send-money"
+  "https://api.mercury.com/api/v1/account/660f9511-e29b-41d4-a716-446655440001/request-send-money"
 ```
 
 **Response:** Returns the payment approval request object with status, amount,
@@ -354,28 +286,13 @@ recipient, and creation timestamp.
 
 ## POST /api/v1/transfer
 
-### Create Internal Transfer
-
-> **CRITICAL -- MONEY MOVEMENT.** This endpoint moves real money between your
-> Mercury accounts. Display all details (amount, source account, destination
-> account) in human-readable form and require explicit "yes" confirmation before
-> executing. Never execute silently. Cowork policy: this is a hard requirement.
-
 **Description:** Transfer money between two Mercury accounts owned by the same organization.
 **Safety:** CRITICAL — money movement, requires explicit "yes" confirmation.
 
-### CRITICAL Gate
-
-Before executing this request, you MUST:
-1. Display ALL details: amount, source account name, destination account name.
-2. Format the amount as "$X,XXX.XX" with commas and two decimal places.
-3. Present the confirmation prompt exactly as shown below.
-4. Wait for the user to reply "yes" before executing.
-
-**Example confirmation language:**
-> "CRITICAL: This will transfer $10,000.00 from your Operating Account to your
-> Savings Account. This moves real money and cannot be undone. Please confirm by
-> replying 'yes' to proceed."
+> **CRITICAL:** Display amount, source account, and destination account. Format as
+> "$X,XXX.XX". Wait for explicit "yes" before executing. Example: "CRITICAL: This
+> will transfer $10,000.00 from Operating Account to Savings Account. This moves
+> real money and cannot be undone. Reply 'yes' to proceed."
 
 ### Request Body
 
@@ -388,11 +305,8 @@ Content-Type: `application/json`
 | amount | decimal | Yes | Amount to transfer; positive, up to 2 decimal places |
 | idempotencyKey | string | Yes | Unique key to prevent duplicate transfers (same rules as send-money above) |
 
-### Idempotency Key
-
-Same rules as send-money. Each transfer needs a unique key. If a transfer times
-out and you retry, reuse the SAME key to prevent a duplicate. Never reuse a key
-from a different transfer.
+**Idempotency:** Same rules as send-money above. Unique key per transfer; reuse
+only on retry.
 
 ### curl Example
 
@@ -402,7 +316,7 @@ curl -s -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "fromAccountId": "550e8400-e29b-41d4-a716-446655440000",
-    "toAccountId": "660f9511-f3ac-52e5-b827-557766551111",
+    "toAccountId": "660f9511-e29b-41d4-a716-446655440001",
     "amount": 10000.00,
     "idempotencyKey": "transfer-20260402-m3p8q"
   }' \
@@ -464,36 +378,12 @@ curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
 
 ## Common Patterns
 
-### Find a Recipient Before Sending Money
-
-Look up recipients to get the ID before sending money:
-
-```bash
-curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  "https://api.mercury.com/api/v1/recipients"
-```
-
-Search the response by `name` client-side (Mercury has no server-side name filter).
-Once you have the recipient ID, use it in the send-money request.
-
-### Check Pending Payment Approvals
-
-```bash
-curl -s -H "Authorization: Bearer ${MERCURY_TOKEN}" \
-  "https://api.mercury.com/api/v1/request-send-money"
-```
-
-Filter by status to identify pending payments. Present conversationally with
-amount, recipient, method, and date.
-
-### Safely Add a New Recipient (CONFIRM Flow)
-
-1. Gather the recipient's name, email, and bank details from the user.
-2. Present all details for review — especially account number, routing number, and
-   account type. Wrong routing numbers cause misdirected payments.
-3. Ask: "Should I create this recipient with the details shown above?"
-4. Only after confirmation, execute `POST /api/v1/recipient`.
-5. Confirm creation: "Recipient 'Acme Corp' created successfully."
+- **Find a recipient before sending money:** Call `GET /recipients`, filter by
+  `name` client-side (no server-side filter), then use the ID in send-money.
+- **Check pending approvals:** Call `GET /request-send-money` and filter by status.
+- **Add a new recipient:** Gather name, email, and bank details from user. Present
+  all details for review (wrong routing numbers cause misdirected payments). Only
+  after CONFIRM gate approval, execute `POST /recipient`.
 
 ## Clarifying Questions
 
