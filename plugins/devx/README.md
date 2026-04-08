@@ -18,6 +18,7 @@ The devx plugin composes multiple plugins (worktree, cmux, vscode) into streamli
 |---------|-------------|
 | `/devx:setup-worktree` | Create a worktree with full development environment setup |
 | `/devx:teardown-worktree` | Remove a worktree and clean up all associated resources |
+| `/devx:sync-workspace` | Reconcile workspace.code-workspace with repos on disk |
 
 ## Dependencies
 
@@ -33,3 +34,4 @@ The devx plugin delegates to these plugins:
 |-------|-------------|
 | `worktree-setup` | Orchestrates worktree creation with terminal and editor integration |
 | `worktree-teardown` | Orchestrates worktree removal with terminal and editor cleanup |
+| `workspace-sync` | Reconciles workspace.code-workspace with repos on disk per workspace-file-spec |
