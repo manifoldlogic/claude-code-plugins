@@ -33,6 +33,9 @@ bash plugins/iterm/skills/pane-management/tests/test-split-pane.sh
 bash plugins/iterm/skills/pane-management/tests/test-list-panes.sh
 bash plugins/iterm/skills/pane-management/tests/test-close-pane.sh
 bash plugins/iterm/skills/pane-management/tests/test-iterm-send-text.sh
+
+# devx plugin tests
+bash plugins/devx/skills/workspace-sync/scripts/test-sync-workspace.sh
 ```
 
 No automated CI/CD - tests are executed manually.

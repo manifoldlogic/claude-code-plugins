@@ -259,6 +259,11 @@ GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
 REPO=$(basename "$GIT_ROOT")
 WORKTREE_PATH="$(dirname "$GIT_ROOT")/$WORKTREE_NAME"
 
+# Derive workspace entry name per workspace-file-spec naming convention
+# The wrapper directory name (parent of GIT_ROOT) is the repo name for display
+REPO_WRAPPER_NAME=$(basename "$(dirname "$GIT_ROOT")")
+WORKSPACE_ENTRY_NAME="$REPO_WRAPPER_NAME ⛙ $WORKTREE_NAME"
+
 ##############################################################################
 # Section 6: Dry Run Mode
 ##############################################################################
@@ -302,9 +307,9 @@ if [ "$DRY_RUN" = true ]; then
     else
         dry_run_msg "Step 3: Update VS Code workspace"
         if [ -n "$WORKSPACE_FILE" ]; then
-            echo "     $WORKSPACE_FOLDER_SCRIPT add $WORKTREE_PATH -w $WORKSPACE_FILE"
+            echo "     $WORKSPACE_FOLDER_SCRIPT add $WORKTREE_PATH --name \"$WORKSPACE_ENTRY_NAME\" -w $WORKSPACE_FILE"
         else
-            echo "     $WORKSPACE_FOLDER_SCRIPT add $WORKTREE_PATH"
+            echo "     $WORKSPACE_FOLDER_SCRIPT add $WORKTREE_PATH --name \"$WORKSPACE_ENTRY_NAME\""
         fi
     fi
     echo ""
@@ -408,10 +413,10 @@ else
 
     if [ -n "$WORKSPACE_FILE" ]; then
         ws_result=0
-        bash "$WORKSPACE_FOLDER_SCRIPT" add "$WORKTREE_PATH" -w "$WORKSPACE_FILE" || ws_result=$?
+        bash "$WORKSPACE_FOLDER_SCRIPT" add "$WORKTREE_PATH" --name "$WORKSPACE_ENTRY_NAME" -w "$WORKSPACE_FILE" || ws_result=$?
     else
         ws_result=0
-        bash "$WORKSPACE_FOLDER_SCRIPT" add "$WORKTREE_PATH" || ws_result=$?
+        bash "$WORKSPACE_FOLDER_SCRIPT" add "$WORKTREE_PATH" --name "$WORKSPACE_ENTRY_NAME" || ws_result=$?
     fi
 
     if [ "$ws_result" -eq 0 ]; then
