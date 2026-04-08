@@ -72,6 +72,6 @@ Handle the exit code from sync-workspace.sh:
 
 - **Exit 1 -- Drift detected (--check mode):** Report the drift summary. Show which entries are missing, stale, or misordered. Suggest running without `--check` to fix.
 
-- **Exit 2 -- Prerequisites missing:** Report which prerequisite is missing (jq not installed, workspace file not found, repos directory not found).
+- **Exit 2 -- Prerequisites missing:** Report which prerequisite is missing (jq not installed, realpath not found, workspace file not found, invalid workspace JSON, repos directory not found).
 
 - **Exit 3 -- Invalid arguments:** Report the unrecognized flag.

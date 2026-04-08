@@ -17,7 +17,8 @@
 #
 # REQUIREMENTS:
 #   - jq (JSON processor)
-#   - Valid workspace file (or --check/--dry-run with nonexistent file)
+#   - realpath (coreutils)
+#   - Valid workspace file
 #
 # USAGE:
 #   sync-workspace.sh [OPTIONS]
@@ -202,20 +203,21 @@ fi
 # Scan Phase: Build desired entries
 ##############################################################################
 
-# Temporary file to collect entries (name\tpath per line)
+# Temporary files for entries and diff computation
 ENTRIES_FILE=$(mktemp)
-trap 'rm -f "$ENTRIES_FILE" "${ENTRIES_FILE}.sorted" "${WORKSPACE_FILE}.sync-tmp" "${WORKSPACE_FILE}.sync-bak"' EXIT
+DESIRED_NAMES_FILE=$(mktemp)
+CURRENT_NAMES_FILE=$(mktemp)
+trap 'rm -f "$ENTRIES_FILE" "${ENTRIES_FILE}.sorted" "${WORKSPACE_FILE}.sync-tmp" "${WORKSPACE_FILE}.sync-bak" "$DESIRED_NAMES_FILE" "$CURRENT_NAMES_FILE"' EXIT
 
 log_verbose "Scanning repos directory: $REPOS_DIR"
 
 # Compute the relative prefix from workspace file dir to repos dir
 WORKSPACE_DIR=$(dirname "$WORKSPACE_FILE")
-if command -v realpath > /dev/null 2>&1; then
-    REPOS_REL=$(realpath --relative-to="$WORKSPACE_DIR" "$REPOS_DIR")
-else
-    # Fallback: assume standard layout
-    REPOS_REL="repos"
+if ! command -v realpath > /dev/null 2>&1; then
+    log_error "realpath is required but not found"
+    exit 2
 fi
+REPOS_REL=$(realpath --relative-to="$WORKSPACE_DIR" "$REPOS_DIR")
 
 for entry_path in "$REPOS_DIR"/*/; do
     [ -d "$entry_path" ] || continue
@@ -299,7 +301,6 @@ DESIRED_JSON=$(
 ##############################################################################
 
 CURRENT_FOLDERS=$(jq '.folders // []' "$WORKSPACE_FILE")
-CURRENT_SETTINGS=$(jq '.settings // {}' "$WORKSPACE_FILE")
 
 ##############################################################################
 # Compare Phase
@@ -323,16 +324,19 @@ if [ "$DESIRED_NORMALIZED" = "$CURRENT_NORMALIZED" ]; then
 fi
 
 # Compute differences for reporting
-DESIRED_NAMES=$(echo "$DESIRED_JSON" | jq -r '.[].name' | sort -f)
-CURRENT_NAMES=$(echo "$CURRENT_FOLDERS" | jq -r '.[].name' | sort -f)
+echo "$DESIRED_JSON" | jq -r '.[].name' | sort -f > "$DESIRED_NAMES_FILE"
+echo "$CURRENT_FOLDERS" | jq -r '.[].name' | sort -f > "$CURRENT_NAMES_FILE"
 
-ADDED=$(comm -23 <(echo "$DESIRED_NAMES") <(echo "$CURRENT_NAMES"))
-REMOVED=$(comm -13 <(echo "$DESIRED_NAMES") <(echo "$CURRENT_NAMES"))
+ADDED=$(comm -23 "$DESIRED_NAMES_FILE" "$CURRENT_NAMES_FILE")
+REMOVED=$(comm -13 "$DESIRED_NAMES_FILE" "$CURRENT_NAMES_FILE")
 # Entries present in both but with different paths or different ordering
-COMMON=$(comm -12 <(echo "$DESIRED_NAMES") <(echo "$CURRENT_NAMES"))
+COMMON=$(comm -12 "$DESIRED_NAMES_FILE" "$CURRENT_NAMES_FILE")
 
 # Count path mismatches among common entries
 PATH_MISMATCHES=""
+# Use a temp file to avoid subshell variable loss from piping
+COMMON_FILE=$(mktemp)
+echo "$COMMON" > "$COMMON_FILE"
 while IFS= read -r name; do
     [ -z "$name" ] && continue
     desired_path=$(echo "$DESIRED_JSON" | jq -r --arg n "$name" '.[] | select(.name == $n) | .path')
@@ -340,7 +344,8 @@ while IFS= read -r name; do
     if [ "$desired_path" != "$current_path" ]; then
         PATH_MISMATCHES="${PATH_MISMATCHES}  $name: $current_path -> $desired_path\n"
     fi
-done <<< "$COMMON"
+done < "$COMMON_FILE"
+rm -f "$COMMON_FILE"
 
 # Check ordering drift
 DESIRED_ORDER=$(echo "$DESIRED_JSON" | jq -r '.[].name')
@@ -423,11 +428,11 @@ cp "$WORKSPACE_FILE" "${WORKSPACE_FILE}.sync-bak" || {
     exit 2
 }
 
-# Build complete workspace JSON preserving settings
-FULL_JSON=$(jq -n \
+# Preserve all existing top-level keys and replace only .folders
+FULL_JSON=$(jq \
     --argjson folders "$DESIRED_JSON" \
-    --argjson settings "$CURRENT_SETTINGS" \
-    '{ folders: $folders, settings: $settings }')
+    '.folders = $folders' \
+    "$WORKSPACE_FILE")
 
 # Write to temp file
 echo "$FULL_JSON" | jq '.' > "${WORKSPACE_FILE}.sync-tmp" || {

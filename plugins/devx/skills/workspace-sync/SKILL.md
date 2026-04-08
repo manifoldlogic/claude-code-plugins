@@ -88,7 +88,7 @@ sync-workspace.sh [OPTIONS]
 |------|---------|------|
 | 0 | Success / in-sync | Default mode or `--check` when no drift |
 | 1 | Drift detected | `--check` mode only |
-| 2 | Prerequisites missing | jq not installed, file not found |
+| 2 | Prerequisites missing | jq not installed, realpath not found, workspace file not found, invalid workspace JSON, repos directory not found |
 | 3 | Invalid arguments | Unknown flags, missing values |
 
 ## How It Works

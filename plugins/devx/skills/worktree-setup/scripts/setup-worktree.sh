@@ -260,9 +260,15 @@ REPO=$(basename "$GIT_ROOT")
 WORKTREE_PATH="$(dirname "$GIT_ROOT")/$WORKTREE_NAME"
 
 # Derive workspace entry name per workspace-file-spec naming convention
-# The wrapper directory name (parent of GIT_ROOT) is the repo name for display
-REPO_WRAPPER_NAME=$(basename "$(dirname "$GIT_ROOT")")
-WORKSPACE_ENTRY_NAME="$REPO_WRAPPER_NAME ⛙ $WORKTREE_NAME"
+# For worktree-managed repos, the parent dir is the wrapper (e.g., crewchief)
+# For flat clones, the parent dir is "repos" — fall back to the repo basename
+REPO_PARENT_NAME=$(basename "$(dirname "$GIT_ROOT")")
+if [ "$REPO_PARENT_NAME" = "repos" ]; then
+    REPO_DISPLAY_NAME=$(basename "$GIT_ROOT")
+else
+    REPO_DISPLAY_NAME="$REPO_PARENT_NAME"
+fi
+WORKSPACE_ENTRY_NAME="$REPO_DISPLAY_NAME ⛙ $WORKTREE_NAME"
 
 ##############################################################################
 # Section 6: Dry Run Mode
