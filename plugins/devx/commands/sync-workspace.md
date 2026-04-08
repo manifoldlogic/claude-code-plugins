@@ -30,7 +30,7 @@ For detailed usage, algorithm, exit codes, and troubleshooting, read `plugins/de
 
 **Script path:** Resolve relative to the plugin installation:
 
-```
+```bash
 ${PLUGIN_DIR}/skills/workspace-sync/scripts/sync-workspace.sh
 ```
 
@@ -75,3 +75,5 @@ Handle the exit code from sync-workspace.sh:
 - **Exit 2 -- Prerequisites missing:** Report which prerequisite is missing (jq not installed, realpath not found, workspace file not found, invalid workspace JSON, repos directory not found).
 
 - **Exit 3 -- Invalid arguments:** Report the unrecognized flag.
+
+- **Exit 4 -- Write failure:** Report that the workspace file could not be updated (backup creation, temp file write, or atomic move failed). The original file is restored from backup on failure.

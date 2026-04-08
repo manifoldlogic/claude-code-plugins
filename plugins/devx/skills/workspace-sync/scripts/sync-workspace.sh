@@ -34,8 +34,10 @@
 # EXIT CODES:
 #   0 - Success (or in-sync for --check)
 #   1 - Drift detected (--check mode only)
-#   2 - Prerequisites missing (jq, workspace file)
+#   2 - Prerequisites missing (jq, realpath, workspace file not found,
+#       invalid workspace JSON, repos directory not found)
 #   3 - Invalid arguments
+#   4 - Write failure (backup, temp file, or atomic move failed)
 #
 
 set -euo pipefail
@@ -98,8 +100,9 @@ OPTIONS:
 EXIT CODES:
   0   Success (or in-sync for --check)
   1   Drift detected (--check mode only)
-  2   Prerequisites missing
+  2   Prerequisites missing (jq, realpath, workspace file, repos dir)
   3   Invalid arguments
+  4   Write failure (backup, temp file, or atomic move)
 
 NAMING CONVENTIONS:
   devcontainer                        Always first entry
@@ -207,7 +210,16 @@ fi
 ENTRIES_FILE=$(mktemp)
 DESIRED_NAMES_FILE=$(mktemp)
 CURRENT_NAMES_FILE=$(mktemp)
-trap 'rm -f "$ENTRIES_FILE" "${ENTRIES_FILE}.sorted" "${WORKSPACE_FILE}.sync-tmp" "${WORKSPACE_FILE}.sync-bak" "$DESIRED_NAMES_FILE" "$CURRENT_NAMES_FILE"' EXIT
+WORKSPACE_TMP=""
+WORKSPACE_BAK=""
+COMMON_FILE=""
+cleanup() {
+    rm -f "$ENTRIES_FILE" "${ENTRIES_FILE}.sorted" "$DESIRED_NAMES_FILE" "$CURRENT_NAMES_FILE"
+    if [ -n "$COMMON_FILE" ]; then rm -f "$COMMON_FILE"; fi
+    if [ -n "$WORKSPACE_TMP" ]; then rm -f "$WORKSPACE_TMP"; fi
+    if [ -n "$WORKSPACE_BAK" ]; then rm -f "$WORKSPACE_BAK"; fi
+}
+trap cleanup EXIT
 
 log_verbose "Scanning repos directory: $REPOS_DIR"
 
@@ -346,6 +358,7 @@ while IFS= read -r name; do
     fi
 done < "$COMMON_FILE"
 rm -f "$COMMON_FILE"
+COMMON_FILE=""
 
 # Check ordering drift
 DESIRED_ORDER=$(echo "$DESIRED_JSON" | jq -r '.[].name')
@@ -365,13 +378,13 @@ if [ "$CHECK_MODE" = true ]; then
     if [ -n "$ADDED" ]; then
         echo "Missing entries:" >&2
         echo "$ADDED" | while IFS= read -r name; do
-            [ -n "$name" ] && echo "  + $name" >&2
+            if [ -n "$name" ]; then echo "  + $name" >&2; fi
         done
     fi
     if [ -n "$REMOVED" ]; then
         echo "Stale entries:" >&2
         echo "$REMOVED" | while IFS= read -r name; do
-            [ -n "$name" ] && echo "  - $name" >&2
+            if [ -n "$name" ]; then echo "  - $name" >&2; fi
         done
     fi
     if [ -n "$PATH_MISMATCHES" ]; then
@@ -422,10 +435,11 @@ fi
 # Default mode: write the workspace file
 log_info "Updating workspace file..."
 
-# Create backup
-cp "$WORKSPACE_FILE" "${WORKSPACE_FILE}.sync-bak" || {
+# Create backup using unique temp file
+WORKSPACE_BAK=$(mktemp "${WORKSPACE_FILE}.sync-bak.XXXXXX")
+cp "$WORKSPACE_FILE" "$WORKSPACE_BAK" || {
     log_error "Failed to create backup"
-    exit 2
+    exit 4
 }
 
 # Preserve all existing top-level keys and replace only .folders
@@ -434,32 +448,35 @@ FULL_JSON=$(jq \
     '.folders = $folders' \
     "$WORKSPACE_FILE")
 
-# Write to temp file
-echo "$FULL_JSON" | jq '.' > "${WORKSPACE_FILE}.sync-tmp" || {
+# Write to unique temp file
+WORKSPACE_TMP=$(mktemp "${WORKSPACE_FILE}.sync-tmp.XXXXXX")
+printf '%s\n' "$FULL_JSON" | jq '.' > "$WORKSPACE_TMP" || {
     log_error "Failed to write temp file"
-    cp "${WORKSPACE_FILE}.sync-bak" "$WORKSPACE_FILE" 2>/dev/null
-    exit 2
+    cp "$WORKSPACE_BAK" "$WORKSPACE_FILE" 2>/dev/null
+    exit 4
 }
 
 # Atomic move
-mv "${WORKSPACE_FILE}.sync-tmp" "$WORKSPACE_FILE" || {
+mv "$WORKSPACE_TMP" "$WORKSPACE_FILE" || {
     log_error "Failed to update workspace file"
-    cp "${WORKSPACE_FILE}.sync-bak" "$WORKSPACE_FILE" 2>/dev/null
-    exit 2
+    cp "$WORKSPACE_BAK" "$WORKSPACE_FILE" 2>/dev/null
+    exit 4
 }
+WORKSPACE_TMP=""
 
 # Cleanup backup
-rm -f "${WORKSPACE_FILE}.sync-bak"
+rm -f "$WORKSPACE_BAK"
+WORKSPACE_BAK=""
 
 # Report what changed
 if [ -n "$ADDED" ]; then
     echo "$ADDED" | while IFS= read -r name; do
-        [ -n "$name" ] && log_success "Added: $name"
+        if [ -n "$name" ]; then log_success "Added: $name"; fi
     done
 fi
 if [ -n "$REMOVED" ]; then
     echo "$REMOVED" | while IFS= read -r name; do
-        [ -n "$name" ] && log_success "Removed: $name"
+        if [ -n "$name" ]; then log_success "Removed: $name"; fi
     done
 fi
 if [ -n "$PATH_MISMATCHES" ]; then
