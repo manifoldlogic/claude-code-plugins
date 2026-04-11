@@ -15,10 +15,12 @@ The following chunk kinds were verified by running `maproom search` against inde
 | `struct` | code repos | Struct definitions (Rust, Go) |
 | `enum` | code repos | Enum definitions |
 | `method` | code repos | Class/struct methods (bound to a type) |
+| `constant` | code repos | Module-level constant assignments |
 | `imports` | code repos | Import blocks (`__imports__` per file) |
 | `heading_1` | docs repos | Top-level headings (`#`) |
 | `heading_2` | docs repos | Section headings (`##`) |
 | `heading_3` | docs repos | Subsection headings (`###`) |
+| `heading_4` | docs repos | Nested subsection headings (`####`) |
 | `markdown_section` | docs repos | Lists, tables, and general prose sections |
 | `code_block` | docs repos | Fenced code blocks (annotated with language) |
 | `link` | docs repos | Hyperlinks within documents |
