@@ -160,8 +160,13 @@ maproom context --chunk-id <id> [flags]
 |------|---------|---------|
 | `--callers` | Include functions that call this chunk | `--callers` |
 | `--callees` | Include functions called by this chunk | `--callees` |
+| `--tests` | Include related test files | `--tests` |
+| `--docs` | Include related documentation | `--docs` |
+| `--config` | Include related configuration files | `--config` |
 | `--max-depth` | Traversal depth (default: 2) | `--max-depth 3` |
 | `--budget` | Token limit for context bundle (default: 6000) | `--budget 4000` |
+
+**Note:** The `--chunk-id` requires a numeric ID from `--format json` output, not the `file:line` format from `--format agent`.
 
 Flags combine freely: `context --chunk-id <id> --callers --callees --max-depth 3`
 

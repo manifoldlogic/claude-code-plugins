@@ -18,6 +18,14 @@ Every maproom error falls into one of five categories. Identifying the category 
 
 **If you can't categorize the error** and it mentions panics, segfaults, or stack traces, it may be a **CLI bug** rather than a user-actionable issue.
 
+### Exit Code Quick Reference
+
+| Exit Code | Meaning | Retry? |
+|---|---|---|
+| **0** | Success (including empty result sets) | N/A |
+| **1** | Runtime error (transient: database lock, network timeout, file not found) | Yes — may succeed on retry |
+| **2** | Configuration error (persistent: missing API key, invalid provider, bad arguments) | No — fix config first |
+
 ---
 
 ## Credential Errors Explained
@@ -79,9 +87,9 @@ Maproom maintains a local SQLite database containing indexed "chunks" of your co
 
 These are two distinct operations:
 - **Scan** (`maproom scan`) — parses code with tree-sitter, extracts chunks, stores in SQLite. Fast (~2 seconds for small repos). Required for FTS search.
-- **Embedding generation** (`maproom generate-embeddings`) — creates vector representations of each chunk via API. Slower (minutes for large repos). Required for vector search.
+- **Embedding generation** (`maproom generate-embeddings`) — creates vector representations of each chunk via API. Slower (minutes for large repos). Required for vector search. Check progress with `maproom encoding-progress`.
 
-After a scan, FTS search works immediately. Vector search requires embeddings to also be up to date.
+After a scan, FTS search works immediately. Vector search requires embeddings to also be up to date. Use `maproom encoding-progress` to monitor embedding generation completion percentage.
 
 ### The Watch Alternative
 
