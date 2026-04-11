@@ -155,9 +155,14 @@ Example: `QUERY="authentication middleware"; maproom search --repo myapp --query
 
 Expand understanding of the code found in Phase 1. Use the `context` command to explore relationships, then read source files for full implementation details.
 
+To get a numeric chunk ID for the context command, re-run one of your Phase 1 searches with `--format json` and extract the `chunk_id` field:
 ```bash
-maproom context --chunk-id <id> --callers --callees --format agent
+QUERY="<terms>"; maproom search --repo <repo> --query "$QUERY" --k 3 --format json
+# Extract chunk_id from JSON output, then:
+maproom context --chunk-id <numeric_id> --callers --callees --format agent
 ```
+
+**Note:** The `--format agent` output shows `file:line` identifiers, not numeric chunk IDs. You must use `--format json` to get the `chunk_id` integer needed by `maproom context`.
 
 Read key files identified by search and context results:
 - Focus on the most relevant 5-15 files
