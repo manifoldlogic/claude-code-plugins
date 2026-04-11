@@ -109,6 +109,7 @@ When maproom produces an error or unexpected output, match the symptom below.
 | Symptom | Likely Cause | What to Do |
 |---|---|---|
 | "No results" (empty output) | Wrong search type, missing embeddings, or repo not indexed | Check search type fits your query; verify with `maproom status` |
+| 0 results with `--kind` filter | Case-sensitive filter — `--kind Func` silently matches nothing | Use lowercase: `func`, `class`, `method`, etc. |
 | Results seem off-topic | Partial term match — one query term matched unrelated code | Narrow query to more specific terms; try the other search type |
 | "Failed to create embedding service" | Expired or missing Google ADC credentials | Credential issue, not a code bug — refresh ADC |
 | "command not found: maproom" | CLI not installed or not on PATH | Install CLI or check PATH |

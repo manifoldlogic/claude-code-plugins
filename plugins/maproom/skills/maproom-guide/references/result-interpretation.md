@@ -165,6 +165,27 @@ plugins/sdd/hooks/workflow-guidance.py:913 | func validate_state_file_schema | 3
 - Truncation marker: `...` appended when content exceeds the limit
 - Preview always starts at the beginning of the chunk (not at the matched term)
 
+### Context Command Output Format
+
+The `maproom context` command produces a different header than search:
+
+```
+CONTEXT chunk_id=2852 | tokens=202/6000 | items=1 | truncated=no
+primary | plugins/sdd/README.md:126-149 | 202 | Primary chunk: Integration with Workflow Guidance (heading_4) | ...
+```
+
+| Field | Meaning |
+|---|---|
+| `chunk_id` | The numeric chunk ID queried |
+| `tokens` | Token count used / budget limit (default 6000) |
+| `items` | Number of context items returned (1 = primary chunk only, >1 = callers/callees found) |
+| `truncated` | Whether results were truncated to fit the token budget |
+
+Context result lines show: `relationship | file:lines | tokens | description | preview`
+- `primary` = the queried chunk itself
+- `caller` = code that calls this chunk
+- `callee` = code called by this chunk
+
 ---
 
 ## Result Count Patterns
