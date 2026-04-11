@@ -114,9 +114,12 @@ All filter values are **case-sensitive**. Combine multiple values with commas fo
 | `--kind` | `func` | Function definitions |
 | `--kind` | `class` | Class definitions |
 | `--kind` | `method` | Class methods |
-| `--kind` | `heading_2` / `heading_3` | Markdown headings |
+| `--kind` | `constant` | Module-level constant assignments |
+| `--kind` | `imports` | File-level import blocks |
+| `--kind` | `heading_1` / `heading_2` / `heading_3` / `heading_4` | Markdown headings |
 | `--kind` | `code_block` | Fenced code blocks |
 | `--kind` | `markdown_section` | Markdown sections (lists, tables) |
+| `--kind` | `link` | Hyperlink references |
 | `--kind` | `json_key` | JSON key-value pairs |
 | `--lang` | `py` | Python (.py) |
 | `--lang` | `ts` | TypeScript (.ts) |
