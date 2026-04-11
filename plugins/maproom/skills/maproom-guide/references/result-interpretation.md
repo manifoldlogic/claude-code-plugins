@@ -190,6 +190,63 @@ Context result lines show: `relationship | file:lines | tokens | description | p
 
 ---
 
+## JSON Format Reference
+
+When using `--format json` (the default), the output structure differs from agent format.
+
+### Search JSON
+
+```json
+{
+  "query": "validate",
+  "mode": "fts",
+  "total_matches": 663,
+  "hits": [
+    {
+      "chunk_id": 4207,
+      "file_relpath": "path/to/file.md",
+      "kind": "code_block",
+      "symbol_name": "Code: plain",
+      "score": 4.81,
+      "start_line": 334,
+      "end_line": 338,
+      "preview": "..."
+    }
+  ]
+}
+```
+
+**Key differences from agent format:**
+- The match count field is `total_matches` (JSON) vs `total_estimate` (agent header) — same data, different names
+- `preview` only appears if `--preview` flag is passed (agent format includes it automatically)
+- `chunk_id` is the numeric ID needed for `maproom context --chunk-id`
+
+### Context JSON
+
+```json
+{
+  "items": [
+    {
+      "relpath": "path/to/file.py",
+      "range": {"start": 914, "end": 941},
+      "role": "primary",
+      "reason": "Primary chunk: function_name (func)",
+      "content": "full chunk content...",
+      "tokens": 200
+    }
+  ],
+  "total_tokens": 200,
+  "truncated": false
+}
+```
+
+**Key differences from agent format:**
+- `content` contains the full chunk text (not a truncated preview)
+- `role` values: `primary`, `caller`, `callee`, `test`, `doc`, `config`
+- `reason` explains why this item was included
+
+---
+
 ## Result Count Patterns
 
 ### Zero Results

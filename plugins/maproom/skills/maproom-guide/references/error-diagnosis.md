@@ -67,6 +67,21 @@ Credential errors contain one of these patterns in the error message:
 
 ---
 
+## Reading `maproom status` Output
+
+Many troubleshooting steps say "run `maproom status`" — here's what to look for:
+
+| Field | Healthy Value | Problem Indicator |
+|---|---|---|
+| Chunks | > 0 | 0 chunks = repo not scanned |
+| Embeddings % | > 0% (for vector search) | 0% = embeddings not generated; FTS still works |
+| Last scan | Recent date | Old date or `never` = stale index |
+| Languages | Expected languages listed | Missing languages = incomplete scan |
+
+Use `maproom status --json` for programmatic parsing. Use `maproom status --repo <name>` to check a specific repo.
+
+---
+
 ## Index Freshness Explained
 
 ### What "Stale Index" Means
