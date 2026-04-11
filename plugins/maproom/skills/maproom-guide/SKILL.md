@@ -123,6 +123,7 @@ When maproom produces an error or unexpected output, match the symptom below.
 | Scores seem wrong or random | Wrong search type for query intent | FTS for known terms, vector for concepts |
 | "fts5: syntax error" | Empty or malformed query string | Ensure query is non-empty and properly quoted |
 | "input token count is ... but the model supports up to 20000" | Embedding batch too large | Re-run with `--batch-size 25` |
+| Scan shows "Embedding generation failed" warning | Missing credentials — scan succeeded, embeddings didn't | FTS works; skip embeddings with `--no-generate-embeddings` |
 
 **Key principle:** Maproom errors fall into five categories (see [error-diagnosis.md](./references/error-diagnosis.md) for full taxonomy):
 1. **Credential** — ADC/API key expired or misconfigured (not a bug)

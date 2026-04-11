@@ -106,6 +106,18 @@ These are two distinct operations:
 
 After a scan, FTS search works immediately. Vector search requires embeddings to also be up to date. Use `maproom encoding-progress` to monitor embedding generation completion percentage.
 
+### Partial Scan Success (Scan OK, Embeddings Fail)
+
+By default, `maproom scan` attempts embedding generation after indexing. If credentials are missing, you'll see:
+
+```
+✅ Scan completed successfully!
+...
+⚠️  Warning: Embedding generation failed: Configuration error: Missing required configuration: No Google credentials found.
+```
+
+**This is a partial success, not a failure.** The scan itself succeeded — FTS search works immediately. Only vector search is affected. The scan exits with code 0. To skip embedding generation intentionally, use `--generate-embeddings=false` or `--no-generate-embeddings`.
+
 ### The Watch Alternative
 
 `maproom watch` auto-indexes on file changes, keeping the index fresh without manual re-scanning. Useful during active development.
