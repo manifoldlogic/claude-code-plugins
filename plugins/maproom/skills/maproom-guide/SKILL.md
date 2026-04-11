@@ -100,6 +100,8 @@ SEARCH query="..." | hits={n} | total_estimate={m} | mode=fts
 | 4–10 results | Good coverage — review scores to prioritize |
 | 10+ results | Query may be too broad — add `--kind`, `--lang`, or reduce `--k` |
 
+The default `--k` is 10 (returns 10 results). Increase `--k` to see more results or decrease to see fewer. `total_estimate` in the output header shows how many matched before the `--k` cap.
+
 For deeper explanation of scoring, ranking mechanics, and edge cases, see [result-interpretation.md](./references/result-interpretation.md).
 
 ---
@@ -113,7 +115,7 @@ When maproom produces an error or unexpected output, match the symptom below.
 | "No results" (empty output) | Wrong search type, missing embeddings, or repo not indexed | Check search type fits your query; verify with `maproom status` |
 | 0 results with `--kind` filter | Case-sensitive filter — `--kind Func` silently matches nothing | Use lowercase: `func`, `class`, `method`, etc. |
 | Results seem off-topic | Partial term match — one query term matched unrelated code | Narrow query to more specific terms; try the other search type |
-| "Failed to create embedding service" | Expired or missing Google ADC credentials | Credential issue, not a code bug — refresh ADC |
+| "Failed to create embedding service" | Expired or missing Google ADC credentials | Not a code bug — run `gcloud auth application-default login` to refresh |
 | "command not found: maproom" | CLI not installed or not on PATH | Install CLI or check PATH |
 | "Repository not found" | Wrong `--repo` name or repo not scanned | Run `maproom status` to list indexed repos |
 | "Failed to assemble context for chunk" | Invalid chunk ID passed to `maproom context` | Re-run search to get a valid chunk ID |
@@ -152,6 +154,8 @@ For a progressive learning path covering these concepts in depth, see [concept-g
 ---
 
 ## Related Skills
+
+**Now that you understand maproom output**, use **maproom-search** to learn command syntax, filtering, and search workflows.
 
 | Skill | Role |
 |---|---|
