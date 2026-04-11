@@ -116,6 +116,8 @@ Maproom stores all indexed chunks and embeddings in a local **SQLite database** 
 
 `maproom context` is a post-search tool that expands a single chunk to show its **callers** (what calls this code) and **callees** (what this code calls). It navigates the code's call graph, which maproom builds during indexing. Use it after finding a relevant chunk via search to understand how that code connects to the rest of the codebase.
 
+**Important:** The context command requires a **numeric chunk ID** (e.g., `--chunk-id 4207`), not the `file:line` format shown in agent output. To get numeric chunk IDs, run the search with `--format json` instead of `--format agent` — the JSON output includes a `chunk_id` field for each result.
+
 ---
 
 ## Maproom vs Other Tools

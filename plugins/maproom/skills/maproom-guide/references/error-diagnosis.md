@@ -127,6 +127,8 @@ The `maproom context` command can fail with:
 - Context errors use a different format than search errors (raw error chain instead of structured `ERROR | type=... | message=...`). This is a known CLI inconsistency.
 - Context on a `json_key` or `heading` chunk with `--callers` may return only the primary chunk (items=1) because documentation and configuration chunks don't have callers in the code graph.
 
+**Common pitfall:** The context command requires **numeric chunk IDs** (e.g., `--chunk-id 4207`). The `--format agent` output shows `file:line` format, which is *not* a valid chunk ID. To get numeric IDs, run the search with `--format json` — the JSON output includes a `chunk_id` integer field for each result. Passing a file path or `file:line` string to `--chunk-id` will fail with a parse error.
+
 ### The Complementary Search Strategy
 
 When one search type returns poor results, try the other:
