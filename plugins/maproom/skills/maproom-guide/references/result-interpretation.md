@@ -87,7 +87,9 @@ Each chunk kind represents a specific type of code element extracted by maproom'
 |---|---|---|---|
 | `func` | Entire function body including signature, docstring, and implementation | `.py`, `.ts`, `.rs`, `.go`, `.js` | Finding function implementations |
 | `class` | Class definition including docstring and method signatures | `.py`, `.ts`, `.js` | Finding class hierarchies, data models |
-| `method` | Individual class method body | `.py`, `.ts`, `.js` | Finding specific behavior within a class |
+| `struct` | Struct definition including field declarations | `.rs`, `.go` | Finding data structures in Rust/Go |
+| `enum` | Enum definition including variants | `.rs` | Finding enum types in Rust |
+| `method` | Individual class/struct method body | `.py`, `.ts`, `.js`, `.rs`, `.go` | Finding specific behavior within a type |
 | `constant` | Module-level constant assignment (e.g., `HOOK_PATH = ...`) | `.py`, `.ts`, `.js` | Finding configuration constants |
 | `imports` | File-level import/require block | `.py`, `.ts`, `.js` | Finding module dependencies |
 

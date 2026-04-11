@@ -19,7 +19,9 @@ Indexing is the process of scanning your repository and breaking code into searc
 A **chunk** is the atomic unit of search in maproom. Each chunk represents one meaningful code element:
 - A function definition (kind: `func`)
 - A class definition (kind: `class`)
-- A method within a class (kind: `method`)
+- A struct definition (kind: `struct`, Rust/Go)
+- An enum definition (kind: `enum`, Rust)
+- A class/struct method (kind: `method`)
 - A module-level constant assignment (kind: `constant`)
 - A file-level import block (kind: `imports`)
 - A markdown heading and its content (kind: `heading_1`, `heading_2`, `heading_3`, `heading_4`)

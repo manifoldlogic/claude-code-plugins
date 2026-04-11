@@ -113,7 +113,9 @@ All filter values are **case-sensitive**. Combine multiple values with commas fo
 |------|-------|---------|
 | `--kind` | `func` | Function definitions |
 | `--kind` | `class` | Class definitions |
-| `--kind` | `method` | Class methods |
+| `--kind` | `struct` | Struct definitions (Rust, Go) |
+| `--kind` | `enum` | Enum definitions (Rust) |
+| `--kind` | `method` | Class/struct methods |
 | `--kind` | `constant` | Module-level constant assignments |
 | `--kind` | `imports` | File-level import blocks |
 | `--kind` | `heading_1` / `heading_2` / `heading_3` / `heading_4` | Markdown headings |

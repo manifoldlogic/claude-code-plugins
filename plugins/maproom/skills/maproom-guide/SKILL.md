@@ -77,7 +77,9 @@ SEARCH query="..." | hits={n} | total_estimate={m} | mode=fts
 |---|---|
 | `func` | Function definition |
 | `class` | Class definition |
-| `method` | Class method |
+| `struct` | Struct definition (Rust, Go) |
+| `enum` | Enum definition (Rust) |
+| `method` | Class/struct method |
 | `constant` | Module-level constant assignment |
 | `imports` | File-level import block |
 | `heading_1` | Markdown # heading |
