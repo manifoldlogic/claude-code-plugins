@@ -135,6 +135,8 @@ $ maproom vector-search --repo <repo> --query "error handling" --threshold 0.7 -
 
 **`--preview-length <N>`** — Adjust preview character limit (default: 120 for agent, 200 for json). See [Output Formats](#output-formats) for preview behavior details.
 **`--threshold <N>`** — Vector-search only. Cosine similarity filter (0.0-1.0); only results >= threshold are returned. Omit for no filtering.
+**`--worktree <name>`** — Filter results to a specific worktree. Useful in multi-worktree environments to avoid cross-worktree noise.
+**`--deduplicate <true|false>`** — Deduplicate results across worktrees (default: true). Use `--no-deduplicate` to see all results including duplicates from different worktrees.
 
 | Task | Recommended Flags |
 |------|-------------------|
