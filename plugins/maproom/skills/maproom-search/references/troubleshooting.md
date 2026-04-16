@@ -237,7 +237,7 @@ maproom search --repo <repo> --query "$name_pattern" --format agent
    - If irrelevant results score high, check whether a different search type (`search` vs. `vector-search`) is more appropriate
    - If expected results are missing entirely, verify the repository index is up to date with `maproom status`
 
-**Prevention:** When investigating search quality issues, always start with `--debug` to get objective scoring data before adjusting queries or filters. See also the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for the full systematic troubleshooting sequence.
+**Prevention:** When investigating search quality issues, use the score interpretation tables in the maproom-guide skill to understand relative scores. Once the `--debug` CLI issue is resolved, the flag will provide objective scoring breakdowns. See also the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for the full systematic troubleshooting sequence.
 
 ---
 

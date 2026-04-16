@@ -130,7 +130,7 @@ The `symbol_name` field in results means different things for different chunk ki
 
 Every search produces a header line before the results:
 
-```
+```text
 SEARCH query="workflow guidance" | hits=10 | total_estimate=1913 | mode=fts
 ```
 
@@ -147,7 +147,7 @@ SEARCH query="workflow guidance" | hits=10 | total_estimate=1913 | mode=fts
 
 A complete agent format result line:
 
-```
+```text
 plugins/sdd/hooks/workflow-guidance.py:913 | func validate_state_file_schema | 3.91 | def validate_state_file_schema(schema_data):...
 ```
 
@@ -171,7 +171,7 @@ plugins/sdd/hooks/workflow-guidance.py:913 | func validate_state_file_schema | 3
 
 The `maproom context` command produces a different header than search:
 
-```
+```text
 CONTEXT chunk_id=2852 | tokens=202/6000 | items=1 | truncated=no
 primary | plugins/sdd/README.md:126-149 | 202 | Primary chunk: Integration with Workflow Guidance (heading_4) | ...
 ```

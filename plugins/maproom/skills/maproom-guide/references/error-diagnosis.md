@@ -110,7 +110,7 @@ After a scan, FTS search works immediately. Vector search requires embeddings to
 
 By default, `maproom scan` attempts embedding generation after indexing. If credentials are missing, you'll see:
 
-```
+```text
 ✅ Scan completed successfully!
 ...
 ⚠️  Warning: Embedding generation failed: Configuration error: Missing required configuration: No Google credentials found.

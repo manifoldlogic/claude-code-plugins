@@ -24,7 +24,7 @@ A **chunk** is the atomic unit of search in maproom. Each chunk represents one m
 - A class/struct method (kind: `method`)
 - A module-level constant assignment (kind: `constant`)
 - A file-level import block (kind: `imports`)
-- A markdown heading and its content (kind: `heading_1`, `heading_2`, `heading_3`, `heading_4`)
+- A Markdown heading and its content (kind: `heading_1`, `heading_2`, `heading_3`, `heading_4`)
 - A fenced code block (kind: `code_block`)
 - A markdown section — lists, tables, paragraphs (kind: `markdown_section`)
 - A hyperlink reference (kind: `link`)

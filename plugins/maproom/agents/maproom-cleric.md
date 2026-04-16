@@ -82,6 +82,7 @@ This validates maproom-search docs. Check output for failures.
 ```bash
 bash plugins/maproom/scripts/compare-cli-flags.sh
 ```
+
 Compare current CLI flags against baseline. Note any discrepancies.
 
 **Cross-Reference Checks (via Grep):**
@@ -104,7 +105,7 @@ Produce a structured audit report. Do not make additional verification calls in 
 
 Structure your final response as follows:
 
-```
+```markdown
 ## Maproom Guide Audit Report
 
 ### Audit Date

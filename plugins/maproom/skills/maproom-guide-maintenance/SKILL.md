@@ -49,9 +49,9 @@ Procedures for keeping the maproom-guide skill accurate and up to date.
 
 | Script | Purpose | When to Run |
 |---|---|---|
-| `scripts/verify-docs.sh` | Cross-reference integrity, format consistency | After any doc change |
-| `scripts/monthly-cli-verification.sh` | Full CLI flag audit against baseline | Monthly (first Friday) |
-| `scripts/compare-cli-flags.sh` | Quick flag diff against baseline | After CLI updates |
+| `plugins/maproom/scripts/verify-docs.sh` | Cross-reference integrity, format consistency | After any doc change |
+| `plugins/maproom/scripts/monthly-cli-verification.sh` | Full CLI flag audit against baseline | Monthly (first Friday) |
+| `plugins/maproom/scripts/compare-cli-flags.sh` | Quick flag diff against baseline | After CLI updates |
 
 ## Maintaining Complementary Boundaries
 

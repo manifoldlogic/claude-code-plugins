@@ -158,7 +158,7 @@ maproom search --repo crewchief-specs --query "planning analysis" --format agent
 maproom search --repo crewchief-specs --query "decision rationale" --format agent
 ```
 
-Results from docs repos include `heading_1`, `heading_2`, and `heading_3` chunks that reveal the document hierarchy. Use the `file_relpath` and line numbers to navigate to specific sections.
+Results from docs repos include `heading_1`, `heading_2`, `heading_3`, and `heading_4` chunks that reveal the document hierarchy. Use the `file_relpath` and line numbers to navigate to specific sections.
 
 ## Cross-Repo Patterns
 
