@@ -140,6 +140,21 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Check database size: large databases may need optimization
 - Ensure SQLite isn't locked by another process
 
+## Skills & Agents
+
+The maproom plugin includes specialized skills and agents for different tasks:
+
+| Component | Type | Purpose |
+|---|---|---|
+| [maproom-search](skills/maproom-search/SKILL.md) | Skill | Command syntax, setup, filtering, multi-repo workflows |
+| [maproom-guide](skills/maproom-guide/SKILL.md) | Skill | Interpret search results, diagnose errors, learn concepts |
+| [sdd-spec-search](skills/sdd-spec-search/SKILL.md) | Skill | SDD specification search patterns |
+| [maproom-guide-maintenance](skills/maproom-guide-maintenance/SKILL.md) | Skill | Procedures for maintaining the guide |
+| [maproom-researcher](agents/maproom-researcher.md) | Agent (Haiku) | 4-phase research workflow for code exploration |
+| [maproom-cleric](agents/maproom-cleric.md) | Agent (Haiku) | Documentation accuracy auditing |
+
+**New to maproom?** Start with [maproom-guide](skills/maproom-guide/SKILL.md) to understand search output, then use [maproom-search](skills/maproom-search/SKILL.md) for command reference.
+
 ## Index Maintenance
 
 The maproom semantic index requires periodic scanning to stay current with codebase changes.

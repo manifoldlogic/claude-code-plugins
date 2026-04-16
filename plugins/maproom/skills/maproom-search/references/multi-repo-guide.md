@@ -15,10 +15,12 @@ The following chunk kinds were verified by running `maproom search` against inde
 | `struct` | code repos | Struct definitions (Rust, Go) |
 | `enum` | code repos | Enum definitions |
 | `method` | code repos | Class/struct methods (bound to a type) |
+| `constant` | code repos | Module-level constant assignments |
 | `imports` | code repos | Import blocks (`__imports__` per file) |
 | `heading_1` | docs repos | Top-level headings (`#`) |
 | `heading_2` | docs repos | Section headings (`##`) |
 | `heading_3` | docs repos | Subsection headings (`###`) |
+| `heading_4` | docs repos | Nested subsection headings (`####`) |
 | `markdown_section` | docs repos | Lists, tables, and general prose sections |
 | `code_block` | docs repos | Fenced code blocks (annotated with language) |
 | `link` | docs repos | Hyperlinks within documents |
@@ -156,7 +158,7 @@ maproom search --repo crewchief-specs --query "planning analysis" --format agent
 maproom search --repo crewchief-specs --query "decision rationale" --format agent
 ```
 
-Results from docs repos include `heading_1`, `heading_2`, and `heading_3` chunks that reveal the document hierarchy. Use the `file_relpath` and line numbers to navigate to specific sections.
+Results from docs repos include `heading_1`, `heading_2`, `heading_3`, and `heading_4` chunks that reveal the document hierarchy. Use the `file_relpath` and line numbers to navigate to specific sections.
 
 ## Cross-Repo Patterns
 

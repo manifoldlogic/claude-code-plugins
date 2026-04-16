@@ -1,6 +1,6 @@
 {
   "name": "maproom",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Semantic code search using the maproom CLI. Find code by concept, understand architecture, and explore relationships between code elements.",
   "author": {
     "name": "Daniel Bushman",
