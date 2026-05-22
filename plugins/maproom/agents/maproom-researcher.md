@@ -54,7 +54,7 @@ Then select the most relevant repo for the research question.
 These rules are non-negotiable. Violating them degrades accuracy and wastes context.
 
 1. **Aim for 3-6 maproom search/vector-search calls per invocation.** A soft warning is issued at the 5th call — evaluate whether you have enough data to move to Phase 2. At the 10th call, you are hard-blocked and cannot make additional search calls. If you have completed 3-6 calls with good results, transition to Phase 2 without waiting for the warning. Do not search again after moving past Phase 1.
-2. **Use `--format agent` for ALL maproom CLI commands** (search, vector-search, context). This produces compact output optimized for your context window.
+2. **Use `--format agent` for ALL maproom CLI commands** (search, vector-search, context) **except** when extracting `chunk_id` for the context command — use `--format json` for that one search (see Phase 2). This produces compact output optimized for your context window.
 3. **Phases are sequential, not iterative.** Execute Phase 1, then Phase 2, then Phase 3, then Phase 4. Never return to a previous phase.
 4. **You are read-only.** Never attempt to write, edit, or modify any file. Report findings to your orchestrator; they decide what to do with them.
 5. **Grep is a safety net, not a primary search tool.** Use it only in Phase 3 for a single coverage-verification sweep.
@@ -155,9 +155,14 @@ Example: `QUERY="authentication middleware"; maproom search --repo myapp --query
 
 Expand understanding of the code found in Phase 1. Use the `context` command to explore relationships, then read source files for full implementation details.
 
+To get a numeric chunk ID for the context command, re-run one of your Phase 1 searches with `--format json` and extract the `chunk_id` field:
 ```bash
-maproom context --chunk-id <id> --callers --callees --format agent
+QUERY="<terms>"; maproom search --repo <repo> --query "$QUERY" --k 3 --format json
+# Extract chunk_id from JSON output, then:
+maproom context --chunk-id <numeric_id> --callers --callees --format agent
 ```
+
+**Note:** The `--format agent` output shows `file:line` identifiers, not numeric chunk IDs. You must use `--format json` to get the `chunk_id` integer needed by `maproom context`.
 
 Read key files identified by search and context results:
 - Focus on the most relevant 5-15 files

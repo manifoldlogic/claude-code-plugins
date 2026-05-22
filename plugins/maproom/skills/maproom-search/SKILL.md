@@ -113,10 +113,15 @@ All filter values are **case-sensitive**. Combine multiple values with commas fo
 |------|-------|---------|
 | `--kind` | `func` | Function definitions |
 | `--kind` | `class` | Class definitions |
-| `--kind` | `method` | Class methods |
-| `--kind` | `heading_2` / `heading_3` | Markdown headings |
+| `--kind` | `struct` | Struct definitions (Rust, Go) |
+| `--kind` | `enum` | Enum definitions (Rust) |
+| `--kind` | `method` | Class/struct methods |
+| `--kind` | `constant` | Module-level constant assignments |
+| `--kind` | `imports` | File-level import blocks |
+| `--kind` | `heading_1` / `heading_2` / `heading_3` / `heading_4` | Markdown headings |
 | `--kind` | `code_block` | Fenced code blocks |
 | `--kind` | `markdown_section` | Markdown sections (lists, tables) |
+| `--kind` | `link` | Hyperlink references |
 | `--kind` | `json_key` | JSON key-value pairs |
 | `--lang` | `py` | Python (.py) |
 | `--lang` | `ts` | TypeScript (.ts) |
@@ -132,6 +137,8 @@ $ maproom vector-search --repo <repo> --query "error handling" --threshold 0.7 -
 
 **`--preview-length <N>`** — Adjust preview character limit (default: 120 for agent, 200 for json). See [Output Formats](#output-formats) for preview behavior details.
 **`--threshold <N>`** — Vector-search only. Cosine similarity filter (0.0-1.0); only results >= threshold are returned. Omit for no filtering.
+**`--worktree <name>`** — Filter results to a specific worktree. Useful in multi-worktree environments to avoid cross-worktree noise.
+**`--deduplicate <true|false>`** — Deduplicate results across worktrees (default: true). Use `--no-deduplicate` to see all results including duplicates from different worktrees.
 
 | Task | Recommended Flags |
 |------|-------------------|
@@ -153,8 +160,13 @@ maproom context --chunk-id <id> [flags]
 |------|---------|---------|
 | `--callers` | Include functions that call this chunk | `--callers` |
 | `--callees` | Include functions called by this chunk | `--callees` |
+| `--tests` | Include related test files | `--tests` |
+| `--docs` | Include related documentation | `--docs` |
+| `--config` | Include related configuration files | `--config` |
 | `--max-depth` | Traversal depth (default: 2) | `--max-depth 3` |
 | `--budget` | Token limit for context bundle (default: 6000) | `--budget 4000` |
+
+**Note:** The `--chunk-id` requires a numeric ID from `--format json` output, not the `file:line` format from `--format agent`.
 
 Flags combine freely: `context --chunk-id <id> --callers --callees --max-depth 3`
 

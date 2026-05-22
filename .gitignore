@@ -11,3 +11,4 @@ __pycache__/
 .crewchief/runs/.crewchief-meta.json
 
 *.local.*
+test-runs/

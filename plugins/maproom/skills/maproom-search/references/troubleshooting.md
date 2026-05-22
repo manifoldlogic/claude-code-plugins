@@ -30,9 +30,9 @@ maproom search --repo <repo> --query "test" --format agent
 # Expected: At least some results (if repo is indexed and non-empty)
 ```
 
-**5. Enable debug mode**
+**5. Enable debug mode** (score breakdown may not appear in CLI v0.1.0 — see [Unexpected Results or Scores](#unexpected-results-or-scores))
 ```bash
-# Add --debug flag to see detailed scoring and ranking information
+# Add --debug flag (intended to show scoring breakdown)
 maproom search --repo <repo> --query "test" --format agent --debug
 ```
 
@@ -227,20 +227,17 @@ maproom search --repo <repo> --query "$name_pattern" --format agent
 **Root Cause:** The default search output shows only final results without the underlying scoring details. Without visibility into how results are scored and ranked, it is difficult to determine whether the issue is query formulation, search type selection, or index staleness.
 
 **Fix:**
-1. Re-run your search with the `--debug` flag to see the full score breakdown:
+1. Re-run your search with the `--debug` flag to see score breakdown details:
    ```bash
    maproom search --repo <repo> --query "your query" --format agent --debug
    ```
-2. Review the debug output, which shows:
-   - Score calculations for each result
-   - Ranking factors (FTS score, semantic similarity, etc.)
-   - Why certain chunks were ranked higher or lower than others
-3. Use the score breakdown to identify the issue:
+   **Note (CLI v0.1.0):** The `--debug` flag is advertised to show `base_fts`, `kind_multiplier`, `exact_match_multiplier`, and `final` breakdown fields, but as of v0.1.0 these fields do not appear in the output. The flag is accepted without error but produces output identical to non-debug mode. This is a known CLI issue. Until it is fixed, use the score interpretation guidance in the maproom-guide skill to understand relative scores.
+2. Use the final score to identify the issue:
    - If scores are uniformly low, refine your query to use more specific terms
    - If irrelevant results score high, check whether a different search type (`search` vs. `vector-search`) is more appropriate
    - If expected results are missing entirely, verify the repository index is up to date with `maproom status`
 
-**Prevention:** When investigating search quality issues, always start with `--debug` to get objective scoring data before adjusting queries or filters. See also the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for the full systematic troubleshooting sequence.
+**Prevention:** When investigating search quality issues, use the score interpretation tables in the maproom-guide skill to understand relative scores. Once the `--debug` CLI issue is resolved, the flag will provide objective scoring breakdowns. See also the [Debugging Workflow](#debugging-workflow) at the top of this document (Step 5) for the full systematic troubleshooting sequence.
 
 ---
 
