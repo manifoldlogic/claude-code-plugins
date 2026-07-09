@@ -6,7 +6,9 @@ Maproom indexes two distinct types of repositories: **code** repos containing so
 
 ### Chunk Kinds by Repo Type
 
-The following chunk kinds were verified by running `maproom search` against indexed repositories (crewchief for code, manifoldlogic/claude-code-plugins for mixed content).
+The following chunk kinds were verified by running `maproom search` against indexed repositories (`manifoldlogic/crewchief` for code, `manifoldlogic/claude-code-plugins` for mixed content).
+
+> **Repo naming:** Names are `owner/repo` derived from git origin (e.g., `manifoldlogic/crewchief`). As of maproom 0.2.0 / CLI 1.7.0, suffix fuzzy-match resolves short names — `crewchief` resolves to `manifoldlogic/crewchief` — but using full names avoids ambiguity. The specs corpus is `--repo specs` (not `crewchief-specs`). Run `maproom status` to see all available repo names.
 
 | Chunk Kind | Found In | Description |
 |---|---|---|
@@ -47,31 +49,31 @@ Use FTS when you know specific names, strings, or identifiers. FTS excels at exa
 **Function/method names:**
 
 ```bash
-maproom search --repo crewchief --query "extract_function_identifier" --kind func --format agent
+maproom search --repo manifoldlogic/crewchief --query "extract_function_identifier" --kind func --format agent
 ```
 
 **Class or struct names:**
 
 ```bash
-maproom search --repo crewchief --query "ShadowMode" --kind class --format agent
+maproom search --repo manifoldlogic/crewchief --query "ShadowMode" --kind class --format agent
 ```
 
 **Error messages or string literals:**
 
 ```bash
-maproom search --repo crewchief --query "Failed to create embedding" --format agent
+maproom search --repo manifoldlogic/crewchief --query "Failed to create embedding" --format agent
 ```
 
 **Configuration keys:**
 
 ```bash
-maproom search --repo crewchief --query "MAPROOM_DATABASE_URL" --format agent
+maproom search --repo manifoldlogic/crewchief --query "MAPROOM_DATABASE_URL" --format agent
 ```
 
 **Import paths:**
 
 ```bash
-maproom search --repo crewchief --query "extract_standard_import" --format agent
+maproom search --repo manifoldlogic/crewchief --query "extract_standard_import" --format agent
 ```
 
 ### Vector Search -- When You Have Concepts
@@ -79,9 +81,9 @@ maproom search --repo crewchief --query "extract_standard_import" --format agent
 Use vector search when you have a concept or question but do not know the exact names. Vector search finds semantically similar code.
 
 ```bash
-maproom vector-search --repo crewchief --query "authentication logic" --format agent
-maproom vector-search --repo crewchief --query "error handling patterns" --format agent
-maproom vector-search --repo crewchief --query "embedding generation pipeline" --format agent
+maproom vector-search --repo manifoldlogic/crewchief --query "authentication logic" --format agent
+maproom vector-search --repo manifoldlogic/crewchief --query "error handling patterns" --format agent
+maproom vector-search --repo manifoldlogic/crewchief --query "embedding generation pipeline" --format agent
 ```
 
 Keep queries to 2-3 core technical terms (see search-best-practices.md for query transformation guidance).
@@ -92,7 +94,7 @@ Use the context command after finding a relevant chunk to understand how it conn
 
 ```bash
 # Find a function first
-maproom search --repo crewchief --query "extract_from_import" --kind func --format agent
+maproom search --repo manifoldlogic/crewchief --query "extract_from_import" --kind func --format agent
 
 # Then get its context (use chunk_id from search results)
 maproom context --chunk-id 10833 --callers --callees
@@ -114,9 +116,9 @@ Docs repos contain design rationale, planning documents, architecture decisions,
 Vector search is the default for docs repos because most queries seek conceptual understanding rather than exact terms.
 
 ```bash
-maproom vector-search --repo crewchief-specs --query "plugin system design rationale" --format agent
-maproom vector-search --repo crewchief-specs --query "why maproom uses SQLite" --format agent
-maproom vector-search --repo crewchief-specs --query "architecture decisions embedding provider" --format agent
+maproom vector-search --repo specs --query "plugin system design rationale" --format agent
+maproom vector-search --repo specs --query "why maproom uses SQLite" --format agent
+maproom vector-search --repo specs --query "architecture decisions embedding provider" --format agent
 ```
 
 ### Full-Text Search -- When You Have Specific Terms
@@ -126,21 +128,21 @@ Use FTS for ticket IDs, exact section names, specific terms, or document referen
 **Ticket IDs:**
 
 ```bash
-maproom search --repo crewchief-specs --query "MPRSKL" --format agent
-maproom search --repo crewchief-specs --query "MAPMULTI" --format agent
+maproom search --repo specs --query "MPRSKL" --format agent
+maproom search --repo specs --query "MAPMULTI" --format agent
 ```
 
 **Section headings:**
 
 ```bash
-maproom search --repo crewchief-specs --query "Risk Assessment" --format agent
-maproom search --repo crewchief-specs --query "Acceptance Criteria" --format agent
+maproom search --repo specs --query "Risk Assessment" --format agent
+maproom search --repo specs --query "Acceptance Criteria" --format agent
 ```
 
 **Specific technical terms:**
 
 ```bash
-maproom search --repo crewchief-specs --query "incremental scanning" --format agent
+maproom search --repo specs --query "incremental scanning" --format agent
 ```
 
 ### Exploration -- When You Need to Browse Structure
@@ -149,13 +151,13 @@ Use FTS with broad heading terms to discover document structure, then drill into
 
 ```bash
 # Find architecture documents
-maproom search --repo crewchief-specs --query "architecture" --format agent
+maproom search --repo specs --query "architecture" --format agent
 
 # Find planning documents
-maproom search --repo crewchief-specs --query "planning analysis" --format agent
+maproom search --repo specs --query "planning analysis" --format agent
 
 # Find decision records
-maproom search --repo crewchief-specs --query "decision rationale" --format agent
+maproom search --repo specs --query "decision rationale" --format agent
 ```
 
 Results from docs repos include `heading_1`, `heading_2`, `heading_3`, and `heading_4` chunks that reveal the document hierarchy. Use the `file_relpath` and line numbers to navigate to specific sections.
@@ -174,14 +176,14 @@ These patterns combine searches across code and docs repos to answer questions t
 
 1. Search the docs/specs repo for design intent:
    ```bash
-   maproom vector-search --repo crewchief-specs --query "plugin system design" --format agent
+   maproom vector-search --repo specs --query "plugin system design" --format agent
    ```
 
 2. Extract key terms from the design document (function names, patterns, architecture components).
 
 3. Search the code repo for the implementation using those terms:
    ```bash
-   maproom search --repo crewchief --query "PluginManager" --format agent
+   maproom search --repo manifoldlogic/crewchief --query "PluginManager" --format agent
    maproom context --chunk-id <id> --callers --callees
    ```
 
@@ -197,15 +199,15 @@ These patterns combine searches across code and docs repos to answer questions t
 
 1. Find the requirement in specs:
    ```bash
-   maproom search --repo crewchief-specs --query "MPRSKL" --format agent
+   maproom search --repo specs --query "MPRSKL" --format agent
    ```
 
 2. Read the requirement to identify what it specifies (e.g., "scan must support incremental mode").
 
 3. Search the code repo for the implementation:
    ```bash
-   maproom search --repo crewchief --query "incremental scan" --format agent
-   maproom search --repo crewchief --query "tree SHA comparison" --format agent
+   maproom search --repo manifoldlogic/crewchief --query "incremental scan" --format agent
+   maproom search --repo manifoldlogic/crewchief --query "tree SHA comparison" --format agent
    ```
 
 4. Use context to verify completeness:
@@ -225,18 +227,18 @@ These patterns combine searches across code and docs repos to answer questions t
 
 1. Identify the code area:
    ```bash
-   maproom search --repo crewchief --query "ShadowMode" --format agent
+   maproom search --repo manifoldlogic/crewchief --query "ShadowMode" --format agent
    ```
 
 2. Search specs for related decisions and history:
    ```bash
-   maproom vector-search --repo crewchief-specs --query "shadow mode AB testing decision" --format agent
-   maproom search --repo crewchief-specs --query "shadow mode" --format agent
+   maproom vector-search --repo specs --query "shadow mode AB testing decision" --format agent
+   maproom search --repo specs --query "shadow mode" --format agent
    ```
 
 3. Look for risk assessments and constraints:
    ```bash
-   maproom vector-search --repo crewchief-specs --query "AB testing risks constraints" --format agent
+   maproom vector-search --repo specs --query "AB testing risks constraints" --format agent
    ```
 
 **Query optimization:** Start with FTS in code to get exact names, then search specs using both the exact names (FTS) and the conceptual area (vector search). Specs often use different terminology than code, so vector search catches conceptual matches that FTS would miss.
@@ -262,28 +264,28 @@ When a filtered search returns zero results, progressively relax filters to find
 
 ```bash
 # Initial attempt -- too narrow (both --kind and --lang filters)
-maproom search --repo crewchief --query "authentication" --kind func --lang py --format agent
+maproom search --repo manifoldlogic/crewchief --query "authentication" --kind func --lang py --format agent
 # Returns 0 results
 ```
 
 **Step 1: Remove language filter** (keep `--kind`, search all languages for functions):
 
 ```bash
-maproom search --repo crewchief --query "authentication" --kind func --format agent
+maproom search --repo manifoldlogic/crewchief --query "authentication" --kind func --format agent
 # May find authentication functions in TypeScript, Rust, or other languages
 ```
 
 **Step 2: Remove kind filter** (keep `--lang`, search all Python chunks):
 
 ```bash
-maproom search --repo crewchief --query "authentication" --lang py --format agent
+maproom search --repo manifoldlogic/crewchief --query "authentication" --lang py --format agent
 # May find authentication in class definitions, imports, or method bodies
 ```
 
 **Step 3: Remove all filters** (broaden search completely):
 
 ```bash
-maproom search --repo crewchief --query "authentication" --format agent
+maproom search --repo manifoldlogic/crewchief --query "authentication" --format agent
 # Returns all chunks mentioning authentication across all files and languages
 ```
 
@@ -325,10 +327,10 @@ Edit the file to list your repositories. See the template for detailed field doc
 
 ```bash
 # Scan the crewchief source code repo
-maproom scan --path /workspace/repos/crewchief/crewchief --repo crewchief
+maproom scan --path /workspace/repos/crewchief/crewchief --repo manifoldlogic/crewchief
 
 # Scan the crewchief specs repo (separate index)
-maproom scan --path /workspace/_SPECS/crewchief --repo crewchief-specs
+maproom scan --path /workspace/_SPECS/crewchief --repo specs
 
 # Scan the plugins repo
 maproom scan --path /workspace/repos/claude-code-plugins --repo manifoldlogic/claude-code-plugins
@@ -354,20 +356,20 @@ maproom status
 Expected output shows each repository with its worktree and chunk count:
 
 ```
-Repository: crewchief
+Repository: manifoldlogic/crewchief
   Worktree: main
-    Chunks: 24,333
+    Chunks: 29,764
 
-Repository: crewchief-specs
+Repository: specs
   Worktree: main
-    Chunks: 1,200
+    Chunks: 28,799
 ```
 
 If embeddings are missing (needed for vector-search), generate them:
 
 ```bash
-maproom generate-embeddings --repo crewchief
-maproom generate-embeddings --repo crewchief-specs
+maproom generate-embeddings --repo manifoldlogic/crewchief
+maproom generate-embeddings --repo specs
 ```
 
 ### Step 5: Test Searches
@@ -376,13 +378,13 @@ Run a test search against each repo to confirm they work:
 
 ```bash
 # Test code repo FTS
-maproom search --repo crewchief --query "scan" --k 3 --format agent
+maproom search --repo manifoldlogic/crewchief --query "scan" --k 3 --format agent
 
 # Test docs repo FTS
-maproom search --repo crewchief-specs --query "architecture" --k 3 --format agent
+maproom search --repo specs --query "architecture" --k 3 --format agent
 
 # Test vector search (requires embeddings)
-maproom vector-search --repo crewchief --query "error handling" --k 3 --format agent
+maproom vector-search --repo manifoldlogic/crewchief --query "error handling" --k 3 --format agent
 ```
 
 ### No Config File Fallback

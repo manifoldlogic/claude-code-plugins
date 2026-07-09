@@ -26,8 +26,15 @@
 #    Only type, path, and description are required.
 
 repos:
+  # --- Repo naming note ---
+  # Repo keys are typically origin-derived owner/repo (e.g., manifoldlogic/crewchief),
+  # except for explicitly-pinned names like "specs" which use a short alias.
+  # As of maproom 0.2.0 / CLI 1.7.0, suffix fuzzy-match resolves short names
+  # (crewchief → manifoldlogic/crewchief), but full names are preferred.
+  # Run `maproom status` to see exact names for any existing index.
+
   # --- Rich example: source code repository ---
-  crewchief:
+  manifoldlogic/crewchief:
     # type: "code" for source repos, "docs" for spec/design repos
     type: code
     # path: use env vars for portability
@@ -50,7 +57,7 @@ repos:
     default_search_type: auto
 
   # --- Rich example: specifications / design docs repository ---
-  crewchief-specs:
+  specs:
     type: docs
     # resolves to /workspace/_SPECS/crewchief (devcontainer)
     # or ~/_SPECS/crewchief (laptop)
