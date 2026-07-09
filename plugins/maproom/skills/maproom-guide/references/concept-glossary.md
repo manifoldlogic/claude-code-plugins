@@ -102,9 +102,14 @@ Different embedding providers (Google Vertex AI, OpenAI, Ollama) produce vectors
 
 ## Infrastructure Concepts
 
-### SQLite Database
+### Storage Backend
 
-Maproom stores all indexed chunks and embeddings in a local **SQLite database** (default: `~/.maproom/maproom.db`). SQLite is a file-based database that requires no server. It supports concurrent reads via WAL (Write-Ahead Logging) mode but serializes writes.
+Maproom stores all indexed chunks and embeddings in a database. Two backends are supported:
+
+- **SQLite (OSS default):** A file-based database at `~/.maproom/maproom.db` (can be overridden via `MAPROOM_DATABASE_URL`). No server required; concurrent reads are handled via WAL (Write-Ahead Logging) mode; writes are serialized. This is the default for standalone/open-source use.
+- **PostgreSQL (shared-Postgres environments):** A server-based database configured via `MAPROOM_DATABASE_URL` (e.g. `postgres://user:pass@host/dbname`). Multiple clients share one database; all repos are stored in a single schema. In shared-Postgres devcontainer setups, two Postgres instances are often present: an in-container instance (e.g. `localhost:5433`, PG14) used **only** for `cargo test` (throwaway sandbox), and the shared live database at a separate host/port (e.g. `host.docker.internal:5433`, PG16). Exact addresses and versions depend on your environment. Run `maproom status` to confirm which repos are indexed in the active backend.
+
+In shared-Postgres environments, `maproom status` is the canonical probe for connectivity and repo inventory. SQLite WAL-specific file paths (`maproom.db-wal`, `maproom.db-shm`) apply only to the SQLite backend.
 
 ### Tree-Sitter
 

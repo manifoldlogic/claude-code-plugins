@@ -34,12 +34,12 @@ See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) 
 Before using the Maproom plugin, ensure you have:
 
 1. **maproom CLI installed**: The plugin requires the `maproom` command-line tool to be available in your system PATH
-2. **Minimum maproom version**: 0.1.0. Verify your version:
+2. **Minimum maproom version**: 0.2.0. Verify your version:
    ```bash
    maproom --version
    ```
 3. **Indexed database**: Your codebase must be scanned using `maproom scan` before searching
-4. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
+4. **Database location**: Maproom stores indexed data in the backend configured via `MAPROOM_DATABASE_URL`. SQLite users find the default database at `~/.maproom/maproom.db`; shared-Postgres users set `MAPROOM_DATABASE_URL=postgres://...`. Run `maproom status` to confirm which repos are indexed in the active backend.
 
 To verify your setup:
 ```bash
@@ -111,7 +111,7 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Solution**:
 - Run `maproom scan` to index your codebase
 - Check indexing status: `maproom status`
-- Verify database exists: `ls -la ~/.maproom/maproom.db`
+- Verify connectivity: `maproom status` (lists indexed repos and confirms backend is reachable; SQLite users can also check `ls -la ~/.maproom/maproom.db`)
 
 ### No Results Found
 **Problem**: Searches return no results or irrelevant matches
@@ -180,7 +180,7 @@ maproom status  # Shows last scan timestamp
 
 ### Monthly CLI Verification
 
-**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
+**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.2.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
 
 **Automation:** This procedure is automated via GitHub Actions (see `.github/workflows/monthly-cli-verification.yml`). The workflow runs on the first Friday of each month and creates a GitHub issue if drift is detected. Manual execution is still supported for ad-hoc verification using the `workflow_dispatch` trigger or by running the script directly:
 ```bash
@@ -199,7 +199,7 @@ bash plugins/maproom/scripts/monthly-cli-verification.sh
   ```bash
   cd plugins/maproom
   ```
-- [ ] Run `maproom --version` and verify the version matches the documented version (currently 0.1.0):
+- [ ] Run `maproom --version` and verify the version matches the documented version (currently 0.2.0):
   ```bash
   maproom --version
   ```

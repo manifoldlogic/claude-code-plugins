@@ -86,7 +86,7 @@ SEARCH_EXPECTED_FLAGS="--format --kind --lang --preview --preview-length --repo 
 VSEARCH_EXPECTED_FLAGS="--format --kind --lang --preview --preview-length --threshold --repo --worktree --query --k"
 
 # Expected version
-EXPECTED_VERSION="0.1.0"
+EXPECTED_VERSION="0.2.0"
 
 # ---------------------------------------------------------------------------
 # Counters
