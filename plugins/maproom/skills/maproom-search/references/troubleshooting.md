@@ -15,7 +15,7 @@ command -v maproom
 **2. Check CLI version**
 ```bash
 maproom --version
-# Expected: >= 0.1.0 (minimum version for this documentation)
+# Expected: >= 0.2.0 (minimum version for this documentation)
 ```
 
 **3. Verify database status**
@@ -785,7 +785,7 @@ When maproom is configured for a shared PostgreSQL backend, connection failures 
 Before diagnosing a maproom error, verify the Postgres container is running and reachable:
 
 ```bash
-# Confirm the container is up
+# Confirm the container is up (replace maproom-postgres with your actual container name)
 docker ps --filter name=maproom-postgres
 
 # Probe the port (expect immediate output, not a timeout)
@@ -800,8 +800,8 @@ The connection string is set via `MAPROOM_DATABASE_URL`. Verify it is exported i
 
 ```bash
 echo "$MAPROOM_DATABASE_URL"
-# Expected: postgres://maproom:maproom@host.docker.internal:5433/maproom
-# (exact values depend on your environment)
+# Expected: postgres://user:pass@host:port/dbname  (exact values depend on your environment)
+# Example in a devcontainer setup: postgres://maproom:maproom@host.docker.internal:5433/maproom
 ```
 
 If `MAPROOM_DATABASE_URL` is empty, maproom falls back to SQLite defaults. Set it in your shell profile or `.env` for persistence.

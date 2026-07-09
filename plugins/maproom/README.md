@@ -34,7 +34,7 @@ See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) 
 Before using the Maproom plugin, ensure you have:
 
 1. **maproom CLI installed**: The plugin requires the `maproom` command-line tool to be available in your system PATH
-2. **Minimum maproom version**: 0.1.0. Verify your version:
+2. **Minimum maproom version**: 0.2.0. Verify your version:
    ```bash
    maproom --version
    ```
@@ -180,7 +180,7 @@ maproom status  # Shows last scan timestamp
 
 ### Monthly CLI Verification
 
-**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
+**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.2.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
 
 **Automation:** This procedure is automated via GitHub Actions (see `.github/workflows/monthly-cli-verification.yml`). The workflow runs on the first Friday of each month and creates a GitHub issue if drift is detected. Manual execution is still supported for ad-hoc verification using the `workflow_dispatch` trigger or by running the script directly:
 ```bash
@@ -199,7 +199,7 @@ bash plugins/maproom/scripts/monthly-cli-verification.sh
   ```bash
   cd plugins/maproom
   ```
-- [ ] Run `maproom --version` and verify the version matches the documented version (currently 0.1.0):
+- [ ] Run `maproom --version` and verify the version matches the documented version (currently 0.2.0):
   ```bash
   maproom --version
   ```
