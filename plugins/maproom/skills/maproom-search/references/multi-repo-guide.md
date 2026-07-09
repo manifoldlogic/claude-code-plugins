@@ -358,11 +358,11 @@ Expected output shows each repository with its worktree and chunk count:
 ```
 Repository: manifoldlogic/crewchief
   Worktree: main
-    Chunks: 24,333
+    Chunks: 29,764
 
 Repository: specs
   Worktree: main
-    Chunks: 1,200
+    Chunks: 28,799
 ```
 
 If embeddings are missing (needed for vector-search), generate them:

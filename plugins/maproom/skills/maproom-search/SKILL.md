@@ -27,7 +27,7 @@ Expected output lists all indexed repositories with their chunk counts. Use `map
 
 ## Choosing Search Type
 
-> **FTS-first in this environment:** All repos currently have 0% embeddings. `maproom search` (FTS) is the operative path. `maproom vector-search` will return empty results until embeddings are generated. Use FTS for all searches now.
+> **FTS-first in this environment:** All repos currently have 0% embeddings. `maproom search` (FTS) is the operative path. `maproom vector-search` will exit with code 2 and an embedding provider error until embeddings are generated. Use FTS for all searches now.
 
 | You Have | Use | Example |
 |----------|-----|---------|
@@ -43,7 +43,7 @@ Expected output lists all indexed repositories with their chunk counts. Use `map
 ```bash
 maproom vector-search --repo <repo> --query "<query>" --format agent
 ```
-Requires embeddings. Check `maproom status` — if `Embeddings: 0 (0.0%)`, vector-search will return no results.
+Requires embeddings. Check `maproom status` — if `Embeddings: 0 (0.0%)`, vector-search will exit with code 2 (`embedding_provider` error: no Google credentials found). Use `maproom search` (FTS) instead.
 
 ### Evidence from Testing
 
@@ -277,8 +277,8 @@ For detailed error recovery steps, see [troubleshooting.md](./references/trouble
 **Token limit exceeded** (`input token count is ... but the model supports up to 20000`):
 Re-run with smaller batches: `maproom generate-embeddings --batch-size 25`
 
-**Vector search returns no results** (search completes but returns empty):
-Check `maproom status` — all repos currently have 0% embeddings. Use `maproom search` (FTS) instead. Vector search requires embeddings to be generated first.
+**Vector search fails with embedding provider error** (exits with code 2, `embedding_provider` error):
+All repos currently have 0% embeddings — vector-search exits with an error, it does NOT complete with empty results. Use `maproom search` (FTS) instead. Vector search requires Google credentials and embeddings to be generated first.
 
 **No repositories indexed** (status shows no repositories):
 The shared index should already be populated. Verify `MAPROOM_DATABASE_URL` is set to the Postgres URL: `postgres://maproom:maproom@host.docker.internal:5433/maproom`. If you are setting up a fresh local environment, see [Appendix: Fresh-Environment Setup](#appendix-fresh-environment-setup).
