@@ -47,6 +47,31 @@ maproom status
 
 Then select the most relevant repo for the research question.
 
+<!-- INTERIM: replaced when cross-repo search ships (see maproom-eco-rust-cross-repo-search) -->
+### Multi-repo tasks
+
+When a task spans multiple repositories, enumerate available repos first, then search each one individually:
+
+```bash
+# Step 1: list all indexed repos (shared-Postgres environments return the full inventory)
+maproom status --json
+```
+
+Parse the `repos[].name` values from the JSON output to build your repo list. Then issue a separate search per repo:
+
+```bash
+# Step 2: search each repo in turn
+QUERY="<search terms>"
+maproom search --repo <repo-name> --query "$QUERY" --k 10 --format agent
+```
+
+A local convenience wrapper (`maproom-all`) may be present in some environments; use it if available, but do not assume it exists — the per-repo loop above is portable.
+
+**`--repo specs` is available in shared-Postgres environments** and covers indexed specification documents. Include it explicitly when the task involves specs.
+
+**No server-side cross-repo search yet.** There is no `--all-repos` flag. Each search targets exactly one repo. Cross-repo synthesis is done by the agent after collecting results from each repo in sequence.
+<!-- end INTERIM -->
+
 ## Critical Rules
 <!-- MAPCAP: soft=5, hard=10 - DO NOT UPDATE without checking all 5 prompt sections -->
 > **Note:** Search budget constraints are enforced by a PreToolUse hook (enforce-search-cap.py) with a soft cap at 5 and hard cap at 10.
@@ -80,7 +105,7 @@ maproom search --repo <repo> --query <search terms> --format agent
 
 Before beginning the 4-phase workflow:
 
-1. **CLI Version Check:** Run `maproom --version` and verify version 0.1.0 or higher. If version check fails, report error and halt execution.
+1. **CLI Version Check:** Run `maproom --version` and verify version 0.2.0 or higher. If version check fails, report error and halt execution.
 2. **Query Validation:** Reject null, empty, or whitespace-only queries. Valid query pattern: at least one non-whitespace character.
 
 ## Query Classification (Before Phase 1)
@@ -322,4 +347,4 @@ Instead:
 **Security:** Do not include actual credentials, access tokens, or project IDs in your findings output. Use placeholders like `YOUR_PROJECT_ID`.
 
 ### CLI and Query Validation
-See Pre-Workflow Checks section above. Version 0.1.0 or higher required; null/empty queries rejected.
+See Pre-Workflow Checks section above. Version 0.2.0 or higher required; null/empty queries rejected.

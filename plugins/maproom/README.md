@@ -39,7 +39,7 @@ Before using the Maproom plugin, ensure you have:
    maproom --version
    ```
 3. **Indexed database**: Your codebase must be scanned using `maproom scan` before searching
-4. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
+4. **Database location**: Maproom stores indexed data in the backend configured via `MAPROOM_DATABASE_URL`. SQLite users find the default database at `~/.maproom/maproom.db`; shared-Postgres users set `MAPROOM_DATABASE_URL=postgres://...`. Run `maproom status` to confirm which repos are indexed in the active backend.
 
 To verify your setup:
 ```bash
@@ -111,7 +111,7 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Solution**:
 - Run `maproom scan` to index your codebase
 - Check indexing status: `maproom status`
-- Verify database exists: `ls -la ~/.maproom/maproom.db`
+- Verify connectivity: `maproom status` (lists indexed repos and confirms backend is reachable; SQLite users can also check `ls -la ~/.maproom/maproom.db`)
 
 ### No Results Found
 **Problem**: Searches return no results or irrelevant matches

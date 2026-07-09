@@ -537,6 +537,8 @@ This section documents boundary conditions, resource errors, and concurrency sce
 
 ### SQLite Lock Contention (GAP-006) -- HIGH PRIORITY
 
+> **SQLite backend only.** This section applies when maproom is configured with a SQLite database. In shared-Postgres environments (`MAPROOM_DATABASE_URL=postgres://...`), PostgreSQL handles concurrent access natively and SQLite lock contention does not occur.
+
 **Symptom:** When multiple agents or processes run `maproom search` or `maproom scan` concurrently against the same repository, commands may fail with SQLite lock errors such as `SQLITE_BUSY` or connection pool timeouts.
 
 **Root Cause:** The maproom database uses SQLite, which has limited write concurrency. Concurrent read-only operations (searches) are handled well by SQLite's WAL mode. However, concurrent write operations (scan while searching) or access to a locked database can cause contention.
@@ -653,6 +655,8 @@ This section documents boundary conditions, resource errors, and concurrency sce
 
 ### Disk Full During Scan (GAP-004)
 
+> **SQLite backend only.** Disk-full behavior described here is specific to SQLite file storage. In shared-Postgres environments (`MAPROOM_DATABASE_URL=postgres://...`), storage is managed by the PostgreSQL server and WAL files (`maproom.db-wal`, `maproom.db-shm`) do not exist on the client.
+
 **Note:** This edge case has not been tested empirically due to the risk of destabilizing the shared development environment. Simulating disk-full conditions requires filling the filesystem, which could affect other processes and services.
 
 **Symptom (predicted):** `maproom scan` fails mid-operation when the filesystem runs out of space. The SQLite database may be left in an inconsistent state if the write-ahead log (WAL) cannot be flushed.
@@ -687,6 +691,8 @@ Error: database or disk is full
 **Prevention:** Ensure at least 2x the expected database size is available before running `scan` or `generate-embeddings`. Check the current database size with `ls -lh ~/.maproom/<repo>/maproom.db*`. For reference, a repository with 6,450 chunks produces a ~67 MB database with a ~40 MB WAL file.
 
 ### Permission Denied on Database (GAP-005)
+
+> **SQLite backend only.** Filesystem permission errors apply to SQLite's file-based storage. In shared-Postgres environments (`MAPROOM_DATABASE_URL=postgres://...`), access control is handled by PostgreSQL roles rather than filesystem permissions; see [Postgres Connectivity Issues](#postgres-connectivity-issues) for connection failure troubleshooting.
 
 **Symptom:** Search or scan commands fail with repeated `ERROR unable to open database file` messages followed by a connection pool timeout. The CLI retries with exponential backoff for approximately 25 seconds before giving up.
 
@@ -765,3 +771,50 @@ Caused by:
    ```
 
 **Prevention:** Keep `--k` values proportional to the expected result set size. Check `maproom status` to see total chunk counts per repository. For a repository with 6,450 chunks, `--k 100` covers the top 1.5% of results. Very large `--k` values (999,999+) cause longer execution times (~25 seconds vs. <1 second) and produce large output volumes (~750 KB) without improving result quality, since all additional results are lower-relevance matches.
+
+---
+
+## Postgres Connectivity Issues
+
+> **Postgres backend only.** This section applies when `MAPROOM_DATABASE_URL` is set to a `postgres://` connection string.
+
+When maproom is configured for a shared PostgreSQL backend, connection failures produce different error patterns than the SQLite errors documented above.
+
+### Container Health Check
+
+Before diagnosing a maproom error, verify the Postgres container is running and reachable:
+
+```bash
+# Confirm the container is up
+docker ps --filter name=maproom-postgres
+
+# Probe the port (expect immediate output, not a timeout)
+maproom status
+```
+
+`maproom status` is the primary health probe. A successful response lists indexed repositories. If it hangs or errors, the container or network path is the issue — not maproom itself.
+
+### Connection String
+
+The connection string is set via `MAPROOM_DATABASE_URL`. Verify it is exported in the current shell:
+
+```bash
+echo "$MAPROOM_DATABASE_URL"
+# Expected: postgres://maproom:maproom@host.docker.internal:5433/maproom
+# (exact values depend on your environment)
+```
+
+If `MAPROOM_DATABASE_URL` is empty, maproom falls back to SQLite defaults. Set it in your shell profile or `.env` for persistence.
+
+### Common Postgres Connection Errors
+
+| Error pattern | Likely cause | Fix |
+|---|---|---|
+| `connection refused` at host/port | Container not running or wrong port | Check `docker ps`; verify port matches the `postgres://` URL |
+| `password authentication failed` | Wrong credentials in URL | Update `MAPROOM_DATABASE_URL` with correct user/password |
+| `database "..." does not exist` | Database not provisioned | Check container init logs; re-run container setup |
+| `timeout` or `no route to host` | Network path blocked (e.g. wrong hostname) | In devcontainer, use `host.docker.internal` for the host machine; use `localhost` only for in-container PG |
+
+### FTS vs. Embeddings in Shared-Postgres Environments
+
+Full-text search (`maproom search`) is fully operative against the shared Postgres backend. Vector search (`maproom vector-search`) requires embeddings to have been generated — run `maproom status` and check `embedding_percentage`; a value of `0.0%` means embeddings are absent and vector search will return no results. See [embedding-providers.md](./embedding-providers.md) for generation instructions.
