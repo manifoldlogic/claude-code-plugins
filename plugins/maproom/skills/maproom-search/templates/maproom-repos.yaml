@@ -27,7 +27,8 @@
 
 repos:
   # --- Repo naming note ---
-  # Repo keys are owner/repo derived from git origin (e.g., manifoldlogic/crewchief).
+  # Repo keys are typically origin-derived owner/repo (e.g., manifoldlogic/crewchief),
+  # except for explicitly-pinned names like "specs" which use a short alias.
   # As of maproom 0.2.0 / CLI 1.7.0, suffix fuzzy-match resolves short names
   # (crewchief → manifoldlogic/crewchief), but full names are preferred.
   # Run `maproom status` to see exact names for any existing index.

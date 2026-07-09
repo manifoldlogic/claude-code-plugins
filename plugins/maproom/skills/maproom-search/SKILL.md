@@ -27,15 +27,15 @@ Expected output lists all indexed repositories with their chunk counts. Use `map
 
 ## Choosing Search Type
 
-> **FTS-first in this environment:** All repos currently have 0% embeddings. `maproom search` (FTS) is the operative path. `maproom vector-search` will exit with code 2 and an embedding provider error until embeddings are generated. Use FTS for all searches now.
+> **FTS-first in this environment:** All repos currently have 0% embeddings. The `search` subcommand (FTS) is the operative path. The `vector-search` subcommand will exit with code 2 and an embedding provider error until embeddings are generated. Use FTS for all searches now.
 
 | You Have | Use | Example |
 |----------|-----|---------|
-| Exact function/variable name | `search` | `--query "validate_state_file_schema"` |
-| Known terminology | `search` | `--query "autogate ready block"` |
-| Finding code patterns | `search` | `--query "try except json"` |
-| Conceptual question | `vector-search` | `--query "how to pause automated work"` (requires embeddings) |
-| Exploring unfamiliar code | `vector-search` | `--query "authentication flow"` (requires embeddings) |
+| Exact function/variable name | `search` (FTS) | `--query "validate_state_file_schema"` |
+| Known terminology | `search` (FTS) | `--query "autogate ready block"` |
+| Finding code patterns | `search` (FTS) | `--query "try except json"` |
+| Conceptual question | `search` (FTS) now; `vector-search` when embeddings available | `--query "how to pause automated work"` |
+| Exploring unfamiliar code | `search` (FTS) now; `vector-search` when embeddings available | `--query "authentication flow"` |
 
 **Rule of thumb:** Know the words? Use `search`. Know the concept? Use `vector-search` (only when embeddings are present).
 
@@ -43,7 +43,7 @@ Expected output lists all indexed repositories with their chunk counts. Use `map
 ```bash
 maproom vector-search --repo <repo> --query "<query>" --format agent
 ```
-Requires embeddings. Check `maproom status` — if `Embeddings: 0 (0.0%)`, vector-search will exit with code 2 (`embedding_provider` error: no Google credentials found). Use `maproom search` (FTS) instead.
+Requires embeddings. Check `maproom status` — if `Embeddings: 0 (0.0%)`, vector-search will exit with code 2 (`embedding_provider` error: no Google credentials found). Use the `search` subcommand (FTS) instead.
 
 ### Evidence from Testing
 
@@ -278,7 +278,7 @@ For detailed error recovery steps, see [troubleshooting.md](./references/trouble
 Re-run with smaller batches: `maproom generate-embeddings --batch-size 25`
 
 **Vector search fails with embedding provider error** (exits with code 2, `embedding_provider` error):
-All repos currently have 0% embeddings — vector-search exits with an error, it does NOT complete with empty results. Use `maproom search` (FTS) instead. Vector search requires Google credentials and embeddings to be generated first.
+All repos currently have 0% embeddings — vector-search exits with an error, it does NOT complete with empty results. Use the `search` subcommand (FTS) instead. Vector search requires Google credentials and embeddings to be generated first.
 
 **No repositories indexed** (status shows no repositories):
 The shared index should already be populated. Verify `MAPROOM_DATABASE_URL` is set to the Postgres URL: `postgres://maproom:maproom@host.docker.internal:5433/maproom`. If you are setting up a fresh local environment, see [Appendix: Fresh-Environment Setup](#appendix-fresh-environment-setup).
