@@ -250,7 +250,20 @@ This lists all repos that have been scanned and are available for search.
 
 ### Cross-Repo Search Workflow
 
-When a question spans both design and implementation, search across repos sequentially.
+**Native multi-repo search (maproom 0.3.0+):** Use `--all-repos` or repeatable `--repo` flags to query multiple repos in a single call. One invocation counts as **one search** against your session cap.
+
+```bash
+# Sweep all indexed repos
+QUERY="authentication middleware"
+maproom search --all-repos --query "$QUERY" --k 10 --format agent
+
+# Target specific repos only
+maproom search --repo manifoldlogic/crewchief --repo specs --query "$QUERY" --k 10 --format agent
+```
+
+Note: `vector-search` does not support multi-repo scope — use FTS (`search`) for cross-repo sweeps.
+
+**Sequential search (specs → code):** When a question spans design rationale and implementation, search specs for *why*, then code for *how*.
 
 **Example: Understanding why and how authentication works**
 

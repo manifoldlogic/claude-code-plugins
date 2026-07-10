@@ -162,6 +162,50 @@ maproom search --repo specs --query "decision rationale" --format agent
 
 Results from docs repos include `heading_1`, `heading_2`, `heading_3`, and `heading_4` chunks that reveal the document hierarchy. Use the `file_relpath` and line numbers to navigate to specific sections.
 
+## Native Cross-Repo Search (maproom 0.3.0+)
+
+Maproom 0.3.0 adds server-side cross-repo search — a single CLI invocation queries multiple repos in one round-trip, returning results grouped by repo with `repo:file:line` coordinates.
+
+### `--all-repos`: sweep the full index
+
+```bash
+QUERY="authentication middleware"
+maproom search --all-repos --query "$QUERY" --k 10 --format agent
+```
+
+`--k` is a **per-repo cap**: `--k 10` returns up to 10 hits per repo. Results are grouped by repo so you can see which repos contain relevant code at a glance.
+
+**Search budget:** One `--all-repos` call counts as **one search** against the session cap (soft=5, hard=10). Prefer it over N single-repo calls — it is equivalent in cost but substantially faster.
+
+### `--repo` (repeatable): target specific repos
+
+```bash
+QUERY="embedding pipeline"
+maproom search --repo manifoldlogic/crewchief --repo specs --query "$QUERY" --k 10 --format agent
+```
+
+Pass `--repo` more than once to search a named subset of repos in a single call. Use this when you know which repos are relevant.
+
+### Scope rules
+
+- `--all-repos`, multiple `--repo` flags, and the legacy single-`--repo` form are mutually exclusive — pass exactly one scope type.
+- `vector-search` and `hybrid` modes do **not** support multi-repo scope. They exit with code 2 if `--all-repos` or multiple `--repo` flags are passed. Use FTS (`search`) for cross-repo sweeps.
+- `--repo specs` covers indexed specification documents in shared-Postgres environments and is a valid target for both single-repo and multi-repo calls.
+
+### Pre-0.3.0 fallback
+
+If you are on an environment running maproom older than 0.3.0, native cross-repo flags are unavailable. Fall back to the per-repo loop:
+
+```bash
+# Pre-0.3.0 fallback only — superseded by --all-repos / repeatable --repo in 0.3.0
+QUERY="authentication middleware"
+for repo in manifoldlogic/crewchief manifoldlogic/claude-code-plugins specs; do
+  maproom search --repo "$repo" --query "$QUERY" --k 10 --format agent
+done
+```
+
+A local convenience wrapper (`maproom-all`) performs the same loop in some environments. Both approaches are superseded by native flags once 0.3.0 is installed.
+
 ## Cross-Repo Patterns
 
 These patterns combine searches across code and docs repos to answer questions that neither repo can answer alone. Each pattern starts in one repo type and follows up in the other.
