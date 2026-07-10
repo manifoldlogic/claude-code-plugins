@@ -188,8 +188,8 @@ Pass `--repo` more than once to search a named subset of repos in a single call.
 
 ### Scope rules
 
-- `--all-repos`, multiple `--repo` flags, and the legacy single-`--repo` form are mutually exclusive — pass exactly one scope type.
-- `vector-search` and `hybrid` modes do **not** support multi-repo scope. They exit with code 2 if `--all-repos` or multiple `--repo` flags are passed. Use FTS (`search`) for cross-repo sweeps.
+- `--all-repos` and `--repo` are mutually exclusive — pass one or the other. `--repo` is repeatable; single and multiple uses are the same flag, not different scope types.
+- The `vector-search` subcommand and `search --mode hybrid` / `search --mode vector` do **not** support multi-repo scope. They exit with code 2 if `--all-repos` or multiple `--repo` flags are passed. Use `search` (FTS / default mode) for cross-repo sweeps.
 - `--repo specs` covers indexed specification documents in shared-Postgres environments and is a valid target for both single-repo and multi-repo calls.
 
 ### Pre-0.3.0 fallback

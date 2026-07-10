@@ -39,6 +39,10 @@ CHECKS:
   9.  New flags (--kind/--lang/--preview/--preview-length/--threshold) in SKILL.md (>= 5)
   10. --format agent in troubleshooting.md (informational)
   11. Cross-reference integrity (./references/*.md and ./templates/* links in SKILL.md)
+  12. No INTERIM markers in plugins/maproom/ (zero hits)
+  13. 0.3.0 version floor in maproom-researcher.md (>= 1)
+  14. --all-repos flag documented in maproom-researcher.md (>= 1)
+  15. Search-budget note (--all-repos = one search) in maproom-researcher.md (>= 1)
 
 EXIT CODES:
   0   All checks passed
@@ -97,7 +101,7 @@ fi
 # ---------------------------------------------------------------------------
 PASS_COUNT=0
 FAIL_COUNT=0
-TOTAL_CHECKS=11
+TOTAL_CHECKS=15
 
 # ---------------------------------------------------------------------------
 # JSON accumulation
@@ -402,6 +406,59 @@ elif [ "$broken" -eq 0 ]; then
 else
   report_fail "$broken of $total_refs cross-references are broken"
   json_add_result 11 "Cross-reference integrity" "fail" "$broken" 0 "$broken of $total_refs cross-references are broken"
+fi
+
+# ===========================================================================
+# Check 12: No INTERIM markers in plugins/maproom/ (zero hits)
+# ===========================================================================
+AGENT_MD="$PLUGIN_DIR/agents/maproom-researcher.md"
+human_echo "Check 12: No INTERIM markers in plugins/maproom/"
+interim_count=$(grep -rn "INTERIM" "$PLUGIN_DIR" | grep -v "verify-docs.sh" | grep -c "INTERIM" || true)
+if [ "$interim_count" -eq 0 ]; then
+  report_pass "No INTERIM markers found"
+  json_add_result 12 "No INTERIM markers in plugins/maproom/" "pass" 0 0 "No INTERIM markers found"
+else
+  report_fail "$interim_count INTERIM marker(s) found — remove before shipping"
+  json_add_result 12 "No INTERIM markers in plugins/maproom/" "fail" "$interim_count" 0 "$interim_count INTERIM marker(s) found"
+fi
+
+# ===========================================================================
+# Check 13: 0.3.0 version floor in maproom-researcher.md (>= 1)
+# ===========================================================================
+human_echo "Check 13: 0.3.0 version floor in maproom-researcher.md"
+count=$(grep -c "0\.3\.0" "$AGENT_MD" || true)
+if [ "$count" -ge 1 ]; then
+  report_pass "$count occurrences (>= 1 required)"
+  json_add_result 13 "0.3.0 version floor in maproom-researcher.md" "pass" "$count" 1 "$count occurrences (>= 1 required)"
+else
+  report_fail "$count occurrences (>= 1 required)"
+  json_add_result 13 "0.3.0 version floor in maproom-researcher.md" "fail" "$count" 1 "$count occurrences (>= 1 required)"
+fi
+
+# ===========================================================================
+# Check 14: --all-repos documented in maproom-researcher.md (>= 1)
+# ===========================================================================
+human_echo "Check 14: --all-repos flag documented in maproom-researcher.md"
+count=$(grep -c "\-\-all-repos" "$AGENT_MD" || true)
+if [ "$count" -ge 1 ]; then
+  report_pass "$count occurrences (>= 1 required)"
+  json_add_result 14 "--all-repos documented in maproom-researcher.md" "pass" "$count" 1 "$count occurrences (>= 1 required)"
+else
+  report_fail "$count occurrences (>= 1 required)"
+  json_add_result 14 "--all-repos documented in maproom-researcher.md" "fail" "$count" 1 "$count occurrences (>= 1 required)"
+fi
+
+# ===========================================================================
+# Check 15: Search-budget note in maproom-researcher.md (>= 1)
+# ===========================================================================
+human_echo "Check 15: Search-budget note (--all-repos = one search) in maproom-researcher.md"
+count=$(grep -c "one search\|one.*--all-repos\|--all-repos.*one" "$AGENT_MD" || true)
+if [ "$count" -ge 1 ]; then
+  report_pass "$count occurrences (>= 1 required)"
+  json_add_result 15 "Search-budget note in maproom-researcher.md" "pass" "$count" 1 "$count occurrences (>= 1 required)"
+else
+  report_fail "$count occurrences (>= 1 required)"
+  json_add_result 15 "Search-budget note in maproom-researcher.md" "fail" "$count" 1 "$count occurrences (>= 1 required)"
 fi
 
 # ===========================================================================

@@ -68,10 +68,10 @@ maproom search --repo manifoldlogic/crewchief --repo specs --query "$QUERY" --k 
 `--repo` is repeatable. Use it when you know which repos are relevant and want to avoid sweeping the full index.
 
 **Scope rules:**
-- `--all-repos`, `--repo` (one or more), and the legacy single-repo `--repo` form are mutually exclusive — pass exactly one scope.
-- `vector-search` and `hybrid` modes do **not** support multi-repo scope; they exit with code 2 if `--all-repos` or multiple `--repo` flags are passed. Use FTS (`search`) for cross-repo sweeps.
+- `--all-repos` and `--repo` are mutually exclusive — pass one or the other. `--repo` is repeatable; single and multiple uses are the same flag, not different scope types.
+- The `vector-search` subcommand and `search --mode hybrid` / `search --mode vector` do **not** support multi-repo scope; they exit with code 2 if `--all-repos` or multiple `--repo` flags are passed. Use `search` (FTS / default mode) for cross-repo sweeps.
 
-**Search budget:** One `--all-repos` call counts as **one search** against your session cap (soft=5, hard=10). Prefer a single `--all-repos` call over N single-repo calls — it is equivalent in cost but 10× faster.
+**Search budget:** One `--all-repos` call counts as **one search** against your session cap (soft=5, hard=10). Prefer a single `--all-repos` call over N single-repo calls — it is equivalent in cost but substantially faster.
 
 **`--repo specs`** covers indexed specification documents in shared-Postgres environments. It is a valid target for both single-repo and multi-repo invocations.
 
