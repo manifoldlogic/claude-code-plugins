@@ -47,30 +47,33 @@ maproom status
 
 Then select the most relevant repo for the research question.
 
-<!-- INTERIM: replaced when cross-repo search ships (see maproom-eco-rust-cross-repo-search) -->
 ### Multi-repo tasks
 
-When a task spans multiple repositories, enumerate available repos first, then search each one individually:
+Maproom 0.3.0 supports native cross-repo search — use `--all-repos` or repeatable `--repo` flags instead of a per-repo loop.
 
+**Sweep all indexed repos in one call:**
 ```bash
-# Step 1: list all indexed repos (shared-Postgres environments return the full inventory)
-maproom status --json
-```
-
-Parse the `repos[].name` values from the JSON output to build your repo list. Then issue a separate search per repo:
-
-```bash
-# Step 2: search each repo in turn
 QUERY="<search terms>"
-maproom search --repo <repo-name> --query "$QUERY" --k 10 --format agent
+maproom search --all-repos --query "$QUERY" --k 10 --format agent
 ```
 
-A local convenience wrapper (`maproom-all`) may be present in some environments; use it if available, but do not assume it exists — the per-repo loop above is portable.
+`--k` is a **per-repo cap**: with `--all-repos` and `--k 10`, you receive up to 10 results per repo, grouped by repo. Results use `repo:file:line` format in `--format agent` output so the source repo is always visible.
 
-**`--repo specs` is available in shared-Postgres environments** and covers indexed specification documents. Include it explicitly when the task involves specs.
+**Target specific repos only:**
+```bash
+QUERY="<search terms>"
+maproom search --repo manifoldlogic/crewchief --repo specs --query "$QUERY" --k 10 --format agent
+```
 
-**No server-side cross-repo search yet.** There is no `--all-repos` flag. Each search targets exactly one repo. Cross-repo synthesis is done by the agent after collecting results from each repo in sequence.
-<!-- end INTERIM -->
+`--repo` is repeatable. Use it when you know which repos are relevant and want to avoid sweeping the full index.
+
+**Scope rules:**
+- `--all-repos` and `--repo` are mutually exclusive — pass one or the other. `--repo` is repeatable; single and multiple uses are the same flag, not different scope types.
+- The `vector-search` subcommand and `search --mode hybrid` / `search --mode vector` do **not** support multi-repo scope; they exit with code 2 if `--all-repos` or multiple `--repo` flags are passed. Use `search` (FTS / default mode) for cross-repo sweeps.
+
+**Search budget:** One `--all-repos` call counts as **one search** against your session cap (soft=5, hard=10). Prefer a single `--all-repos` call over N single-repo calls — it is equivalent in cost but substantially faster.
+
+**`--repo specs`** covers indexed specification documents in shared-Postgres environments. It is a valid target for both single-repo and multi-repo invocations.
 
 ## Critical Rules
 <!-- MAPCAP: soft=5, hard=10 - DO NOT UPDATE without checking all 5 prompt sections -->
@@ -105,7 +108,7 @@ maproom search --repo <repo> --query <search terms> --format agent
 
 Before beginning the 4-phase workflow:
 
-1. **CLI Version Check:** Run `maproom --version` and verify version 0.2.0 or higher. If version check fails, report error and halt execution.
+1. **CLI Version Check:** Run `maproom --version` and verify version 0.3.0 or higher. If version check fails, report error and halt execution.
 2. **Query Validation:** Reject null, empty, or whitespace-only queries. Valid query pattern: at least one non-whitespace character.
 
 ## Query Classification (Before Phase 1)
@@ -347,4 +350,4 @@ Instead:
 **Security:** Do not include actual credentials, access tokens, or project IDs in your findings output. Use placeholders like `YOUR_PROJECT_ID`.
 
 ### CLI and Query Validation
-See Pre-Workflow Checks section above. Version 0.2.0 or higher required; null/empty queries rejected.
+See Pre-Workflow Checks section above. Version 0.3.0 or higher required; null/empty queries rejected.
