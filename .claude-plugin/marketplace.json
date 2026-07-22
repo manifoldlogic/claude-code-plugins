@@ -32,6 +32,11 @@
       "description": "Obsidian vault management using obsidian-cli"
     },
     {
+      "name": "dayone",
+      "source": "./plugins/dayone",
+      "description": "Manage a Day One personal journal using the Day One CLI on the macOS host"
+    },
+    {
       "name": "worktree",
       "source": "./plugins/worktree",
       "description": "Git worktree management using crewchief CLI"

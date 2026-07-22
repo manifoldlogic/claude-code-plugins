@@ -1,0 +1,19 @@
+{
+  "name": "dayone",
+  "version": "0.1.0",
+  "description": "Manage a Day One personal journal from Claude Code using the Day One CLI (dayone) on the macOS host",
+  "author": {
+    "name": "Daniel Bushman",
+    "email": "dbushman@manifoldlogic.com",
+    "url": "https://github.com/manifoldlogic/claude-code-plugins"
+  },
+  "repository": "https://github.com/manifoldlogic/claude-code-plugins",
+  "keywords": [
+    "dayone",
+    "journal",
+    "journaling",
+    "diary",
+    "notes",
+    "macos"
+  ]
+}
