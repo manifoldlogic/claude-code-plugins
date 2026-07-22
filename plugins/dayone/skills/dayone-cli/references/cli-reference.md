@@ -99,7 +99,7 @@ The wrapper runs `dayone` locally on the host, or over SSH from a devcontainer.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `DAYONE_HOST_USER` | `$USER` | macOS host username for SSH. |
+| `DAYONE_HOST_USER` | `$HOST_USER`, else `$USER` | macOS host username for SSH. Defaults to the container-wide `HOST_USER` (set by this devcontainer for host access), falling back to the local `$USER`. |
 | `DAYONE_HOST` | `host.docker.internal` | SSH host. |
 | `DAYONE_SSH_OPTS` | `-o BatchMode=yes` (non-tty) | Extra ssh options. |
 | `DAYONE_FORCE_MODE` | auto | Force `local` or `remote` instead of auto-detecting. |

@@ -32,8 +32,9 @@ Interpret the exit status:
   One from the Mac App Store and open it once; you cannot do this for them.
 - **4** — The host is unreachable over SSH. Help the user enable Remote Login
   (System Settings → General → Sharing → Remote Login) and confirm
-  `ssh <user>@host.docker.internal` works with a key. Set `DAYONE_HOST_USER` if
-  the host username differs from the container's `$USER`.
+  `ssh <user>@host.docker.internal` works with a key. The SSH user defaults to
+  the container-wide `HOST_USER` (falling back to `$USER`); set `DAYONE_HOST_USER`
+  to override if the host username differs.
 
 ## Installation is opt-in — never silent
 

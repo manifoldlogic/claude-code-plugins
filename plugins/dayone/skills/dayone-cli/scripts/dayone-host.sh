@@ -27,7 +27,9 @@
 
 set -euo pipefail
 
-HOST_USER="${DAYONE_HOST_USER:-${USER:-}}"
+# Prefer an explicit override, then the container-wide HOST_USER convention that
+# the sibling host-SSH plugins (cmux/iterm) rely on, then the local $USER.
+HOST_USER="${DAYONE_HOST_USER:-${HOST_USER:-${USER:-}}}"
 HOST="${DAYONE_HOST:-host.docker.internal}"
 APP_CLI_INSTALLER="/Applications/Day One.app/Contents/Resources/install_cli.sh"
 
