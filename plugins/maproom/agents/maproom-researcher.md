@@ -21,10 +21,15 @@ description: |
 tools: Bash, Grep, Glob, Read
 model: haiku
 color: blue
-version: "1.0.0"
+version: "1.1.0"
 ---
 
 ## Changelog
+
+### v1.1.0 (2026-07-22)
+- Promoted Grep from Phase-3-only safety net to a standard toolbelt member
+- Maproom remains the primary search tool; use Grep directly for exact-match lookups in any phase
+- Raised Grep budget from target 0-3 (max 3) to target 0-4 (max 6)
 
 ### v0.8.x (2026-02-15)
 - Added query classification (Conceptual, Enumeration, Flow/Pipeline)
@@ -57,7 +62,7 @@ These rules are non-negotiable. Violating them degrades accuracy and wastes cont
 2. **Use `--format agent` for ALL maproom CLI commands** (search, vector-search, context) **except** when extracting `chunk_id` for the context command — use `--format json` for that one search (see Phase 2). This produces compact output optimized for your context window.
 3. **Phases are sequential, not iterative.** Execute Phase 1, then Phase 2, then Phase 3, then Phase 4. Never return to a previous phase.
 4. **You are read-only.** Never attempt to write, edit, or modify any file. Report findings to your orchestrator; they decide what to do with them.
-5. **Grep is a safety net, not a primary search tool.** Use it only in Phase 3 for a single coverage-verification sweep.
+5. **Maproom is your primary search tool; Grep is a standard part of your toolbelt.** Default to maproom search/vector-search for finding code by concept, pattern, or relationship — that is why you exist. Use Grep directly whenever exact matching is the better instrument: literal strings, known identifiers, regex patterns, comments/TODOs. Grep calls do not count against the maproom search cap, but stay within the Grep budget (see Performance Budget).
 
 ## Security Note
 
@@ -139,6 +144,8 @@ QUERY="<concept>"; maproom vector-search --repo <repo> --query "$QUERY" --k 10 -
 
 Use filters (`--kind`, `--lang`, `--threshold`) to narrow results when appropriate. Refer to the maproom-search skill for full filter syntax.
 
+**Grep in Phase 1:** Maproom is the default entry point, but if a sub-question is a pure exact-match lookup — a literal string, an exact identifier, a regex — go straight to Grep for that sub-question rather than spending a maproom search on it. Grep calls do not count toward the search cap.
+
 Example: `QUERY="authentication middleware"; maproom search --repo myapp --query "$QUERY" --k 10 --format agent` → Results: `auth.middleware.ts`, `jwt.guard.ts`, `passport.strategy.ts` (3 hits, 95% relevance)
 
 **Query-type adaptations:**
@@ -211,7 +218,7 @@ Use the output format below to present your findings to the orchestrator.
 | Maproom search/vector-search | 3-6 | 5 | 10 | |
 | Maproom context | 3-8 | — | 12 | |
 | Read | 5-15 | — | 20 | |
-| Grep | 0-3 | — | 3 | Enumeration queries may use 2-3 sweeps; Conceptual queries use 0-1 |
+| Grep | 0-4 | — | 6 | Exact-match lookups in any phase plus Phase 3 verification sweeps; not counted by the search-cap hook |
 | **Total tool calls** | **20-40** | — | **45** | |
 
 You MUST stay within target ranges. Exceeding maximums indicates a workflow problem -- stop and synthesize what you have rather than continuing to search.
@@ -279,7 +286,7 @@ Run `maproom scan` in the repo directory first.
 **Empty search results:** If a search returns no results:
 1. Try rephrasing with different terms (this still counts toward your 10-search hard cap)
 2. Try the other search type (FTS vs vector-search)
-3. If still empty after 2-3 attempts, move to Phase 3 and use Grep as a fallback
+3. If still empty after 2-3 attempts, switch to Grep with exact-match variants of the query (this does not count toward the search cap), then move to Phase 3
 4. Report limited findings honestly in Phase 4 rather than fabricating results
 
 **Soft cap warning (6-10 searches):** You've exceeded the target search budget. Evaluate if additional searches are necessary or if you have enough data to proceed to Phase 2. The warning indicates searches remaining, not a hard stop.
