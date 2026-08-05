@@ -15,7 +15,7 @@ Embedding providers convert code chunks into numerical vectors (embeddings) that
 | Google Vertex AI | ADC or service account (`GOOGLE_APPLICATION_CREDENTIALS`) | [ADC setup guide](./adc-setup.md) | Free tier available, then per-character pricing ([pricing](https://cloud.google.com/vertex-ai/pricing)) | 768 (`text-embedding-004`) | High quality embeddings; free tier; Google ecosystem integration | Requires GCP project; ADC credentials expire and need refresh | Teams already using Google Cloud; production environments with GCP infrastructure |
 | OpenAI | API key (`OPENAI_API_KEY`) | Set environment variable | ~$0.02 per 1M tokens ([pricing](https://openai.com/api/pricing/)) | 1536 (`text-embedding-3-small`) | Simple API key setup; widely used; high quality | Requires paid API key; higher dimensions increase storage; network-dependent | Quick setup; teams already using OpenAI; when simplicity is preferred |
 | Ollama | None (local) | Install Ollama and pull model | Free (runs locally) | Varies by model (768 for `nomic-embed-text`, 1024 for `mxbai-embed-large`) | Free; fully offline; no credentials needed; data stays local | Requires local compute resources; quality varies by model; slower on CPU | Air-gapped environments; cost-sensitive workflows; local development without API keys |
-| AWS Bedrock | Standard AWS credential chain (no new secret) | Enable model access + `bedrock:InvokeModel` | ~$0.02 per 1M tokens ([pricing](https://aws.amazon.com/bedrock/pricing/)) | 1024 (`amazon.titan-embed-text-v2:0`; 512/256 also selectable) | No new API key to manage; works with SSO, EC2/EKS/ECS roles; traffic can stay in a VPC; cheapest cloud option | Requires an AWS account with Bedrock enabled in-region; Titan sends one request per chunk | Teams already on AWS; environments that forbid introducing new long-lived secrets |
+| AWS Bedrock | Standard AWS credential chain (no new secret) | Enable model access + `bedrock:InvokeModel` | ~$0.02 per 1M tokens ([pricing](https://aws.amazon.com/bedrock/pricing/)) | 1024 (`amazon.titan-embed-text-v2:0`) | No new API key to manage; works with SSO, EC2/EKS/ECS roles; traffic can stay in a VPC; cheapest cloud option | Requires an AWS account with Bedrock enabled in-region; Titan sends one request per chunk | Teams already on AWS; environments that forbid introducing new long-lived secrets |
 
 > **Pricing disclaimer:** Costs shown are approximate as of Feb 2026 and are subject to change. Always check the linked pricing pages for current rates.
 
@@ -96,7 +96,12 @@ maproom generate-embeddings
 ### AWS Bedrock
 
 **Model:** `amazon.titan-embed-text-v2:0` (default)
-**Dimensions:** 1024 (512 and 256 also supported by Titan v2)
+**Dimensions:** 1024
+
+Titan v2 can also emit 512- and 256-dimensional vectors, but maproom stores
+embeddings in per-dimension tables and supports only 768, 1024, and 1536.
+Setting `MAPROOM_EMBEDDING_DIMENSION=512` is rejected at startup rather than
+after a full scan.
 **Endpoint:** `bedrock-runtime.REGION.amazonaws.com`
 
 Bedrock has **no maproom-specific API key**. Requests are signed with AWS
@@ -146,7 +151,7 @@ Center (SSO), or `role_arn` + `source_profile` chaining.
 
 | Model | Dimensions | Texts per request |
 |-------|-----------:|------------------:|
-| `amazon.titan-embed-text-v2:0` | 1024 (or 512, 256) | 1 |
+| `amazon.titan-embed-text-v2:0` | 1024 | 1 |
 | `amazon.titan-embed-text-v1` | 1536 | 1 |
 | `cohere.embed-english-v3` | 1024 | 96 |
 | `cohere.embed-multilingual-v3` | 1024 | 96 |
