@@ -387,20 +387,170 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
    ```bash
    export OPENAI_API_KEY="<your-key>"
    ```
-4. If you see `OPENAI_API_KEY` in the error but are not using OpenAI, the provider may be misconfigured. See [Embedding Providers](./embedding-providers.md) for correct configuration.
+4. If set to `bedrock` (or its aliases `aws` / `aws-bedrock`), no maproom key is needed — verify AWS credentials resolve:
+   ```bash
+   aws sts get-caller-identity
+   ```
+5. If you see `OPENAI_API_KEY` in the error but are not using OpenAI, the provider may be misconfigured. See [Embedding Providers](./embedding-providers.md) for correct configuration.
 
 **Reference:** See [Embedding Providers](./embedding-providers.md) for the full list of supported providers and their required environment variables.
+
+### AWS Bedrock: "No AWS credentials found"
+
+```text
+Error: Failed to create embedding service
+Caused by: No AWS credentials found for the Bedrock embedding provider.
+
+  Tried, in order:
+    - environment (AWS_ACCESS_KEY_ID unset)
+    - web identity (AWS_WEB_IDENTITY_TOKEN_FILE unset)
+    - default profile (not configured)
+    - container credentials (endpoint env vars unset)
+    - EC2 IMDSv2 (not an EC2 instance)
+```
+
+**Cause:** Bedrock signs requests with the standard AWS credential chain and
+found nothing usable. The error lists every source it tried and why each
+failed — read that list first, it is the diagnosis.
+
+**Recovery:**
+
+1. Confirm the machine can authenticate to AWS at all:
+   ```bash
+   aws sts get-caller-identity
+   ```
+2. If that fails, authenticate however your organization does — commonly:
+   ```bash
+   aws sso login --profile my-profile
+   export AWS_PROFILE=my-profile
+   ```
+3. If `aws sts get-caller-identity` succeeds but maproom still fails, the
+   environment maproom runs in differs from your shell. Check that
+   `AWS_PROFILE` is exported (not just set) and visible to the process.
+
+**Exit code:** 2 (configuration error — retrying will not help).
+
+### AWS Bedrock: "AccessDeniedException"
+
+```text
+Error: Access denied invoking amazon.titan-embed-text-v2:0 in us-east-1
+```
+
+**Cause:** Two independent gates control Bedrock access and **both** must be
+open. Authentication succeeding tells you nothing about either.
+
+**Recovery:**
+
+1. **Model access** — in the AWS console, go to **Bedrock > Model access** and
+   enable the embedding model. This is per account *and* per region, and is the
+   more commonly missed of the two.
+2. **IAM** — the calling identity needs `bedrock:InvokeModel` on the model ARN:
+   ```json
+   {
+     "Effect": "Allow",
+     "Action": "bedrock:InvokeModel",
+     "Resource": "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0"
+   }
+   ```
+3. Confirm which identity is actually being used — it may not be the one you
+   expect if a profile or instance role is in play:
+   ```bash
+   aws sts get-caller-identity
+   RUST_LOG=info maproom generate-embeddings   # logs the credential source
+   ```
+
+### AWS Bedrock: model not found in region
+
+```text
+Error: Model 'cohere.embed-english-v3' was not found in region eu-west-2
+```
+
+**Cause:** Bedrock model availability varies by region. The model id is
+probably correct; the region does not offer it.
+
+**Recovery:**
+
+1. List the embedding models actually offered where you are:
+   ```bash
+   # Resolve the region maproom will use, in its own precedence order.
+   # Querying $AWS_REGION alone can inspect a different region than the one
+   # maproom embeds in — which is the confusion this step exists to settle.
+   region="${MAPROOM_BEDROCK_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}}"
+
+   aws bedrock list-foundation-models --region "${region:-us-east-1}" \
+     --query "modelSummaries[?outputModalities[0]=='EMBEDDING'].modelId"
+   ```
+2. Either pick a model that region offers, or point maproom alone at a region
+   that has the model you want, leaving the rest of your AWS tooling unchanged:
+   ```bash
+   export MAPROOM_BEDROCK_REGION=us-east-1
+   ```
+
+### AWS Bedrock: slow scans / throttling
+
+**Symptom:** Embedding generation is much slower than expected. With
+`RUST_LOG=debug`, repeated "retrying in Nms" lines mention throttling.
+
+**Root Cause:** Bedrock enforces a requests-per-minute quota per model per
+region. Titan models embed **one document per request**, so a large scan is
+request-bound. Throttling is retried automatically with backoff, so this shows
+up as slowness rather than failure.
+
+**Fix:** any of —
+
+1. Switch to a Cohere model, which batches 96 texts per request (~96x fewer
+   requests):
+   ```bash
+   export MAPROOM_EMBEDDING_MODEL=cohere.embed-english-v3
+   ```
+2. Lower concurrency so fewer requests are in flight:
+   ```bash
+   export MAPROOM_EMBEDDING_PARALLEL_MAX_CONCURRENCY=6
+   ```
+3. Request a higher **InvokeModel requests per minute** quota for the model in
+   the AWS Service Quotas console.
+
+### AWS Bedrock: "Cannot infer the embedding dimension"
+
+```text
+Error: Cannot infer the embedding dimension for Bedrock model 'arn:aws:bedrock:...'
+```
+
+**Cause:** The model id is not one maproom recognizes — usually a
+provisioned-throughput ARN or a model released after your maproom build.
+
+**Fix:** set the width explicitly.
+
+```bash
+# Use the model's own output width. maproom stores only 768, 1024, and 1536.
+export MAPROOM_EMBEDDING_DIMENSION=1024   # e.g. Titan v2 or Cohere v3
+```
+
+maproom refuses to guess here deliberately: a wrong dimension produces an index
+that builds successfully and then returns no vector-search results.
 
 ### Network Timeout During Vector Search
 
 **Symptom:** `maproom vector-search` hangs or times out during embedding generation. The command does not return results or an error within the expected time frame.
 
-**Root Cause:** The OpenAI API is unreachable due to network connectivity issues. Vector search requires a live API call to generate query embeddings — unlike FTS search, it cannot operate offline.
+**Root Cause:** The embedding API is unreachable due to network connectivity issues. Vector search requires a live API call to generate query embeddings — unlike FTS search, it cannot operate offline. (Ollama is the exception: it runs locally.)
+
+For AWS Bedrock behind a restricted network, confirm the endpoint is reachable
+and, if you route through PrivateLink or an egress proxy, that
+`MAPROOM_BEDROCK_ENDPOINT_URL` points at it.
 
 **Fix:**
-1. Check network connectivity to the OpenAI API:
+1. Check connectivity to the endpoint for *your* configured provider:
    ```bash
+   # OpenAI
    curl -sf https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" > /dev/null && echo "API reachable" || echo "API unreachable"
+
+   # AWS Bedrock (resolves the region maproom uses)
+   region="${MAPROOM_BEDROCK_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}}"
+   curl -sf -o /dev/null "https://bedrock-runtime.${region:-us-east-1}.amazonaws.com" && echo "API reachable" || echo "API unreachable"
+
+   # Ollama (local)
+   curl -sf http://localhost:11434/api/tags > /dev/null && echo "API reachable" || echo "API unreachable"
    ```
 2. Retry the vector-search command (max 3 retries with 2-4-8 second exponential backoff):
    ```bash

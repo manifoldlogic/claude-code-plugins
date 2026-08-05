@@ -303,6 +303,9 @@ When analyzing CLI output, recognize these patterns as **credential issues, not 
 | "invalid_rapt" | Expired Google authentication token | Same as above — refresh ADC credentials |
 | "quota_project_id is required" | Missing GCP quota project configuration | Run: `gcloud auth application-default set-quota-project <project-id>` |
 | "OPENAI_API_KEY" in error when not using OpenAI | Wrong embedding provider configured | Check `MAPROOM_EMBEDDING_PROVIDER` env var; see embedding-providers.md |
+| "No AWS credentials found for the Bedrock embedding provider" | Bedrock configured but the AWS credential chain found nothing | The error lists every source tried; verify with `aws sts get-caller-identity`, or `aws sso login --profile NAME` |
+| "Access denied invoking ... in REGION" (Bedrock) | Model access not enabled, or missing `bedrock:InvokeModel` | Enable the model under Bedrock > Model access for that account+region, and grant the IAM action |
+| "was not found in region" (Bedrock) | Model not offered in that region | Set `MAPROOM_BEDROCK_REGION` to a region that has it |
 
 **IMPORTANT:** If the error matches any pattern above, do NOT:
 - Suggest filing a bug against the CLI
@@ -316,7 +319,7 @@ Instead:
 4. Reference the ADC setup guide for detailed instructions: `../skills/maproom-search/references/adc-setup.md`
 
 **Distinguishing credential errors from actual code bugs:**
-- **Credential issue:** Error message contains "ADC", "token provider", "invalid_rapt", "quota_project_id", or references an API key for a provider you are not using
+- **Credential issue:** Error message contains "ADC", "token provider", "invalid_rapt", "quota_project_id", "No AWS credentials found", "IAM Identity Center token", or references an API key for a provider you are not using
 - **Code bug:** Error message references code paths, panics, segfaults, or describes unexpected behavior that occurs even with valid, fresh credentials
 
 **Security:** Do not include actual credentials, access tokens, or project IDs in your findings output. Use placeholders like `YOUR_PROJECT_ID`.

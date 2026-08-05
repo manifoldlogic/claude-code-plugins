@@ -1,6 +1,6 @@
 # Embedding Provider Comparison
 
-Maproom supports three embedding providers for vector search: Google Vertex AI, OpenAI, and Ollama. This guide helps you choose the right provider and configure it for your environment.
+Maproom supports four embedding providers for vector search: Google Vertex AI, OpenAI, Ollama, and AWS Bedrock. This guide helps you choose the right provider and configure it for your environment.
 
 ## Overview
 
@@ -15,6 +15,7 @@ Embedding providers convert code chunks into numerical vectors (embeddings) that
 | Google Vertex AI | ADC or service account (`GOOGLE_APPLICATION_CREDENTIALS`) | [ADC setup guide](./adc-setup.md) | Free tier available, then per-character pricing ([pricing](https://cloud.google.com/vertex-ai/pricing)) | 768 (`text-embedding-004`) | High quality embeddings; free tier; Google ecosystem integration | Requires GCP project; ADC credentials expire and need refresh | Teams already using Google Cloud; production environments with GCP infrastructure |
 | OpenAI | API key (`OPENAI_API_KEY`) | Set environment variable | ~$0.02 per 1M tokens ([pricing](https://openai.com/api/pricing/)) | 1536 (`text-embedding-3-small`) | Simple API key setup; widely used; high quality | Requires paid API key; higher dimensions increase storage; network-dependent | Quick setup; teams already using OpenAI; when simplicity is preferred |
 | Ollama | None (local) | Install Ollama and pull model | Free (runs locally) | Varies by model (768 for `nomic-embed-text`, 1024 for `mxbai-embed-large`) | Free; fully offline; no credentials needed; data stays local | Requires local compute resources; quality varies by model; slower on CPU | Air-gapped environments; cost-sensitive workflows; local development without API keys |
+| AWS Bedrock | Standard AWS credential chain (no new secret) | Enable model access + `bedrock:InvokeModel` | ~$0.02 per 1M tokens ([pricing](https://aws.amazon.com/bedrock/pricing/)) | 1024 (`amazon.titan-embed-text-v2:0`) | No new API key to manage; works with SSO, EC2/EKS/ECS roles; traffic can stay in a VPC; cheapest cloud option | Requires an AWS account with Bedrock enabled in-region; Titan sends one request per chunk | Teams already on AWS; environments that forbid introducing new long-lived secrets |
 
 > **Pricing disclaimer:** Costs shown are approximate as of Feb 2026 and are subject to change. Always check the linked pricing pages for current rates.
 
@@ -92,6 +93,88 @@ export MAPROOM_EMBEDDING_DIMENSION=1536
 maproom generate-embeddings
 ```
 
+### AWS Bedrock
+
+**Model:** `amazon.titan-embed-text-v2:0` (default)
+**Dimensions:** 1024
+
+Titan v2 can also emit 512- and 256-dimensional vectors, but maproom stores
+embeddings in per-dimension tables and supports only 768, 1024, and 1536.
+Setting `MAPROOM_EMBEDDING_DIMENSION=512` is rejected at startup rather than
+after a full scan.
+**Endpoint:** `bedrock-runtime.REGION.amazonaws.com`
+
+Bedrock has **no maproom-specific API key**. Requests are signed with AWS
+Signature V4 using the same credential chain the `aws` CLI uses. If
+`aws sts get-caller-identity` works on the machine, maproom can resolve
+credentials the same way.
+
+That is an authentication check only. Model access and the
+`bedrock:InvokeModel` permission are separate gates — both must also be in
+place before an embedding call succeeds (see Prerequisites below).
+
+**Prerequisites:**
+
+1. Enable the model under **Bedrock > Model access** in the AWS console (one
+   time, per account, per region). Without this, every request returns
+   `AccessDeniedException` even when IAM is correct.
+2. Grant the caller `bedrock:InvokeModel` on the model ARN.
+
+**Environment variables:**
+
+```bash
+# Set the embedding provider ('aws' and 'aws-bedrock' also work)
+export MAPROOM_EMBEDDING_PROVIDER=bedrock
+
+# Optional: which AWS profile to use (falls back to AWS_PROFILE)
+export MAPROOM_AWS_PROFILE=my-profile
+
+# Optional: region (falls back to AWS_REGION, AWS_DEFAULT_REGION,
+# the profile's region, then us-east-1)
+export MAPROOM_BEDROCK_REGION=us-east-1
+
+# Optional: override model (default: amazon.titan-embed-text-v2:0)
+export MAPROOM_EMBEDDING_MODEL=cohere.embed-english-v3
+
+# Optional: override dimensions (inferred from the model otherwise)
+export MAPROOM_EMBEDDING_DIMENSION=1024
+```
+
+**Credential resolution order:**
+
+1. `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN`)
+2. A named profile (`MAPROOM_AWS_PROFILE` or `AWS_PROFILE`)
+3. Web identity (`AWS_WEB_IDENTITY_TOKEN_FILE` + `AWS_ROLE_ARN`) — EKS IRSA
+4. The `default` profile
+5. ECS task role / EKS Pod Identity
+6. EC2 instance role (IMDSv2)
+
+Profiles may themselves use static keys, `credential_process`, IAM Identity
+Center (SSO), or `role_arn` + `source_profile` chaining.
+
+**Available models:**
+
+| Model | Dimensions | Texts per request |
+|-------|-----------:|------------------:|
+| `amazon.titan-embed-text-v2:0` | 1024 | 1 |
+| `amazon.titan-embed-text-v1` | 1536 | 1 |
+| `cohere.embed-english-v3` | 1024 | 96 |
+| `cohere.embed-multilingual-v3` | 1024 | 96 |
+
+Prefer a Cohere model for large repositories: Bedrock's `InvokeModel` embeds
+one document per call for Titan, so a 50,000-chunk scan is 50,000 requests
+versus roughly 520 with Cohere.
+
+**Generate embeddings:**
+
+```bash
+maproom generate-embeddings
+```
+
+**Private networking:** for VPC/PrivateLink endpoints or an egress proxy, set
+`MAPROOM_BEDROCK_ENDPOINT_URL`. For FIPS 140-3 endpoints, set
+`MAPROOM_BEDROCK_USE_FIPS=true`.
+
 ### Ollama
 
 **Models:** `nomic-embed-text` (768 dimensions), `mxbai-embed-large` (1024 dimensions), and others
@@ -148,7 +231,9 @@ maproom generate-embeddings
 
 Switching embedding providers requires regenerating all embeddings because:
 
-1. **Different dimensions:** Google produces 768-dimensional vectors, OpenAI produces 1536-dimensional vectors, and Ollama dimensions vary by model. These vectors cannot be compared.
+1. **Different dimensions:** Google produces 768-dimensional vectors, OpenAI produces 1536-dimensional vectors, Bedrock's default Titan v2 produces 1024, and Ollama dimensions vary by model. These vectors cannot be compared.
+
+   Note that matching dimensions is *not* sufficient — Bedrock Titan v2 and Ollama `mxbai-embed-large` are both 1024-dimensional but occupy unrelated vector spaces. Re-index when switching between them even though the dimension does not change.
 2. **Different vector spaces:** Even if dimensions matched, each provider's model maps concepts to different coordinates. Cosine similarity scores between vectors from different providers are meaningless.
 
 **To switch providers:**
@@ -171,7 +256,7 @@ maproom vector-search --repo YOUR_REPO --query "test query" --format agent
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `MAPROOM_EMBEDDING_PROVIDER` | Provider selection | `ollama`, `openai`, `google` |
+| `MAPROOM_EMBEDDING_PROVIDER` | Provider selection | `ollama`, `openai`, `google`, `bedrock` |
 | `MAPROOM_EMBEDDING_MODEL` | Model override | `text-embedding-004`, `text-embedding-3-small`, `nomic-embed-text` |
 | `MAPROOM_EMBEDDING_DIMENSION` | Dimension override | `768`, `1536`, `1024` |
 | `OPENAI_API_KEY` | OpenAI API key | `sk-...` (placeholder) |
@@ -179,6 +264,11 @@ maproom vector-search --repo YOUR_REPO --query "test query" --format agent
 | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON | `/path/to/key.json` |
 | `GOOGLE_PROJECT_ID` | Google Cloud project ID | `YOUR_PROJECT_ID` |
 | `MAPROOM_GOOGLE_PROJECT_ID` | Google Cloud project ID (prefixed) | `YOUR_PROJECT_ID` |
+| `MAPROOM_AWS_PROFILE` | AWS shared-config profile for Bedrock | `my-profile` |
+| `AWS_PROFILE` | AWS profile (fallback) | `my-profile` |
+| `MAPROOM_BEDROCK_REGION` | Bedrock region override | `us-east-1` |
+| `MAPROOM_BEDROCK_ENDPOINT_URL` | Bedrock endpoint override (VPC/proxy) | `https://vpce-...amazonaws.com` |
+| `MAPROOM_BEDROCK_USE_FIPS` | Use the region's FIPS endpoint | `true` |
 
 ## FAQ
 
@@ -199,6 +289,7 @@ No. Full-text search uses SQLite FTS5 indexes and does not involve embeddings at
 - If you have no API keys and want to get started quickly, use **Ollama** (free, local, no setup beyond installation).
 - If you already have an OpenAI API key, use **OpenAI** (simplest cloud setup).
 - If your team uses Google Cloud, use **Google Vertex AI** (best integration with GCP tooling).
+- If your team is on AWS, use **AWS Bedrock** — it is the cheapest cloud option and introduces no new secret, since it reuses whatever already authenticates the `aws` CLI.
 
 ### Do higher dimensions mean better search quality?
 
@@ -216,6 +307,8 @@ The `generate-embeddings` command will fail mid-process. Refresh your credential
 - [Google Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing) - Official Google Cloud pricing
 - [OpenAI API Pricing](https://openai.com/api/pricing/) - Official OpenAI pricing
 - [Ollama](https://ollama.com/) - Official Ollama website and documentation
+- [AWS Bedrock Pricing](https://aws.amazon.com/bedrock/pricing/) - Official AWS pricing
+- [AWS Bedrock model support by region](https://docs.aws.amazon.com/bedrock/latest/userguide/models-regions.html)
 
 ---
 

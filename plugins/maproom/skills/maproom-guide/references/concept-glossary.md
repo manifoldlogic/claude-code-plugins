@@ -96,7 +96,9 @@ This is the score you see in vector search results. See [result-interpretation.m
 
 ### Provider Incompatibility
 
-Different embedding providers (Google Vertex AI, OpenAI, Ollama) produce vectors in different mathematical spaces. Embeddings from one provider **cannot be compared** with embeddings from another. If you switch providers, you must regenerate all embeddings with `maproom generate-embeddings`.
+Different embedding providers (Google Vertex AI, OpenAI, Ollama, AWS Bedrock) produce vectors in different mathematical spaces. Embeddings from one provider **cannot be compared** with embeddings from another. If you switch providers, you must regenerate all embeddings with `maproom generate-embeddings`.
+
+Matching dimensions do **not** imply compatibility. Bedrock's `amazon.titan-embed-text-v2:0` and Ollama's `mxbai-embed-large` are both 1024-dimensional, but their coordinates mean entirely different things — similarity scores between them are noise. Re-index on any provider or model change, even when the dimension is unchanged.
 
 ---
 
