@@ -10,7 +10,7 @@ Every maproom error falls into one of five categories. Identifying the category 
 
 | Category | Caused By | User-Actionable? | Examples |
 |---|---|---|---|
-| **Credential** | Expired tokens, missing API keys, wrong provider | Yes — refresh or configure | ADC expiry, missing OPENAI_API_KEY |
+| **Credential** | Expired tokens, missing API keys, wrong provider | Yes — refresh or configure | ADC expiry, missing OPENAI_API_KEY, expired AWS SSO session |
 | **Index** | Repo not scanned, stale data, missing embeddings | Yes — scan or regenerate | "No repositories indexed", stale results |
 | **CLI** | Binary missing, wrong version, invalid flags | Yes — install or fix syntax | "command not found", invalid flag value |
 | **Query** | Wrong search type, bad filters, special chars | Yes — reformulate query | Zero results, irrelevant results |
@@ -32,10 +32,11 @@ Every maproom error falls into one of five categories. Identifying the category 
 
 ### Why Credentials Expire
 
-Maproom's vector search and embedding generation call external APIs (Google Vertex AI by default, or OpenAI). These APIs require authentication tokens that expire periodically as a security measure.
+Maproom's vector search and embedding generation call external APIs (Google Vertex AI by default, or OpenAI, or AWS Bedrock). These APIs require authentication tokens that expire periodically as a security measure.
 
 - **Google ADC tokens** expire after ~1 hour and are automatically refreshed — but the refresh token itself can expire after extended periods of inactivity
 - **OpenAI API keys** don't expire by time, but can be revoked or rate-limited
+- **AWS SSO sessions** expire after the session duration configured by the account (commonly 8-12 hours); `aws sso login --profile NAME` re-establishes them. Instance-role and IRSA credentials refresh automatically and rarely surface as errors.
 
 ### How to Recognize Credential Errors
 
@@ -46,6 +47,9 @@ Credential errors contain one of these patterns in the error message:
 - "invalid_rapt"
 - "quota_project_id is required"
 - References to `OPENAI_API_KEY` when you're not using OpenAI
+- "No AWS credentials found for the Bedrock embedding provider" (Bedrock; the message lists every source that was tried)
+- "No valid IAM Identity Center token cached" (Bedrock via SSO — run `aws sso login`)
+- "AWS profile 'NAME' not found" (Bedrock; the message lists the profiles that do exist)
 
 **Note:** The top-level error message is usually "Failed to create embedding service". The specific credential detail (ADC, token provider, etc.) appears in the `Caused by` chain below it. An agent scanning only the first line of error output should match on "Failed to create embedding service" as the primary pattern.
 
@@ -63,7 +67,29 @@ Credential errors contain one of these patterns in the error message:
 
 1. **Don't investigate maproom source code** — credential errors are expected operational events
 2. **Fall back to FTS** — `maproom search` works entirely locally, no credentials needed
-3. **Refresh credentials** when convenient — see [ADC setup guide](../../maproom-search/references/adc-setup.md)
+3. **Refresh credentials** when convenient — see [ADC setup guide](../../maproom-search/references/adc-setup.md) for Google, or `aws sso login --profile NAME` for AWS Bedrock
+
+### Bedrock-specific credential notes
+
+Bedrock has no maproom API key — it signs requests with the standard AWS
+credential chain. That changes diagnosis in two useful ways:
+
+- The "no credentials" error **enumerates every source it tried** (environment,
+  named profile, web identity, default profile, container endpoint, IMDSv2) and
+  why each failed. Read that list before investigating anything else.
+- `aws sts get-caller-identity` is an independent check. If it succeeds and
+  maproom still fails, the problem is authorization (IAM or model access), not
+  authentication.
+
+Two distinct gates cause `AccessDeniedException`, and both must be open:
+
+1. **Model access** — enable the model under **Bedrock > Model access** in the
+   AWS console, per account and per region.
+2. **IAM** — the caller needs `bedrock:InvokeModel` on the model ARN.
+
+A `ResourceNotFoundException` naming the region usually means the model is not
+offered there, not that the id is wrong — Bedrock model availability varies by
+region.
 
 ---
 
