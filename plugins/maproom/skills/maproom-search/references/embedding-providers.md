@@ -106,7 +106,12 @@ after a full scan.
 
 Bedrock has **no maproom-specific API key**. Requests are signed with AWS
 Signature V4 using the same credential chain the `aws` CLI uses. If
-`aws sts get-caller-identity` works on the machine, maproom will work.
+`aws sts get-caller-identity` works on the machine, maproom can resolve
+credentials the same way.
+
+That is an authentication check only. Model access and the
+`bedrock:InvokeModel` permission are separate gates — both must also be in
+place before an embedding call succeeds (see Prerequisites below).
 
 **Prerequisites:**
 

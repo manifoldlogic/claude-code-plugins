@@ -387,7 +387,7 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
    ```bash
    export OPENAI_API_KEY="<your-key>"
    ```
-4. If set to `bedrock`, no maproom key is needed — verify AWS credentials resolve:
+4. If set to `bedrock` (or its aliases `aws` / `aws-bedrock`), no maproom key is needed — verify AWS credentials resolve:
    ```bash
    aws sts get-caller-identity
    ```
@@ -397,7 +397,7 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
 
 ### AWS Bedrock: "No AWS credentials found"
 
-```
+```text
 Error: Failed to create embedding service
 Caused by: No AWS credentials found for the Bedrock embedding provider.
 
@@ -432,7 +432,7 @@ failed — read that list first, it is the diagnosis.
 
 ### AWS Bedrock: "AccessDeniedException"
 
-```
+```text
 Error: Access denied invoking amazon.titan-embed-text-v2:0 in us-east-1
 ```
 
@@ -461,7 +461,7 @@ open. Authentication succeeding tells you nothing about either.
 
 ### AWS Bedrock: model not found in region
 
-```
+```text
 Error: Model 'cohere.embed-english-v3' was not found in region eu-west-2
 ```
 
@@ -472,11 +472,16 @@ probably correct; the region does not offer it.
 
 1. List the embedding models actually offered where you are:
    ```bash
-   aws bedrock list-foundation-models --region "$AWS_REGION" \
+   # Resolve the region maproom will use, in its own precedence order.
+   # Querying $AWS_REGION alone can inspect a different region than the one
+   # maproom embeds in — which is the confusion this step exists to settle.
+   region="${MAPROOM_BEDROCK_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}}"
+
+   aws bedrock list-foundation-models --region "${region:-us-east-1}" \
      --query "modelSummaries[?outputModalities[0]=='EMBEDDING'].modelId"
    ```
-2. Either pick an available model, or point only maproom at a region that has
-   the one you want:
+2. Either pick a model that region offers, or point maproom alone at a region
+   that has the model you want, leaving the rest of your AWS tooling unchanged:
    ```bash
    export MAPROOM_BEDROCK_REGION=us-east-1
    ```
@@ -507,7 +512,7 @@ up as slowness rather than failure.
 
 ### AWS Bedrock: "Cannot infer the embedding dimension"
 
-```
+```text
 Error: Cannot infer the embedding dimension for Bedrock model 'arn:aws:bedrock:...'
 ```
 
@@ -517,7 +522,8 @@ provisioned-throughput ARN or a model released after your maproom build.
 **Fix:** set the width explicitly.
 
 ```bash
-export MAPROOM_EMBEDDING_DIMENSION=1024
+# Use the model's own output width. maproom stores only 768, 1024, and 1536.
+export MAPROOM_EMBEDDING_DIMENSION=1024   # e.g. Titan v2 or Cohere v3
 ```
 
 maproom refuses to guess here deliberately: a wrong dimension produces an index
@@ -534,9 +540,17 @@ and, if you route through PrivateLink or an egress proxy, that
 `MAPROOM_BEDROCK_ENDPOINT_URL` points at it.
 
 **Fix:**
-1. Check network connectivity to the OpenAI API:
+1. Check connectivity to the endpoint for *your* configured provider:
    ```bash
+   # OpenAI
    curl -sf https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" > /dev/null && echo "API reachable" || echo "API unreachable"
+
+   # AWS Bedrock (resolves the region maproom uses)
+   region="${MAPROOM_BEDROCK_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}}"
+   curl -sf -o /dev/null "https://bedrock-runtime.${region:-us-east-1}.amazonaws.com" && echo "API reachable" || echo "API unreachable"
+
+   # Ollama (local)
+   curl -sf http://localhost:11434/api/tags > /dev/null && echo "API reachable" || echo "API unreachable"
    ```
 2. Retry the vector-search command (max 3 retries with 2-4-8 second exponential backoff):
    ```bash
