@@ -188,7 +188,10 @@ fi
 # ===========================================================================
 human_echo "Check 3: Bare search commands in SKILL.md (only in Output Formats section)"
 # Find search/vector-search commands that do NOT include --format agent
-bare_lines=$(grep -n "maproom search\|maproom vector-search" "$SKILL_MD" | grep -v "\-\-format agent" || true)
+# --format agent exists to conserve agent context in command OUTPUT. `--help`
+# prints usage text, not search results, so it is out of scope for this rule --
+# as are prose mentions of the command (filtered below, matching Check 4).
+bare_lines=$(grep -n "maproom search\|maproom vector-search" "$SKILL_MD" | grep -v "\-\-format agent" | grep -v "\-\-help" || true)
 if [ -n "$bare_lines" ]; then
   # Find the line range for the Output Formats section
   # Start: line with "## Output Formats"
@@ -208,7 +211,10 @@ if [ -n "$bare_lines" ]; then
       continue
     fi
     line_num=$(echo "$line" | cut -d: -f1)
-    if [ -n "$section_start" ] && [ "$line_num" -ge "$section_start" ] && [ "$line_num" -lt "$section_end" ]; then
+    content=$(echo "$line" | sed 's/^[0-9]*://')
+    if ! echo "$content" | grep -qE "^\s*(maproom|\\\$\s*maproom)"; then
+      : # Prose mention, not a command invocation (same rule as Check 4)
+    elif [ -n "$section_start" ] && [ "$line_num" -ge "$section_start" ] && [ "$line_num" -lt "$section_end" ]; then
       : # Inside Output Formats section, acceptable
     else
       bare_outside_section=$((bare_outside_section + 1))
@@ -235,7 +241,7 @@ fi
 # ===========================================================================
 human_echo "Check 4: Bare search commands in multi-repo-guide.md (zero in code blocks)"
 # Find lines with search commands missing --format agent
-bare_lines=$(grep -n "maproom search\|maproom vector-search" "$MULTI_REPO_MD" | grep -v "\-\-format agent" || true)
+bare_lines=$(grep -n "maproom search\|maproom vector-search" "$MULTI_REPO_MD" | grep -v "\-\-format agent" | grep -v "\-\-help" || true)
 if [ -z "$bare_lines" ]; then
   report_pass "No bare search commands found"
   json_add_result 4 "Bare search commands in multi-repo-guide.md" "pass" 0 0 "No bare search commands found"
