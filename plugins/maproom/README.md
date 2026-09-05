@@ -19,13 +19,18 @@ The Maproom plugin provides semantic code search capabilities powered by the map
 
 Search across multiple repositories by configuring repo-specific search strategies and agent guidance.
 
+Cross-repo search also needs every repo indexed into **one shared database** — in practice
+one shared Postgres, because repos indexed into separate SQLite files can only be searched
+one at a time. Export the same `MAPROOM_DATABASE_URL` for every repo before you scan (see
+[Which backend?](#which-backend)).
+
 1. Copy the configuration template to your workspace root:
    ```bash
    cp plugins/maproom/skills/maproom-search/templates/maproom-repos.yaml ./maproom-repos.yaml
    ```
 2. Customize repo entries for your workspace (paths, descriptions, search guidance)
 3. Set environment variables for path portability (`MAPROOM_REPOS_ROOT`, `MAPROOM_SPECS_ROOT`)
-4. Index each repo with `maproom scan`
+4. Index each repo with `maproom scan`, with that same shared `MAPROOM_DATABASE_URL` set
 
 See [multi-repo-guide.md](skills/maproom-search/references/multi-repo-guide.md) for detailed setup instructions, search strategies by repo type, and cross-repo search patterns.
 
@@ -38,8 +43,44 @@ Before using the Maproom plugin, ensure you have:
    ```bash
    maproom --version
    ```
-3. **Indexed database**: Your codebase must be scanned using `maproom scan` before searching
-4. **Database location**: The maproom database is typically located at `~/.maproom/maproom.db` (can be overridden with `MAPROOM_DATABASE_URL` environment variable)
+   Builds differ in which features and embedding providers they include, so treat
+   `maproom --help` — which lists the subcommands and environment variables your build
+   supports — as the source of truth rather than any doc, this one included.
+3. **A database, on one of two backends**: maproom chooses its backend at runtime from
+   `MAPROOM_DATABASE_URL` (a `--database-url` flag overrides the env var):
+   - `sqlite://…` — or a plain filesystem path — selects **SQLite**. This is the default,
+     at `~/.maproom/maproom.db`.
+   - `postgres://…` / `postgresql://…` selects **PostgreSQL**. This requires a binary built
+     with `--features postgres`.
+4. **Indexed content**: your codebase must be scanned with `maproom scan` before searching
+
+### Which backend?
+
+One repo on one machine: SQLite is fine — set nothing.
+
+A multi-repo fleet: point **every** repo at **one shared Postgres**. That single shared
+database is what makes cross-repo search work; repos indexed into separate SQLite files
+can only ever be searched one at a time. A typical devcontainer URL:
+
+```bash
+export MAPROOM_DATABASE_URL=postgres://maproom:maproom@host.docker.internal:5433/maproom
+```
+
+### Devcontainer trap: `host.docker.internal`, never `localhost`
+
+The shared Postgres container runs on the **host** docker daemon, so from inside a
+devcontainer it must be reached at `host.docker.internal`. Inside the container,
+`localhost:5433` is frequently a *different*, throwaway Postgres — for example a
+tmpfs-backed instance used by `cargo test` — whose data vanishes when the container stops.
+
+Pointing maproom at `localhost` raises no error. Scans succeed, `maproom status` looks
+healthy, and the data is simply missing later. If indexed content keeps disappearing,
+check the host in your URL first:
+
+```bash
+echo $MAPROOM_DATABASE_URL
+pg_isready -h host.docker.internal -p 5433
+```
 
 To verify your setup:
 ```bash
@@ -49,7 +90,7 @@ maproom --version
 # Index your repository
 maproom scan
 
-# Verify indexing succeeded
+# Verify indexing succeeded (also lists the indexed repo names)
 maproom status
 ```
 
@@ -111,7 +152,9 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Solution**:
 - Run `maproom scan` to index your codebase
 - Check indexing status: `maproom status`
-- Verify database exists: `ls -la ~/.maproom/maproom.db`
+- Confirm which database you are actually talking to: `echo $MAPROOM_DATABASE_URL`. On
+  SQLite, `ls -la ~/.maproom/maproom.db`; on Postgres,
+  `pg_isready -h host.docker.internal -p 5433` (see the devcontainer trap above)
 
 ### No Results Found
 **Problem**: Searches return no results or irrelevant matches
@@ -122,6 +165,10 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Check if the repository is actually indexed: `maproom status`
 - Verify file types are indexed (use `--file-type` filter if needed)
 - Try different search modes: hybrid (default), fts, or vector
+- `--repo` matches the **indexed repo name** (derived from the git origin, suffix
+  fuzzy-matched), not the directory name on disk. A directory called `django-olympics`
+  indexed as `django/django` is found by `--repo django`; `--repo django-olympics`
+  returns zero hits with no error. List the indexed names with `maproom status`
 - For very recent code changes, re-index: `maproom scan --force`
 
 ### Stale Results
@@ -130,6 +177,8 @@ Uses context expansion to show where validateCart is called throughout the codeb
 **Solution**:
 - Re-index the repository: `maproom scan`
 - The daemon auto-refreshes but may need manual reindexing for major changes
+- Scanning and watching refresh **chunks only**. Embeddings are a separate, scheduled
+  job — see [Index Maintenance](#index-maintenance)
 
 ### Performance Issues
 **Problem**: Searches are slow or timing out
@@ -138,7 +187,15 @@ Uses context expansion to show where validateCart is called throughout the codeb
 - Reduce the number of results requested (use `k` parameter)
 - Use FTS mode for exact keyword matches (faster than semantic search)
 - Check database size: large databases may need optimization
-- Ensure SQLite isn't locked by another process
+- On the SQLite backend, ensure the database isn't locked by another process
+- On the Postgres backend, `pool timed out while waiting for an open connection` from
+  maproom (with `Connection refused` from `psql`) almost always means the Postgres
+  container is not running, or you are pointed at the wrong host — it is *not* a file
+  permissions problem. Check `pg_isready -h host.docker.internal -p 5433`, then start
+  the host container. The same error appears transiently when something else is
+  saturating the database, so check `pg_stat_activity` for long-running statements
+  before concluding the container is down. See
+  [maproom-guide](skills/maproom-guide/SKILL.md) for the full diagnosis path
 
 ## Skills & Agents
 
@@ -157,7 +214,10 @@ The maproom plugin includes specialized skills and agents for different tasks:
 
 ## Index Maintenance
 
-The maproom semantic index requires periodic scanning to stay current with codebase changes.
+Keeping the index healthy takes **two** jobs, and only one of them is scanning. Scanning
+maintains chunks. It does not maintain embeddings.
+
+### 1. Chunks: periodic scanning
 
 **Recommended scan frequency:**
 - **Active repositories** (daily commits): Run `maproom scan` daily or before research sessions
@@ -169,10 +229,52 @@ The maproom semantic index requires periodic scanning to stay current with codeb
 maproom scan [--repo-path /path/to/repo]
 ```
 
-**Index freshness check:**
+### 2. Embeddings: a periodic `generate-embeddings` job (required)
+
+Neither `maproom scan` nor a file watcher regenerates embeddings. The incremental
+processor **deletes** the embeddings for chunks that changed and never recreates them, so
+embedding coverage decays continuously as you work. Documentation anywhere claiming that
+"watch keeps the index fresh" is true for chunks and **false** for embeddings.
+
+The decay is silent, because losing embeddings does not break search: with zero
+embeddings `maproom search` still returns results by falling back to full-text and
+structural ranking. Only vector search and semantic ranking quietly go away. Never infer
+coverage from "search still works" — check it:
+
 ```bash
-maproom status  # Shows last scan timestamp
+maproom status   # per repo, e.g. "Embeddings: 0 (0.0%)"
 ```
+
+Hold coverage by scheduling `maproom generate-embeddings` on cron or your process
+manager. Two things to know before you write that job:
+
+- **Bound each pass and loop until pending reaches zero.** An unbounded pass dies at
+  scale — and gets worse the more chunks you have already embedded — with
+  `Failed to fetch chunks ... canceling statement due to statement timeout`. The failure
+  therefore shows up *late*, just as the job is closest to finishing.
+- **Batch size is a blast-radius decision.** A single failed provider sub-batch fails the
+  whole pipeline batch; these failures are transient and self-heal on the next pass, so a
+  bounded loop converges.
+
+Run `maproom generate-embeddings --help` for the current flags on your binary. For
+provider configuration (Ollama, Google/Vertex, OpenAI, and — where your build includes it
+— Bedrock), batch and concurrency tuning, and the model/dimension constraints on
+switching embedding models, see
+[maproom-guide](skills/maproom-guide/SKILL.md).
+
+### Index freshness check
+
+```bash
+maproom status
+```
+
+**"Last scan" is not a freshness signal.** `maproom status` prints a per-worktree
+"Last scan" timestamp that is *not* updated when an incremental scan finds the git tree
+SHA unchanged — it logs `No changes detected (tree SHA match), skipping scan` and leaves
+the old timestamp alone. A months-old "Last scan" therefore usually means "nothing has
+changed since then", not "the index is stale"; judging staleness by this field leads to
+pointless full re-scans. To really test freshness, search for a symbol you know was added
+recently, or compare the repo's current HEAD against what the index recorded.
 
 **Note:** The maproom-researcher agent does NOT automatically trigger index scans. Users must ensure the index is current before invoking the agent for accurate semantic search results.
 
@@ -180,7 +282,7 @@ maproom status  # Shows last scan timestamp
 
 ### Monthly CLI Verification
 
-**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is at v0.1.0 (pre-release), where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
+**Purpose:** Detect maproom CLI flag deprecation or behavior changes before agents encounter failures. The CLI is pre-1.0, where breaking changes are allowed per semver. 52 command examples across plugin documentation depend on 6 CLI flags; if any flag is renamed or removed, agents will learn deprecated syntax and encounter command failures.
 
 **Automation:** This procedure is automated via GitHub Actions (see `.github/workflows/monthly-cli-verification.yml`). The workflow runs on the first Friday of each month and creates a GitHub issue if drift is detected. Manual execution is still supported for ad-hoc verification using the `workflow_dispatch` trigger or by running the script directly:
 ```bash
@@ -199,20 +301,20 @@ bash plugins/maproom/scripts/monthly-cli-verification.sh
   ```bash
   cd plugins/maproom
   ```
-- [ ] Run `maproom --version` and verify the version matches the documented version (currently 0.1.0):
+- [ ] Run `maproom --version` and record it; if it has moved since the last verification, treat every flag check below as required:
   ```bash
   maproom --version
   ```
-- [ ] Run `maproom search --help` and verify all expected flags are present:
+- [ ] Run `maproom search --help` and check the flags it prints against the baseline
+  deliverable named below — the baseline is where the expected flag list lives, so it is
+  not duplicated here:
   ```bash
   maproom search --help
   ```
-  Confirm these 5 flags exist in the `search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`
-- [ ] Run `maproom vector-search --help` and verify all expected flags are present:
+- [ ] Run `maproom vector-search --help` and check it against the same baseline:
   ```bash
   maproom vector-search --help
   ```
-  Confirm all 6 flags exist in the `vector-search` subcommand: `--format`, `--kind`, `--lang`, `--preview`, `--preview-length`, `--threshold`
 - [ ] Compare output against the baseline verification deliverable and check for any discrepancies (new flags, removed flags, renamed flags, changed defaults, changed accepted values):
   - **Baseline deliverable:** `planning/deliverables/cli-flag-verification.md` (located at the ticket level in your specs directory)
   - **Full path:** `/path/to/specs/tickets/<ticket-name>/planning/deliverables/cli-flag-verification.md`

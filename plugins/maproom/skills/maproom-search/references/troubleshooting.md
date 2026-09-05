@@ -2,9 +2,88 @@
 
 Detailed error recovery for common maproom issues, including edge case handling for boundary conditions and concurrency scenarios. This is a companion to the quick-reference troubleshooting section in [SKILL.md](../SKILL.md) — start there for quick fixes, and use this file when you need root cause analysis or step-by-step recovery.
 
+---
+
+## First: Which Storage Backend Are You On?
+
+Answer this before diagnosing anything else. maproom ships with **two storage backends**, and the
+failure modes, the error strings and the fixes are different for each. Most of the older material
+in this document was written against a single-repo SQLite database and is labelled accordingly.
+
+**The backend is chosen at runtime from `MAPROOM_DATABASE_URL`:**
+
+| Value of `MAPROOM_DATABASE_URL` | Backend |
+|---|---|
+| unset, a plain filesystem path, or `sqlite://...` | SQLite — the default, `~/.maproom/maproom.db` |
+| `postgres://...` or `postgresql://...` | PostgreSQL — requires a build compiled with `--features postgres` |
+
+A `--database-url` flag overrides the environment variable. Postgres support is a **build feature,
+not a guarantee**: run `maproom --help` to see the subcommands and environment variables your build
+actually supports before assuming it is available.
+
+```bash
+# What am I actually pointed at?
+echo "$MAPROOM_DATABASE_URL"
+maproom status
+```
+
+**Why it matters:** a SQLite database is a file you own, so permissions and local disk space are
+real failure modes. A Postgres database is a server you reach over TCP, so *its* failure modes are
+"container not running", "wrong host", "statement timeout" and "connection pool exhausted".
+Applying a SQLite fix (`chmod`, deleting `maproom.db-wal`) to a Postgres problem accomplishes
+nothing at all.
+
+### Multi-repo fleets share one Postgres database
+
+Cross-repo search only works when every repo is indexed into the **same** database, so a fleet
+points every scanner, watcher and search at one shared Postgres instance:
+
+```bash
+export MAPROOM_DATABASE_URL="postgres://maproom:maproom@host.docker.internal:5433/maproom"
+```
+
+### Devcontainer trap: `localhost:5433` is not the fleet database
+
+**This one destroys data silently and produces no error at all.** In a devcontainer the shared
+Postgres container normally runs on the **host** docker daemon and must be reached at
+`host.docker.internal`. Inside the container, `localhost:5433` may be a *different*, throwaway
+Postgres — for example a tmpfs-backed instance used only by `cargo test` — whose data vanishes when
+the container stops.
+
+Pointing maproom at `localhost` indexes happily into that disposable database. Nothing errors. You
+find out later, when searches come back empty and `maproom status` no longer lists repos you know
+you scanned.
+
+```bash
+# Confirm the fleet database is reachable at the host address
+pg_isready -h host.docker.internal -p 5433
+```
+
+### Postgres schema facts worth knowing before you debug
+
+- `code_embeddings` holds **one row per `blob_sha`**, with a `UNIQUE` constraint on `blob_sha`. A
+  blob that already has a row is skipped by incremental runs — this is the root of the model
+  switching corruption described in
+  [Switching Embedding Models Requires Deleting the Old Rows](#switching-embedding-models-requires-deleting-the-old-rows).
+- Vectors live in **fixed per-dimension columns** — `embedding_768`, `embedding_1024` and
+  `embedding_1536`, each with its own HNSW index. A model emitting any other dimension has nowhere
+  to be stored.
+- `code_embeddings` has **no foreign key to `chunks`**, so deleting chunks leaves orphan embedding
+  rows behind. They are harmless, but they accumulate.
+
+---
+
 ## Debugging Workflow
 
 When a search command fails or produces unexpected results, follow this systematic workflow:
+
+**0. Identify the storage backend** — every branch below depends on it
+```bash
+echo "$MAPROOM_DATABASE_URL"
+# empty, or a path -> SQLite (~/.maproom/maproom.db); permissions and disk are in play
+# postgres://...   -> shared Postgres; connectivity and timeouts are in play, not permissions
+```
+See [First: Which Storage Backend Are You On?](#first-which-storage-backend-are-you-on).
 
 **1. Verify CLI installed**
 ```bash
@@ -17,6 +96,11 @@ command -v maproom
 maproom --version
 # Expected: >= 0.1.0 (minimum version for this documentation)
 ```
+Behavior differs between builds. The edge-case tables at the end of this document were measured on
+CLI v0.1.0 against SQLite; the Postgres and embedding-pipeline material was measured on CLI 0.3.0
+against Postgres 16 with pgvector. Provider and feature availability is **not** uniform across
+builds — confirm anything load-bearing against your own binary with `maproom --help` rather than
+trusting a list in any document.
 
 **3. Verify database status**
 ```bash
@@ -39,9 +123,194 @@ maproom search --repo <repo> --query "test" --format agent --debug
 If all steps pass but your specific search still fails, check:
 - Query syntax (special characters may need quoting)
 - Filter values (case-sensitive: `func` not `Func`, `py` not `PY`)
-- Repository name (must match indexed name exactly)
+- Repository name — `--repo` matches the **indexed** name (derived from the git origin) with suffix
+  fuzzy-matching, not the directory name on disk; see
+  [Silent Zero Hits from a Repo-Name Mismatch](#silent-zero-hits-from-a-repo-name-mismatch)
 
 ---
+
+### Connection Pool Timeout or "Connection refused" (Postgres backend)
+
+**Symptom:** maproom fails with a pool timeout. From maproom:
+
+```
+pool timed out while waiting for an open connection
+```
+
+and `psql` or `pg_isready` against the same URL reports:
+
+```
+Connection refused
+```
+
+**Root Cause:** On a Postgres setup this almost always means the **Postgres container is not
+running**, or you are pointed at the wrong host. It is **not** a file-permissions problem. The
+`chmod` recovery under [Permission Denied on Database (GAP-005)](#permission-denied-on-database-gap-005)
+applies to the **SQLite backend only** — on Postgres there are no database files to `chmod` and
+running those commands changes nothing.
+
+The same pool timeout also appears **transiently** when something else is saturating the database's
+CPU: a runaway `ANALYZE`, a heavy hand-written query, a large scan. Rule that out before concluding
+the server is down.
+
+**Fix:**
+1. Is the server reachable at all?
+   ```bash
+   pg_isready -h host.docker.internal -p 5433
+   ```
+2. If the connection is refused, start the Postgres container **on the host docker daemon** (not
+   inside the devcontainer), then retry.
+3. If `pg_isready` succeeds but maproom still times out, the pool is being starved. Look for
+   long-running statements before restarting anything:
+   ```sql
+   select pid, now() - query_start as runtime, state, left(query, 120)
+   from pg_stat_activity
+   where state <> 'idle'
+   order by runtime desc;
+   ```
+   Wait for or cancel the offending statement, then retry.
+4. Confirm you are pointed at the fleet database and not a throwaway one — see
+   [Devcontainer trap: `localhost:5433` is not the fleet database](#devcontainer-trap-localhost5433-is-not-the-fleet-database).
+
+**Prevention:** Keep the shared Postgres container on a restart policy such as `unless-stopped`, and
+serialize heavy maintenance (full re-scans, `ANALYZE`, bulk embedding passes) so it does not overlap
+with interactive searching.
+
+### The Entire Watcher Fleet Disappeared
+
+**Symptom:** `pm2 list` prints an empty table. Every per-repo maproom watcher is gone at once, yet
+the pm2 God daemon is still alive and answering.
+
+**Root Cause:** pm2 lost its in-memory process list. This is a pm2-level event, not a maproom one —
+the watchers did not fail individually, the whole fleet vanished together.
+
+**Fix:**
+```bash
+pm2 resurrect   # restores every watcher from ~/.pm2/dump.pm2
+pm2 list        # confirm the fleet is back
+```
+
+**Prevention:** Run `pm2 save` after adding or changing watchers so `~/.pm2/dump.pm2` is current —
+`pm2 resurrect` can only restore what was saved. Without knowing about `resurrect`, the obvious but
+wrong recovery is to hand-rebuild N watchers one at a time, losing their original configuration.
+
+### Scan Run Reports Success but One Repo Is Only Half Indexed
+
+**Symptom:** A fleet-wide scan finishes and the aggregate run looks clean — every repo reports
+success. Later, searches against one particular repo miss files you know exist.
+
+**Root Cause:** Scanning a large repo on a slow mount (FUSE, virtiofs, a network filesystem) can
+exceed a wrapping timeout **mid-scan**. That repo is left partially refreshed while every other repo
+in the run succeeds, so the run-level summary hides the failure. Measured example: a 1,328-file docs
+repo died at roughly 30% under a 1800s cap, and needed about 2,326s to finish when run unbounded.
+
+**Fix:**
+1. Re-scan the affected repo on its own, with no timeout wrapper (or a far larger one), and let it
+   run to completion.
+2. Confirm coverage afterwards by searching for a file or symbol you know sits late in the traversal.
+
+**Prevention:** Budget scan timeouts against the *slowest* repo on the *slowest* mount, not the
+average one. Treat any per-repo scan that ends at almost exactly your timeout value as a failure,
+even when the surrounding job reports success.
+
+### Silent Zero Hits from a Repo-Name Mismatch
+
+**Symptom:** A search that should obviously match returns **zero results, with no error and exit
+code 0**.
+
+**Root Cause:** `--repo` matches the **indexed repo name** — derived from the git origin, not the
+directory name on disk — with suffix fuzzy-matching. A directory named `django-olympics` whose
+origin is `django/django` is indexed as `django/django`: `--repo django` finds it, while
+`--repo django-olympics` returns zero hits and says nothing at all.
+
+**Fix:**
+```bash
+# List the indexed names, then search using one of those
+maproom status
+maproom search --repo django --query "middleware" --format agent
+```
+
+**Prevention:** When a search comes back silently empty, suspect the repo name before you suspect
+the index. A name that fuzzy-matches nothing can return an empty result set rather than
+`Error: Repository not found`, so empty results are never proof that a repo is indexed and healthy.
+See also [Zero Results with Valid Query](#zero-results-with-valid-query) for case-sensitive filter
+values, which fail the same silent way.
+
+### generate-embeddings Stalls Near the Finish Line
+
+**Symptom:** Embedding generation ran fine for hours, then every pass began failing — and the closer
+coverage gets to complete, the more reliably it dies:
+
+```
+Failed to fetch chunks ... canceling statement due to statement timeout
+```
+
+**Root Cause:** The pending-chunk query is a `NOT IN` subquery whose cost grows with the size of
+`code_embeddings`, and maproom pins `statement_timeout` to **5000ms** on every connection (set in
+`after_connect`; there is no environment override). The job therefore gets **slower as it succeeds**,
+until the pending-chunk fetch alone exceeds 5 seconds.
+
+Measured on ~195k chunks with ~113k rows already embedded: fetching **40,000** pending chunks blew
+the 5s timeout and every pass died. Bounding the pass to **10,000** completed the same fetch in
+about 0.73s.
+
+**Fix:**
+1. **Bound every pass** — on the order of 10,000 chunks — and loop until the pending count reaches
+   zero. Run `maproom generate-embeddings --help` to see the flag that bounds a pass on your binary.
+2. Run bounded passes in a loop rather than trying to finish in one shot. Each pass is independent;
+   chunks that were not embedded simply stay pending for the next one.
+3. Recognise the shape of the failure: it appears **late**, exactly when the job is closest to
+   finishing. A pass that worked yesterday failing today is expected behavior at scale, not a
+   regression, and not a reason to rebuild the index.
+
+**Do not reproduce this by hand in `psql` and trust what you see.** maproom sets `work_mem` itself
+(256MB) on its own connections, and this query is exquisitely sensitive to it: the same `NOT IN`
+query planned at **cost 218,119,741** (Materialize plus a per-row Seq Scan) under a small `work_mem`
+versus **101,635** (a hashed SubPlan) at 64MB and above — three orders of magnitude apart. A stock
+`psql` session will show you a far worse problem than maproom actually has. If you must plan it by
+hand, match the setting first:
+
+```sql
+set work_mem = '256MB';
+-- then EXPLAIN (ANALYZE, BUFFERS) the pending-chunk query
+```
+
+**Prevention:** Treat bounded-pass-plus-loop as the normal way to run `generate-embeddings` on a
+large index, not as a workaround reached for after the first failure.
+
+### One Failing Sub-Batch Fails the Whole Batch
+
+**Symptom:** An embedding pass reports a batch failure that names a *sub-batch*:
+
+```
+Sub-batch 2 failed: API error: Bad request: Batch of 50 texts rejected: {"error":"Post \"http://127.0.0.1:51950/tokenize\": EOF"}
+```
+
+**Root Cause:** Providers are called in sub-batches (Ollama default 50, concurrency 8). If **one**
+sub-batch errors, maproom marks the **entire pipeline batch** failed — every chunk in that batch is
+lost for the pass, not just the 50 in the failing sub-batch. The error above is the Ollama model
+runner dropping the connection mid-request.
+
+Blast radius scales with batch size: with `--batch-size 1000` each incident cost 1,000 chunks; at
+500 it cost 500.
+
+**Fix:**
+1. Do nothing dramatic. These failures are **transient and self-heal on the next pass** — the lost
+   chunks simply stay pending — so a loop of bounded passes converges on full coverage.
+2. Lower `--batch-size` to limit the blast radius per incident, but keep it **above** the sub-batch
+   size (default 50), or sub-batch parallelism never engages and the pass runs fully serialized.
+3. Tune parallelism with the environment variables below, confirming they are honored by your build
+   (`maproom --help` lists the environment variables your build supports):
+   - `MAPROOM_EMBEDDING_PARALLEL_ENABLED`
+   - `MAPROOM_EMBEDDING_PARALLEL_SUB_BATCH_SIZE` (default 50)
+   - `MAPROOM_EMBEDDING_PARALLEL_MAX_CONCURRENCY` (default 8)
+
+   Measured against a local Ollama, throughput improved as concurrency rose to ~8 and got **worse**
+   at 16. Eight was the sweet spot.
+
+**Prevention:** Pick a batch size comfortably above the sub-batch size but well below "the whole
+job" — 500 against Ollama's default sub-batch of 50 is a good starting point — and always run
+embedding generation as a loop rather than a single heroic pass.
 
 ### Token Limit Exceeded
 
@@ -62,26 +331,54 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
    maproom status
    ```
 
-**Prevention:** Use `--batch-size 25` when generating embeddings for repositories with large files or code chunks.
+**Prevention:** Lower the batch size when generating embeddings against the Google API for
+repositories with large files or code chunks. Mind the trade-off: a batch size at or below the
+parallel sub-batch size (default 50) runs fully serialized — see
+[One Failing Sub-Batch Fails the Whole Batch](#one-failing-sub-batch-fails-the-whole-batch).
 
-### Vector Search Returns No Results
+**Note:** this limit is provider-specific — it is the Google embedding API rejecting an oversized
+request, not maproom. Other providers fail differently: Ollama truncates oversized inputs instead of
+rejecting them (a ~107KB chunk embedded fine in testing), and Cohere v3 models on Bedrock silently
+truncate beyond 512 tokens. A provider-side rejection of a whole batch is also distinct from
+[One Failing Sub-Batch Fails the Whole Batch](#one-failing-sub-batch-fails-the-whole-batch), where a
+transient connection error loses the batch and self-heals on the next pass.
 
-**Symptom:** `maproom vector-search` completes without errors but returns an empty result set.
+### Vector Search Returns No Results (Zero Embeddings)
 
-**Root Cause:** Embeddings have not been generated for the repository. Vector search requires pre-computed embeddings; without them, there is nothing to match against.
+**Symptom:** `maproom vector-search` completes without errors but returns an empty result set —
+while `maproom search` keeps returning perfectly good results.
+
+**Root Cause:** Embeddings have not been generated. **Zero embeddings never raises an error.** With
+no embeddings at all, `maproom search` still returns results by falling back to full-text and
+structural ranking; only vector search and semantic ranking are actually unavailable. Never infer
+embedding coverage from "search works" — that is precisely the signal this failure mode fakes.
 
 **Fix:**
-1. Check embedding status:
+1. Check coverage **explicitly**. `maproom status` reports it per repo, e.g. `Embeddings: 0 (0.0%)`:
    ```bash
    maproom status
    ```
-2. If embeddings are missing, generate them:
-   ```bash
-   maproom generate-embeddings
+   On Postgres, an empty `encoding_runs` table confirms no generation run has ever happened, and
+   coverage can be measured per repo directly:
+   ```sql
+   select r.name, count(distinct c.blob_sha) blobs, count(distinct e.blob_sha) embedded
+   from repos r join worktrees w on w.repo_id=r.id
+   join chunk_worktrees cw on cw.worktree_id=w.id
+   join chunks c on c.id=cw.chunk_id
+   left join code_embeddings e on e.blob_sha=c.blob_sha group by 1 order by 2 desc;
    ```
-3. Re-run your vector search after embeddings complete.
+2. Generate embeddings in **bounded passes, looped until the pending count reaches zero** — an
+   unbounded pass dies at scale, see
+   [generate-embeddings Stalls Near the Finish Line](#generate-embeddings-stalls-near-the-finish-line):
+   ```bash
+   maproom generate-embeddings --batch-size 500
+   ```
+   Run `maproom generate-embeddings --help` for the bounding and batching flags your binary exposes.
+3. Re-run your vector search once coverage is non-zero.
 
-**Prevention:** Always run `maproom status` before your first vector search to confirm embeddings are available.
+**Prevention:** Check embedding coverage explicitly before your first vector search, and on a
+schedule afterwards — coverage **decays as you work**, silently, see
+[Watchers Do Not Maintain Embeddings](#watchers-do-not-maintain-embeddings).
 
 ### No Repositories Indexed
 
@@ -120,6 +417,20 @@ Failed to generate code embeddings: Api(BadRequest("input token count is 20633 b
    ```bash
    maproom generate-embeddings
    ```
+
+**Note — "Last scan" is not a freshness signal.** `maproom status` prints a per-worktree "Last
+scan" timestamp that is **not** updated when an incremental scan finds the git tree SHA unchanged;
+the scan logs `No changes detected (tree SHA match), skipping scan` and leaves the old timestamp in
+place. A months-old "Last scan" therefore usually means "nothing has changed since then", **not**
+"the index is stale". Judging staleness by this field leads to pointless full re-scans. To actually
+test freshness, search for a symbol you know was added recently, or compare the repo's current HEAD
+against what the index recorded.
+
+**Note — re-scanning does not restore embeddings, it removes them.** The incremental processor
+**deletes** embeddings for changed chunks and never regenerates them, so a re-scan improves chunk
+freshness while *reducing* embedding coverage. Follow any significant re-scan with bounded
+`generate-embeddings` passes. See
+[Watchers Do Not Maintain Embeddings](#watchers-do-not-maintain-embeddings).
 
 **Prevention:** Re-scan after significant code changes (branch switches, large merges, refactors) to keep the index current.
 
@@ -328,6 +639,58 @@ maproom search --repo <repo-name> --query "<search terms>"
 maproom search --help
 ```
 
+### Pool Timed Out While Waiting for an Open Connection
+
+```
+pool timed out while waiting for an open connection
+```
+
+**Cause:** Depends entirely on the backend. On **Postgres** the server is unreachable (container not
+running, wrong host) or its connections are saturated by a long-running statement. On **SQLite** it
+is the tail end of a permissions problem, after ~25 seconds of `unable to open database file`
+retries.
+
+**Recovery:** See
+[Connection Pool Timeout or "Connection refused" (Postgres backend)](#connection-pool-timeout-or-connection-refused-postgres-backend)
+for Postgres, or [Permission Denied on Database (GAP-005)](#permission-denied-on-database-gap-005)
+for SQLite. Do not apply the SQLite `chmod` recovery to a Postgres deployment.
+
+### Canceling Statement Due to Statement Timeout
+
+```
+Failed to fetch chunks ... canceling statement due to statement timeout
+```
+
+**Cause:** Postgres backend only. maproom pins `statement_timeout` to 5000ms per connection, and the
+pending-chunk query for `generate-embeddings` grows more expensive as `code_embeddings` fills up.
+
+**Recovery:** Bound each embedding pass and loop — see
+[generate-embeddings Stalls Near the Finish Line](#generate-embeddings-stalls-near-the-finish-line).
+
+### Error: "Reauthentication failed" (ADC expired, non-interactive)
+
+```
+Reauthentication failed. cannot prompt during non-interactive execution
+```
+
+**Cause:** Google Application Default Credentials have expired, and the embedding pass is running
+somewhere it cannot prompt you to log in — cron, pm2, CI, a background loop. Every pass dies at
+config time, before any chunk is embedded.
+
+**Recovery:**
+```bash
+# Interactive sessions: refresh ADC
+gcloud auth application-default login
+
+# Unattended jobs: use a service-account key instead of user ADC
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+# (MAPROOM_GOOGLE_APPLICATION_CREDENTIALS is also honored)
+```
+
+A user-ADC refresh token that expires every few hours is the wrong credential for a scheduled
+embedding job; move unattended work to a service account rather than re-running `gcloud auth` by
+hand each morning.
+
 ### Error: "Failed to create token provider from ADC"
 
 ```
@@ -338,7 +701,7 @@ Caused by:
        Failed to create token provider from ADC
 ```
 
-**Cause:** Google Application Default Credentials (ADC) have expired. This is a **credential issue, not a code bug**. The `vector-search` subcommand requires valid credentials to call the embedding API (Vertex AI by default). When ADC tokens expire, the CLI cannot authenticate with the embedding provider.
+**Cause:** Google Application Default Credentials (ADC) have expired. This is a **credential issue, not a code bug**. The `vector-search` subcommand requires valid credentials to call the embedding API (Google/Vertex when that is the configured provider). When ADC tokens expire, the CLI cannot authenticate with the embedding provider.
 
 **Recovery:**
 1. Refresh ADC credentials:
@@ -360,6 +723,9 @@ Caused by:
    ```
 
 **Related Errors:**
+- `Reauthentication failed. cannot prompt during non-interactive execution` is the same expiry seen
+  from a non-interactive context (cron, pm2, CI). See
+  [Error: "Reauthentication failed" (ADC expired, non-interactive)](#error-reauthentication-failed-adc-expired-non-interactive).
 - `invalid_rapt` in error output also indicates expired ADC credentials; use the same resolution steps above.
 - `quota_project_id is required` indicates the quota project is not configured; run `gcloud auth application-default set-quota-project YOUR_PROJECT_ID`.
 
@@ -382,16 +748,52 @@ Error: Failed to create embedding service. Ensure OPENAI_API_KEY is set.
    ```bash
    echo "$MAPROOM_EMBEDDING_PROVIDER"
    ```
-2. If the variable is unset or set to `vertex-ai`, this is an ADC credential issue. Follow the ADC recovery steps above.
+2. If the variable is unset, or set to the Google/Vertex provider (current builds accept
+   `MAPROOM_EMBEDDING_PROVIDER=google`; older builds may use a different value — check
+   `maproom --help`), this is an ADC credential issue. Follow the ADC recovery steps above.
 3. If set to `openai`, set the API key:
    ```bash
    export OPENAI_API_KEY="<your-key>"
    ```
 4. If you see `OPENAI_API_KEY` in the error but are not using OpenAI, the provider may be misconfigured. See [Embedding Providers](./embedding-providers.md) for correct configuration.
 
+**Provider quick facts — confirm every one against your own binary, availability differs between
+builds (`maproom --help`):**
+
+- **`ollama`** (local, free). Endpoint from `OLLAMA_URL` (also `MAPROOM_OLLAMA_URL`). **In a
+  devcontainer this must be `http://host.docker.internal:11434`** — `localhost:11434` is not the
+  host's Ollama. Default model `mxbai-embed-large` is 1024-dimensional (fits `embedding_1024`);
+  `nomic-embed-text` is 768. Oversized inputs are truncated rather than rejected.
+- **`google`** (Vertex). Requires `GOOGLE_PROJECT_ID` (also `MAPROOM_GOOGLE_PROJECT_ID`) plus
+  **Application Default Credentials — not an API key**. Setting `GEMINI_API_KEY` or `GOOGLE_API_KEY`
+  does **nothing** for this provider; this is a common and confusing mistake, because the variables
+  look plausible and the failure arrives as an authentication error rather than a configuration one.
+- **`openai`**: `OPENAI_API_KEY` (also `MAPROOM_OPENAI_API_KEY`). Cohere direct uses
+  `MAPROOM_COHERE_API_KEY`.
+- **`bedrock`** (AWS): default model `amazon.titan-embed-text-v2:0` at 1024 dimensions with a
+  **maximum batch of 1**, so throughput comes from concurrency rather than batch size (see
+  [One Failing Sub-Batch Fails the Whole Batch](#one-failing-sub-batch-fails-the-whole-batch));
+  `amazon.titan-embed-text-v1` is 1536-dimensional, also max batch 1; `cohere.embed-english-v3` and
+  `cohere.embed-multilingual-v3` are 1024-dimensional with max batch 96 and **silently truncate**
+  beyond 512 tokens. Credentials resolve through the standard AWS chain (static env keys, shared
+  config/credentials files honoring `AWS_PROFILE`, web identity / IRSA, container credentials).
+  **Bedrock support is not present in every maproom build** — verify with `maproom --help` and by
+  checking whether `MAPROOM_EMBEDDING_PROVIDER=bedrock` is accepted before planning around it.
+  Configuration details live in [Embedding Providers](./embedding-providers.md).
+
+Whichever provider you pick, its output dimension must match a stored column — see
+[Embedding Dimension Must Match a Stored Column](#embedding-dimension-must-match-a-stored-column).
+
 **Reference:** See [Embedding Providers](./embedding-providers.md) for the full list of supported providers and their required environment variables.
 
 ### Network Timeout During Vector Search
+
+**Scope — this and the two sections that follow assume a *remote* embedding provider.** They were
+measured against OpenAI; the same shapes apply to any hosted provider (Google/Vertex, Bedrock,
+Cohere) with that provider's endpoint and credentials substituted. A local `ollama` provider has no
+internet dependency and no rate limit at all — in a devcontainer it is reached at
+`http://host.docker.internal:11434`, and it fails in the ways described under
+[One Failing Sub-Batch Fails the Whole Batch](#one-failing-sub-batch-fails-the-whole-batch).
 
 **Symptom:** `maproom vector-search` hangs or times out during embedding generation. The command does not return results or an error within the expected time frame.
 
@@ -500,34 +902,99 @@ Caused by:
        Failed to create token provider from ADC
 ```
 
+From a non-interactive context — cron, pm2, CI, an overnight embedding loop — the same expiry
+surfaces as:
+
+```
+Reauthentication failed. cannot prompt during non-interactive execution
+```
+
 This is **not a code bug**. It is a credential expiry issue. Refresh credentials with:
 ```bash
 gcloud auth application-default login --no-launch-browser
 gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 ```
 
+For unattended jobs, prefer a service-account key over user ADC:
+`GOOGLE_APPLICATION_CREDENTIALS` (also `MAPROOM_GOOGLE_APPLICATION_CREDENTIALS`).
+
 See [ADC Setup Guide](./adc-setup.md) for detailed instructions.
 
 ### text-embedding-004 Is Not Available via Gemini REST API
 
 The `text-embedding-004` model used by maproom for embeddings is only available through the **Vertex AI API**, not through the Gemini REST API. Attempting to use the Gemini REST API endpoint for embeddings will fail. This means:
-- ADC credentials (Google Cloud authentication) are required for the default embedding provider.
+- ADC credentials (Google Cloud authentication) are required whenever the Google/Vertex provider is
+  configured.
 - The `GOOGLE_API_KEY` environment variable (used for Gemini REST API) is **not sufficient** for embedding generation.
-- You must use either the Vertex AI provider (with ADC) or the OpenAI provider (with `OPENAI_API_KEY`).
+- For this model specifically, use the Vertex AI provider with ADC. It is not the only embedding
+  provider available — `ollama` (local), `openai`, `bedrock` and Cohere are separate options with
+  their own models and credentials; see the provider quick facts under
+  [Embedding Provider Misconfiguration](#embedding-provider-misconfiguration), and confirm what your
+  build accepts with `maproom --help`.
 
 See [Embedding Providers](./embedding-providers.md) for supported providers and configuration.
 
 ### Cross-Provider Re-indexing Required When Switching Providers
 
-Embeddings generated by one provider (e.g., Vertex AI with `text-embedding-004`) are **not compatible** with embeddings from another provider (e.g., OpenAI with `text-embedding-ada-002`). If you switch embedding providers, you must regenerate all embeddings:
+Embeddings generated by one provider (e.g., Vertex AI with `text-embedding-004`) are **not compatible** with embeddings from another provider (e.g., OpenAI with `text-embedding-ada-002`). If you switch embedding providers, you must regenerate all embeddings — on a large index as bounded
+passes looped until the pending count reaches zero, not one unbounded run (see
+[generate-embeddings Stalls Near the Finish Line](#generate-embeddings-stalls-near-the-finish-line)):
 
 ```bash
-maproom generate-embeddings
+maproom generate-embeddings --batch-size 500
 ```
 
 Failure to re-index after switching providers will cause vector-search to return poor or zero results, because the query embedding (from the new provider) will be compared against stored embeddings (from the old provider) that exist in a different vector space.
 
+**On the Postgres backend, re-running `generate-embeddings` is not sufficient** — the old rows must
+be deleted first. See the next entry.
+
 See [Embedding Providers](./embedding-providers.md) for details on provider switching.
+
+### Switching Embedding Models Requires Deleting the Old Rows
+
+`code_embeddings` is `UNIQUE` on `blob_sha`, so a blob that was already embedded at the old
+dimension **keeps its row**. Incremental runs see that a row exists and skip the blob, while vector
+search at the new dimension cannot see it. Switching model or provider without deleting the rows at
+the old dimension **silently corrupts coverage** — no error, no warning, just a growing set of
+chunks that are quietly unreachable by vector search.
+
+Verify homogeneity before and after any model change:
+
+```sql
+select embedding_dim, model_version, count(*) from code_embeddings group by 1,2;
+```
+
+More than one `(embedding_dim, model_version)` pair means the index is mixed. Delete the rows at the
+old dimension/model, then run bounded `generate-embeddings` passes until the pending count reaches
+zero.
+
+Related housekeeping: `code_embeddings` has no foreign key to `chunks`, so deleting chunks leaves
+orphan embedding rows behind. They are harmless, but they accumulate and they inflate the `NOT IN`
+subquery described in
+[generate-embeddings Stalls Near the Finish Line](#generate-embeddings-stalls-near-the-finish-line).
+
+### Embedding Dimension Must Match a Stored Column
+
+Only **768, 1024 and 1536** have columns (`embedding_768`, `embedding_1024`, `embedding_1536`) and
+HNSW indexes. A model emitting any other dimension **cannot be stored at all** — for example Ollama's
+`qwen3-embedding:4b` at 2560 dimensions. Model choice is constrained by the schema, not by taste.
+
+Where a model offers configurable output sizes, the same constraint applies: Titan v2 can emit 256-
+and 512-dimensional vectors, but with no column set for those sizes they are rejected by a dimension
+validation step rather than failing after a full scan.
+
+### Watchers Do Not Maintain Embeddings
+
+A per-repo watcher keeps **chunks** fresh. It does **not** keep embeddings fresh: the incremental
+processor **deletes** embeddings for changed chunks and never regenerates them. Embedding coverage
+therefore **decays continuously as you work** — silently, because search keeps returning results the
+whole time by falling back to full-text ranking (see
+[Vector Search Returns No Results (Zero Embeddings)](#vector-search-returns-no-results-zero-embeddings)).
+
+Holding coverage requires a **periodic `maproom generate-embeddings` job** — cron, a process-manager
+schedule, or an equivalent — running bounded passes in a loop. Documentation elsewhere claiming
+"watch keeps the index fresh" is true for chunks and **false for embeddings**.
 
 ---
 
@@ -535,7 +1002,22 @@ See [Embedding Providers](./embedding-providers.md) for details on provider swit
 
 This section documents boundary conditions, resource errors, and concurrency scenarios tested against `maproom` version 0.1.0. Each entry records empirical CLI behavior observed during testing.
 
+**Backend scope:** these were measured against the **SQLite backend**, and the storage-related
+entries (GAP-004, GAP-005, GAP-006) describe SQLite failure modes only. On the Postgres backend
+there is no local database file, so file permissions, WAL files and `~/.maproom/` disk usage are not
+in play at all — see
+[First: Which Storage Backend Are You On?](#first-which-storage-backend-are-you-on) and
+[Connection Pool Timeout or "Connection refused" (Postgres backend)](#connection-pool-timeout-or-connection-refused-postgres-backend).
+The flag-behavior entries (GAP-001, GAP-002, GAP-003, GAP-007) are backend-independent, but were
+measured on v0.1.0 — check your own binary with `maproom search --help` before relying on the exact
+values below.
+
 ### SQLite Lock Contention (GAP-006) -- HIGH PRIORITY
+
+**Applies to: SQLite backend only.** Postgres handles concurrent readers and writers with MVCC and
+does not produce `SQLITE_BUSY`; a pool timeout there means something else entirely (see
+[Connection Pool Timeout or "Connection refused" (Postgres backend)](#connection-pool-timeout-or-connection-refused-postgres-backend)).
+A shared Postgres fleet is in fact the standard way to run many concurrent watchers and searches.
 
 **Symptom:** When multiple agents or processes run `maproom search` or `maproom scan` concurrently against the same repository, commands may fail with SQLite lock errors such as `SQLITE_BUSY` or connection pool timeouts.
 
@@ -604,7 +1086,7 @@ This section documents boundary conditions, resource errors, and concurrency sce
 | `--threshold=-0.5` (equals) | `vector-search` | Accepted by parser (fails at API key check before validation) | 1 |
 | `--threshold=1.5` (equals) | `vector-search` | Accepted by parser (fails at API key check before validation) | 1 |
 
-**Note:** Full threshold range validation could not be tested empirically because `vector-search` requires `OPENAI_API_KEY` which was not available in the test environment. The parser accepts the values, but runtime behavior with actual embeddings is untested.
+**Note:** Full threshold range validation could not be tested empirically because `vector-search` needs working credentials for the configured embedding provider (`OPENAI_API_KEY` in that test environment), which were not available. The parser accepts the values, but runtime behavior with actual embeddings is untested.
 
 **Fix:**
 1. Only use `--threshold` with the `vector-search` subcommand, never with `search`:
@@ -653,6 +1135,10 @@ This section documents boundary conditions, resource errors, and concurrency sce
 
 ### Disk Full During Scan (GAP-004)
 
+**Applies to: SQLite backend only.** On Postgres, disk exhaustion is a property of the database
+server's host and volume, not of `~/.maproom/`; the recovery below (deleting `maproom.db*` and
+re-migrating) has no Postgres equivalent and must not be attempted there.
+
 **Note:** This edge case has not been tested empirically due to the risk of destabilizing the shared development environment. Simulating disk-full conditions requires filling the filesystem, which could affect other processes and services.
 
 **Symptom (predicted):** `maproom scan` fails mid-operation when the filesystem runs out of space. The SQLite database may be left in an inconsistent state if the write-ahead log (WAL) cannot be flushed.
@@ -687,6 +1173,13 @@ Error: database or disk is full
 **Prevention:** Ensure at least 2x the expected database size is available before running `scan` or `generate-embeddings`. Check the current database size with `ls -lh ~/.maproom/<repo>/maproom.db*`. For reference, a repository with 6,450 chunks produces a ~67 MB database with a ~40 MB WAL file.
 
 ### Permission Denied on Database (GAP-005)
+
+**Applies to: SQLite backend only.** This is the entry most often misapplied. On the Postgres
+backend there is no database file to `chmod`, and an identical-looking connection pool timeout means
+the server is unreachable or saturated — see
+[Connection Pool Timeout or "Connection refused" (Postgres backend)](#connection-pool-timeout-or-connection-refused-postgres-backend).
+Distinguish them by the accompanying log lines: repeated `unable to open database file` before the
+timeout means SQLite permissions; `Connection refused` from `psql` or `pg_isready` means Postgres.
 
 **Symptom:** Search or scan commands fail with repeated `ERROR unable to open database file` messages followed by a connection pool timeout. The CLI retries with exponential backoff for approximately 25 seconds before giving up.
 
