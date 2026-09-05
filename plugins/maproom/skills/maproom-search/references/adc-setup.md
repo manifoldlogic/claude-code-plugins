@@ -2,6 +2,19 @@
 
 Step-by-step guide for configuring Google Application Default Credentials (ADC) in a DevContainer environment. ADC is required when using Google Vertex AI as the embedding provider for maproom vector search.
 
+> **ADC is not an API key.** The Google provider authenticates *only* through Application
+> Default Credentials — either a user credential written by `gcloud auth application-default
+> login`, or a service-account key pointed at by `GOOGLE_APPLICATION_CREDENTIALS`. Setting
+> `GEMINI_API_KEY` or `GOOGLE_API_KEY` does **nothing** for this provider: maproom never reads
+> them, and exporting them will not fix a credential error. This is the single most common
+> mistake with the Google provider — if you have an API key and no ADC, you are not
+> authenticated. (Bare API keys belong to *other* providers — `openai` reads `OPENAI_API_KEY`,
+> Cohere direct reads `MAPROOM_COHERE_API_KEY` — never to `google`.)
+
+Provider availability differs between maproom builds. Confirm your binary accepts
+`MAPROOM_EMBEDDING_PROVIDER=google` — `maproom --help` lists the subcommands and environment
+variables your build supports.
+
 ## Prerequisites
 
 - **gcloud CLI** installed (already available in the DevContainer)
@@ -54,8 +67,11 @@ Configure maproom to use Google Vertex AI as the embedding provider:
 
 ```bash
 export MAPROOM_EMBEDDING_PROVIDER=google
-export MAPROOM_GOOGLE_PROJECT_ID=YOUR_PROJECT_ID
+export MAPROOM_GOOGLE_PROJECT_ID=YOUR_PROJECT_ID   # GOOGLE_PROJECT_ID also works
 ```
+
+Note what is *not* here: there is no API-key variable to set. The project ID says *which*
+project is called; ADC (Step 1) is what proves *who* is calling.
 
 ### Step 4: Verify Credentials
 
@@ -71,7 +87,10 @@ If this prints a long token string (starting with `ya29.`), ADC is configured co
 maproom vector-search --repo YOUR_REPO --query "test query" --format agent
 ```
 
-If this returns search results without credential errors, setup is complete.
+If this returns search results without credential errors, setup is complete. Zero hits with no
+error is *not* a credential failure: `--repo` matches the indexed repo name derived from the git
+origin (with suffix fuzzy-matching), not the directory name on disk, so a mismatch returns an
+empty result silently. List the indexed names with `maproom status`.
 
 ## Refreshing Expired Credentials
 
@@ -89,7 +108,19 @@ Caused by:
 
 or errors containing `invalid_rapt`.
 
-**Resolution:**
+In a non-interactive context — a cron job, a pm2-managed process, a background
+`maproom generate-embeddings` run — expired ADC surfaces as this instead, and every pass dies
+at config time before a single embedding is produced:
+
+```
+Reauthentication failed. cannot prompt during non-interactive execution
+```
+
+That string means exactly one thing: gcloud wants a human to re-authenticate and there is no
+terminal to ask. There are two fixes, and which one you want depends on whether a human is
+around.
+
+**Resolution (interactive):**
 
 Re-run the login and quota project commands:
 
@@ -103,6 +134,22 @@ gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 # Step 3: Verify
 gcloud auth application-default print-access-token
 ```
+
+**Resolution (unattended):**
+
+User credentials expire on a schedule you do not control, so they are the wrong credential for
+scheduled or background jobs. Use a service-account key instead — it does not expire and never
+prompts:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+# maproom also accepts MAPROOM_GOOGLE_APPLICATION_CREDENTIALS for the same purpose
+```
+
+The service account needs the same Vertex AI access as your user (see
+[Permission denied](#error-permission-denied-on-vertex-ai-api) below). Make sure the variable is
+exported in the environment the *job* runs in — a cron or pm2 process does not inherit your
+interactive shell.
 
 ## Troubleshooting
 
@@ -132,6 +179,31 @@ Caused by:
    gcloud auth application-default login --no-launch-browser
    gcloud auth application-default set-quota-project YOUR_PROJECT_ID
    ```
+
+### Error: "Reauthentication failed. cannot prompt during non-interactive execution"
+
+**Full error:**
+
+```
+Reauthentication failed. cannot prompt during non-interactive execution
+```
+
+**Root cause:** ADC user credentials have expired and gcloud cannot open an interactive
+re-auth prompt (cron, pm2, CI, a background embedding run). Note that this is *not* fixable by
+setting `GEMINI_API_KEY` or `GOOGLE_API_KEY` — see [the note at the top](#google-adc-setup-for-devcontainer).
+
+**Resolution:** either re-authenticate interactively —
+
+```bash
+gcloud auth application-default login --no-launch-browser
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+```
+
+— or, for anything unattended, switch that job to a service-account key:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+```
 
 ### Error: "invalid_rapt"
 
@@ -199,7 +271,7 @@ chmod 600 ~/.config/gcloud/application_default_credentials.json
 .config/gcloud/
 ```
 
-**Token rotation:** ADC tokens expire periodically. Re-run `gcloud auth application-default login` when tokens expire. There is no way to set a permanent, non-expiring ADC token (this is a security feature).
+**Token rotation:** ADC *user* credentials expire periodically, and there is no way to make one permanent (this is a security feature) — re-run `gcloud auth application-default login` when they expire. That is exactly why unattended jobs should use a service-account key (`GOOGLE_APPLICATION_CREDENTIALS`) instead of a user credential.
 
 **Service account keys:** If using service account JSON keys (`GOOGLE_APPLICATION_CREDENTIALS`), store them securely, rotate them regularly, and never commit them to version control.
 
@@ -219,9 +291,19 @@ Use this checklist to confirm ADC is fully configured:
 - [ ] Access token is valid: `gcloud auth application-default print-access-token` (prints a token, not an error)
 - [ ] Vector search works: `maproom vector-search --repo YOUR_REPO --query "test" --format agent` (returns results without credential errors)
 
+## If Google Auth Is Impractical
+
+If you cannot get ADC working — no browser, no service account you are allowed to create, a
+re-auth policy that keeps expiring under a scheduled job — the Google provider is not your only
+option. **Ollama** runs locally and is free (no cloud credentials at all), and **AWS Bedrock**
+is an option where AWS credentials are easier to obtain than Google ones, though Bedrock support
+is not present in every maproom build. See
+[Embedding Provider Comparison](./embedding-providers.md) for how each is configured and how to
+choose between them, and confirm what your binary actually accepts with `maproom --help`.
+
 ## Related Documentation
 
-- [Embedding Provider Comparison](./embedding-providers.md) - Compare Google Vertex AI, OpenAI, and Ollama providers
+- [Embedding Provider Comparison](./embedding-providers.md) - Compare Google Vertex AI, OpenAI, Ollama, and (build permitting) AWS Bedrock providers
 - [Troubleshooting](./troubleshooting.md) - Common maproom error messages and recovery steps
 - [Google Cloud ADC Documentation](https://cloud.google.com/docs/authentication/provide-credentials-adc) - Official Google documentation
 - [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing) - Google Cloud pricing for embedding API calls
